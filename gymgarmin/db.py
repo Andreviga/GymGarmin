@@ -47,6 +47,18 @@ CREATE TABLE IF NOT EXISTS garmin_override (
     exercise TEXT NOT NULL,
     PRIMARY KEY (user_id, exercise_id)
 );
+CREATE TABLE IF NOT EXISTS schedule (
+    id INTEGER PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    date TEXT NOT NULL,
+    plan_id INTEGER,
+    day_idx INTEGER,
+    status TEXT NOT NULL DEFAULT 'planejado',
+    data TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_schedule_user_date ON schedule(user_id, date);
 CREATE TABLE IF NOT EXISTS garmin_pushes (
     id INTEGER PRIMARY KEY,
     user_id INTEGER NOT NULL,
@@ -71,6 +83,13 @@ DEFAULT_PROFILE = {
     "volume_factor": 1.0,
     "days_per_week": 4,
     "limitations": [],
+    "training_months": None,
+    "available_days": None,
+    "session_minutes": 60,
+    "equipment": [],
+    "cardio_machines": [],
+    "cardio_target_min": None,
+    "schedule_plan_id": None,
 }
 
 
@@ -144,7 +163,8 @@ def get_plan(plan_id: int, user_id: int = 1) -> dict | None:
 
 
 def _plan_data(plan: dict) -> str:
-    keep = {k: plan.get(k) for k in ("days", "days_per_week", "notes", "goal") if k in plan}
+    keep = {k: plan.get(k) for k in ("days", "days_per_week", "notes", "goal", "generator", "goals_week", "rationale")
+            if k in plan}
     keep.setdefault("days", [])
     return json.dumps(keep, ensure_ascii=False)
 
@@ -198,8 +218,8 @@ def get_session(session_id: int, user_id: int = 1) -> dict | None:
 
 
 def _session_data(s: dict) -> str:
-    keep = {k: s.get(k) for k in ("items", "notes", "source", "garmin_activity_id", "feeling", "duration_min")
-            if k in s}
+    keep = {k: s.get(k) for k in ("items", "notes", "source", "garmin_activity_id", "feeling", "duration_min",
+                                  "schedule_id") if k in s}
     keep.setdefault("items", [])
     return json.dumps(keep, ensure_ascii=False)
 
@@ -254,3 +274,49 @@ def log_push(plan_id: int | None, day_name: str, workout_id: int | None, schedul
     with conn() as c:
         c.execute("INSERT INTO garmin_pushes (user_id, plan_id, day_name, workout_id, scheduled, created_at) VALUES (?,?,?,?,?,?)",
                   (user_id, plan_id, day_name, workout_id, scheduled, now()))
+
+
+# ---- agenda semanal --------------------------------------------------------
+
+ENTRY_COLS = ("id", "date", "plan_id", "day_idx", "status")
+
+
+def _entry_row(r) -> dict:
+    return {"id": r["id"], "date": r["date"], "plan_id": r["plan_id"], "day_idx": r["day_idx"],
+            "status": r["status"], **json.loads(r["data"])}
+
+
+def list_schedule(start: str, end: str, user_id: int = 1) -> list[dict]:
+    with conn() as c:
+        rows = c.execute("SELECT * FROM schedule WHERE user_id = ? AND date >= ? AND date <= ? ORDER BY date, id",
+                         (user_id, start, end)).fetchall()
+    return [_entry_row(r) for r in rows]
+
+
+def get_entry(entry_id: int, user_id: int = 1) -> dict | None:
+    with conn() as c:
+        r = c.execute("SELECT * FROM schedule WHERE id = ? AND user_id = ?", (entry_id, user_id)).fetchone()
+    return _entry_row(r) if r else None
+
+
+def save_entry(e: dict, user_id: int = 1) -> dict:
+    data = json.dumps({k: v for k, v in e.items() if k not in ENTRY_COLS}, ensure_ascii=False, default=str)
+    with conn() as c:
+        if e.get("id"):
+            c.execute("UPDATE schedule SET date = ?, plan_id = ?, day_idx = ?, status = ?, data = ?, updated_at = ? "
+                      "WHERE id = ? AND user_id = ?",
+                      (e["date"], e.get("plan_id"), e.get("day_idx"), e.get("status", "planejado"), data, now(),
+                       e["id"], user_id))
+            eid = e["id"]
+        else:
+            cur = c.execute("INSERT INTO schedule (user_id, date, plan_id, day_idx, status, data, created_at, updated_at) "
+                            "VALUES (?,?,?,?,?,?,?,?)",
+                            (user_id, e["date"], e.get("plan_id"), e.get("day_idx"), e.get("status", "planejado"),
+                             data, now(), now()))
+            eid = cur.lastrowid
+    return get_entry(eid, user_id)
+
+
+def delete_entry(entry_id: int, user_id: int = 1) -> None:
+    with conn() as c:
+        c.execute("DELETE FROM schedule WHERE id = ? AND user_id = ?", (entry_id, user_id))

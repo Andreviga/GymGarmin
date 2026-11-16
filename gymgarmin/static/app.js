@@ -77,32 +77,193 @@ function balanceHtml(bal) {
 }
 
 /* --------------------------------------------------------------- HOJE --- */
-async function viewHoje() {
-  const [rep, plans] = await Promise.all([api("/api/report/weekly"), api("/api/plans")]);
-  const active = plans.filter((p) => p.active);
-  const rec = rep.muscles.filter((m) => m.recovery.hours_since !== null).sort((a, b) => a.recovery.ready_pct - b.recovery.ready_pct);
-  const c = rep.cardio;
+const STATUS_INFO = { planejado: ["Planejado", ""], feito: ["Feito ✔", "ok"], perdido: ["Perdido", "bad"], pulado: ["Não treinou", "warn"], substituido: ["Substituído", "muted"] };
+const PHASES = [["preparo", "Preparação (aquecimento + mobilidade)"], ["principal", "Treino"], ["pos", "Pós-treino (alongamento)"]];
+const ddmm = (iso) => { const [y, m, d] = iso.slice(0, 10).split("-"); return `${d}/${m}`; };
+const addDays = (iso, n) => { const d = new Date(iso + "T12:00:00"); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
+
+function timeBar(t) {
+  if (!t) return "";
+  const segs = [["preparo", "Preparo", "var(--c-prep)"], ["forca_trabalho", "Força", "var(--c-work)"], ["forca_descanso", "Descanso", "var(--c-rest)"], ["cardio", "Cardio", "var(--c-cardio)"], ["pos", "Alongamento", "var(--c-post)"]];
+  const tot = Math.max(t.total, t.orcamento || 0, 1);
+  const on = segs.filter((x) => t[x[0]] > 0);
+  return `<div class="tbar">${on.map((x) => `<span style="width:${(t[x[0]] / tot) * 100}%;background:${x[2]}" title="${x[1]}: ${t[x[0]]} min"></span>`).join("")}</div>
+    <div class="small muted">${on.map((x) => `<span class="dot" style="background:${x[2]}"></span>${x[1]} ${Math.round(t[x[0]])}′`).join(" ")} · <b>${Math.round(t.total)} min</b>${t.orcamento ? ` de ${t.orcamento}` : ""}</div>`;
+}
+
+function itemLine(it) {
+  const name = esc(it._name || it._ex?.name || it.exercise_id);
+  let d = "";
+  if (it.intervals) d = `${it.warmup_min || 0}′ + ${it.intervals.repeats}× (${it.intervals.work_s}s Z${it.intervals.work_zone} / ${it.intervals.rest_s}s) + ${it.cooldown_min || 0}′`;
+  else if (it.duration_min) d = `${it.duration_min} min${it.zone ? " Z" + it.zone : ""}`;
+  else if (it.sets) d = `${it.sets}×${it.reps || (it.duration_s ? it.duration_s + "s" : "")}${it.rest_s && it.phase !== "preparo" && it.phase !== "pos" ? ` · ${it.rest_s}s` : ""}`;
+  const tags = [it.ramp ? `<span class="pill">+${it.ramp} série</span>` : "", it.deload ? `<span class="pill warn">deload</span>` : "", it.added ? `<span class="pill warn">+${it.added}</span>` : "", it.added_from ? `<span class="pill warn">compensação</span>` : "", it.finisher ? `<span class="pill muted">finalizador</span>` : ""].join(" ");
+  return `<li><span data-ex="${esc(it.exercise_id)}" style="cursor:pointer">${name}</span> <span class="muted">${esc(d)}</span> ${tags}</li>`;
+}
+
+function itemsByPhase(items) {
+  return PHASES.map(([ph, label]) => {
+    const list = items.filter((i) => (i.phase || "principal") === ph);
+    return list.length ? `<div class="small"><b>${label}</b><ul class="plain">${list.map(itemLine).join("")}</ul></div>` : "";
+  }).join("");
+}
+
+function meter(label, done, target, unit = "") {
+  const pct = target ? Math.min(100, (done / target) * 100) : 0;
+  return `<div><div class="row between small"><span>${label}</span><b>${done}${unit} / ${target}${unit}</b></div><div class="meter"><span style="width:${pct}%"></span></div></div>`;
+}
+
+async function viewHoje(weekDate) {
+  const sch = await api(`/api/schedule${weekDate ? `?date=${weekDate}` : ""}`);
+  if (!sch.plan) {
+    view.innerHTML = `<div class="card"><h2>Monte seu treino automático</h2>
+      <p>Diga há quanto tempo treina, quais dias pode ir e quanto tempo tem — o app monta a divisão, escolhe os exercícios respeitando suas limitações, calcula o tempo de cada sessão (aquecimento, séries, descanso, cardio e alongamento) e reorganiza a semana quando você faltar.</p>
+      <button class="btn" id="gen-open">Gerar meu treino</button> <a class="btn ghost" href="#planilhas">Montar manualmente</a></div>`;
+    $("#gen-open").onclick = () => openGenerator();
+    return;
+  }
+  const g = sch.goals;
+  const missed = sch.entries.filter((e) => e.status === "perdido");
+  const outdated = sch.entries.some((e) => e.garmin_outdated && e.status === "planejado");
+  const cyc = sch.cycle;
   view.innerHTML = `
+  ${missed.length ? `<div class="rec alerta"><b>Treino perdido:</b> ${missed.map((e) => `${e.weekday} ${ddmm(e.date)} – ${esc(e.day_name)}`).join(", ")}.
+     <div class="row gap wrap" style="margin-top:6px">${missed.map((e) => `<button class="btn sm" data-skip="${e.id}">Ajustar a semana (${e.weekday})</button>`).join("")}</div></div>` : ""}
   <div class="card">
-    <h2>Treinar hoje</h2>
-    ${active.length ? active.map((p) => `<div class="stack"><div class="small muted">${esc(p.name)}</div><div class="chips">
-      ${p.days.map((d, i) => `<a class="btn sm ghost" href="#treinar/${p.id}/${i}">${esc(d.name)}</a>`).join("")}</div></div>`).join('<div class="hr"></div>')
-      : `<p class="muted">Nenhuma planilha ainda.</p><a class="btn" href="#planilhas">Criar planilha</a>`}
-  </div>
-  <div class="card">
-    <div class="row between"><h2>Semana</h2><span class="small muted">${fmtDate(rep.period.start)} – ${fmtDate(rep.period.end)}</span></div>
-    <div class="grid2">
-      <div><div class="kpi">${rep.sessions_7d}</div><div class="small muted">treinos em 7 dias</div></div>
-      <div><div class="kpi">${c.who_equivalent}<span class="small muted"> / 150 min</span></div><div class="small muted">cardio (equivalente OMS)</div>
-        <div class="meter"><span style="width:${Math.min(100, c.who_equivalent / 1.5)}%"></span></div></div>
+    <div class="row between gap"><button class="icon-btn" data-week="${addDays(sch.week_start, -7)}" title="Semana anterior">‹</button>
+      <div class="grow" style="text-align:center"><h2 style="margin:0">Semana de ${ddmm(sch.week_start)}</h2>
+        <div class="small muted">${esc(sch.plan.name)}${cyc ? ` · ciclo ${cyc.cycle}, semana ${cyc.week}/${cyc.length}${cyc.deload ? " — <b>DELOAD</b>" : ""}` : ""}</div></div>
+      <button class="icon-btn" data-week="${addDays(sch.week_start, 7)}" title="Próxima semana">›</button></div>
+    ${cyc && cyc.deload ? `<p class="small rec">Semana de deload: menos séries, carga −10% e RPE ~6 para o corpo assimilar o ciclo.</p>` : ""}
+    <div class="stack" style="margin-top:10px">
+      ${sch.entries.length ? sch.entries.map((e) => dayCard(e, sch.today)).join("") : `<p class="empty">Nenhum treino nesta semana.</p>`}
     </div>
-    ${rep.most_trained.length ? `<p class="small">Mais treinados: <b>${rep.most_trained.map((m) => `${esc(m.pt)} (${m.sets})`).join(", ")}</b><br>Menos: ${rep.least_trained.map((m) => `${esc(m.pt)} (${m.sets})`).join(", ")}</p>` : ""}
+    <div class="row gap wrap" style="margin-top:10px">
+      <button class="btn sm ${outdated ? "" : "ghost"}" id="push-week">${outdated ? "Reenviar alterações ao Garmin" : "Enviar semana ao Garmin"}</button>
+      <button class="btn sm ghost" id="gen-open">Regerar treino</button>
+      <button class="btn sm ghost" id="rebuild">Refazer semana pela planilha</button>
+    </div>
   </div>
-  <div class="card"><h2>Recuperação muscular</h2>
-    ${rec.length ? `<div class="chips">${rec.map((m) => `<span class="pill ${m.recovery.status === "pronto" ? "ok" : m.recovery.status === "quase" ? "warn" : "bad"}" title="${m.recovery.hours_since} h desde o último estímulo (estimado ${m.recovery.needed_h} h)">${esc(m.pt)} ${m.recovery.ready_pct}%</span>`).join("")}</div>
-      <p class="small muted">Estimativa pelo tempo desde o último estímulo, nº de séries e RPE.</p>` : `<p class="muted">Registre treinos para ver a recuperação.</p>`}
-  </div>
-  <div class="card"><h2>O que ajustar</h2>${recsHtml(rep.recommendations.slice(0, 8))}</div>`;
+  <div class="card"><h2>Metas da semana</h2><div class="stack">
+    ${meter("Treinos", g.sessions.done, g.sessions.planned)}
+    ${meter("Cardio (min equivalentes OMS)", g.cardio.done, g.cardio.target)}
+    ${meter("Séries de força", g.sets.done, g.sets.planned)}
+    ${meter("Tempo treinado", g.minutes.done, g.minutes.planned, " min")}
+  </div></div>
+  <div class="card" id="hoje-recs"><h2>O que ajustar</h2><p class="muted small">Carregando…</p></div>`;
+  bindAgenda(sch);
+  api("/api/report/weekly").then((rep) => { const b = $("#hoje-recs"); if (b) b.innerHTML = `<h2>O que ajustar</h2>${recsHtml(rep.recommendations.slice(0, 6))}`; }).catch(() => {});
+}
+
+function dayCard(e, today) {
+  const [label, cls] = STATUS_INFO[e.status] || [e.status, ""];
+  const active = e.status === "planejado" || e.status === "perdido";
+  return `<div class="day ${e.date === today ? "today" : ""} ${active ? "" : "dim"}">
+    <div class="row between gap"><div><b>${e.weekday} ${ddmm(e.date)}</b> · ${esc(e.day_name)}</div><span class="pill ${cls}">${label}</span></div>
+    ${active ? timeBar(e.time) : ""}
+    ${e.changes && e.changes.length ? `<ul class="small changes">${e.changes.map((c) => `<li>${esc(c)}</li>`).join("")}</ul>` : ""}
+    ${e.skip_result ? `<ul class="small changes">${e.skip_result.changes.map((c) => `<li>${esc(c)}</li>`).join("")}</ul>` : ""}
+    ${e.garmin_outdated ? `<span class="pill warn">Garmin desatualizado</span>` : e.garmin_workout_id ? `<span class="pill ok">no Garmin</span>` : ""}
+    <details><summary class="small">Ver treino</summary>${itemsByPhase(e.items)}</details>
+    <div class="row gap wrap" style="margin-top:6px">
+      ${e.status === "planejado" ? `<a class="btn sm" href="#treinar/agenda/${e.id}">Treinar</a>
+        <button class="btn sm ghost" data-skip="${e.id}">Não vou treinar</button>
+        <button class="btn sm ghost" data-move="${e.id}" data-date="${e.date}">Mover</button>
+        <button class="btn sm ghost" data-push="${e.id}">Garmin</button>
+        <a class="btn sm ghost" href="/api/schedule/${e.id}/fit">.FIT</a>` : ""}
+      ${e.status === "perdido" ? `<button class="btn sm" data-skip="${e.id}">Ajustar a semana</button><a class="btn sm ghost" href="#treinar/agenda/${e.id}">Registrar mesmo assim</a>` : ""}
+      ${e.status === "pulado" && e.can_undo ? `<button class="btn sm ghost" data-undo="${e.id}">Desfazer ajuste</button>` : ""}
+    </div></div>`;
+}
+
+function bindAgenda(sch) {
+  view.onclick = async (ev) => {
+    const t = ev.target.closest("button, [data-ex]"); if (!t) return;
+    const d = t.dataset;
+    try {
+      if (d.ex) return showExercise(d.ex);
+      if (d.week) { location.hash = `#hoje/${d.week}`; return; }
+      if (d.skip) {
+        t.disabled = true;
+        const r = await api(`/api/schedule/${d.skip}/skip`, { method: "POST" });
+        openModal(`<h2>${r.strategy === "mover" ? "Treino remarcado" : "Semana reajustada"}</h2>
+          <ul>${r.changes.map((c) => `<li>${esc(c)}</li>`).join("")}</ul>
+          <p class="small muted">Você pode desfazer pelo card do dia. Treinos já enviados ao Garmin foram marcados para reenviar.</p>
+          <button class="btn" id="ok-close">Ok</button>`);
+        $("#ok-close").onclick = closeModal;
+        return viewHoje(sch.week_start);
+      }
+      if (d.undo) { await api(`/api/schedule/${d.undo}/undo`, { method: "POST" }); toast("Ajuste desfeito"); return viewHoje(sch.week_start); }
+      if (d.move) {
+        const days = [0, 1, 2, 3, 4, 5, 6].map((i) => addDays(sch.week_start, i)).filter((x) => x >= sch.today && x !== d.date);
+        const body = openModal(`<h2>Mover para…</h2><div class="chips">${days.map((x) => `<button class="chip" data-to="${x}">${["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"][(new Date(x + "T12:00:00").getDay() + 6) % 7]} ${ddmm(x)}</button>`).join("")}</div>`);
+        body.onclick = async (e2) => {
+          const to = e2.target.dataset.to; if (!to) return;
+          const r = await api(`/api/schedule/${d.move}/move`, { method: "POST", body: { date: to } });
+          closeModal(); toast(r.warning || "Treino movido", r.warning ? 6000 : 2500); viewHoje(sch.week_start);
+        };
+        return;
+      }
+      if (d.push) { t.disabled = true; const r = await api(`/api/schedule/${d.push}/push`, { method: "POST" }); toast(`Enviado ao Garmin para ${r.scheduled}`); return viewHoje(sch.week_start); }
+      if (t.id === "push-week") {
+        t.disabled = true;
+        const r = await api("/api/schedule/push-week", { method: "POST", body: { only_outdated: false } });
+        toast(`${r.length} treinos enviados ao Garmin Connect`); return viewHoje(sch.week_start);
+      }
+      if (t.id === "gen-open") return openGenerator();
+      if (t.id === "rebuild") { if (!confirm("Recriar os treinos ainda não feitos desta semana a partir da planilha?")) return; await api("/api/schedule/rebuild", { method: "POST" }); return viewHoje(sch.week_start); }
+    } catch (err) { t.disabled = false; toast(err.message, 5000); if (/login|conectado/i.test(err.message)) location.hash = "#perfil"; }
+  };
+}
+
+/* ------------------------------------------------------------- GERADOR -- */
+const MONTH_OPTS = [[2, "Começando (< 3 meses)"], [4, "3 a 6 meses"], [9, "6 a 12 meses"], [18, "1 a 2 anos"], [36, "2 a 5 anos"], [72, "Mais de 5 anos"]];
+async function openGenerator() {
+  const opts = await api("/api/generator/options");
+  const p = state.profile || {};
+  const avail = p.available_days || [0, 2, 4];
+  const nearest = (m) => MONTH_OPTS.reduce((a, b) => (Math.abs(b[0] - (m ?? 12)) < Math.abs(a[0] - (m ?? 12)) ? b : a))[0];
+  let seed = 0;
+  const body = openModal(`<h2>Gerar treino automático</h2>
+    <div class="grid2">
+      <div class="field"><label>Tempo de prática</label><select id="gm-months">${MONTH_OPTS.map(([v, t]) => `<option value="${v}" ${nearest(p.training_months) === v ? "selected" : ""}>${t}</option>`).join("")}</select></div>
+      <div class="field"><label>Objetivo</label><select id="gm-goal">${opts.goals.map((g) => `<option value="${g.id}" ${p.goal === g.id ? "selected" : ""}>${esc(g.label)}</option>`).join("")}</select></div>
+      <div class="field"><label>Minutos por sessão</label><input id="gm-min" type="number" min="20" max="180" step="5" value="${p.session_minutes || 60}"></div>
+      <div class="field"><label>Meta de cardio (min/semana, vazio = pelo objetivo)</label><input id="gm-cardio" type="number" min="0" step="10" value="${p.cardio_target_min ?? ""}"></div>
+    </div>
+    <label>Dias que você pode treinar</label>
+    <div class="chips" id="gm-days">${opts.weekdays.map((w, i) => `<label class="chip"><input type="checkbox" value="${i}" ${avail.includes(i) ? "checked" : ""}> ${w}</label>`).join("")}</div>
+    <p class="small muted">Limitações, equipamentos e aparelhos preferidos vêm do seu Perfil.</p>
+    <div class="row gap wrap"><button class="btn ghost" id="gm-prev">Pré-visualizar</button><button class="btn ghost" id="gm-var" hidden>Outra variação</button><button class="btn" id="gm-apply" hidden>Usar e montar minha semana</button></div>
+    <div id="gm-out" style="margin-top:12px"></div>`);
+  const read = () => ({
+    training_months: +$("#gm-months", body).value, goal: $("#gm-goal", body).value,
+    session_minutes: +$("#gm-min", body).value || 60,
+    cardio_target_min: $("#gm-cardio", body).value === "" ? null : +$("#gm-cardio", body).value,
+    available_days: $$("#gm-days input", body).filter((c) => c.checked).map((c) => +c.value),
+  });
+  const preview = async () => {
+    const prof = read();
+    if (!prof.available_days.length) return toast("Escolha pelo menos um dia");
+    $("#gm-out", body).innerHTML = `<p class="muted">Montando…</p>`;
+    const plan = await api("/api/generator/preview", { method: "POST", body: { profile: prof, seed } });
+    $("#gm-out", body).innerHTML = `<h3>Por que assim</h3><ul class="small">${plan.rationale.map((r) => `<li>${esc(r)}</li>`).join("")}</ul>
+      ${plan.days.map((d) => `<div class="day"><b>${esc(d.name)}</b>${timeBar(d.time)}${itemsByPhase(d.items.map((i) => ({ ...i, _name: i._name })))}</div>`).join("")}
+      <h3>Volume semanal planejado</h3>${muscleBars(plan.analysis.muscles, "sets_week")}`;
+    // nomes dos exercícios
+    const ids = [...new Set(plan.days.flatMap((d) => d.items.map((i) => i.exercise_id)))];
+    const names = {}; await Promise.all(ids.map(async (id) => { try { names[id] = (await api(`/api/exercises/${encodeURIComponent(id)}`)).name; } catch (_) { /* */ } }));
+    $$("#gm-out [data-ex]", body).forEach((el) => { if (names[el.dataset.ex]) el.textContent = names[el.dataset.ex]; });
+    $("#gm-var", body).hidden = false; $("#gm-apply", body).hidden = false;
+  };
+  $("#gm-prev", body).onclick = () => preview().catch((e) => toast(e.message));
+  $("#gm-var", body).onclick = () => { seed += 1; preview().catch((e) => toast(e.message)); };
+  $("#gm-apply", body).onclick = async () => {
+    await api("/api/generator/apply", { method: "POST", body: { profile: read(), seed } });
+    state.profile = await api("/api/profile");
+    closeModal(); toast("Treino gerado e semana montada!");
+    if (location.hash.startsWith("#hoje") || !location.hash) route(); else location.hash = "#hoje";
+  };
 }
 
 /* ----------------------------------------------------------- PLANILHAS -- */
@@ -110,12 +271,13 @@ async function viewPlanilhas() {
   const plans = await api("/api/plans");
   view.innerHTML = `
   <div class="card"><div class="row between wrap gap"><h2>Suas planilhas</h2>
-    <div class="row gap wrap"><button class="btn sm" id="new-plan">Nova</button><button class="btn sm ghost" id="tpl-plan">Modelos</button><button class="btn sm ghost" id="csv-plan">Importar CSV</button></div></div>
+    <div class="row gap wrap"><button class="btn sm" id="gen-plan">Gerar automático</button><button class="btn sm ghost" id="new-plan">Nova</button><button class="btn sm ghost" id="tpl-plan">Modelos</button><button class="btn sm ghost" id="csv-plan">Importar CSV</button></div></div>
     ${plans.length ? `<ul class="list">${plans.map((p) => `<li><a href="#plano/${p.id}" class="row between" style="text-decoration:none;color:inherit">
       <span><b>${esc(p.name)}</b><br><span class="small muted">${p.days.length} treinos · ${p.days_per_week || p.days.length}×/semana</span></span>
       <span class="pill ${p.active ? "ok" : "muted"}">${p.active ? "ativa" : "arquivada"}</span></a></li>`).join("")}</ul>`
       : `<p class="empty">Crie uma planilha do zero, a partir de um modelo ou importando um CSV (Excel/Google Planilhas).</p>`}
   </div>`;
+  $("#gen-plan").onclick = () => openGenerator();
   $("#new-plan").onclick = async () => {
     const p = await api("/api/plans", { method: "POST", body: { name: "Minha planilha", days_per_week: state.profile.days_per_week || 3, days: [{ name: "A", items: [] }, { name: "B", items: [] }] } });
     location.hash = `#plano/${p.id}`;
@@ -176,6 +338,7 @@ function renderPlano() {
   ${day ? `<div class="card">
     <div class="row gap"><input id="day-name" value="${esc(day.name)}" class="grow" aria-label="Nome do treino">
       <button class="icon-btn" id="del-day" title="Excluir treino">🗑</button></div>
+    <div id="day-time" style="margin-top:8px"></div>
     <div style="margin-top:10px">${day.items.map((it, i) => planItemHtml(it, i, day.items.length)).join("") || `<p class="empty">Adicione exercícios ou cardio.</p>`}</div>
     <div class="row gap wrap"><button class="btn sm" id="add-ex">+ Exercício</button><button class="btn sm ghost" id="add-cardio">+ Cardio</button></div>
   </div>
@@ -200,7 +363,8 @@ function planItemHtml(it, i, n) {
   const name = ex.name || it._name || it.exercise_id;
   const f = (k, label, type = "text", extra = "") => `<div><label>${label}</label><input data-f="${k}" data-i="${i}" type="${type}" value="${esc(it[k] ?? "")}" ${extra}></div>`;
   return `<div class="plan-item">
-    <div class="row gap"><span class="grow"><b class="link" data-ex="${esc(it.exercise_id)}" style="cursor:pointer">${esc(name)}</b> ${limBadge(it._lim)}</span>
+    <div class="row gap"><span class="grow"><b class="link" data-ex="${esc(it.exercise_id)}" style="cursor:pointer">${esc(name)}</b>
+      ${it.phase === "preparo" ? `<span class="pill">preparo</span>` : it.phase === "pos" ? `<span class="pill">pós</span>` : ""}${it.finisher ? ` <span class="pill muted">finalizador</span>` : ""} ${limBadge(it._lim)}</span>
       <button class="icon-btn" data-mv="${i}:-1" ${i === 0 ? "disabled" : ""} title="Subir">↑</button>
       <button class="icon-btn" data-mv="${i}:1" ${i === n - 1 ? "disabled" : ""} title="Descer">↓</button>
       <button class="icon-btn" data-rm="${i}" title="Remover">✕</button></div>
@@ -245,6 +409,7 @@ function refreshPlanAnalysis() {
     try {
       const a = await api("/api/plans/analyze", { method: "POST", body: cleanPlan(state.draftPlan) });
       const conflicts = a.conflicts.map((c) => `<li><span class="pill ${LIM_CLASS[c.status]}">${LIM_TXT[c.status]}</span> <b>${esc(c.name)}</b> <span class="small muted">(${esc(c.day)})</span><div class="small muted">${esc(c.reasons.join(" · "))}</div></li>`).join("");
+      const dt = $("#day-time"); if (dt && a.times) dt.innerHTML = timeBar(a.times[state.planTab]);
       box.innerHTML = `<h2>Análise da planilha</h2>
         <p class="small muted">Volume semanal planejado com ${a.days_per_week} treinos/semana · cardio ${a.cardio_minutes_week} min (${a.cardio_who_equivalent} equivalentes OMS).</p>
         ${muscleBars(a.muscles, "sets_week")}
@@ -376,6 +541,12 @@ async function showExercise(id) {
 
 /* ------------------------------------------------------------- TREINAR -- */
 async function viewTreinar(planId, idx) {
+  if (planId === "agenda") {
+    const draft = store("gg_session");
+    if (draft && String(draft.schedule_id) === String(idx)) state.session = draft;
+    else state.session = await api(`/api/schedule/${idx}/prefill`);
+    return renderSession();
+  }
   if (planId === undefined) {
     const draft = store("gg_session");
     const plans = (await api("/api/plans")).filter((p) => p.active);
@@ -397,9 +568,18 @@ async function viewTreinar(planId, idx) {
 function renderSession() {
   const s = state.session;
   store("gg_session", s);
+  const idxs = s.items.map((it, i) => [it, i]);
+  const phaseOf = (it) => it.phase || "principal";
+  const compact = (ph) => idxs.filter(([it]) => phaseOf(it) === ph);
+  const compactCard = (ph, title) => compact(ph).length ? `<div class="card"><h3>${title}</h3><ul class="list">${compact(ph).map(([it, i]) => `<li class="row gap">
+      <button class="check ${it.done ? "on" : ""}" data-pdone="${i}">✓</button>
+      <span class="grow"><b data-ex="${esc(it.exercise_id)}" style="cursor:pointer">${esc(it.name)}</b><br><span class="small muted">${it.kind === "cardio" ? `${it.duration_min} min Z${it.zone}` : `${(it.plan && it.plan.duration_s) || 30}s${(it.plan && it.plan.sets) > 1 ? ` × ${it.plan.sets}` : ""}`}${it.plan && it.plan.notes ? " · " + esc(it.plan.notes) : ""}</span></span></li>`).join("")}</ul></div>` : "";
   view.innerHTML = `<div class="card"><div class="row between gap"><h2 class="grow">${esc(s.day_name || "Treino")}</h2>
-      <input type="datetime-local" id="s-date" value="${esc((s.date || "").slice(0, 16))}" style="width:auto"></div></div>
-    ${s.items.map((it, i) => sessionItemHtml(it, i)).join("")}
+      <input type="datetime-local" id="s-date" value="${esc((s.date || "").slice(0, 16))}" style="width:auto"></div>
+      ${s.deload ? `<p class="small rec">Semana de deload: menos séries, carga −10%, RPE ~6.</p>` : ""}</div>
+    ${compactCard("preparo", "Preparação — aquecimento e mobilidade")}
+    ${idxs.filter(([it]) => phaseOf(it) === "principal").map(([it, i]) => sessionItemHtml(it, i)).join("")}
+    ${compactCard("pos", "Pós-treino — alongamento")}
     <div class="card"><button class="btn sm ghost" id="s-add">+ Adicionar exercício</button>
       <div class="field" style="margin-top:10px"><label>Como foi o treino?</label><textarea id="s-notes" placeholder="Sensações, dores, energia…">${esc(s.notes || "")}</textarea></div>
       <div class="row gap"><button class="btn" id="s-finish">Finalizar e salvar</button><button class="btn danger" id="s-cancel">Descartar</button></div></div>`;
@@ -412,7 +592,7 @@ function sessionItemHtml(it, i) {
   const head = `<div class="row gap">${it.images && it.images[0] ? `<img class="thumb" src="${esc(it.images[0])}" alt="" loading="lazy">` : ""}
     <div class="grow"><b data-ex="${esc(it.exercise_id)}" style="cursor:pointer">${esc(it.name)}</b> ${limBadge(it.limitation)}
     <div class="small muted">${it.kind === "cardio" ? `${plan.duration_min || ""} min · Z${plan.zone || ""}` : `${plan.sets || ""}×${plan.reps || (plan.duration_s ? plan.duration_s + "s" : "")} ${plan.load_kg ? "· " + plan.load_kg + " kg" : ""} · descanso ${plan.rest_s || 90}s`}
-    ${lastTxt ? `<br>Última: ${esc(lastTxt)}` : ""}${plan.notes ? `<br>${esc(plan.notes)}` : ""}</div></div></div>`;
+    ${lastTxt ? `<br>Última: ${esc(lastTxt)}` : ""}${it.suggestion && it.suggestion.note ? `<br><b>${esc(it.suggestion.note)}</b>` : ""}${plan.notes ? `<br>${esc(plan.notes)}` : ""}</div></div></div>`;
   if (it.kind === "cardio") {
     return `<div class="card">${head}<div class="grid2" style="margin-top:8px">
       <div><label>Minutos</label><input type="number" data-c="duration_min" data-i="${i}" value="${esc(it.duration_min ?? "")}"></div>
@@ -453,6 +633,7 @@ function bindSession() {
       if (set.done) startTimer((s.items[i].plan || {}).rest_s || 90);
     }
     if (t.dataset.cdone) { const it = s.items[+t.dataset.cdone]; it.done = !it.done; t.classList.toggle("on", it.done); save(); }
+    if (t.dataset.pdone) { const it = s.items[+t.dataset.pdone]; it.done = !it.done; t.classList.toggle("on", it.done); save(); }
     if (t.dataset.addset) { const it = s.items[+t.dataset.addset]; const last = it.sets[it.sets.length - 1] || {}; it.sets.push({ ...last, done: false }); renderSession(); }
     if (t.dataset.rmset) { const it = s.items[+t.dataset.rmset]; it.sets.pop(); renderSession(); }
   };
@@ -463,21 +644,22 @@ function bindSession() {
   });
   $("#s-cancel").onclick = () => { if (confirm("Descartar este treino?")) { store("gg_session", null); state.session = null; location.hash = "#hoje"; } };
   $("#s-finish").onclick = async () => {
-    let anyDone = s.items.some((it) => it.kind === "cardio" ? it.done : it.sets.some((x) => x.done));
+    const main = s.items.filter((it) => (it.phase || "principal") === "principal");
+    let anyDone = main.some((it) => it.kind === "cardio" ? it.done : (it.sets || []).some((x) => x.done));
     if (!anyDone) {
       if (!confirm("Nenhuma série marcada como feita. Salvar todas as séries preenchidas como feitas?")) return;
-      s.items.forEach((it) => { if (it.kind === "cardio") it.done = true; else it.sets.forEach((x) => { if (x.reps || x.duration_s) x.done = true; }); });
+      main.forEach((it) => { if (it.kind === "cardio") it.done = true; else (it.sets || []).forEach((x) => { if (x.reps || x.duration_s) x.done = true; }); });
     }
     const payload = {
-      date: s.date, plan_id: s.plan_id || null, day_name: s.day_name, notes: s.notes,
-      items: s.items.map((it) => it.kind === "cardio"
+      date: s.date, plan_id: s.plan_id || null, day_name: s.day_name, notes: s.notes, schedule_id: s.schedule_id || null,
+      items: s.items.filter((it) => it.kind === "cardio" || (it.phase || "principal") === "principal").map((it) => it.kind === "cardio"
         ? (it.done ? { exercise_id: it.exercise_id, duration_min: it.duration_min, zone: it.zone, avg_hr: it.avg_hr } : null)
         : { exercise_id: it.exercise_id, sets: it.sets.filter((x) => x.done).map(({ reps, load_kg, rpe, duration_s }) => ({ reps, load_kg, rpe, duration_s })) })
         .filter((it) => it && (it.duration_min || (it.sets && it.sets.length))),
     };
     await api("/api/sessions", { method: "POST", body: payload });
     store("gg_session", null); state.session = null; stopTimer();
-    toast("Treino salvo! 🎉"); location.hash = "#analise";
+    toast("Treino salvo! 🎉"); location.hash = s.schedule_id ? "#hoje" : "#analise";
   };
 }
 
@@ -565,11 +747,25 @@ async function viewPerfil() {
       ${num("hr_max", `FC máx. medida <span class="muted">(calculada: ${p.hr_max_calc ?? "—"})</span>`)}${num("hr_rest", "FC repouso")}
       <div class="field"><label>Sexo</label><select data-p="sex"><option value=""></option><option value="M" ${p.sex === "M" ? "selected" : ""}>Masculino</option><option value="F" ${p.sex === "F" ? "selected" : ""}>Feminino</option></select></div>
       <div class="field"><label>Nível</label><select data-p="level">${[["iniciante", "Iniciante (< 1 ano)"], ["intermediario", "Intermediário"], ["avancado", "Avançado (> 3 anos)"]].map(([v, t]) => `<option value="${v}" ${p.level === v ? "selected" : ""}>${t}</option>`).join("")}</select></div>
-      <div class="field"><label>Objetivo</label><select data-p="goal">${[["hipertrofia", "Hipertrofia"], ["forca", "Força"], ["emagrecimento", "Emagrecimento"], ["condicionamento", "Condicionamento"], ["saude", "Saúde geral"]].map(([v, t]) => `<option value="${v}" ${p.goal === v ? "selected" : ""}>${t}</option>`).join("")}</select></div>
+      <div class="field"><label>Objetivo</label><select data-p="goal">${[["hipertrofia", "Hipertrofia"], ["forca", "Força"], ["emagrecimento", "Emagrecimento"], ["condicionamento", "Condicionamento"], ["saude", "Saúde geral"], ["hibrido", "Híbrido (força + resistência)"]].map(([v, t]) => `<option value="${v}" ${p.goal === v ? "selected" : ""}>${t}</option>`).join("")}</select></div>
       ${num("days_per_week", "Dias de treino/semana", 'min="1" max="14"')}
       ${num("volume_factor", "Ajuste de volume (×)", 'step="0.05" min="0.5" max="1.5"')}
     </div>
     <p class="small muted">“Ajuste de volume” multiplica as faixas de séries por músculo — reduza se não estiver recuperando, aumente se estiver estagnado e recuperando bem.</p>
+  </div>
+  <div class="card"><h2>Rotina (para o treino automático)</h2>
+    <div class="grid2">
+      <div class="field"><label>Tempo de prática</label><select data-p="training_months"><option value="">—</option>${MONTH_OPTS.map(([v, t]) => `<option value="${v}" ${+p.training_months === v ? "selected" : ""}>${t}</option>`).join("")}</select></div>
+      ${num("session_minutes", "Minutos por sessão", 'min="20" max="180" step="5"')}
+      ${num("cardio_target_min", "Meta de cardio (min/semana)", 'min="0" step="10" placeholder="pelo objetivo"')}
+    </div>
+    <label>Dias disponíveis</label>
+    <div class="chips">${["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"].map((w, i) => `<label class="chip"><input type="checkbox" data-wd="${i}" ${(p.available_days || []).includes(i) ? "checked" : ""}> ${w}</label>`).join("")}</div>
+    <label style="margin-top:8px">Equipamentos da sua academia</label>
+    <div class="chips">${[["barbell", "Barra"], ["dumbbell", "Halteres"], ["machine", "Máquinas"], ["cable", "Polia/cabo"], ["kettlebells", "Kettlebell"], ["bands", "Elástico"], ["e-z curl bar", "Barra W"]].map(([k, t]) => `<label class="chip"><input type="checkbox" data-eq="${k}" ${!(p.equipment || []).length || p.equipment.includes(k) ? "checked" : ""}> ${t}</label>`).join("")}</div>
+    <label style="margin-top:8px">Aparelhos de cardio preferidos</label>
+    <div class="chips" id="cm-list"></div>
+    <p class="small muted">Nível é calculado pelo tempo de prática. Depois de salvar, use “Gerar treino” na tela Hoje.</p>
   </div>
   <div class="card"><h2>Limitações e lesões</h2>
     <p class="small muted">O app marca exercícios como <span class="pill warn">cuidado</span> ou <span class="pill bad">evitar</span>, troca exercícios dos modelos e limita a zona de FC do cardio. Não substitui orientação de médico/fisioterapeuta.</p>
@@ -594,9 +790,16 @@ async function viewPerfil() {
       <p><b>2. Garmin Connect (direto):</b> “Enviar ao Garmin Connect” cria o treino na sua biblioteca (mesmo formato do editor web) e agenda na data escolhida; o relógio recebe na próxima sincronização. Usa a API não-oficial (biblioteca <code>garminconnect</code>), pois a API oficial de treinos é restrita a empresas parceiras.</p>
       <p><b>3. Volta do relógio:</b> “Importar treinos do relógio” traz séries/reps/carga registradas no relógio para a análise muscular.</p></div></details>
   </div>`;
+  api("/api/generator/options").then((o) => {
+    const el = $("#cm-list"); if (!el) return;
+    el.innerHTML = o.cardio_machines.map((m) => `<label class="chip"><input type="checkbox" data-cm="${m.id}" ${(p.cardio_machines || []).includes(m.id) ? "checked" : ""}> ${esc(m.name)}</label>`).join("");
+  });
   $("#save-profile").onclick = async () => {
     const body = {};
-    $$("[data-p]").forEach((el) => { const v = el.value; body[el.dataset.p] = el.type === "number" ? (v === "" ? null : +v) : v; });
+    $$("[data-p]").forEach((el) => { const v = el.value; body[el.dataset.p] = (el.type === "number" || el.dataset.p === "training_months") ? (v === "" ? null : +v) : v; });
+    body.available_days = $$("[data-wd]").filter((c) => c.checked).map((c) => +c.dataset.wd);
+    const eq = $$("[data-eq]"); body.equipment = eq.every((c) => c.checked) ? [] : eq.filter((c) => c.checked).map((c) => c.dataset.eq);
+    body.cardio_machines = $$("[data-cm]").filter((c) => c.checked).map((c) => c.dataset.cm);
     body.limitations = $$("[data-lim]").filter((c) => c.checked).map((c) => ({ key: c.dataset.lim, severity: $(`[data-sev="${c.dataset.lim}"]`).value }));
     const ca = $("#custom-avoid").value.trim();
     if (ca) body.limitations.push({ key: "personalizado", label: "Restrição pessoal", severity: "evitar", custom_avoid: ca });
@@ -643,7 +846,7 @@ async function route() {
   view.innerHTML = `<p class="muted">Carregando…</p>`;
   try {
     if (!state.meta) [state.meta, state.profile] = await Promise.all([api("/api/meta"), api("/api/profile")]);
-    const routes = { hoje: viewHoje, planilhas: viewPlanilhas, plano: () => viewPlano(a), treinar: () => viewTreinar(a, b), analise: viewAnalise, exercicios: viewExercicios, perfil: viewPerfil };
+    const routes = { hoje: () => viewHoje(a), planilhas: viewPlanilhas, plano: () => viewPlano(a), treinar: () => viewTreinar(a, b), analise: viewAnalise, exercicios: viewExercicios, perfil: viewPerfil };
     await (routes[name] || viewHoje)();
     if (!view.onclick) view.onclick = (e) => { const id = e.target.dataset && e.target.dataset.ex; if (id) showExercise(id); };
   } catch (e) { view.innerHTML = `<div class="card"><p class="pill bad">Erro: ${esc(e.message)}</p></div>`; }

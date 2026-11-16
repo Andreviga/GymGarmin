@@ -1,0 +1,449 @@
+"""Agenda semanal e reajuste automático quando um treino não acontece.
+
+Fluxo:
+- A semana (seg–dom) é montada a partir da planilha da agenda: cada treino cai no seu dia
+  da semana (ou nos dias disponíveis, em ordem), já com a semana do ciclo aplicada
+  (acúmulo / deload).
+- Treino registrado na data → "feito". Data passou sem registro → "perdido".
+- "Não vou treinar" (ou ajustar um perdido) dispara o REAJUSTE:
+    1. MOVER: se houver um dia disponível livre na semana, o treino vai para lá — desde
+       que não fique colado (±1 dia) num treino que trabalha os mesmos músculos.
+       Se esse dia tinha cardio, o cardio vira finalizador.
+    2. REDISTRIBUIR: sem dia livre, calcula quais músculos ficariam abaixo do alvo semanal
+       e encaixa ~75% desse volume nos treinos restantes: +1 série nos exercícios que já
+       trabalham o músculo (até +2 por exercício) ou adiciona o exercício perdido —
+       sempre dentro do tempo da sessão (+10% de tolerância).
+    3. Cardio perdido vira minutos extras nos dias de cardio ou finalizadores.
+    4. O que não couber é informado, e o reajuste pode ser DESFEITO.
+- Treinos já enviados ao Garmin que mudaram ficam marcados para reenviar.
+"""
+
+from __future__ import annotations
+
+import copy
+import math
+from collections import defaultdict
+from datetime import date, datetime, timedelta
+
+from . import catalog, db
+from .generator import WEEKDAYS, _cardio_equiv, _default_days, item_time, time_breakdown, weekly_targets, tier_for
+from .muscles import PRIMARY_WEIGHT, muscle_pt
+from .progression import apply_cycle, cycle_position
+
+
+def week_start(d: date) -> date:
+    return d - timedelta(days=d.weekday())
+
+
+def _d(s) -> date:
+    if isinstance(s, date) and not isinstance(s, datetime):
+        return s
+    return date.fromisoformat(str(s)[:10])
+
+
+def _clean_name(name: str) -> str:
+    for w in WEEKDAYS:
+        if name.startswith(w + " – "):
+            return name[len(w) + 3:]
+    return name
+
+
+def _kind(day: dict) -> str:
+    if day.get("kind"):
+        return day["kind"]
+    items = [i for i in day.get("items", []) if (i.get("phase") or "principal") == "principal"]
+    if items and all((catalog.get(i.get("exercise_id")) or {}).get("kind") == "cardio" for i in items):
+        return "cardio"
+    return "forca"
+
+
+def schedule_plan(profile: dict) -> dict | None:
+    pid = profile.get("schedule_plan_id")
+    if pid:
+        p = db.get_plan(int(pid))
+        if p:
+            return p
+    plans = [p for p in db.list_plans() if p.get("active")]
+    auto = [p for p in plans if p.get("generator")]
+    return (auto or plans or [None])[0]
+
+
+def available_days(profile: dict) -> list[int]:
+    return sorted(set(profile.get("available_days") or _default_days(int(profile.get("days_per_week") or 3))))
+
+
+def session_budget(profile: dict, plan: dict | None = None) -> float:
+    gen = (plan or {}).get("generator") or {}
+    return float(profile.get("session_minutes") or gen.get("session_minutes") or 60)
+
+
+def build_week(plan: dict, profile: dict, ws: date, from_date: date | None = None) -> list[dict]:
+    gen = plan.get("generator") or {}
+    pos = cycle_position(gen.get("cycle_start") or plan.get("created_at"), ws, gen.get("cycle_weeks") or 5)
+    avail = available_days(profile)
+    used: set[int] = set()
+    entries = []
+    free = iter([d for d in avail])
+    for idx, day in enumerate(plan.get("days") or []):
+        wd = day.get("weekday")
+        if wd is None or wd in used:
+            wd = next((d for d in free if d not in used), None)
+            if wd is None:
+                break
+        used.add(wd)
+        dt = ws + timedelta(days=wd)
+        if from_date and dt < from_date:
+            continue
+        entries.append({
+            "date": dt.isoformat(), "plan_id": plan["id"], "day_idx": idx, "status": "planejado",
+            "day_name": _clean_name(day.get("name") or f"Treino {idx + 1}"), "kind": _kind(day),
+            "items": apply_cycle(day.get("items", []), pos, int(gen.get("ramp_sets") or 0)),
+            "cycle": pos, "changes": [],
+        })
+    return entries
+
+
+def _sessions_in_week(ws: date) -> list[dict]:
+    start = ws.isoformat()
+    end = (ws + timedelta(days=7)).isoformat()
+    return [s for s in db.list_sessions(since=start, limit=500) if s["date"][:10] < end]
+
+
+def sync_status(entries: list[dict], sessions: list[dict], today: date) -> list[dict]:
+    by_sched = {s.get("schedule_id"): s for s in sessions if s.get("schedule_id")}
+    by_date = defaultdict(list)
+    for s in sessions:
+        if not s.get("schedule_id"):
+            by_date[s["date"][:10]].append(s)
+    out = []
+    for e in entries:
+        status = e["status"]
+        if status in ("planejado", "perdido"):
+            if e["id"] in by_sched or by_date.get(e["date"]):
+                status = "feito"
+            elif _d(e["date"]) < today and status == "planejado":
+                status = "perdido"
+        if status != e["status"]:
+            e["status"] = status
+            e = db.save_entry(e)
+        out.append(e)
+    return out
+
+
+def ensure_week(profile: dict, any_day: date, today: date | None = None) -> list[dict]:
+    today = today or date.today()
+    ws = week_start(any_day)
+    entries = db.list_schedule(ws.isoformat(), (ws + timedelta(days=6)).isoformat())
+    if not entries and ws >= week_start(today):
+        plan = schedule_plan(profile)
+        if plan:
+            entries = [db.save_entry(e) for e in build_week(plan, profile, ws, from_date=today if ws == week_start(today) else None)]
+    return sync_status(entries, _sessions_in_week(ws), today)
+
+
+def rebuild_week(profile: dict, today: date | None = None) -> list[dict]:
+    """Recria os treinos ainda não feitos da semana atual a partir da planilha da agenda."""
+    today = today or date.today()
+    ws = week_start(today)
+    for e in db.list_schedule(today.isoformat(), (ws + timedelta(days=6)).isoformat()):
+        if e["status"] in ("planejado", "perdido"):
+            db.delete_entry(e["id"])
+    plan = schedule_plan(profile)
+    if plan:
+        existing = {e["date"] for e in db.list_schedule(ws.isoformat(), (ws + timedelta(days=6)).isoformat())
+                    if e["status"] == "feito"}
+        for e in build_week(plan, profile, ws, from_date=today):
+            if e["date"] not in existing:
+                db.save_entry(e)
+    return ensure_week(profile, today, today)
+
+
+# ------------------------------------------------------------------ reajuste --
+
+def _strength_items(e: dict) -> list[dict]:
+    return [i for i in e.get("items", []) if (i.get("phase") or "principal") == "principal"
+            and (catalog.get(i.get("exercise_id")) or {}).get("kind") == "strength"]
+
+
+def _cardio_items(e: dict) -> list[dict]:
+    return [i for i in e.get("items", []) if (i.get("phase") or "principal") == "principal"
+            and (catalog.get(i.get("exercise_id")) or {}).get("kind") == "cardio"]
+
+
+def _load(e: dict) -> dict[str, float]:
+    out: dict[str, float] = defaultdict(float)
+    for it in _strength_items(e):
+        ex = catalog.get(it["exercise_id"])
+        for m in ex["primaryMuscles"]:
+            out[m] += int(it.get("sets") or 0) * PRIMARY_WEIGHT
+        for m in ex["secondaryMuscles"]:
+            out[m] += int(it.get("sets") or 0) * 0.5
+    return out
+
+
+def _conflict(a: dict, b: dict) -> bool:
+    """Treinos colados que repetem os mesmos músculos principais atrapalham a recuperação."""
+    la, lb = _load(a), _load(b)
+    big = lambda load: {m for m, v in load.items() if v >= 4}  # noqa: E731
+    return bool(big(la) & big(lb))
+
+
+def _minutes(e: dict) -> float:
+    return sum(item_time(i)["total"] for i in e.get("items", [])) / 60
+
+
+def _set_minutes(it: dict) -> float:
+    one = item_time({**it, "sets": 1, "approach_sets": False})
+    return (one["work"] + (it.get("rest_s") or 60)) / 60
+
+
+def _note(e: dict, text: str) -> None:
+    e.setdefault("changes", []).append(text)
+    if e.get("garmin_workout_id"):
+        e["garmin_outdated"] = True
+
+
+def _fmt(d: str) -> str:
+    dd = _d(d)
+    return f"{WEEKDAYS[dd.weekday()]} {dd.day:02d}/{dd.month:02d}"
+
+
+def _place_cardio(lost: float, future: list[dict], origin: str, budget: float, machine: str, changes: list[str]) -> float:
+    """Encaixa minutos de cardio nos próximos dias: primeiro dias de cardio, depois finalizadores."""
+    for e in [x for x in future if x.get("kind") == "cardio"] + [x for x in future if x.get("kind") == "forca"]:
+        if lost < 5:
+            break
+        slack = budget - _minutes(e)
+        add = int(min(lost, slack, 20) // 5 * 5)
+        if add < 5:
+            continue
+        c = next((i for i in _cardio_items(e) if i.get("duration_min") and (i.get("finisher") or e.get("kind") == "cardio")), None)
+        if c:
+            c["duration_min"] = float(c["duration_min"]) + add
+        else:
+            posts = [i for i in e["items"] if i.get("phase") == "pos"]
+            idx = e["items"].index(posts[0]) if posts else len(e["items"])
+            e["items"].insert(idx, {"exercise_id": machine, "duration_min": add, "zone": 2, "phase": "principal",
+                                    "finisher": True, "notes": "cardio compensado"})
+        _note(e, f"+{add} min de cardio (compensa {origin})")
+        changes.append(f"Cardio: +{add} min em {_fmt(e['date'])}.")
+        lost -= add
+    return lost
+
+
+def handle_missed(entry_id: int, profile: dict, today: date | None = None) -> dict:
+    today = today or date.today()
+    missed = db.get_entry(entry_id)
+    if not missed:
+        raise ValueError("Treino da agenda não encontrado")
+    if missed["status"] == "feito":
+        raise ValueError("Este treino já foi feito")
+    ws = week_start(_d(missed["date"]))
+    entries = db.list_schedule(ws.isoformat(), (ws + timedelta(days=6)).isoformat())
+    snapshot = [copy.deepcopy(e) for e in entries if e["id"] != missed["id"]]
+    plan = db.get_plan(missed["plan_id"]) if missed.get("plan_id") else None
+    budget = session_budget(profile, plan) * 1.10
+    changes: list[str] = []
+    unrecovered: list[str] = []
+    created: list[int] = []
+    strategy = "redistribuir"
+    moved_cardio_left = 0.0
+    moved_cardio_machine = "cardio_bike_vertical"
+
+    missed["status"] = "pulado"
+    others = [e for e in entries if e["id"] != missed["id"]]
+    future = [e for e in others if e["status"] == "planejado" and _d(e["date"]) >= today]
+    if _d(missed["date"]) == today:
+        future = [e for e in future if _d(e["date"]) > today]
+
+    # ---------- 1) mover para um dia livre
+    if missed.get("kind") == "forca" and _strength_items(missed):
+        taken = {e["date"] for e in others if e["status"] in ("planejado", "feito") and e.get("kind") == "forca"}
+        first = max(today + (timedelta(days=1) if _d(missed["date"]) <= today else timedelta()), ws)
+        for wd in available_days(profile):
+            cand = ws + timedelta(days=wd)
+            if cand < first or cand.isoformat() == missed["date"] or cand.isoformat() in taken:
+                continue
+            neighbors = [e for e in others if e.get("kind") == "forca" and e["status"] in ("planejado", "feito")
+                         and abs((_d(e["date"]) - cand).days) == 1]
+            if any(_conflict(missed, n) for n in neighbors):
+                continue
+            new = {k: copy.deepcopy(v) for k, v in missed.items() if k not in ("id", "undo", "garmin_workout_id", "garmin_outdated")}
+            new.update(date=cand.isoformat(), status="planejado", moved_from=missed["date"], changes=[])
+            cardio_day = next((e for e in others if e["date"] == cand.isoformat() and e["status"] == "planejado"
+                               and e.get("kind") == "cardio"), None)
+            fin_added = 0
+            if cardio_day:
+                slack = budget - _minutes(new)
+                total_c = _cardio_equiv([{"items": _cardio_items(cardio_day)}])
+                for c in _cardio_items(cardio_day):
+                    moved_cardio_machine = c["exercise_id"]
+                    if slack >= 10 and c.get("duration_min"):
+                        mins = int(min(c["duration_min"], slack) // 5 * 5)
+                        fin = {**copy.deepcopy(c), "finisher": True, "duration_min": mins,
+                               "notes": "cardio do dia (virou finalizador)"}
+                        posts = [i for i in new["items"] if i.get("phase") == "pos"]
+                        idx = new["items"].index(posts[0]) if posts else len(new["items"])
+                        new["items"].insert(idx, fin)
+                        slack -= mins
+                        fin_added += mins
+                moved_cardio_left = max(0.0, total_c - fin_added)
+                cardio_day["status"] = "substituido"
+                _note(cardio_day, f"Substituído pelo treino {missed['day_name']} (movido)")
+                db.save_entry(cardio_day)
+            _note(new, f"Movido de {_fmt(missed['date'])}")
+            saved = db.save_entry(new)
+            created.append(saved["id"])
+            changes.append(f"{missed['day_name']} foi movido para {_fmt(saved['date'])}"
+                           + (f" ({fin_added} min do cardio do dia viraram finalizador)" if fin_added else "") + ".")
+            strategy = "mover"
+            break
+
+    # ---------- 2) redistribuir volume de força
+    if strategy == "redistribuir" and _strength_items(missed):
+        months = profile.get("training_months")
+        gen = (plan or {}).get("generator") or {}
+        targets = gen.get("targets") or weekly_targets(tier_for(months if months is not None else 12),
+                                                       profile.get("goal") or "hipertrofia", profile.get("volume_factor") or 1)
+        projected: dict[str, float] = defaultdict(float)
+        for e in others:
+            if e["status"] in ("planejado", "feito"):
+                for m, v in _load(e).items():
+                    projected[m] += v
+        missed_direct: dict[str, float] = defaultdict(float)
+        for it in _strength_items(missed):
+            for m in catalog.get(it["exercise_id"])["primaryMuscles"]:
+                missed_direct[m] += int(it.get("sets") or 0)
+        deficits = sorted(((targets.get(m, 0) - projected[m], m) for m in missed_direct if targets.get(m, 0) - projected[m] > 0.5),
+                          reverse=True)
+        strength_future = [e for e in future if e.get("kind") == "forca"]
+        moved_ex: set[str] = set()
+        for deficit, m in deficits:
+            need = math.ceil(min(deficit, missed_direct[m]) * 0.75)
+            placed = 0
+            while need > 0:
+                done = False
+                for e in sorted(strength_future, key=lambda x: _minutes(x)):
+                    for it in _strength_items(e):
+                        if m in catalog.get(it["exercise_id"])["primaryMuscles"] and it.get("added", 0) < 2 and it["sets"] < 6:
+                            if _minutes(e) + _set_minutes(it) <= budget:
+                                it["sets"] += 1
+                                it["added"] = it.get("added", 0) + 1
+                                _note(e, f"+1 série em {catalog.get(it['exercise_id'])['name']} (compensa {missed['day_name']})")
+                                need -= 1
+                                placed += 1
+                                done = True
+                                break
+                    if done:
+                        break
+                if not done:
+                    src = next((i for i in _strength_items(missed) if i["exercise_id"] not in moved_ex
+                                and m in catalog.get(i["exercise_id"])["primaryMuscles"]), None)
+                    if src:
+                        for e in sorted(strength_future, key=lambda x: _minutes(x)):
+                            if any(i["exercise_id"] == src["exercise_id"] for i in e["items"]):
+                                continue
+                            sets = max(2, min(need, 3))
+                            add = {**copy.deepcopy(src), "sets": sets, "added_from": missed["day_name"], "approach_sets": False,
+                                   "notes": f"veio do treino {missed['day_name']}"}
+                            if _minutes(e) + item_time(add)["total"] / 60 <= budget:
+                                posts = [i for i in e["items"] if i.get("phase") == "pos" or i.get("finisher")]
+                                idx = e["items"].index(posts[0]) if posts else len(e["items"])
+                                e["items"].insert(idx, add)
+                                moved_ex.add(src["exercise_id"])
+                                _note(e, f"+ {catalog.get(src['exercise_id'])['name']} {sets} séries (do treino {missed['day_name']})")
+                                need -= sets
+                                placed += sets
+                                done = True
+                                break
+                if not done:
+                    break
+            if placed:
+                changes.append(f"{muscle_pt(m)}: {placed} séries redistribuídas na semana.")
+            if need > 0:
+                unrecovered.append(f"{muscle_pt(m)} ({need} séries)")
+        if not deficits:
+            changes.append("O volume da semana continua dentro do alvo sem esse treino — nada precisou ser compensado.")
+
+    # ---------- 3) cardio perdido
+    if strategy == "redistribuir" and _cardio_items(missed):
+        lost = _cardio_equiv([{"items": _cardio_items(missed)}])
+        machine = next((i["exercise_id"] for i in _cardio_items(missed)), "cardio_bike_vertical")
+        left = _place_cardio(lost, [x for x in future if x["status"] == "planejado"], missed["day_name"], budget, machine, changes)
+        if left >= 5:
+            unrecovered.append(f"cardio (~{int(left)} min)")
+    if moved_cardio_left >= 5:
+        left = _place_cardio(moved_cardio_left, [x for x in future if x["status"] == "planejado" and x["id"] not in created],
+                             "cardio substituído", budget, moved_cardio_machine, changes)
+        if left >= 5:
+            unrecovered.append(f"cardio (~{int(left)} min)")
+
+    for e in others:
+        if e.get("changes") != next((s.get("changes") for s in snapshot if s["id"] == e["id"]), None) or \
+                e["items"] != next((s["items"] for s in snapshot if s["id"] == e["id"]), None):
+            db.save_entry(e)
+    if unrecovered:
+        changes.append("Não coube nesta semana: " + ", ".join(unrecovered) + ". Priorize na próxima.")
+    missed["undo"] = {"snapshot": snapshot, "created": created}
+    missed["skip_result"] = {"strategy": strategy, "changes": changes, "at": datetime.now().isoformat(timespec="minutes")}
+    db.save_entry(missed)
+    return {"strategy": strategy, "changes": changes, "unrecovered": unrecovered}
+
+
+def undo(entry_id: int) -> None:
+    e = db.get_entry(entry_id)
+    if not e or not e.get("undo"):
+        raise ValueError("Nada para desfazer")
+    for cid in e["undo"].get("created", []):
+        db.delete_entry(cid)
+    for snap in e["undo"].get("snapshot", []):
+        cur = db.get_entry(snap["id"])
+        if cur and cur["status"] != "feito":
+            db.save_entry(snap)
+    e.pop("undo", None)
+    e.pop("skip_result", None)
+    e["status"] = "planejado"
+    db.save_entry(e)
+
+
+def move(entry_id: int, to: str) -> dict:
+    e = db.get_entry(entry_id)
+    if not e:
+        raise ValueError("Treino não encontrado")
+    old = e["date"]
+    e["date"] = _d(to).isoformat()
+    e["status"] = "planejado"
+    _note(e, f"Movido manualmente de {_fmt(old)}")
+    saved = db.save_entry(e)
+    ws = week_start(_d(to))
+    warn = [x for x in db.list_schedule(ws.isoformat(), (ws + timedelta(days=6)).isoformat())
+            if x["id"] != entry_id and x.get("kind") == "forca" and x["status"] in ("planejado", "feito")
+            and abs((_d(x["date"]) - _d(to)).days) <= 1 and _conflict(saved, x)]
+    return {"entry": saved, "warning": (f"Atenção: fica colado em {warn[0]['day_name']} ({_fmt(warn[0]['date'])}), "
+                                        "que treina os mesmos músculos.") if warn else None}
+
+
+# ------------------------------------------------------------- metas da semana --
+
+def week_goals(entries: list[dict], profile: dict, ws: date) -> dict:
+    from .analysis import cardio_summary
+
+    sessions = _sessions_in_week(ws)
+    start = datetime.combine(ws, datetime.min.time())
+    end = start + timedelta(days=7)
+    cardio = cardio_summary(sessions, start, end, profile)
+    plan = schedule_plan(profile)
+    gen = (plan or {}).get("generator") or {}
+    target_cardio = float(profile.get("cardio_target_min") or gen.get("cardio_target") or 150)
+    planned = [e for e in entries if e["status"] not in ("substituido",)]
+    done_sets = sum(len(it.get("sets") or []) for s in sessions for it in s.get("items", []) if it.get("sets"))
+    planned_sets = sum(int(i.get("sets") or 0) for e in planned for i in _strength_items(e))
+    minutes_done = sum(time_breakdown(e.get("items", []))["total"] for e in entries if e["status"] == "feito")
+    return {
+        "sessions": {"done": sum(1 for e in entries if e["status"] == "feito") or len(sessions),
+                     "planned": sum(1 for e in planned if e["status"] != "pulado")},
+        "cardio": {"done": cardio["who_equivalent"], "target": round(target_cardio)},
+        "sets": {"done": done_sets, "planned": planned_sets},
+        "minutes": {"done": round(minutes_done), "planned": round(sum(time_breakdown(e.get("items", []))["total"]
+                                                                       for e in planned if e["status"] != "pulado"))},
+    }

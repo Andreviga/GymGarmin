@@ -55,8 +55,17 @@ def normalize_day(day: dict) -> list[dict]:
     return out
 
 
+def _phase(it: dict) -> str:
+    return it.get("phase") or "principal"
+
+
 def is_cardio_only(items: list[dict]) -> bool:
-    return bool(items) and all(i["_ex"]["kind"] == "cardio" for i in items)
+    main = [i for i in items if _phase(i) == "principal"]
+    return bool(main) and all(i["_ex"]["kind"] == "cardio" for i in main)
+
+
+def _phase_step_type(it: dict, default: str) -> str:
+    return {"preparo": "warmup", "pos": "cooldown"}.get(_phase(it), default)
 
 
 def _garmin_override(ex: dict, overrides: dict | None) -> dict:
@@ -83,22 +92,9 @@ def _notes(it: dict, extra: str | None = None) -> str | None:
 
 
 def estimate_duration_s(items: list[dict]) -> int:
-    total = 0
-    for it in items:
-        ex = it["_ex"]
-        if ex["kind"] == "cardio":
-            iv = it.get("intervals")
-            if iv and iv.get("repeats"):
-                total += int(iv["repeats"]) * (int(iv.get("work_s") or 0) + int(iv.get("rest_s") or 0))
-                total += int(float(it.get("warmup_min") or 0) * 60 + float(it.get("cooldown_min") or 0) * 60)
-            else:
-                total += int(float(it.get("duration_min") or 0) * 60)
-        else:
-            sets = int(it.get("sets") or 3)
-            reps, _ = parse_reps(it.get("reps"))
-            work = int(it.get("duration_s") or 0) or max(20, reps * 3)
-            total += sets * (work + int(it.get("rest_s") or 90))
-    return total
+    from .generator import item_time
+
+    return int(sum(item_time(i)["total"] for i in items))
 
 
 # ---------------------------------------------------------------------------
@@ -187,8 +183,8 @@ def _cardio_steps_connect(order: _Order, it: dict, ex: dict, in_strength: bool, 
                                     **ex_fields, **_zone_target(1)))
         return steps
     step_type = {"first": "warmup", "last": "cooldown"}.get(position, "interval")
-    if not in_strength:
-        step_type = "interval"
+    if not in_strength or it.get("phase"):
+        step_type = _phase_step_type(it, "interval")
     steps.append(_exec_step(order, step_type, COND_TIME, float(it.get("duration_min") or 10) * 60,
                             description=desc, **ex_fields, **_zone_target(it.get("zone"))))
     return steps
@@ -225,6 +221,14 @@ def _strength_block_connect(order: _Order, it: dict, ex: dict, overrides: dict |
     }
 
 
+def _phase_step_connect(order: _Order, it: dict, ex: dict, overrides: dict | None, with_exercise: bool) -> dict:
+    g = _garmin_override(ex, overrides)
+    secs = int(it.get("duration_s") or 30) * max(1, int(it.get("sets") or 1))
+    extra = {"category": g["category"], "exerciseName": g["exercise"]} if with_exercise else {}
+    return _exec_step(order, _phase_step_type(it, "warmup"), COND_TIME, secs,
+                      description=_notes(it, ex["name"]), **extra)
+
+
 def to_connect_json(day: dict, plan_name: str = "", overrides: dict | None = None) -> dict:
     items = normalize_day(day)
     if not items:
@@ -233,11 +237,15 @@ def to_connect_json(day: dict, plan_name: str = "", overrides: dict | None = Non
     order = _Order()
     steps: list[dict] = []
     if is_cardio_only(items):
-        sport_key = items[0]["_ex"].get("connect_sport", "cardio_training")
-        if any(i["_ex"].get("connect_sport") != sport_key for i in items):
+        cardio_items = [i for i in items if i["_ex"]["kind"] == "cardio"]
+        sport_key = cardio_items[0]["_ex"].get("connect_sport", "cardio_training")
+        if any(i["_ex"].get("connect_sport") != sport_key for i in cardio_items):
             sport_key = "cardio_training"
         for idx, it in enumerate(items):
-            steps += _cardio_steps_connect(order, it, it["_ex"], False, "", overrides)
+            if it["_ex"]["kind"] == "cardio":
+                steps += _cardio_steps_connect(order, it, it["_ex"], False, "", overrides)
+            else:
+                steps.append(_phase_step_connect(order, it, it["_ex"], overrides, False))
     else:
         sport_key = "strength_training"
         for idx, it in enumerate(items):
@@ -245,6 +253,8 @@ def to_connect_json(day: dict, plan_name: str = "", overrides: dict | None = Non
             if ex["kind"] == "cardio":
                 pos = "first" if idx == 0 else ("last" if idx == len(items) - 1 else "")
                 steps += _cardio_steps_connect(order, it, ex, True, pos, overrides)
+            elif _phase(it) in ("preparo", "pos"):
+                steps.append(_phase_step_connect(order, it, ex, overrides, True))
             else:
                 steps.append(_strength_block_connect(order, it, ex, overrides))
     sport = SPORTS[sport_key]
@@ -320,8 +330,9 @@ def to_fit(day: dict, plan_name: str = "", overrides: dict | None = None,
 
     cardio_only = is_cardio_only(items)
     if cardio_only:
-        fs = items[0]["_ex"].get("fit_sport", {"sport": "fitness_equipment", "sub_sport": "cardio_training"})
-        if any(i["_ex"].get("fit_sport") != fs for i in items):
+        cardio_items = [i for i in items if i["_ex"]["kind"] == "cardio"]
+        fs = cardio_items[0]["_ex"].get("fit_sport", {"sport": "fitness_equipment", "sub_sport": "cardio_training"})
+        if any(i["_ex"].get("fit_sport") != fs for i in cardio_items):
             fs = {"sport": "fitness_equipment", "sub_sport": "cardio_training"}
         sport, sub_sport = fs["sport"], fs["sub_sport"]
     else:
@@ -360,13 +371,21 @@ def to_fit(day: dict, plan_name: str = "", overrides: dict | None = None,
                          **hr(1), **ex_fields})
             else:
                 intensity = "active"
-                if not cardio_only:
+                if it.get("phase") in ("preparo", "pos"):
+                    intensity = "warmup" if it["phase"] == "preparo" else "cooldown"
+                elif not cardio_only and not it.get("phase"):
                     intensity = "warmup" if idx == 0 else ("cooldown" if idx == len(items) - 1 else "active")
                 add({"wkt_step_name": label, "duration_type": "time",
                      "duration_value": int(float(it.get("duration_min") or 10) * 60_000), "intensity": intensity,
                      **hr(it.get("zone")), **ex_fields, **({"notes": notes} if notes else {})})
             continue
 
+        if _phase(it) in ("preparo", "pos"):
+            secs = int(it.get("duration_s") or 30) * max(1, int(it.get("sets") or 1))
+            add({"wkt_step_name": label, "duration_type": "time", "duration_value": secs * 1000,
+                 "intensity": "warmup" if _phase(it) == "preparo" else "cooldown", "target_type": "open",
+                 **({} if cardio_only else ex_fields)})
+            continue
         sets = max(1, int(it.get("sets") or 3))
         reps, reps_note = parse_reps(it.get("reps"))
         notes = _notes(it, reps_note)

@@ -70,3 +70,25 @@ def test_garmin_override(client):
     assert client.get("/api/exercises/Leg_Extensions").json()["garmin"]["confidence"] == "manual"
     bad = client.put("/api/exercises/Leg_Extensions/garmin", json={"category": "X", "exercise": "Y"})
     assert bad.status_code == 400
+
+
+def test_generator_and_agenda_flow(client):
+    client.put("/api/profile", json={"training_months": 18, "goal": "hibrido", "available_days": [0, 1, 2, 3, 4, 5],
+                                     "session_minutes": 60})
+    prev = client.post("/api/generator/preview", json={}).json()
+    assert prev["rationale"] and prev["analysis"]["muscles"]
+    plan = client.post("/api/generator/apply", json={}).json()
+    assert plan["generator"]["tier"] == "intermediario"
+    sch = client.get("/api/schedule").json()
+    assert sch["plan"]["id"] == plan["id"] and "goals" in sch
+    upcoming = [e for e in sch["entries"] if e["status"] == "planejado"]
+    if upcoming:
+        e = upcoming[0]
+        assert e["time"]["total"] > 0
+        pre = client.get(f"/api/schedule/{e['id']}/prefill").json()
+        assert pre["schedule_id"] == e["id"]
+        assert client.get(f"/api/schedule/{e['id']}/fit").content[8:12] == b".FIT"
+        r = client.post(f"/api/schedule/{e['id']}/skip").json()
+        assert r["changes"]
+        assert client.post(f"/api/schedule/{e['id']}/undo").status_code == 200
+    assert client.post("/api/schedule/push-week", json={}).status_code in (200, 401)

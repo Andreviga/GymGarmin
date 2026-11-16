@@ -167,3 +167,18 @@ input[type="checkbox"] { width: auto; min-height: 0; }
 .kpi { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .empty { text-align: center; padding: 24px 8px; color: var(--ink-2); }
 pre.json { font-size: 11px; overflow: auto; max-height: 50vh; background: var(--bg); padding: 10px; border-radius: 10px; }
+
+/* agenda e tempo */
+:root { --c-prep: #60a5fa; --c-work: #0f766e; --c-rest: #b6bec8; --c-cardio: #f59e0b; --c-post: #a78bfa; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --c-work: #2dd4bf; --c-rest: #4b5563; } }
+:root[data-theme="dark"] { --c-work: #2dd4bf; --c-rest: #4b5563; }
+.tbar { display: flex; height: 10px; border-radius: 5px; overflow: hidden; background: var(--line); margin: 6px 0 2px; }
+.tbar > span { display: block; height: 100%; }
+.dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin: 0 3px 0 6px; vertical-align: middle; }
+.day { border: 1px solid var(--line); border-radius: 12px; padding: 10px; }
+.day.today { border-color: var(--brand); box-shadow: 0 0 0 1px var(--brand) inset; }
+.day.dim { opacity: .75; }
+.changes { margin: 6px 0; padding-left: 18px; color: var(--ink-2); }
+ul.plain { margin: 4px 0 8px; padding-left: 18px; }
+.chip input { width: auto; min-height: 0; margin: 0 4px 0 0; vertical-align: middle; }
+label.chip { display: inline-flex; align-items: center; color: var(--ink); font-size: 13px; }

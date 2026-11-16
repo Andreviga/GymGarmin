@@ -11,7 +11,10 @@ from fastapi import Body, FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
-from . import analysis, catalog, db, garmin_export, garmin_sync, limitations, plans_io, templates
+from datetime import date, timedelta
+
+from . import (analysis, catalog, db, garmin_export, garmin_sync, generator, limitations, plans_io, progression,
+               schedule, templates)
 from .muscles import EQUIPMENT_PT, HR_ZONES, MUSCLES, hr_max, zone_bpm
 
 STATIC = Path(__file__).resolve().parent / "static"
@@ -112,6 +115,8 @@ def get_profile():
 @app.put("/api/profile")
 def put_profile(body: dict = Body(...)):
     body.pop("hr_max_calc", None)
+    if body.get("training_months") not in (None, ""):
+        body["level"] = generator.TIERS[generator.tier_for(body["training_months"])]["level"]
     return db.save_profile(body)
 
 
@@ -156,15 +161,23 @@ def del_plan(plan_id: int):
     return {"ok": True}
 
 
+def _plan_analysis(plan: dict) -> dict:
+    prof = _profile()
+    res = analysis.plan_report(plan, prof)
+    budget = schedule.session_budget(prof, plan)
+    res["times"] = [generator.time_breakdown(d.get("items", []), budget) for d in plan.get("days", [])]
+    return res
+
+
 @app.get("/api/plans/{plan_id}/analysis")
 def plan_analysis(plan_id: int):
-    return analysis.plan_report(_plan_or_404(plan_id), _profile())
+    return _plan_analysis(_plan_or_404(plan_id))
 
 
 @app.post("/api/plans/analyze")
 def plan_analysis_draft(body: dict = Body(...)):
     """Analisa uma planilha ainda não salva (editor)."""
-    return analysis.plan_report(body, _profile())
+    return _plan_analysis(body)
 
 
 def _day(plan: dict, idx: int) -> dict:
@@ -244,7 +257,13 @@ def sessions(since: str | None = None, limit: int = 100):
 @app.post("/api/sessions")
 def create_session(body: dict = Body(...)):
     try:
-        return db.save_session(body)
+        saved = db.save_session(body)
+        if body.get("schedule_id"):
+            e = db.get_entry(int(body["schedule_id"]))
+            if e:
+                e["status"] = "feito"
+                db.save_entry(e)
+        return saved
     except ValueError as e:
         raise HTTPException(409, str(e)) from e
 
@@ -268,33 +287,40 @@ def del_session(session_id: int):
     return {"ok": True}
 
 
-@app.get("/api/sessions/prefill/{plan_id}/{idx}")
-def session_prefill(plan_id: int, idx: int):
-    """Monta a sessão do dia a partir da planilha + última carga usada em cada exercício."""
-    plan = _plan_or_404(plan_id)
-    day = _day(plan, idx)
+def _prefill_items(day_items: list[dict], deload: bool = False) -> list[dict]:
     items = []
     lims = _profile().get("limitations") or []
-    for it in day.get("items", []):
+    for it in day_items:
         ex = catalog.get(it.get("exercise_id"))
         if not ex:
             continue
         last = db.last_performance(ex["id"])
         entry = {"exercise_id": ex["id"], "name": ex["name"], "kind": ex["kind"], "plan": it,
-                 "last": last, "limitation": limitations.check_exercise(ex, lims),
-                 "images": ex["images"][:1], "timed": ex.get("timed")}
+                 "phase": it.get("phase") or "principal", "last": last,
+                 "limitation": limitations.check_exercise(ex, lims), "images": ex["images"][:1], "timed": ex.get("timed")}
         if ex["kind"] == "cardio":
-            entry.update(duration_min=it.get("duration_min") or 10, zone=it.get("zone") or 2)
+            iv = it.get("intervals") or {}
+            mins = it.get("duration_min") or (garmin_export.estimate_duration_s([it]) / 60 if iv else 10)
+            entry.update(duration_min=round(mins), zone=it.get("zone") or iv.get("work_zone") or 2)
         else:
+            sug = progression.suggest(it, last, deload=deload or it.get("deload", False)) \
+                if entry["phase"] == "principal" and not ex.get("timed") else {"load_kg": it.get("load_kg"), "note": None}
+            entry["suggestion"] = sug
             reps, _ = garmin_export.parse_reps(it.get("reps"))
-            last_sets = (last or {}).get("sets") or []
-            load = it.get("load_kg") or (max((s.get("load_kg") or 0) for s in last_sets) if last_sets else None)
             entry["sets"] = [{"reps": reps if not it.get("duration_s") else None,
-                              "duration_s": it.get("duration_s"), "load_kg": load, "rpe": None, "done": False}
-                             for _ in range(int(it.get("sets") or 3))]
+                              "duration_s": it.get("duration_s"), "load_kg": sug.get("load_kg"), "rpe": None, "done": False}
+                             for _ in range(int(it.get("sets") or (1 if entry["phase"] != "principal" else 3)))]
         items.append(entry)
+    return items
+
+
+@app.get("/api/sessions/prefill/{plan_id}/{idx}")
+def session_prefill(plan_id: int, idx: int):
+    """Monta a sessão do dia a partir da planilha + progressão de carga do histórico."""
+    plan = _plan_or_404(plan_id)
+    day = _day(plan, idx)
     return {"plan_id": plan_id, "day_name": day.get("name"), "date": datetime.now().isoformat(timespec="minutes"),
-            "items": items}
+            "items": _prefill_items(day.get("items", []))}
 
 
 # ------------------------------------------------------------- análise ----
@@ -364,6 +390,181 @@ def g_import(activity_id: int):
         raise HTTPException(409, str(e)) from e
     except RuntimeError as e:
         raise HTTPException(401, str(e)) from e
+
+
+# ----------------------------------------------------- gerador automático ----
+
+@app.get("/api/generator/options")
+def generator_options():
+    return {
+        "tiers": [{"id": k, "label": v["label"], "months": v["months"]} for k, v in generator.TIERS.items()],
+        "goals": [{"id": k, "label": v["label"], "cardio_target": v["cardio_target"]} for k, v in generator.GOALS.items()],
+        "weekdays": generator.WEEKDAYS,
+        "cardio_machines": [{"id": e["id"], "name": e["name"]} for e in catalog.all_exercises() if e.get("machine")],
+    }
+
+
+@app.post("/api/generator/preview")
+def generator_preview(body: dict = Body(default={})):
+    prof = {**_profile(), **(body.get("profile") or {})}
+    plan = generator.generate(prof, int(body.get("seed") or 0))
+    plan["analysis"] = analysis.plan_report(plan, prof)
+    return plan
+
+
+@app.post("/api/generator/apply")
+def generator_apply(body: dict = Body(default={})):
+    """Gera, salva a planilha, define como planilha da agenda e (re)monta a semana."""
+    overrides = body.get("profile") or {}
+    if overrides:
+        db.save_profile(overrides)
+    prof = _profile()
+    seed = int(body.get("seed") or 0)
+    plan = generator.generate(prof, seed)
+    plan["generator"]["cycle_start"] = schedule.week_start(date.today()).isoformat()
+    for p in db.list_plans():
+        if p.get("generator") and p.get("active"):
+            p["active"] = False
+            db.update_plan(p["id"], p)
+    saved = db.create_plan(plan)
+    db.save_profile({"schedule_plan_id": saved["id"]})
+    schedule.rebuild_week(_profile())
+    return saved
+
+
+# --------------------------------------------------------------- agenda ----
+
+def _entry_view(e: dict, budget: float) -> dict:
+    e = dict(e)
+    e["can_undo"] = bool(e.pop("undo", None))
+    e["time"] = generator.time_breakdown(e.get("items", []), budget)
+    e["weekday"] = generator.WEEKDAYS[date.fromisoformat(e["date"]).weekday()]
+    for it in e.get("items", []):
+        ex = catalog.get(it.get("exercise_id"))
+        it["_name"] = ex["name"] if ex else it.get("exercise_id")
+    return e
+
+
+@app.get("/api/schedule")
+def get_schedule(date_: str | None = Query(None, alias="date")):
+    prof = _profile()
+    day = date.fromisoformat(date_) if date_ else date.today()
+    entries = schedule.ensure_week(prof, day)
+    ws = schedule.week_start(day)
+    plan = schedule.schedule_plan(prof)
+    budget = schedule.session_budget(prof, plan)
+    cycle = next((e.get("cycle") for e in entries if e.get("cycle")), None)
+    return {
+        "week_start": ws.isoformat(), "today": date.today().isoformat(),
+        "plan": {"id": plan["id"], "name": plan["name"], "generator": plan.get("generator")} if plan else None,
+        "cycle": cycle, "budget": budget,
+        "entries": [_entry_view(e, budget) for e in entries],
+        "goals": schedule.week_goals(entries, prof, ws),
+    }
+
+
+def _entry_or_404(entry_id: int) -> dict:
+    e = db.get_entry(entry_id)
+    if not e:
+        raise HTTPException(404, "Treino da agenda não encontrado")
+    return e
+
+
+@app.post("/api/schedule/{entry_id}/skip")
+def schedule_skip(entry_id: int):
+    try:
+        return schedule.handle_missed(entry_id, _profile())
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from e
+
+
+@app.post("/api/schedule/{entry_id}/undo")
+def schedule_undo(entry_id: int):
+    try:
+        schedule.undo(entry_id)
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from e
+    return {"ok": True}
+
+
+@app.post("/api/schedule/{entry_id}/move")
+def schedule_move(entry_id: int, body: dict = Body(...)):
+    try:
+        return schedule.move(entry_id, body["date"])
+    except (ValueError, KeyError) as e:
+        raise HTTPException(400, str(e)) from e
+
+
+@app.post("/api/schedule/rebuild")
+def schedule_rebuild():
+    schedule.rebuild_week(_profile())
+    return {"ok": True}
+
+
+@app.get("/api/schedule/{entry_id}/prefill")
+def schedule_prefill(entry_id: int):
+    e = _entry_or_404(entry_id)
+    deload = bool((e.get("cycle") or {}).get("deload"))
+    return {"schedule_id": e["id"], "plan_id": e.get("plan_id"), "day_name": e.get("day_name"),
+            "date": e["date"] + datetime.now().strftime("T%H:%M"), "deload": deload,
+            "items": _prefill_items(e.get("items", []), deload)}
+
+
+def _entry_day(e: dict) -> dict:
+    d = date.fromisoformat(e["date"])
+    return {"name": f"{e.get('day_name')} {d.day:02d}/{d.month:02d}", "items": e.get("items", []),
+            "notes": "; ".join(e.get("changes") or []) or None}
+
+
+@app.get("/api/schedule/{entry_id}/fit")
+def schedule_fit(entry_id: int):
+    e = _entry_or_404(entry_id)
+    data = garmin_export.to_fit(_entry_day(e), "", db.garmin_overrides())
+    fname = garmin_export.fit_filename(e["date"], e.get("day_name") or "treino")
+    return Response(data, media_type="application/octet-stream",
+                    headers={"Content-Disposition": f'attachment; filename="{fname}"'})
+
+
+def _push_entry(e: dict) -> dict:
+    if e.get("garmin_workout_id"):
+        try:
+            garmin_sync.delete_workout(int(e["garmin_workout_id"]))
+        except Exception:  # noqa: BLE001 - versão antiga pode já ter sido apagada
+            pass
+    payload = garmin_export.to_connect_json(_entry_day(e), "", db.garmin_overrides())
+    res = garmin_sync.push_workout(payload, e["date"])
+    e["garmin_workout_id"] = res.get("workout_id")
+    e["garmin_outdated"] = False
+    db.save_entry(e)
+    db.log_push(e.get("plan_id"), e.get("day_name"), res.get("workout_id"), e["date"])
+    return res
+
+
+def _garmin_call(fn):
+    try:
+        return fn()
+    except garmin_sync.GarminUnavailable as e:
+        raise HTTPException(501, str(e)) from e
+    except RuntimeError as e:
+        raise HTTPException(401, str(e)) from e
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(502, f"Garmin Connect recusou o envio: {e}") from e
+
+
+@app.post("/api/schedule/{entry_id}/push")
+def schedule_push(entry_id: int):
+    e = _entry_or_404(entry_id)
+    return _garmin_call(lambda: _push_entry(e))
+
+
+@app.post("/api/schedule/push-week")
+def schedule_push_week(body: dict = Body(default={})):
+    only_outdated = bool(body.get("only_outdated"))
+    today = date.today()
+    ws = schedule.week_start(today)
+    entries = [e for e in db.list_schedule(today.isoformat(), (ws + timedelta(days=6)).isoformat())
+               if e["status"] == "planejado" and (not only_outdated or e.get("garmin_outdated") or not e.get("garmin_workout_id"))]
+    return _garmin_call(lambda: [{"date": e["date"], **_push_entry(e)} for e in entries])
 
 
 # ------------------------------------------------------------- estático ----

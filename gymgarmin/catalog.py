@@ -31,6 +31,11 @@ CARDIO_MERGE = {
     "cardio_corda": ["Rope_Jumping"],
 }
 
+# Correções de dados do free-exercise-db (músculos errados na fonte)
+MUSCLE_FIXES = {
+    "Cable_Hip_Adduction": (["adductors"], ["glutes"]),
+}
+
 # Nomes em português dos exercícios mais comuns de academia no Brasil
 NAMES_PT = {
     "Barbell_Bench_Press_-_Medium_Grip": "Supino reto com barra",
@@ -250,8 +255,8 @@ def _load() -> tuple[list[dict], dict[str, dict]]:
             "force_pt": FORCE_PT.get(e.get("force")),
             "mechanic": e.get("mechanic"),
             "mechanic_pt": MECHANIC_PT.get(e.get("mechanic")),
-            "primaryMuscles": e.get("primaryMuscles", []),
-            "secondaryMuscles": e.get("secondaryMuscles", []),
+            "primaryMuscles": MUSCLE_FIXES.get(e["id"], (e.get("primaryMuscles", []),))[0],
+            "secondaryMuscles": MUSCLE_FIXES[e["id"]][1] if e["id"] in MUSCLE_FIXES else e.get("secondaryMuscles", []),
             "instructions": e.get("instructions", []),
             "images": [IMAGE_BASE + i for i in e.get("images", [])],
             "garmin": g,

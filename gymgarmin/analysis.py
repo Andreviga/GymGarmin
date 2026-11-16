@@ -341,6 +341,10 @@ def weekly_report(sessions: list[dict], profile: dict | None = None, now: dateti
         recs.append({"level": "dica", "muscle": None,
                      "text": f"Por suas limitações, mantenha o cardio até a zona {mz} ({HR_ZONES[mz]['pt']}).", "suggestions": []})
 
+    if not sessions:
+        recs = [{"level": "dica", "muscle": None, "suggestions": [],
+                 "text": "Ainda não há treinos registrados. Depois do primeiro treino o app mostra volume por músculo, "
+                         "músculos esquecidos e equilíbrio."}]
     return {
         "period": {"start": start7.date().isoformat(), "end": end.date().isoformat()},
         "muscles": muscles,
