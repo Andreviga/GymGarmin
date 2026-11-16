@@ -1,0 +1,11 @@
+{
+  "name": "GymGarmin",
+  "short_name": "GymGarmin",
+  "description": "Treinos de academia com análise muscular e envio para o Garmin",
+  "start_url": "/#hoje",
+  "display": "standalone",
+  "background_color": "#0e1114",
+  "theme_color": "#0f766e",
+  "lang": "pt-BR",
+  "icons": [{ "src": "/static/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
+}

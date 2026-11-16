@@ -1,0 +1,5258 @@
+{
+"3_4_Sit-Up": {
+"category": "SIT_UP",
+"confidence": "alta",
+"exercise": "SIT_UP",
+"garmin_name": "Sit-up"
+},
+"90_90_Hamstring": {
+"category": "WARM_UP",
+"confidence": "generica",
+"exercise": "WARM_UP",
+"garmin_name": "Warm-up"
+},
+"Ab_Crunch_Machine": {
+"category": "CRUNCH",
+"confidence": "alta",
+"exercise": "CRUNCH",
+"garmin_name": "Crunch"
+},
+"Ab_Roller": {
+"category": "CORE",
+"confidence": "generica",
+"exercise": "CORE",
+"garmin_name": "Core"
+},
+"Adductor": {
+"category": "WARM_UP",
+"confidence": "generica",
+"exercise": "WARM_UP",
+"garmin_name": "Warm-up"
+},
+"Adductor_Groin": {
+"category": "WARM_UP",
+"confidence": "generica",
+"exercise": "WARM_UP",
+"garmin_name": "Warm-up"
+},
+"Advanced_Kettlebell_Windmill": {
+"category": "CORE",
+"confidence": "alta",
+"exercise": "KETTLEBELL_WINDMILL",
+"garmin_name": "Kettlebell Windmill"
+},
+"Air_Bike": {
+"category": "INDOOR_BIKE",
+"confidence": "alta",
+"exercise": "AIR_BIKE",
+"garmin_name": "Air Bike"
+},
+"All_Fours_Quad_Stretch": {
+"category": "WARM_UP",
+"confidence": "alta",
+"exercise": "STRETCH_QUAD",
+"garmin_name": "Quad Stretch"
+},
+"Alternate_Hammer_Curl": {
+"category": "CURL",
+"confidence": "alta",
+"exercise": "DUMBBELL_HAMMER_CURL",
+"garmin_name": "Dumbbell Hammer Curl"
+},
+"Alternate_Heel_Touchers": {
+"category": "CORE",
+"confidence": "generica",
+"exercise": "CORE",
+"garmin_name": "Core"
+},
+"Alternate_Incline_Dumbbell_Curl": {
+"category": "CURL",
+"confidence": "alta",
+"exercise": "INCLINE_DUMBBELL_BICEPS_CURL",
+"garmin_name": "Incline Dumbbell Biceps Curl"
+},
+"Alternate_Leg_Diagonal_Bound": {
+"category": "PLYO",
+"confidence": "generica",
+"exercise": "PLYO",
+"garmin_name": "Plyo"
+},
+"Alternating_Cable_Shoulder_Press": {
+"category": "SHOULDER_PRESS",
+"confidence": "alta",
+"exercise": "SHOULDER_PRESS",
+"garmin_name": "Shoulder Press"
+},
+"Alternating_Deltoid_Raise": {
+"category": "SHOULDER_PRESS",
+"confidence": "generica",
+"exercise": "SHOULDER_PRESS",
+"garmin_name": "Shoulder Press"
+},
+"Alternating_Floor_Press": {
+"category": "BENCH_PRESS",
+"confidence": "alta",
+"exercise": "BARBELL_FLOOR_PRESS",
+"garmin_name": "Barbell Floor Press"
+},
+"Alternating_Hang_Clean": {
+"category": "OLYMPIC_LIFT",
+"confidence": "media",
+"exercise": "CLEAN_AND_JERK",
+"garmin_name": "Clean and Jerk"
+},
+"Alternating_Kettlebell_Press": {
+"category": "BENCH_PRESS",
+"confidence": "media",
+"exercise": "KETTLEBELL_CHEST_PRESS",
+"garmin_name": "Kettlebell Chest Press"
+},
+"Alternating_Kettlebell_Row": {
+"category": "ROW",
+"confidence": "alta",
+"exercise": "KETTLEBELL_ROW",
+"garmin_name": "Kettlebell Row"
+},
+"Alternating_Renegade_Row": {
+"category": "ROW",
+"confidence": "alta",
+"exercise": "RENEGADE_ROW",
+"garmin_name": "Renegade Row"
+},
+"Ankle_Circles": {
+"category": "WARM_UP",
+"confidence": "alta",
+"exercise": "ANKLE_CIRCLES",
+"garmin_name": "Ankle Circles"
+},
+"Ankle_On_The_Knee": {
+"category": "WARM_UP",
+"confidence": "generica",
+"exercise": "WARM_UP",
+"garmin_name": "Warm-up"
+},
+"Anterior_Tibialis-SMR": {
+"category": "WARM_UP",
+"confidence": "generica",
+"exercise": "WARM_UP",
+"garmin_name": "Warm-up"
+},
+"Anti-Gravity_Press": {
+"category": "SHOULDER_PRESS",
+"confidence": "generica",
+"exercise": "SHOULDER_PRESS",
+"garmin_name": "Shoulder Press"
+},
+"Arm_Circles": {
+"category": "WARM_UP",
+"confidence": "alta",
+"exercise": "ARM_CIRCLES",
+"garmin_name": "Arm Circles"
+},
+"Arnold_Dumbbell_Press": {
+"category": "SHOULDER_PRESS",
+"confidence": "alta",
+"exercise": "ARNOLD_PRESS",
+"garmin_name": "Arnold Press"
+},
+"Around_The_Worlds": {
+"category": "SANDBAG",
+"confidence": "media",
+"exercise": "AROUND_THE_WORLD",
+"garmin_name": "Sandbag Around the World"
+},
+"Atlas_Stone_Trainer": {
+"category": "HYPEREXTENSION",
+"confidence": "generica",
+"exercise": "HYPEREXTENSION",
+"garmin_name": "Hyperextension"
+},
+"Atlas_Stones": {
+"category": "HYPEREXTENSION",
+"confidence": "generica",
+"exercise": "HYPEREXTENSION",
+"garmin_name": "Hyperextension"
+},
+"Axle_Deadlift": {
+"category": "DEADLIFT",
+"confidence": "alta",
+"exercise": "DEADLIFT",
+"garmin_name": "Deadlift"
+},
+"Back_Flyes_-_With_Bands": {
+"category": "FLYE",
+"confidence": "alta",
+"exercise": "FLYE",
+"garmin_name": "Fly"
+},
+"Backward_Drag": {
+"category": "SLED",
+"confidence": "alta",
+"exercise": "BACKWARD_DRAG",
+"garmin_name": "Sled Backward Drag"
+},
+"Backward_Medicine_Ball_Throw": {
+"category": "PLYO",
+"confidence": "media",
+"exercise": "MEDICINE_BALL_OVERHEAD_THROWS",
+"garmin_name": "Medicine Ball Overhead Throws"
+},
+"Balance_Board": {
+"category": "CALF_RAISE",
+"confidence": "generica",
+"exercise": "CALF_RAISE",
+"garmin_name": "Calf Raise"
+},
+"Ball_Leg_Curl": {
+"category": "LEG_CURL",
+"confidence": "alta",
+"exercise": "LEG_CURL",
+"garmin_name": "Leg Curl"
+},
+"Band_Assisted_Pull-Up": {
+"category": "PULL_UP",
+"confidence": "alta",
+"exercise": "BAND_ASSISTED_PULL_UP",
+"garmin_name": "Band-assisted Pull-up"
+},
+"Band_Good_Morning": {
+"category": "LEG_CURL",
+"confidence": "alta",
+"exercise": "BAND_GOOD_MORNING",
+"garmin_name": "Band Good Morning"
+},
+"Band_Good_Morning_Pull_Through": {
+"category": "HIP_RAISE",
+"confidence": "generica",
+"exercise": "HIP_RAISE",
+"garmin_name": "Hip Raise"
+},
+"Band_Hip_Adductions": {
+"category": "HIP_STABILITY",
+"confidence": "media",
+"exercise": "SLIDING_HIP_ADDUCTION",
+"garmin_name": "Sliding Hip Adduction"
+},
+"Band_Pull_Apart": {
+"category": "PULL_UP",
+"confidence": "media",
+"exercise": "BAND_ASSISTED_PULL_UP",
+"garmin_name": "Band-assisted Pull-up"
+},
+"Band_Skull_Crusher": {
+"category": "TRICEPS_EXTENSION",
+"confidence": "generica",
+"exercise": "TRICEPS_EXTENSION",
+"garmin_name": "Triceps Extension"
+},
+"Barbell_Ab_Rollout": {
+"category": "CORE",
+"confidence": "media",
+"exercise": "ABS_JABS",
+"garmin_name": "Abs Jabs"
+},
+"Barbell_Ab_Rollout_-_On_Knees": {
+"category": "CORE",
+"confidence": "media",
+"exercise": "ABS_JABS",
+"garmin_name": "Abs Jabs"
+},
+"Barbell_Bench_Press_-_Medium_Grip": {
+"category": "BENCH_PRESS",
+"confidence": "alta",
+"exercise": "BARBELL_BENCH_PRESS",
+"garmin_name": "Barbell Bench Press"
+},
+"Barbell_Curl": {
+"category": "CURL",
+"confidence": "alta",
+"exercise": "BARBELL_BICEPS_CURL",
+"garmin_name": "Barbell Biceps Curl"
+},
+"Barbell_Curls_Lying_Against_An_Incline": {
+"category": "CURL",
+"confidence": "media",
+"exercise": "BARBELL_BICEPS_CURL",
+"garmin_name": "Barbell Biceps Curl"
+},
+"Barbell_Deadlift": {
+"category": "DEADLIFT",
+"confidence": "alta",
+"exercise": "BARBELL_DEADLIFT",
+"garmin_name": "Barbell Deadlift"
+},
+"Barbell_Full_Squat": {
+"category": "SQUAT",
+"confidence": "alta",
+"exercise": "BARBELL_BACK_SQUAT",
+"garmin_name": "Barbell Back Squat"
+},
+"Barbell_Glute_Bridge": {
+"category": "HIP_RAISE",
+"confidence": "media",
+"exercise": "CLAM_BRIDGE",
+"garmin_name": "Clam Bridge"
+},
+"Barbell_Guillotine_Bench_Press": {
+"category": "BENCH_PRESS",
+"confidence": "alta",
+"exercise": "BARBELL_BENCH_PRESS",
+"garmin_name": "Barbell Bench Press"
+},
+"Barbell_Hack_Squat": {
+"category": "SQUAT",
+"confidence": "alta",
+"exercise": "BARBELL_HACK_SQUAT",
+"garmin_name": "Barbell Hack Squat"
+},
+"Barbell_Hip_Thrust": {
+"category": "HIP_RAISE",
+"confidence": "alta",
+"exercise": "BARBELL_HIP_THRUST_ON_FLOOR",
+"garmin_name": "Barbell Hip Thrust on Floor"
+},
+"Barbell_Incline_Bench_Press_-_Medium_Grip": {
+"category": "BENCH_PRESS",
+"confidence": "alta",
+"exercise": "INCLINE_BARBELL_BENCH_PRESS",
+"garmin_name": "Incline Barbell Bench Press"
+},
+"Barbell_Incline_Shoulder_Raise": {
+"category": "LATERAL_RAISE",
+"confidence": "media",
+"exercise": "COMBO_SHOULDER_RAISE",
+"garmin_name": "Combo Shoulder Raise"
+},
+"Barbell_Lunge": {
+"category": "LUNGE",
+"confidence": "alta",
+"exercise": "BARBELL_LUNGE",
+"garmin_name": "Barbell Lunge"
+},
+"Barbell_Rear_Delt_Row": {
+"category": "LATERAL_RAISE",
+"confidence": "media",
+"exercise": "CALORIE_ROW",
+"garmin_name": "Calorie Row"
+},
+"Barbell_Rollout_from_Bench": {
+"category": "CORE",
+"confidence": "media",
+"exercise": "BARBELL_ROLLOUT",
+"garmin_name": "Barbell Roll-out"
+},
+"Barbell_Seated_Calf_Raise": {
+"category": "CALF_RAISE",
+"confidence": "alta",
+"exercise": "SEATED_CALF_RAISE",
+"garmin_name": "Seated Calf Raise"
+},
+"Barbell_Shoulder_Press": {
+"category": "SHOULDER_PRESS",
+"confidence": "alta",
+"exercise": "BARBELL_SHOULDER_PRESS",
+"garmin_name": "Barbell Shoulder Press"
+},
+"Barbell_Shrug": {
+"category": "SHRUG",
+"confidence": "alta",
+"exercise": "BARBELL_SHRUG",
+"garmin_name": "Barbell Shrug"
+},
+"Barbell_Shrug_Behind_The_Back": {
+"category": "SHRUG",
+"confidence": "alta",
+"exercise": "BEHIND_THE_BACK_SHRUG",
+"garmin_name": "Behind-the-Back Shrug"
+},
+"Barbell_Side_Bend": {
+"category": "CORE",
+"confidence": "alta",
+"exercise": "SIDE_BEND",
+"garmin_name": "Side Bend"
+},
+"Barbell_Side_Split_Squat": {
+"category": "LUNGE",
+"confidence": "alta",
+"exercise": "BARBELL_SPLIT_SQUAT",
+"garmin_name": "Barbell Split Squat"
+},
+"Barbell_Squat": {
+"category": "SQUAT",
+"confidence": "alta",
+"exercise": "BARBELL_BACK_SQUAT",
+"garmin_name": "Barbell Back Squat"
+},
+"Barbell_Squat_To_A_Bench": {
+"category": "SQUAT",
+"confidence": "alta",
+"exercise": "BARBELL_BACK_SQUAT",
+"garmin_name": "Barbell Back Squat"
+},
+"Barbell_Step_Ups": {
+"category": "SQUAT",
+"confidence": "media",
+"exercise": "BARBELL_STEPOVER",
+"garmin_name": "Barbell Step-over"
+},
+"Barbell_Walking_Lunge": {
+"category": "LUNGE",
+"confidence": "alta",
+"exercise": "WALKING_BARBELL_LUNGE",
+"garmin_name": "Walking Barbell Lunge"
+},
+"Battling_Ropes": {
+"category": "BATTLE_ROPE",
+"confidence": "alta",
+"exercise": "BATTLE_ROPE",
+"garmin_name": "Battle Rope"
+},
+"Bear_Crawl_Sled_Drags": {
+"category": "SLED",
+"confidence": "alta",
+"exercise": "BACKWARD_DRAG",
+"garmin_name": "Sled Backward Drag"
+},
+"Behind_Head_Chest_Stretch": {
+"category": "WARM_UP",
+"confidence": "alta",
+"exercise": "STRETCH_WALL_CHEST_AND_SHOULDER",
+"garmin_name": "Wall Chest and Shoulder Stretch"
+},
+"Bench_Dips": {
+"category": "TRICEPS_EXTENSION",
+"confidence": "alta",
+"exercise": "BENCH_DIP",
+"garmin_name": "Bench Dip"
+},
+"Bench_Jump": {
+"category": "PLYO",
+"confidence": "alta",
+"exercise": "BOX_JUMP",
+"garmin_name": "Box Jump"
+},
+"Bench_Press_-_Powerlifting": {
+"category": "BENCH_PRESS",
+"confidence": "alta",
+"exercise": "BENCH_PRESS",
+"garmin_name": "Bench Press"
+},
+"Bench_Press_-_With_Bands": {
+"category": "BENCH_PRESS",
+"confidence": "alta",
+"exercise": "BENCH_PRESS",
+"garmin_name": "Bench Press"
+},
+"Bench_Press_with_Chains": {
+"category": "BENCH_PRESS",
+"confidence": "alta",
+"exercise": "BENCH_PRESS",
+"garmin_name": "Bench Press"
+},
+"Bench_Sprint": {
+"category": "RUN",
+"confidence": "media",
+"exercise": "SPRINT",
+"garmin_name": "Sprint"
+},
+"Bent-Arm_Barbell_Pullover": {
+"category": "PULL_UP",
+"confidence": "generica",
+"exercise": "PULL_UP",
+"garmin_name": "Pull-up"
+},
+"Bent-Arm_Dumbbell_Pullover": {
+"category": "BENCH_PRESS",
+"confidence": "generica",
+"exercise": "BENCH_PRESS",
+"garmin_name": "Bench Press"
+},
+"Bent-Knee_Hip_Raise": {
+"category": "HIP_RAISE",
+"confidence": "alta",
+"exercise": "HIP_RAISE_WITH_KNEE_SQUEEZE",
+"garmin_name": "Hip Raise with Knee Squeeze"
+},
+"Bent_Over_Barbell_Row": {
+"category": "ROW",
+"confidence": "alta",
+"exercise": "BENT_OVER_ROW_WITH_BARBELL",
+"garmin_name": "Bent-over Row with Barbell"
+},
+"Bent_Over_Dumbbell_Rear_Delt_Raise_With_Head_On_Bench": {
+"category": "LATERAL_RAISE",
+"confidence": "alta",
+"exercise": "BENT_OVER_LATERAL_RAISE",
+"garmin_name": "Bent-over Lateral Raise"
+},
+"Bent_Over_Low-Pulley_Side_Lateral": {
+"category": "LATERAL_RAISE",
+"confidence": "media",
+"exercise": "BENT_OVER_LATERAL_RAISE",
+"garmin_name": "Bent-over Lateral Raise"
+},
+"Bent_Over_One-Arm_Long_Bar_Row": {
+"category": "ROW",
+"confidence": "alta",
+"exercise": "ONE_ARM_BENT_OVER_ROW",
+"garmin_name": "One-arm Bent-over Row"
+},
+"Bent_Over_Two-Arm_Long_Bar_Row": {
+"category": "ROW",
+"confidence": "alta",
+"exercise": "ONE_ARM_BENT_OVER_ROW",
+"garmin_name": "One-arm Bent-over Row"
+},
+"Bent_Over_Two-Dumbbell_Row": {
+"category": "ROW",
+"confidence": "alta",
+"exercise": "BENT_OVER_ROW_WITH_DUMBELL",
+"garmin_name": "Bent-over Row with Dumbbell"
+},
+"Bent_Over_Two-Dumbbell_Row_With_Palms_In": {
+"category": "ROW",
+"confidence": "alta",
+"exercise": "BENT_OVER_ROW_WITH_DUMBELL",
+"garmin_name": "Bent-over Row with Dumbbell"
+},
+"Bent_Press": {
+"category": "CORE",
+"confidence": "generica",
+"exercise": "CORE",
+"garmin_name": "Core"
+},
+"Bicycling": {
+"category": "CARDIO",
+"confidence": "generica",
+"exercise": "CARDIO",
+"garmin_name": "Cardio"
+},
+"Bicycling_Stationary": {
+"category": "CARDIO",
+"confidence": "generica",
+"exercise": "CARDIO",
+"garmin_name": "Cardio"
+},
+"Board_Press": {
+"category": "BENCH_PRESS",
+"confidence": "alta",
+"exercise": "BARBELL_BOARD_BENCH_PRESS",
+"garmin_name": "Barbell Board Bench Press"
+},
+"Body-Up": {
+"category": "TRICEPS_EXTENSION",
+"confidence": "generica",
+"exercise": "TRICEPS_EXTENSION",
+"garmin_name": "Triceps Extension"
+},
+"Body_Tricep_Press": {
+"category": "TRICEPS_EXTENSION",
+"confidence": "alta",
+"exercise": "TRICEPS_PRESS",
+"garmin_name": "Triceps Press"
+},
+"Bodyweight_Flyes": {
+"category": "FLYE",
+"confidence": "alta",
+"exercise": "FLYE",
+"garmin_name": "Fly"
+},
+"Bodyweight_Mid_Row": {
+"category": "ROW",
+"confidence": "alta",
+"exercise": "ROW",
+"garmin_name": "Row"
+},
+"Bodyweight_Squat": {
+"category": "SQUAT",
+"confidence": "alta",
+"exercise": "SQUAT",
+"garmin_name": "Squat"
+},
+"Bodyweight_Walking_Lunge": {
+"category": "LUNGE",
+"confidence": "alta",
+"exercise": "WALKING_LUNGE",
+"garmin_name": "Walking Lunge"
+},
+"Bosu_Ball_Cable_Crunch_With_Side_Bends": {
+"category": "CRUNCH",
+"confidence": "alta",
+"exercise": "SWISS_BALL_SIDE_CRUNCH",
+"garmin_name": "Swiss Ball Side Crunch"
+},
+"Bottoms-Up_Clean_From_The_Hang_Position": {
+"category": "OLYMPIC_LIFT",
+"confidence": "generica",
+"exercise": "OLYMPIC_LIFT",
+"garmin_name": "Olympic Lift"
+},
+"Bottoms_Up": {
+"category": "CORE",
+"confidence": "generica",
+"exercise": "CORE",
+"garmin_name": "Core"
+},
+"Box_Jump_Multiple_Response": {
+"category": "PLYO",
+"confidence": "alta",
+"exercise": "BOX_JUMP",
+"garmin_name": "Box Jump"
+},
+"Box_Skip": {
+"category": "PLYO",
+"confidence": "media",
+"exercise": "BOX_JUMP",
+"garmin_name": "Box Jump"
+},
+"Box_Squat": {
+"category": "PLYO",
+"confidence": "alta",
+"exercise": "SQUAT_JUMP_ONTO_BOX",
+"garmin_name": "Squat Jump Onto Box"
+},
+"Box_Squat_with_Bands": {
+"category": "PLYO",
+"confidence": "media",
+"exercise": "SQUAT_JUMP_ONTO_BOX",
+"garmin_name": "Squat Jump Onto Box"
+},
+"Box_Squat_with_Chains": {
+"category": "PLYO",
+"confidence": "media",
+"exercise": "SQUAT_JUMP_ONTO_BOX",
+"garmin_name": "Squat Jump Onto Box"
+},
+"Brachialis-SMR": {
+"category": "WARM_UP",
+"confidence": "generica",
+"exercise": "WARM_UP",
+"garmin_name": "Warm-up"
+},
+"Bradford_Rocky_Presses": {
+"category": "SHOULDER_PRESS",
+"confidence": "generica",
+"exercise": "SHOULDER_PRESS",
+"garmin_name": "Shoulder Press"
+},
+"Butt-Ups": {
+"category": "CORE",
+"confidence": "generica",
+"exercise": "CORE",
+"garmin_name": "Core"
+},
+"Butt_Lift_Bridge": {
+"category": "HIP_RAISE",
+"confidence": "media",
+"exercise": "CLAM_BRIDGE",
+"garmin_name": "Clam Bridge"
+},
+"Butterfly": {
+"category": "FLYE",
+"confidence": "generica",
+"exercise": "FLYE",
+"garmin_name": "Fly"
+},
+"Cable_Chest_Press": {
+"category": "BENCH_PRESS",
+"confidence": "alta",
+"exercise": "SINGLE_ARM_CABLE_CHEST_PRESS",
+"garmin_name": "Single-arm Cable Chest Press"
+},
+"Cable_Crossover": {
+"category": "FLYE",
+"confidence": "alta",
+"exercise": "CABLE_CROSSOVER",
+"garmin_name": "Cable Crossover"
+},
+"Cable_Crunch": {
+"category": "CRUNCH",
+"confidence": "alta",
+"exercise": "CABLE_CRUNCH",
+"garmin_name": "Cable Crunch"
+},
+"Cable_Deadlifts": {
+"category": "DEADLIFT",
+"confidence": "alta",
+"exercise": "DEADLIFT",
+"garmin_name": "Deadlift"
+},
+"Cable_Hammer_Curls_-_Rope_Attachment": {
+"category": "CURL",
+"confidence": "alta",
+"exercise": "CABLE_HAMMER_CURL",
+"garmin_name": "Cable Hammer Curl"
+},
+"Cable_Hip_Adduction": {
+"category": "HIP_STABILITY",
+"confidence": "media",
+"exercise": "SLIDING_HIP_ADDUCTION",
+"garmin_name": "Sliding Hip Adduction"
+},
+"Cable_Incline_Pushdown": {
+"category": "TRICEPS_EXTENSION",
+"confidence": "media",
+"exercise": "INCLINE_DIP",
+"garmin_name": "Incline Dip"
+},
+"Cable_Incline_Triceps_Extension": {
+"category": "TRICEPS_EXTENSION",
+"confidence": "alta",
+"exercise": "TRICEPS_EXTENSION",
+"garmin_name": "Triceps Extension"
+},
+"Cable_Internal_Rotation": {
+"category": "SHOULDER_STABILITY",
+"confidence": "alta",
+"exercise": "CABLE_INTERNAL_ROTATION",
+"garmin_name": "Cable Internal Rotation"
+},
+"Cable_Iron_Cross": {
+"category": "BENCH_PRESS",
+"confidence": "generica",
+"exercise": "BENCH_PRESS",
+"garmin_name": "Bench Press"
+},
+"Cable_Judo_Flip": {
+"category": "CORE",
+"confidence": "generica",
+"exercise": "CORE",
+"garmin_name": "Core"
+},
+"Cable_Lying_Triceps_Extension": {
+"category": "TRICEPS_EXTENSION",
+"confidence": "alta",
+"exercise": "CABLE_LYING_TRICEPS_EXTENSION",
+"garmin_name": "Cable Lying Triceps Extension"
+},
+"Cable_One_Arm_Tricep_Extension": {
+"category": "TRICEPS_EXTENSION",
+"confidence": "alta",
+"exercise": "TRICEPS_EXTENSION",
+"garmin_name": "Triceps Extension"
+},
+"Cable_Preacher_Curl": {
+"category": "CURL",
+"confidence": "alta",
+"exercise": "PREACHER_CURL_WITH_CABLE",
+"garmin_name": "Preacher Curl with Cable"
+},
+"Cable_Rear_Delt_Fly": {
+"category": "FLYE",
+"confidence": "media",
+"exercise": "KNEELING_REAR_FLYE",
+"garmin_name": "Kneeling Rear Fly"
+},
+"Cable_Reverse_Crunch": {
+"category": "CRUNCH",
+"confidence": "alta",
+"exercise": "CABLE_CRUNCH",
+"garmin_name": "Cable Crunch"
+},
+"Cable_Rope_Overhead_Triceps_Extension": {
+"category": "TRICEPS_EXTENSION",
+"confidence": "alta",
+"exercise": "CABLE_OVERHEAD_TRICEPS_EXTENSION",
+"garmin_name": "Cable Overhead Triceps Extension"
+},
+"Cable_Rope_Rear-Delt_Rows": {
+"category": "LATERAL_RAISE",
+"confidence": "media",
+"exercise": "CALORIE_ROW",
+"garmin_name": "Calorie Row"
+},
+"Cable_Russian_Twists": {
+"category": "CORE",
+"confidence": "alta",
+"exercise": "RUSSIAN_TWIST",
+"garmin_name": "Russian Twist"
+},
+"Cable_Seated_Crunch": {
+"category": "CRUNCH",
+"confidence": "alta",
+"exercise": "CABLE_CRUNCH",
+"garmin_name": "Cable Crunch"
+},
+"Cable_Seated_Lateral_Raise": {
+"category": "LATERAL_RAISE",
+"confidence": "alta",
+"exercise": "SEATED_LATERAL_RAISE",
+"garmin_name": "Seated Lateral Raise"
+},
+"Cable_Shoulder_Press": {
+"category": "SHOULDER_PRESS",
+"confidence": "alta",
+"exercise": "SHOULDER_PRESS",
+"garmin_name": "Shoulder Press"
+},
+"Cable_Shrugs": {
+"category": "SHRUG",
+"confidence": "alta",
+"exercise": "SHRUG",
+"garmin_name": "Shrug"
+},
+"Cable_Wrist_Curl": {
+"category": "CURL",
+"confidence": "alta",
+"exercise": "CABLE_BICEPS_CURL",
+"garmin_name": "Cable Biceps Curl"
+},
+"Calf-Machine_Shoulder_Shrug": {
+"category": "CALF_RAISE",
+"confidence": "media",
+"exercise": "CALF_RAISE",
+"garmin_name": "Calf Raise"
+},
+"Calf_Press": {
+"category": "CALF_RAISE",
+"confidence": "alta",
+"exercise": "CALF_RAISE",
+"garmin_name": "Calf Raise"
+},
+"Calf_Press_On_The_Leg_Press_Machine": {
+"category": "CALF_RAISE",
+"confidence": "media",
+"exercise": "CALF_RAISE",
+"garmin_name": "Calf Raise"
+},
+"Calf_Raise_On_A_Dumbbell": {
+"category": "CALF_RAISE",
+"confidence": "alta",
+"exercise": "CALF_RAISE",
+"garmin_name": "Calf Raise"
+},
+"Calf_Raises_-_With_Bands": {
+"category": "CALF_RAISE",
+"confidence": "alta",
+"exercise": "CALF_RAISE",
+"garmin_name": "Calf Raise"
+},
+"Calf_Stretch_Elbows_Against_Wall": {
+"category": "CALF_RAISE",
+"confidence": "media",
+"exercise": "CALF_RAISE",
+"garmin_name": "Calf Raise"
+},
+"Calf_Stretch_Hands_Against_Wall": {
+"category": "CALF_RAISE",
+"confidence": "media",
+"exercise": "CALF_RAISE",
+"garmin_name": "Calf Raise"
+},
+"Calves-SMR": {
+"category": "WARM_UP",
+"confidence": "generica",
+"exercise": "WARM_UP",
+"garmin_name": "Warm-up"
+},
+"Car_Deadlift": {
+"category": "DEADLIFT",
+"confidence": "alta",
+"exercise": "DEADLIFT",
+"garmin_name": "Deadlift"
+},
+"Car_Drivers": {
+"category": "SHOULDER_PRESS",
+"confidence": "generica",
+"exercise": "SHOULDER_PRESS",
+"garmin_name": "Shoulder Press"
+},
+"Carioca_Quick_Step": {
+"category": "PLYO",
+"confidence": "generica",
+"exercise": "PLYO",
+"garmin_name": "Plyo"
+},
+"Cat_Stretch": {
+"category": "WARM_UP",
+"confidence": "alta",
+"exercise": "STRETCH_CAT_COW",
+"garmin_name": "Cat Cow Stretch"
+},
+"Catch_and_Overhead_Throw": {
+"category": "PLYO",
+"confidence": "media",
+"exercise": "MEDICINE_BALL_OVERHEAD_THROWS",
+"garmin_name": "Medicine Ball Overhead Throws"
+},
+"Chain_Handle_Extension": {
+"category": "TRICEPS_EXTENSION",
+"confidence": "generica",
+"exercise": "TRICEPS_EXTENSION",
+"garmin_name": "Triceps Extension"
+},
+"Chain_Press": {
+"category": "BENCH_PRESS",
+"confidence": "generica",
+"exercise": "BENCH_PRESS",
+"garmin_name": "Bench Press"
+},
+"Chair_Leg_Extended_Stretch": {
+"category": "WARM_UP",
+"confidence": "media",
+"exercise": "STRETCH_90_90",
+"garmin_name": "90/90 Stretch"
+},
+"Chair_Lower_Back_Stretch": {
+"category": "WARM_UP",
+"confidence": "media",
+"exercise": "STRETCH_90_90",
+"garmin_name": "90/90 Stretch"
+},
+"Chair_Squat": {
+"category": "SQUAT",
+"confidence": "alta",
+"exercise": "SQUAT",
+"garmin_name": "Squat"
+},
+"Chair_Upper_Body_Stretch": {
+"category": "WARM_UP",
+"confidence": "media",
+"exercise": "STRETCH_90_90",
+"garmin_name": "90/90 Stretch"
+},
+"Chest_And_Front_Of_Shoulder_Stretch": {
+"category": "WARM_UP",
+"confidence": "alta",
+"exercise": "STRETCH_WALL_CHEST_AND_SHOULDER",
+"garmin_name": "Wall Chest and Shoulder Stretch"
+},
+"Chest_Push_from_3_point_stance": {
+"category": "PLYO",
+"confidence": "generica",
+"exercise": "PLYO",
+"garmin_name": "Plyo"
+},
+"Chest_Push_multiple_response": {
+"category": "PLYO",
+"confidence": "generica",
+"exercise": "PLYO",
+"garmin_name": "Plyo"
+},
+"Chest_Push_single_response": {
+"category": "PLYO",
+"confidence": "generica",
+"exercise": "PLYO",
+"garmin_name": "Plyo"
+},
+"Chest_Push_with_Run_Release": {
+"category": "PLYO",
+"confidence": "generica",
+"exercise": "PLYO",
+"garmin_name": "Plyo"
+},
+"Chest_Stretch_on_Stability_Ball": {
+"category": "WARM_UP",
+"confidence": "alta",
+"exercise": "STRETCH_WALL_CHEST_AND_SHOULDER",
+"garmin_name": "Wall Chest and Shoulder Stretch"
+},
+"Childs_Pose": {
+"category": "WARM_UP",
+"confidence": "alta",
+"exercise": "STRETCH_CHILDS_POSE",
+"garmin_name": "Child's Pose Stretch"
+},
+"Chin-Up": {
+"category": "PULL_UP",
+"confidence": "alta",
+"exercise": "CHIN_UP",
+"garmin_name": "Chin-up"
+},
+"Chin_To_Chest_Stretch": {
+"category": "WARM_UP",
+"confidence": "alta",
+"exercise": "STRETCH_WALL_CHEST_AND_SHOULDER",
+"garmin_name": "Wall Chest and Shoulder Stretch"
+},
+"Circus_Bell": {
+"category": "SHOULDER_PRESS",
+"confidence": "generica",
+"exercise": "SHOULDER_PRESS",
+"garmin_name": "Shoulder Press"
+},
+"Clean": {
+"category": "OLYMPIC_LIFT",
+"confidence": "alta",
+"exercise": "CLEAN",
+"garmin_name": "Barbell Clean"
+},
+"Clean_Deadlift": {
+"category": "DEADLIFT",
+"confidence": "alta",
+"exercise": "DEADLIFT",
+"garmin_name": "Deadlift"
+},
+"Clean_Pull": {
+"category": "OLYMPIC_LIFT",
+"confidence": "alta",
+"exercise": "CLEAN",
+"garmin_name": "Barbell Clean"
+},
+"Clean_Shrug": {
+"category": "OLYMPIC_LIFT",
+"confidence": "alta",
+"exercise": "CLEAN",
+"garmin_name": "Barbell Clean"
+},
+"Clean_and_Jerk": {
+"category": "OLYMPIC_LIFT",
+"confidence": "alta",
+"exercise": "CLEAN_AND_JERK",
+"garmin_name": "Clean and Jerk"
+},
+"Clean_and_Press": {
+"category": "OLYMPIC_LIFT",
+"confidence": "alta",
+"exercise": "CLEAN_AND_PRESS",
+"garmin_name": "Clean and Press"
+},
+"Clean_from_Blocks": {
+"category": "OLYMPIC_LIFT",
+"confidence": "media",
+"exercise": "CLEAN",
+"garmin_name": "Barbell Clean"
+},
+"Clock_Push-Up": {
+"category": "PUSH_UP",
+"confidence": "alta",
+"exercise": "PUSH_UP",
+"garmin_name": "Push-up"
+},
+"Close-Grip_Barbell_Bench_Press": {
+"category": "BENCH_PRESS",
+"confidence": "alta",
+"exercise": "CLOSE_GRIP_BARBELL_BENCH_PRESS",
+"garmin_name": "Close-grip Barbell Bench Press"
+},
+"Close-Grip_Dumbbell_Press": {
+"category": "BENCH_PRESS",
+"confidence": "media",
+"exercise": "NEUTRAL_GRIP_DUMBBELL_BENCH_PRESS",
+"garmin_name": "Neutral-grip Dumbbell Bench Press"
+},
+"Close-Grip_EZ-Bar_Curl_with_Band": {
+"category": "CURL",
+"confidence": "alta",
+"exercise": "CLOSE_GRIP_EZ_BAR_BICEPS_CURL",
+"garmin_name": "Close-grip EZ-Bar Biceps Curl"
+},
+"Close-Grip_EZ-Bar_Press": {
+"category": "CURL",
+"confidence": "media",
+"exercise": "CLOSE_GRIP_EZ_BAR_BICEPS_CURL",
+"garmin_name": "Close-grip EZ-Bar Biceps Curl"
+},
+"Close-Grip_EZ_Bar_Curl": {
+"category": "CURL",
+"confidence": "alta",
+"exercise": "CLOSE_GRIP_EZ_BAR_BICEPS_CURL",
+"garmin_name": "Close-grip EZ-Bar Biceps Curl"
+},
+"Close-Grip_Front_Lat_Pulldown": {
+"category": "PULL_UP",
+"confidence": "alta",
+"exercise": "CLOSE_GRIP_LAT_PULLDOWN",
+"garmin_name": "Close-grip Lat Pull-down"
+},
+"Close-Grip_Push-Up_off_of_a_Dumbbell": {
+"category": "PUSH_UP",
+"confidence": "alta",
+"exercise": "CLOSE_HANDS_PUSH_UP",
+"garmin_name": "Close-hands Push-up"
+},
+"Close-Grip_Standing_Barbell_Curl": {
+"category": "CURL",
+"confidence": "alta",
+"exercise": "BARBELL_BICEPS_CURL",
+"garmin_name": "Barbell Biceps Curl"
+},
+"Cocoons": {
+"category": "CORE",
+"confidence": "generica",
+"exercise": "CORE",
+"garmin_name": "Core"
+},
+"Conans_Wheel": {
+"category": "SQUAT",
+"confidence": "generica",
+"exercise": "SQUAT",
+"garmin_name": "Squat"
+},
+"Concentration_Curls": {
+"category": "CURL",
+"confidence": "alta",
+"exercise": "CURL",
+"garmin_name": "Curl"
+},
+"Cross-Body_Crunch": {
+"category": "CRUNCH",
+"confidence": "alta",
+"exercise": "SKATER_CRUNCH_CROSS",
+"garmin_name": "Skater Crunch Cross"
+},
+"Cross_Body_Hammer_Curl": {
+"category": "CURL",
+"confidence": "alta",
+"exercise": "CROSS_BODY_DUMBBELL_HAMMER_CURL",
+"garmin_name": "Cross-body Dumbbell Hammer Curl"
+},
+"Cross_Over_-_With_Bands": {
+"category": "BENCH_PRESS",
+"confidence": "generica",
+"exercise": "BENCH_PRESS",
+"garmin_name": "Bench Press"
+},
+"Crossover_Reverse_Lunge": {
+"category": "FLYE",
+"confidence": "generica",
+"exercise": "FLYE",
+"garmin_name": "Fly"
+},
+"Crucifix": {
+"category": "SHOULDER_PRESS",
+"confidence": "generica",
+"exercise": "SHOULDER_PRESS",
+"garmin_name": "Shoulder Press"
+},
+"Crunch_-_Hands_Overhead": {
+"category": "CRUNCH",
+"confidence": "alta",
+"exercise": "CRUNCH",
+"garmin_name": "Crunch"
+},
+"Crunch_-_Legs_On_Exercise_Ball": {
+"category": "CRUNCH",
+"confidence": "alta",
+"exercise": "STRAIGHT_LEG_CRUNCH_WITH_BALL",
+"garmin_name": "Straight-leg Crunch with Ball"
+},
+"Crunches": {
+"category": "CRUNCH",
+"confidence": "alta",
+"exercise": "CRUNCH",
+"garmin_name": "Crunch"
+},
+"Cuban_Press": {
+"category": "SHOULDER_STABILITY",
+"confidence": "generica",
+"exercise": "SHOULDER_STABILITY",
+"garmin_name": "Shoulder Stability"
+},
+"Dancers_Stretch": {
+"category": "WARM_UP",
+"confidence": "alta",
+"exercise": "STRETCH_90_90",
+"garmin_name": "90/90 Stretch"
+},
+"Dead_Bug": {
+"category": "HIP_STABILITY",
+"confidence": "alta",
+"exercise": "DEAD_BUG",
+"garmin_name": "Dead Bug"
+},
+"Deadlift_with_Bands": {
+"category": "DEADLIFT",
+"confidence": "alta",
+"exercise": "DEADLIFT",
+"garmin_name": "Deadlift"
+},
+"Deadlift_with_Chains": {
+"category": "DEADLIFT",
+"confidence": "alta",
+"exercise": "DEADLIFT",
+"garmin_name": "Deadlift"
+},
+"Decline_Barbell_Bench_Press": {
+"category": "BENCH_PRESS",
+"confidence": "alta",
+"exercise": "BARBELL_BENCH_PRESS",
+"garmin_name": "Barbell Bench Press"
+},
+"Decline_Close-Grip_Bench_To_Skull_Crusher": {
+"category": "TRICEPS_EXTENSION",
+"confidence": "generica",
+"exercise": "TRICEPS_EXTENSION",
+"garmin_name": "Triceps Extension"
+},
+"Decline_Crunch": {
+"category": "CRUNCH",
+"confidence": "alta",
+"exercise": "CRUNCH",
+"garmin_name": "Crunch"
+},
+"Decline_Dumbbell_Bench_Press": {
+"category": "BENCH_PRESS",
+"confidence": "alta",
+"exercise": "DECLINE_DUMBBELL_BENCH_PRESS",
+"garmin_name": "Decline Dumbbell Bench Press"
+},
+"Decline_Dumbbell_Flyes": {
+"category": "FLYE",
+"confidence": "alta",
+"exercise": "DECLINE_DUMBBELL_FLYE",
+"garmin_name": "Decline Dumbbell Fly"
+},
+"Decline_Dumbbell_Triceps_Extension": {
+"category": "TRICEPS_EXTENSION",
+"confidence": "alta",
+"exercise": "TRICEPS_EXTENSION",
+"garmin_name": "Triceps Extension"
+},
+"Decline_EZ_Bar_Triceps_Extension": {
+"category": "TRICEPS_EXTENSION",
+"confidence": "alta",
+"exercise": "EZ_BAR_OVERHEAD_TRICEPS_EXTENSION",
+"garmin_name": "EZ-Bar Overhead Triceps Extension"
+},
+"Decline_Oblique_Crunch": {
+"category": "CRUNCH",
+"confidence": "alta",
+"exercise": "CRUNCH",
+"garmin_name": "Crunch"
+},
+"Decline_Push-Up": {
+"category": "PUSH_UP",
+"confidence": "alta",
+"exercise": "DECLINE_PUSH_UP",
+"garmin_name": "Decline Push-up"
+},
+"Decline_Reverse_Crunch": {
+"category": "CRUNCH",
+"confidence": "alta",
+"exercise": "REVERSE_CRUNCH",
+"garmin_name": "Reverse Crunch"
+},
+"Decline_Smith_Press": {
+"category": "BENCH_PRESS",
+"confidence": "media",
+"exercise": "SMITH_MACHINE_BENCH_PRESS",
+"garmin_name": "Smith Machine Bench Press"
+},
+"Deficit_Deadlift": {
+"category": "DEADLIFT",
+"confidence": "alta",
+"exercise": "DEADLIFT",
+"garmin_name": "Deadlift"
+},
+"Depth_Jump_Leap": {
+"category": "PLYO",
+"confidence": "alta",
+"exercise": "DEPTH_JUMP",
+"garmin_name": "Depth Jump"
+},
+"Dip_Machine": {
+"category": "TRICEPS_EXTENSION",
+"confidence": "alta",
+"exercise": "BENCH_DIP",
+"garmin_name": "Bench Dip"
+},
+"Dips_-_Chest_Version": {
+"category": "TRICEPS_EXTENSION",
+"confidence": "media",
+"exercise": "BENCH_DIP",
+"garmin_name": "Bench Dip"
+},
+"Dips_-_Triceps_Version": {
+"category": "TRICEPS_EXTENSION",
+"confidence": "media",
+"exercise": "BENCH_DIP",
+"garmin_name": "Bench Dip"
+},
+"Donkey_Calf_Raises": {
+"category": "CALF_RAISE",
+"confidence": "alta",
+"exercise": "DONKEY_CALF_RAISE",
+"garmin_name": "Donkey Calf Raise"
+},
+"Double_Kettlebell_Alternating_Hang_Clean": {
+"category": "OLYMPIC_LIFT",
+"confidence": "media",
+"exercise": "CLEAN_AND_JERK",
+"garmin_name": "Clean and Jerk"
+},
+"Double_Kettlebell_Jerk": {
+"category": "OLYMPIC_LIFT",
+"confidence": "media",
+"exercise": "CLEAN_AND_JERK",
+"garmin_name": "Clean and Jerk"
+},
+"Double_Kettlebell_Push_Press": {
+"category": "SHOULDER_PRESS",
+"confidence": "media",
+"exercise": "ONE_ARM_PUSH_PRESS",
+"garmin_name": "One-arm Push Press"
+},
+"Double_Kettlebell_Snatch": {
+"category": "OLYMPIC_LIFT",
+"confidence": "alta",
+"exercise": "SNATCH",
+"garmin_name": "Snatch"
+},
+"Double_Kettlebell_Windmill": {
+"category": "CORE",
+"confidence": "alta",
+"exercise": "KETTLEBELL_WINDMILL",
+"garmin_name": "Kettlebell Windmill"
+},
+"Double_Leg_Butt_Kick": {
+"category": "PLYO",
+"confidence": "generica",
+"exercise": "PLYO",
+"garmin_name": "Plyo"
+},
+"Downward_Facing_Balance": {
+"category": "HIP_RAISE",
+"confidence": "generica",
+"exercise": "HIP_RAISE",
+"garmin_name": "Hip Raise"
+},
+"Drag_Curl": {
+"category": "CURL",
+"confidence": "alta",
+"exercise": "CURL",
+"garmin_name": "Curl"
+},
+"Drop_Push": {
+"category": "PLYO",
+"confidence": "generica",
+"exercise": "PLYO",
+"garmin_name": "Plyo"
+},
+"Dumbbell_Alternate_Bicep_Curl": {
+"category": "CURL",
+"confidence": "alta",
+"exercise": "DUMBBELL_BICEPS_CURL",
+"garmin_name": "Dumbbell Biceps Curl"
+},
+"Dumbbell_Bench_Press": {
+"category": "BENCH_PRESS",
+"confidence": "alta",
+"exercise": "DUMBBELL_BENCH_PRESS",
+"garmin_name": "Dumbbell Bench Press"
+},
+"Dumbbell_Bench_Press_with_Neutral_Grip": {
+"category": "BENCH_PRESS",
+"confidence": "alta",
+"exercise": "NEUTRAL_GRIP_DUMBBELL_BENCH_PRESS",
+"garmin_name": "Neutral-grip Dumbbell Bench Press"
+},
+"Dumbbell_Bicep_Curl": {
+"category": "CURL",
+"confidence": "alta",
+"exercise": "DUMBBELL_BICEPS_CURL",
+"garmin_name": "Dumbbell Biceps Curl"
+},
+"Dumbbell_Clean": {
+"category": "OLYMPIC_LIFT",
+"confidence": "alta",
+"exercise": "DUMBBELL_CLEAN",
+"garmin_name": "Dumbbell Clean"
+},
+"Dumbbell_Floor_Press": {
+"category": "BENCH_PRESS",
+"confidence": "alta",
+"exercise": "DUMBBELL_FLOOR_PRESS",
+"garmin_name": "Dumbbell Floor Press"
+},
+"Dumbbell_Flyes": {
+"category": "FLYE",
+"confidence": "alta",
+"exercise": "DUMBBELL_FLYE",
+"garmin_name": "Dumbbell Fly"
+},
+"Dumbbell_Incline_Row": {
+"category": "ROW",
+"confidence": "alta",
+"exercise": "DUMBBELL_ROW",
+"garmin_name": "Dumbbell Row"
+},
+"Dumbbell_Incline_Shoulder_Raise": {
+"category": "FLYE",
+"confidence": "media",
+"exercise": "INCLINE_DUMBBELL_FLYE",
+"garmin_name": "Incline Dumbbell Fly"
+},
+"Dumbbell_Lunges": {
+"category": "LUNGE",
+"confidence": "alta",
+"exercise": "DUMBBELL_LUNGE",
+"garmin_name": "Dumbbell Lunge"
+},
+"Dumbbell_Lying_One-Arm_Rear_Lateral_Raise": {
+"category": "LATERAL_RAISE",
+"confidence": "alta",
+"exercise": "DUMBBELL_LATERAL_RAISE",
+"garmin_name": "Dumbbell Lateral Raise"
+},
+"Dumbbell_Lying_Pronation": {
+"category": "LATERAL_RAISE",
+"confidence": "media",
+"exercise": "LYING_DUMBBELL_RAISE",
+"garmin_name": "Lying Dumbbell Raise"
+},
+"Dumbbell_Lying_Rear_Lateral_Raise": {
+"category": "LATERAL_RAISE",
+"confidence": "alta",
+"exercise": "DUMBBELL_LATERAL_RAISE",
+"garmin_name": "Dumbbell Lateral Raise"
+},
+"Dumbbell_Lying_Supination": {
+"category": "LATERAL_RAISE",
+"confidence": "media",
+"exercise": "LYING_DUMBBELL_RAISE",
+"garmin_name": "Lying Dumbbell Raise"
+},
+"Dumbbell_One-Arm_Shoulder_Press": {
+"category": "SHOULDER_PRESS",
+"confidence": "alta",
+"exercise": "DUMBBELL_SHOULDER_PRESS",
+"garmin_name": "Dumbbell Shoulder Press"
+},
+"Dumbbell_One-Arm_Triceps_Extension": {
+"category": "TRICEPS_EXTENSION",
+"confidence": "alta",
+"exercise": "TRICEPS_EXTENSION",
+"garmin_name": "Triceps Extension"
+},
+"Dumbbell_One-Arm_Upright_Row": {
+"category": "ROW",
+"confidence": "alta",
+"exercise": "ONE_ARM_BENT_OVER_ROW",
+"garmin_name": "One-arm Bent-over Row"
+},
+"Dumbbell_Prone_Incline_Curl": {
+"category": "CURL",
+"confidence": "alta",
+"exercise": "INCLINE_DUMBBELL_BICEPS_CURL",
+"garmin_name": "Incline Dumbbell Biceps Curl"
+},
+"Dumbbell_Raise": {
+"category": "LATERAL_RAISE",
+"confidence": "alta",
+"exercise": "DUMBBELL_DIAGONAL_RAISE",
+"garmin_name": "Dumbbell Diagonal Raise"
+},
+"Dumbbell_Rear_Lunge": {
+"category": "LUNGE",
+"confidence": "alta",
+"exercise": "DUMBBELL_LUNGE",
+"garmin_name": "Dumbbell Lunge"
+},
+"Dumbbell_Scaption": {
+"category": "LATERAL_RAISE",
+"confidence": "media",
+"exercise": "SCAPTION",
+"garmin_name": "Scaption"
+},
+"Dumbbell_Seated_Box_Jump": {
+"category": "PLYO",
+"confidence": "alta",
+"exercise": "BOX_JUMP",
+"garmin_name": "Box Jump"
+},
+"Dumbbell_Seated_One-Leg_Calf_Raise": {
+"category": "CALF_RAISE",
+"confidence": "alta",
+"exercise": "SEATED_CALF_RAISE",
+"garmin_name": "Seated Calf Raise"
+},
+"Dumbbell_Shoulder_Press": {
+"category": "SHOULDER_PRESS",
+"confidence": "alta",
+"exercise": "DUMBBELL_SHOULDER_PRESS",
+"garmin_name": "Dumbbell Shoulder Press"
+},
+"Dumbbell_Shrug": {
+"category": "SHRUG",
+"confidence": "alta",
+"exercise": "DUMBBELL_SHRUG",
+"garmin_name": "Dumbbell Shrug"
+},
+"Dumbbell_Side_Bend": {
+"category": "CORE",
+"confidence": "alta",
+"exercise": "SIDE_BEND",
+"garmin_name": "Side Bend"
+},
+"Dumbbell_Squat": {
+"category": "SQUAT",
+"confidence": "alta",
+"exercise": "DUMBBELL_SQUAT",
+"garmin_name": "Dumbbell Squat"
+},
+"Dumbbell_Squat_To_A_Bench": {
+"category": "SQUAT",
+"confidence": "alta",
+"exercise": "DUMBBELL_SQUAT",
+"garmin_name": "Dumbbell Squat"
+},
+"Dumbbell_Step_Ups": {
+"category": "SQUAT",
+"confidence": "media",
+"exercise": "DUMBBELL_STEPOVER",
+"garmin_name": "Dumbbell Step-over"
+},
+"Dumbbell_Tricep_Extension_-Pronated_Grip": {
+"category": "TRICEPS_EXTENSION",
+"confidence": "alta",
+"exercise": "TRICEPS_EXTENSION",
+"garmin_name": "Triceps Extension"
+},
+"Dynamic_Back_Stretch": {
+"category": "WARM_UP",
+"confidence": "media",
+"exercise": "STRETCH_90_90",
+"garmin_name": "90/90 Stretch"
+},
+"Dynamic_Chest_Stretch": {
+"category": "WARM_UP",
+"confidence": "alta",
+"exercise": "STRETCH_WALL_CHEST_AND_SHOULDER",
+"garmin_name": "Wall Chest and Shoulder Stretch"
+},
+"EZ-Bar_Curl": {
+"category": "CURL",
+"confidence": "alta",
+"exercise": "EZ_BAR_PREACHER_CURL",
+"garmin_name": "EZ-Bar Preacher Curl"
+},
+"EZ-Bar_Skullcrusher": {
+"category": "TRICEPS_EXTENSION",
+"confidence": "media",
+"exercise": "EZ_BAR_OVERHEAD_TRICEPS_EXTENSION",
+"garmin_name": "EZ-Bar Overhead Triceps Extension"
+},
+"Elbow_Circles": {
+"category": "WARM_UP",
+"confidence": "generica",
+"exercise": "WARM_UP",
+"garmin_name": "Warm-up"
+},
+"Elbow_to_Knee": {
+"category": "CRUNCH",
+"confidence": "alta",
+"exercise": "KNEES_TO_ELBOW",
+"garmin_name": "Knees-to-Elbow"
+},
+"Elbows_Back": {
+"category": "WARM_UP",
+"confidence": "generica",
+"exercise": "WARM_UP",
+"garmin_name": "Warm-up"
+},
+"Elevated_Back_Lunge": {
+"category": "LUNGE",
+"confidence": "alta",
+"exercise": "LUNGE",
+"garmin_name": "Lunge"
+},
+"Elevated_Cable_Rows": {
+"category": "ROW",
+"confidence": "alta",
+"exercise": "ELEVATED_FEET_INVERTED_ROW",
+"garmin_name": "Elevated-feet Inverted Row"
+},
+"Elliptical_Trainer": {
+"category": "ELLIPTICAL",
+"confidence": "media",
+"exercise": "ELLIPTICAL",
+"garmin_name": "Elliptical"
+},
+"Exercise_Ball_Crunch": {
+"category": "CRUNCH",
+"confidence": "alta",
+"exercise": "SWISS_BALL_CRUNCH",
+"garmin_name": "Swiss Ball Crunch"
+},
+"Exercise_Ball_Pull-In": {
+"category": "CORE",
+"confidence": "generica",
+"exercise": "CORE",
+"garmin_name": "Core"
+},
+"Extended_Range_One-Arm_Kettlebell_Floor_Press": {
+"category": "BENCH_PRESS",
+"confidence": "alta",
+"exercise": "ONE_ARM_FLOOR_PRESS",
+"garmin_name": "One-arm Floor Press"
+},
+"External_Rotation": {
+"category": "SHOULDER_STABILITY",
+"confidence": "alta",
+"exercise": "LYING_EXTERNAL_ROTATION",
+"garmin_name": "Lying External Rotation"
+},
+"External_Rotation_with_Band": {
+"category": "SHOULDER_STABILITY",
+"confidence": "alta",
+"exercise": "BAND_EXTERNAL_ROTATION",
+"garmin_name": "Band External Rotation"
+},
+"External_Rotation_with_Cable": {
+"category": "SHOULDER_STABILITY",
+"confidence": "alta",
+"exercise": "CABLE_EXTERNAL_ROTATION",
+"garmin_name": "Cable External Rotation"
+},
+"Face_Pull": {
+"category": "ROW",
+"confidence": "alta",
+"exercise": "FACE_PULL",
+"garmin_name": "Face Pull"
+},
+"Farmers_Walk": {
+"category": "CARRY",
+"confidence": "alta",
+"exercise": "FARMERS_WALK",
+"garmin_name": "Farmer's Walk"
+},
+"Fast_Skipping": {
+"category": "PLYO",
+"confidence": "generica",
+"exercise": "PLYO",
+"garmin_name": "Plyo"
+},
+"Finger_Curls": {
+"category": "CURL",
+"confidence": "alta",
+"exercise": "CURL",
+"garmin_name": "Curl"
+},
+"Flat_Bench_Cable_Flyes": {
+"category": "FLYE",
+"confidence": "media",
+"exercise": "FLYE",
+"garmin_name": "Fly"
+},
+"Flat_Bench_Leg_Pull-In": {
+"category": "CORE",
+"confidence": "generica",
+"exercise": "CORE",
+"garmin_name": "Core"
+},
+"Flat_Bench_Lying_Leg_Raise": {
+"category": "LEG_RAISE",
+"confidence": "alta",
+"exercise": "LYING_STRAIGHT_LEG_RAISE",
+"garmin_name": "Lying Straight-leg Raise"
+},
+"Flexor_Incline_Dumbbell_Curls": {
+"category": "CURL",
+"confidence": "alta",
+"exercise": "INCLINE_DUMBBELL_BICEPS_CURL",
+"garmin_name": "Incline Dumbbell Biceps Curl"
+},
+"Floor_Glute-Ham_Raise": {
+"category": "SHOULDER_STABILITY",
+"confidence": "media",
+"exercise": "FLOOR_I_RAISE",
+"garmin_name": "Floor I Raise"
+},
+"Floor_Press": {
+"category": "BENCH_PRESS",
+"confidence": "alta",
+"exercise": "BARBELL_FLOOR_PRESS",
+"garmin_name": "Barbell Floor Press"
+},
+"Floor_Press_with_Chains": {
+"category": "BENCH_PRESS",
+"confidence": "alta",
+"exercise": "BARBELL_FLOOR_PRESS",
+"garmin_name": "Barbell Floor Press"
+},
+"Flutter_Kicks": {
+"category": "CRUNCH",
+"confidence": "alta",
+"exercise": "FLUTTER_KICKS",
+"garmin_name": "Flutter Kicks"
+},
+"Foot-SMR": {
+"category": "WARM_UP",
+"confidence": "generica",
+"exercise": "WARM_UP",
+"garmin_name": "Warm-up"
+},
+"Forward_Drag_with_Press": {
+"category": "SLED",
+"confidence": "media",
+"exercise": "FORWARD_DRAG",
+"garmin_name": "Sled Forward Drag"
+},
+"Frankenstein_Squat": {
+"category": "SQUAT",
+"confidence": "alta",
+"exercise": "SQUAT",
+"garmin_name": "Squat"
+},
+"Freehand_Jump_Squat": {
+"category": "PLYO",
+"confidence": "alta",
+"exercise": "JUMP_SQUAT",
+"garmin_name": "Jump Squat"
+},
+"Frog_Hops": {
+"category": "PLYO",
+"confidence": "media",
+"exercise": "LATERAL_LEAP_AND_HOP",
+"garmin_name": "Lateral Leap and Hop"
+},
+"Frog_Sit-Ups": {
+"category": "SIT_UP",
+"confidence": "media",
+"exercise": "GHD_SIT_UPS",
+"garmin_name": "GHD Sit-ups"
+},
+"Front_Barbell_Squat": {
+"category": "SQUAT",
+"confidence": "alta",
+"exercise": "BARBELL_FRONT_SQUAT",
+"garmin_name": "Barbell Front Squat"
+},
+"Front_Barbell_Squat_To_A_Bench": {
+"category": "SQUAT",
+"confidence": "alta",
+"exercise": "BARBELL_FRONT_SQUAT",
+"garmin_name": "Barbell Front Squat"
+},
+"Front_Box_Jump": {
+"category": "PLYO",
+"confidence": "alta",
+"exercise": "BOX_JUMP",
+"garmin_name": "Box Jump"
+},
+"Front_Cable_Raise": {
+"category": "LATERAL_RAISE",
+"confidence": "alta",
+"exercise": "CABLE_FRONT_RAISE",
+"garmin_name": "Cable Front Raise"
+},
+"Front_Cone_Hops_or_hurdle_hops": {
+"category": "PLYO",
+"confidence": "generica",
+"exercise": "PLYO",
+"garmin_name": "Plyo"
+},
+"Front_Dumbbell_Raise": {
+"category": "SHOULDER_PRESS",
+"confidence": "alta",
+"exercise": "DUMBBELL_FRONT_RAISE",
+"garmin_name": "Dumbbell Front Raise"
+},
+"Front_Incline_Dumbbell_Raise": {
+"category": "SHOULDER_PRESS",
+"confidence": "alta",
+"exercise": "DUMBBELL_FRONT_RAISE",
+"garmin_name": "Dumbbell Front Raise"
+},
+"Front_Leg_Raises": {
+"category": "LEG_RAISE",
+"confidence": "alta",
+"exercise": "LEG_RAISE",
+"garmin_name": "Leg Raise"
+},
+"Front_Plate_Raise": {
+"category": "SHOULDER_PRESS",
+"confidence": "alta",
+"exercise": "WEIGHT_PLATE_FRONT_RAISE",
+"garmin_name": "Weight-plate Front Raise"
+},
+"Front_Raise_And_Pullover": {
+"category": "LATERAL_RAISE",
+"confidence": "alta",
+"exercise": "FRONT_RAISE",
+"garmin_name": "Front Raise"
+},
+"Front_Squat_Clean_Grip": {
+"category": "OLYMPIC_LIFT",
+"confidence": "alta",
+"exercise": "BARBELL_SQUAT_CLEAN",
+"garmin_name": "Barbell Squat Clean"
+},
+"Front_Squats_With_Two_Kettlebells": {
+"category": "SQUAT",
+"confidence": "alta",
+"exercise": "KETTLEBELL_SQUAT",
+"garmin_name": "Kettlebell Squat"
+},
+"Front_Two-Dumbbell_Raise": {
+"category": "SHOULDER_PRESS",
+"confidence": "alta",
+"exercise": "DUMBBELL_FRONT_RAISE",
+"garmin_name": "Dumbbell Front Raise"
+},
+"Full_Range-Of-Motion_Lat_Pulldown": {
+"category": "PULL_UP",
+"confidence": "alta",
+"exercise": "LAT_PULLDOWN",
+"garmin_name": "Lat Pull-down"
+},
+"Gironda_Sternum_Chins": {
+"category": "PULL_UP",
+"confidence": "generica",
+"exercise": "PULL_UP",
+"garmin_name": "Pull-up"
+},
+"Glute_Ham_Raise": {
+"category": "LEG_CURL",
+"confidence": "generica",
+"exercise": "LEG_CURL",
+"garmin_name": "Leg Curl"
+},
+"Glute_Kickback": {
+"category": "HIP_RAISE",
+"confidence": "generica",
+"exercise": "HIP_RAISE",
+"garmin_name": "Hip Raise"
+},
+"Goblet_Squat": {
+"category": "SQUAT",
+"confidence": "alta",
+"exercise": "GOBLET_SQUAT",
+"garmin_name": "Goblet Squat"
+},
+"Good_Morning": {
+"category": "LEG_CURL",
+"confidence": "alta",
+"exercise": "GOOD_MORNING",
+"garmin_name": "Good Morning"
+},
+"Good_Morning_off_Pins": {
+"category": "HYPEREXTENSION",
+"confidence": "generica",
+"exercise": "HYPEREXTENSION",
+"garmin_name": "Hyperextension"
+},
+"Gorilla_Chin_Crunch": {
+"category": "CRUNCH",
+"confidence": "alta",
+"exercise": "CRUNCH",
+"garmin_name": "Crunch"
+},
+"Groin_and_Back_Stretch": {
+"category": "WARM_UP",
+"confidence": "media",
+"exercise": "STRETCH_90_90",
+"garmin_name": "90/90 Stretch"
+},
+"Groiners": {
+"category": "WARM_UP",
+"confidence": "alta",
+"exercise": "GROINERS",
+"garmin_name": "Groiners"
+},
+"Hack_Squat": {
+"category": "SQUAT",
+"confidence": "alta",
+"exercise": "SQUAT",
+"garmin_name": "Squat"
+},
+"Hammer_Curls": {
+"category": "CURL",
+"confidence": "alta",
+"exercise": "DUMBBELL_HAMMER_CURL",
+"garmin_name": "Dumbbell Hammer Curl"
+},
+"Hammer_Grip_Incline_DB_Bench_Press": {
+"category": "BENCH_PRESS",
+"confidence": "alta",
+"exercise": "NEUTRAL_GRIP_DUMBBELL_INCLINE_BENCH_PRESS",
+"garmin_name": "Neutral-grip Dumbbell Incline Bench Press"
+},
+"Hamstring-SMR": {
+"category": "WARM_UP",
+"confidence": "alta",
+"exercise": "STRETCH_HAMSTRING",
+"garmin_name": "Hamstring Stretch"
+},
+"Hamstring_Stretch": {
+"category": "WARM_UP",
+"confidence": "alta",
+"exercise": "STRETCH_HAMSTRING",
+"garmin_name": "Hamstring Stretch"
+},
+"Handstand_Push-Ups": {
+"category": "PUSH_UP",
+"confidence": "media",
+"exercise": "HANDSTAND_PUSH_UP",
+"garmin_name": "Handstand Push-up"
+},
+"Hang_Clean": {
+"category": "OLYMPIC_LIFT",
+"confidence": "alta",
+"exercise": "BARBELL_HANG_POWER_CLEAN",
+"garmin_name": "Barbell Hang Power Clean"
+},
+"Hang_Clean_-_Below_the_Knees": {
+"category": "OLYMPIC_LIFT",
+"confidence": "alta",
+"exercise": "BARBELL_HANG_POWER_CLEAN",
+"garmin_name": "Barbell Hang Power Clean"
+},
+"Hang_Snatch": {
+"category": "OLYMPIC_LIFT",
+"confidence": "alta",
+"exercise": "BARBELL_HANG_POWER_SNATCH",
+"garmin_name": "Barbell Hang Power Snatch"
+},
+"Hang_Snatch_-_Below_Knees": {
+"category": "OLYMPIC_LIFT",
+"confidence": "alta",
+"exercise": "BARBELL_HANG_POWER_SNATCH",
+"garmin_name": "Barbell Hang Power Snatch"
+},
+"Hanging_Bar_Good_Morning": {
+"category": "LEG_CURL",
+"confidence": "media",
+"exercise": "BAR_GOOD_MORNING",
+"garmin_name": "Bar Good Morning"
+},
+"Hanging_Leg_Raise": {
+"category": "LEG_RAISE",
+"confidence": "alta",
+"exercise": "HANGING_LEG_RAISE",
+"garmin_name": "Hanging Leg Raise"
+},
+"Hanging_Pike": {
+"category": "LEG_RAISE",
+"confidence": "media",
+"exercise": "HANGING_KNEE_RAISE",
+"garmin_name": "Hanging Knee Raise"
+},
+"Heaving_Snatch_Balance": {
+"category": "OLYMPIC_LIFT",
+"confidence": "alta",
+"exercise": "SNATCH",
+"garmin_name": "Snatch"
+},
+"Heavy_Bag_Thrust": {
+"category": "PLYO",
+"confidence": "generica",
+"exercise": "PLYO",
+"garmin_name": "Plyo"
+},
+"High_Cable_Curls": {
+"category": "CURL",
+"confidence": "alta",
+"exercise": "CABLE_BICEPS_CURL",
+"garmin_name": "Cable Biceps Curl"
+},
+"Hip_Circles_prone": {
+"category": "HIP_STABILITY",
+"confidence": "alta",
+"exercise": "HIP_CIRCLES",
+"garmin_name": "Hip Circles"
+},
+"Hip_Extension_with_Bands": {
+"category": "HIP_STABILITY",
+"confidence": "media",
+"exercise": "QUADRUPED_HIP_EXTENSION",
+"garmin_name": "Quadruped Hip Extension"
+},
+"Hip_Flexion_with_Band": {
+"category": "SQUAT",
+"confidence": "generica",
+"exercise": "SQUAT",
+"garmin_name": "Squat"
+},
+"Hip_Lift_with_Band": {
+"category": "HIP_RAISE",
+"confidence": "media",
+"exercise": "HIP_RAISE",
+"garmin_name": "Hip Raise"
+},
+"Hug_A_Ball": {
+"category": "WARM_UP",
+"confidence": "generica",
+"exercise": "WARM_UP",
+"garmin_name": "Warm-up"
+},
+"Hug_Knees_To_Chest": {
+"category": "WARM_UP",
+"confidence": "media",
+"exercise": "WALKING_KNEE_HUGS",
+"garmin_name": "Walking Knee Hugs"
+},
+"Hurdle_Hops": {
+"category": "PLYO",
+"confidence": "media",
+"exercise": "LATERAL_LEAP_AND_HOP",
+"garmin_name": "Lateral Leap and Hop"
+},
+"Hyperextensions_Back_Extensions": {
+"category": "HYPEREXTENSION",
+"confidence": "alta",
+"exercise": "STATIC_BACK_EXTENSION",
+"garmin_name": "Static Back Extension"
+},
+"Hyperextensions_With_No_Hyperextension_Bench": {
+"category": "HYPEREXTENSION",
+"confidence": "alta",
+"exercise": "HYPEREXTENSION",
+"garmin_name": "Hyperextension"
+},
+"IT_Band_and_Glute_Stretch": {
+"category": "WARM_UP",
+"confidence": "alta",
+"exercise": "GLUTES_STRETCH",
+"garmin_name": "Glutes Stretch"
+},
+"Iliotibial_Tract-SMR": {
+"category": "WARM_UP",
+"confidence": "generica",
+"exercise": "WARM_UP",
+"garmin_name": "Warm-up"
+},
+"Inchworm": {
+"category": "CORE",
+"confidence": "alta",
+"exercise": "INCHWORM",
+"garmin_name": "Inchworm"
+},
+"Incline_Barbell_Triceps_Extension": {
+"category": "TRICEPS_EXTENSION",
+"confidence": "alta",
+"exercise": "TRICEPS_EXTENSION",
+"garmin_name": "Triceps Extension"
+},
+"Incline_Bench_Pull": {
+"category": "ROW",
+"confidence": "generica",
+"exercise": "ROW",
+"garmin_name": "Row"
+},
+"Incline_Cable_Chest_Press": {
+"category": "BENCH_PRESS",
+"confidence": "alta",
+"exercise": "SINGLE_ARM_CABLE_CHEST_PRESS",
+"garmin_name": "Single-arm Cable Chest Press"
+},
+"Incline_Cable_Flye": {
+"category": "FLYE",
+"confidence": "alta",
+"exercise": "INCLINE_REVERSE_FLYE",
+"garmin_name": "Incline Reverse Fly"
+},
+"Incline_Dumbbell_Bench_With_Palms_Facing_In": {
+"category": "BENCH_PRESS",
+"confidence": "generica",
+"exercise": "BENCH_PRESS",
+"garmin_name": "Bench Press"
+},
+"Incline_Dumbbell_Curl": {
+"category": "CURL",
+"confidence": "alta",
+"exercise": "INCLINE_DUMBBELL_BICEPS_CURL",
+"garmin_name": "Incline Dumbbell Biceps Curl"
+},
+"Incline_Dumbbell_Flyes": {
+"category": "FLYE",
+"confidence": "alta",
+"exercise": "INCLINE_DUMBBELL_FLYE",
+"garmin_name": "Incline Dumbbell Fly"
+},
+"Incline_Dumbbell_Flyes_-_With_A_Twist": {
+"category": "FLYE",
+"confidence": "alta",
+"exercise": "INCLINE_DUMBBELL_FLYE",
+"garmin_name": "Incline Dumbbell Fly"
+},
+"Incline_Dumbbell_Press": {
+"category": "BENCH_PRESS",
+"confidence": "alta",
+"exercise": "INCLINE_DUMBBELL_BENCH_PRESS",
+"garmin_name": "Incline Dumbbell Bench Press"
+},
+"Incline_Hammer_Curls": {
+"category": "CURL",
+"confidence": "alta",
+"exercise": "DUMBBELL_HAMMER_CURL",
+"garmin_name": "Dumbbell Hammer Curl"
+},
+"Incline_Inner_Biceps_Curl": {
+"category": "CURL",
+"confidence": "alta",
+"exercise": "INCLINE_DUMBBELL_BICEPS_CURL",
+"garmin_name": "Incline Dumbbell Biceps Curl"
+},
+"Incline_Push-Up": {
+"category": "PUSH_UP",
+"confidence": "alta",
+"exercise": "INCLINE_PUSH_UP",
+"garmin_name": "Incline Push-up"
+},
+"Incline_Push-Up_Close-Grip": {
+"category": "PUSH_UP",
+"confidence": "alta",
+"exercise": "INCLINE_PUSH_UP",
+"garmin_name": "Incline Push-up"
+},
+"Incline_Push-Up_Depth_Jump": {
+"category": "PLYO",
+"confidence": "alta",
+"exercise": "DEPTH_JUMP",
+"garmin_name": "Depth Jump"
+},
+"Incline_Push-Up_Medium": {
+"category": "PUSH_UP",
+"confidence": "alta",
+"exercise": "INCLINE_PUSH_UP",
+"garmin_name": "Incline Push-up"
+},
+"Incline_Push-Up_Reverse_Grip": {
+"category": "PUSH_UP",
+"confidence": "alta",
+"exercise": "INCLINE_PUSH_UP",
+"garmin_name": "Incline Push-up"
+},
+"Incline_Push-Up_Wide": {
+"category": "PUSH_UP",
+"confidence": "alta",
+"exercise": "INCLINE_PUSH_UP",
+"garmin_name": "Incline Push-up"
+},
+"Intermediate_Groin_Stretch": {
+"category": "WARM_UP",
+"confidence": "media",
+"exercise": "STRETCH_90_90",
+"garmin_name": "90/90 Stretch"
+},
+"Intermediate_Hip_Flexor_and_Quad_Stretch": {
+"category": "WARM_UP",
+"confidence": "alta",
+"exercise": "STRETCH_HIP_FLEXOR_AND_QUAD",
+"garmin_name": "Hip Flexor and Quad Stretch"
+},
+"Internal_Rotation_with_Band": {
+"category": "SHOULDER_STABILITY",
+"confidence": "alta",
+"exercise": "BAND_INTERNAL_ROTATION",
+"garmin_name": "Band Internal Rotation"
+},
+"Inverted_Row": {
+"category": "ROW",
+"confidence": "alta",
+"exercise": "INVERTED_ROW",
+"garmin_name": "Inverted Row"
+},
+"Inverted_Row_with_Straps": {
+"category": "ROW",
+"confidence": "alta",
+"exercise": "INVERTED_ROW",
+"garmin_name": "Inverted Row"
+},
+"Iron_Cross": {
+"category": "SHOULDER_PRESS",
+"confidence": "generica",
+"exercise": "SHOULDER_PRESS",
+"garmin_name": "Shoulder Press"
+},
+"Iron_Crosses_stretch": {
+"category": "WARM_UP",
+"confidence": "media",
+"exercise": "STRETCH_90_90",
+"garmin_name": "90/90 Stretch"
+},
+"Isometric_Chest_Squeezes": {
+"category": "PLYO",
+"confidence": "generica",
+"exercise": "PLYO",
+"garmin_name": "Plyo"
+},
+"Isometric_Neck_Exercise_-_Front_And_Back": {
+"category": "WARM_UP",
+"confidence": "generica",
+"exercise": "WARM_UP",
+"garmin_name": "Warm-up"
+},
+"Isometric_Neck_Exercise_-_Sides": {
+"category": "WARM_UP",
+"confidence": "generica",
+"exercise": "WARM_UP",
+"garmin_name": "Warm-up"
+},
+"Isometric_Wipers": {
+"category": "BENCH_PRESS",
+"confidence": "generica",
+"exercise": "BENCH_PRESS",
+"garmin_name": "Bench Press"
+},
+"JM_Press": {
+"category": "TRICEPS_EXTENSION",
+"confidence": "alta",
+"exercise": "TRICEPS_PRESS",
+"garmin_name": "Triceps Press"
+},
+"Jackknife_Sit-Up": {
+"category": "SIT_UP",
+"confidence": "alta",
+"exercise": "SIT_UP",
+"garmin_name": "Sit-up"
+},
+"Janda_Sit-Up": {
+"category": "SIT_UP",
+"confidence": "alta",
+"exercise": "SIT_UP",
+"garmin_name": "Sit-up"
+},
+"Jefferson_Squats": {
+"category": "SQUAT",
+"confidence": "alta",
+"exercise": "SQUAT",
+"garmin_name": "Squat"
+},
+"Jerk_Balance": {
+"category": "OLYMPIC_LIFT",
+"confidence": "alta",
+"exercise": "CLEAN_AND_JERK",
+"garmin_name": "Clean and Jerk"
+},
+"Jerk_Dip_Squat": {
+"category": "OLYMPIC_LIFT",
+"confidence": "alta",
+"exercise": "SQUAT_CLEAN_AND_JERK",
+"garmin_name": "Squat Clean and Jerk"
+},
+"Jogging_Treadmill": {
+"category": "RUN_INDOOR",
+"confidence": "media",
+"exercise": "TREADMILL",
+"garmin_name": "Treadmill"
+},
+"Keg_Load": {
+"category": "HYPEREXTENSION",
+"confidence": "generica",
+"exercise": "HYPEREXTENSION",
+"garmin_name": "Hyperextension"
+},
+"Kettlebell_Arnold_Press": {
+"category": "SHOULDER_PRESS",
+"confidence": "alta",
+"exercise": "ARNOLD_PRESS",
+"garmin_name": "Arnold Press"
+},
+"Kettlebell_Dead_Clean": {
+"category": "OLYMPIC_LIFT",
+"confidence": "media",
+"exercise": "CLEAN_AND_JERK",
+"garmin_name": "Clean and Jerk"
+},
+"Kettlebell_Figure_8": {
+"category": "CORE",
+"confidence": "generica",
+"exercise": "CORE",
+"garmin_name": "Core"
+},
+"Kettlebell_Halo": {
+"category": "SHOULDER_PRESS",
+"confidence": "generica",
+"exercise": "SHOULDER_PRESS",
+"garmin_name": "Shoulder Press"
+},
+"Kettlebell_Halo_With_Overhead_Extension": {
+"category": "SQUAT",
+"confidence": "media",
+"exercise": "KETTLEBELL_SWING_OVERHEAD",
+"garmin_name": "Kettlebell Swing Overhead"
+},
+"Kettlebell_Hang_Clean": {
+"category": "OLYMPIC_LIFT",
+"confidence": "media",
+"exercise": "CLEAN_AND_JERK",
+"garmin_name": "Clean and Jerk"
+},
+"Kettlebell_One-Legged_Deadlift": {
+"category": "DEADLIFT",
+"confidence": "alta",
+"exercise": "KETTLEBELL_DEADLIFT",
+"garmin_name": "Kettlebell Deadlift"
+},
+"Kettlebell_Overhead_Triceps_Extension": {
+"category": "TRICEPS_EXTENSION",
+"confidence": "alta",
+"exercise": "TRICEPS_EXTENSION",
+"garmin_name": "Triceps Extension"
+},
+"Kettlebell_Pass_Between_The_Legs": {
+"category": "LEG_RAISE",
+"confidence": "media",
+"exercise": "KETTLEBELL_LEG_RAISES",
+"garmin_name": "Kettlebell Leg Raises"
+},
+"Kettlebell_Pirate_Ships": {
+"category": "SHOULDER_PRESS",
+"confidence": "generica",
+"exercise": "SHOULDER_PRESS",
+"garmin_name": "Shoulder Press"
+},
+"Kettlebell_Pistol_Squat": {
+"category": "SQUAT",
+"confidence": "alta",
+"exercise": "KETTLEBELL_SQUAT",
+"garmin_name": "Kettlebell Squat"
+},
+"Kettlebell_Seated_Press": {
+"category": "SHOULDER_PRESS",
+"confidence": "media",
+"exercise": "ARNOLD_PRESS",
+"garmin_name": "Arnold Press"
+},
+"Kettlebell_Seesaw_Press": {
+"category": "BENCH_PRESS",
+"confidence": "media",
+"exercise": "KETTLEBELL_CHEST_PRESS",
+"garmin_name": "Kettlebell Chest Press"
+},
+"Kettlebell_Sumo_High_Pull": {
+"category": "OLYMPIC_LIFT",
+"confidence": "media",
+"exercise": "BARBELL_HIGH_PULL",
+"garmin_name": "Barbell High Pull"
+},
+"Kettlebell_Thruster": {
+"category": "SQUAT",
+"confidence": "media",
+"exercise": "THRUSTERS",
+"garmin_name": "Thrusters"
+},
+"Kettlebell_Turkish_Get-Up_Lunge_style": {
+"category": "LUNGE",
+"confidence": "media",
+"exercise": "LUNGE",
+"garmin_name": "Lunge"
+},
+"Kettlebell_Turkish_Get-Up_Squat_style": {
+"category": "SQUAT",
+"confidence": "alta",
+"exercise": "KETTLEBELL_SQUAT",
+"garmin_name": "Kettlebell Squat"
+},
+"Kettlebell_Windmill": {
+"category": "CORE",
+"confidence": "alta",
+"exercise": "KETTLEBELL_WINDMILL",
+"garmin_name": "Kettlebell Windmill"
+},
+"Kipping_Muscle_Up": {
+"category": "PULL_UP",
+"confidence": "alta",
+"exercise": "KIPPING_PULL_UP",
+"garmin_name": "Kipping Pull-up"
+},
+"Knee_Across_The_Body": {
+"category": "WARM_UP",
+"confidence": "generica",
+"exercise": "WARM_UP",
+"garmin_name": "Warm-up"
+},
+"Knee_Circles": {
+"category": "WARM_UP",
+"confidence": "generica",
+"exercise": "WARM_UP",
+"garmin_name": "Warm-up"
+},
+"Knee_Hip_Raise_On_Parallel_Bars": {
+"category": "HIP_RAISE",
+"confidence": "alta",
+"exercise": "HIP_RAISE_WITH_KNEE_SQUEEZE",
+"garmin_name": "Hip Raise with Knee Squeeze"
+},
+"Knee_Tuck_Jump": {
+"category": "LEG_RAISE",
+"confidence": "media",
+"exercise": "HANGING_KNEE_RAISE",
+"garmin_name": "Hanging Knee Raise"
+},
+"Kneeling_Arm_Drill": {
+"category": "PLYO",
+"confidence": "generica",
+"exercise": "PLYO",
+"garmin_name": "Plyo"
+},
+"Kneeling_Cable_Crunch_With_Alternating_Oblique_Twists": {
+"category": "CRUNCH",
+"confidence": "alta",
+"exercise": "KNEELING_OBLIQUE_CABLE_CRUNCH",
+"garmin_name": "Kneeling Oblique Cable Crunch"
+},
+"Kneeling_Cable_Triceps_Extension": {
+"category": "TRICEPS_EXTENSION",
+"confidence": "alta",
+"exercise": "TRICEPS_EXTENSION",
+"garmin_name": "Triceps Extension"
+},
+"Kneeling_Forearm_Stretch": {
+"category": "WARM_UP",
+"confidence": "alta",
+"exercise": "STRETCH_FOREARMS",
+"garmin_name": "Forearm Stretch"
+},
+"Kneeling_High_Pulley_Row": {
+"category": "ROW",
+"confidence": "media",
+"exercise": "ROW",
+"garmin_name": "Row"
+},
+"Kneeling_Hip_Flexor": {
+"category": "WARM_UP",
+"confidence": "media",
+"exercise": "STRETCH_HIP_FLEXOR_AND_QUAD",
+"garmin_name": "Hip Flexor and Quad Stretch"
+},
+"Kneeling_Jump_Squat": {
+"category": "PLYO",
+"confidence": "alta",
+"exercise": "JUMP_SQUAT",
+"garmin_name": "Jump Squat"
+},
+"Kneeling_Single-Arm_High_Pulley_Row": {
+"category": "ROW",
+"confidence": "alta",
+"exercise": "SINGLE_ARM_CABLE_ROW",
+"garmin_name": "Single-arm Cable Row"
+},
+"Kneeling_Squat": {
+"category": "SQUAT",
+"confidence": "alta",
+"exercise": "SQUAT",
+"garmin_name": "Squat"
+},
+"Landmine_180s": {
+"category": "CORE",
+"confidence": "generica",
+"exercise": "CORE",
+"garmin_name": "Core"
+},
+"Landmine_Linear_Jammer": {
+"category": "SHOULDER_PRESS",
+"confidence": "generica",
+"exercise": "SHOULDER_PRESS",
+"garmin_name": "Shoulder Press"
+},
+"Lateral_Bound": {
+"category": "PLYO",
+"confidence": "alta",
+"exercise": "LATERAL_SLIDE",
+"garmin_name": "Lateral Slide"
+},
+"Lateral_Box_Jump": {
+"category": "PLYO",
+"confidence": "alta",
+"exercise": "BOX_JUMP",
+"garmin_name": "Box Jump"
+},
+"Lateral_Cone_Hops": {
+"category": "PLYO",
+"confidence": "alta",
+"exercise": "LATERAL_LEAP_AND_HOP",
+"garmin_name": "Lateral Leap and Hop"
+},
+"Lateral_Raise_-_With_Bands": {
+"category": "LATERAL_RAISE",
+"confidence": "alta",
+"exercise": "LATERAL_RAISE",
+"garmin_name": "Lateral Raise"
+},
+"Latissimus_Dorsi-SMR": {
+"category": "WARM_UP",
+"confidence": "generica",
+"exercise": "WARM_UP",
+"garmin_name": "Warm-up"
+},
+"Leg-Over_Floor_Press": {
+"category": "BENCH_PRESS",
+"confidence": "media",
+"exercise": "ONE_ARM_FLOOR_PRESS",
+"garmin_name": "One-arm Floor Press"
+},
+"Leg-Up_Hamstring_Stretch": {
+"category": "WARM_UP",
+"confidence": "alta",
+"exercise": "STRETCH_HAMSTRING",
+"garmin_name": "Hamstring Stretch"
+},
+"Leg_Extensions": {
+"category": "CRUNCH",
+"confidence": "alta",
+"exercise": "LEG_EXTENSIONS",
+"garmin_name": "Leg Extensions"
+},
+"Leg_Lift": {
+"category": "LEG_RAISE",
+"confidence": "alta",
+"exercise": "LEG_RAISE",
+"garmin_name": "Leg Raise"
+},
+"Leg_Press": {
+"category": "SQUAT",
+"confidence": "alta",
+"exercise": "LEG_PRESS",
+"garmin_name": "Leg Press"
+},
+"Leg_Pull-In": {
+"category": "CORE",
+"confidence": "generica",
+"exercise": "CORE",
+"garmin_name": "Core"
+},
+"Leverage_Chest_Press": {
+"category": "BENCH_PRESS",
+"confidence": "alta",
+"exercise": "KETTLEBELL_CHEST_PRESS",
+"garmin_name": "Kettlebell Chest Press"
+},
+"Leverage_Deadlift": {
+"category": "DEADLIFT",
+"confidence": "alta",
+"exercise": "DEADLIFT",
+"garmin_name": "Deadlift"
+},
+"Leverage_Decline_Chest_Press": {
+"category": "BENCH_PRESS",
+"confidence": "media",
+"exercise": "BENCH_PRESS",
+"garmin_name": "Bench Press"
+},
+"Leverage_High_Row": {
+"category": "ROW",
+"confidence": "alta",
+"exercise": "ROW",
+"garmin_name": "Row"
+},
+"Leverage_Incline_Chest_Press": {
+"category": "BENCH_PRESS",
+"confidence": "media",
+"exercise": "INCLINE_SMITH_MACHINE_BENCH_PRESS",
+"garmin_name": "Incline Smith Machine Bench Press"
+},
+"Leverage_Iso_Row": {
+"category": "ROW",
+"confidence": "alta",
+"exercise": "ROW",
+"garmin_name": "Row"
+},
+"Leverage_Shoulder_Press": {
+"category": "SHOULDER_PRESS",
+"confidence": "alta",
+"exercise": "SHOULDER_PRESS",
+"garmin_name": "Shoulder Press"
+},
+"Leverage_Shrug": {
+"category": "SHRUG",
+"confidence": "alta",
+"exercise": "SHRUG",
+"garmin_name": "Shrug"
+},
+"Linear_3-Part_Start_Technique": {
+"category": "PLYO",
+"confidence": "generica",
+"exercise": "PLYO",
+"garmin_name": "Plyo"
+},
+"Linear_Acceleration_Wall_Drill": {
+"category": "PLYO",
+"confidence": "generica",
+"exercise": "PLYO",
+"garmin_name": "Plyo"
+},
+"Linear_Depth_Jump": {
+"category": "PLYO",
+"confidence": "alta",
+"exercise": "DEPTH_JUMP",
+"garmin_name": "Depth Jump"
+},
+"Log_Lift": {
+"category": "SHOULDER_PRESS",
+"confidence": "generica",
+"exercise": "SHOULDER_PRESS",
+"garmin_name": "Shoulder Press"
+},
+"London_Bridges": {
+"category": "HIP_RAISE",
+"confidence": "alta",
+"exercise": "CLAM_BRIDGE",
+"garmin_name": "Clam Bridge"
+},
+"Looking_At_Ceiling": {
+"category": "WARM_UP",
+"confidence": "generica",
+"exercise": "WARM_UP",
+"garmin_name": "Warm-up"
+},
+"Low_Cable_Crossover": {
+"category": "FLYE",
+"confidence": "alta",
+"exercise": "CABLE_CROSSOVER",
+"garmin_name": "Cable Crossover"
+},
+"Low_Cable_Triceps_Extension": {
+"category": "TRICEPS_EXTENSION",
+"confidence": "alta",
+"exercise": "TRICEPS_EXTENSION",
+"garmin_name": "Triceps Extension"
+},
+"Low_Pulley_Row_To_Neck": {
+"category": "ROW",
+"confidence": "media",
+"exercise": "ROW",
+"garmin_name": "Row"
+},
+"Lower_Back-SMR": {
+"category": "WARM_UP",
+"confidence": "generica",
+"exercise": "WARM_UP",
+"garmin_name": "Warm-up"
+},
+"Lower_Back_Curl": {
+"category": "CURL",
+"confidence": "alta",
+"exercise": "CURL",
+"garmin_name": "Curl"
+},
+"Lunge_Pass_Through": {
+"category": "LUNGE",
+"confidence": "alta",
+"exercise": "LUNGE",
+"garmin_name": "Lunge"
+},
+"Lunge_Sprint": {
+"category": "LUNGE",
+"confidence": "alta",
+"exercise": "LUNGE",
+"garmin_name": "Lunge"
+},
+"Lying_Bent_Leg_Groin": {
+"category": "WARM_UP",
+"confidence": "generica",
+"exercise": "WARM_UP",
+"garmin_name": "Warm-up"
+},
+"Lying_Cable_Curl": {
+"category": "CURL",
+"confidence": "alta",
+"exercise": "LYING_CONCENTRATION_CABLE_CURL",
+"garmin_name": "Lying Concentration Cable Curl"
+},
+"Lying_Cambered_Barbell_Row": {
+"category": "ROW",
+"confidence": "alta",
+"exercise": "BARBELL_ROW",
+"garmin_name": "Barbell Row"
+},
+"Lying_Close-Grip_Bar_Curl_On_High_Pulley": {
+"category": "CURL",
+"confidence": "media",
+"exercise": "CLOSE_GRIP_EZ_BAR_BICEPS_CURL",
+"garmin_name": "Close-grip EZ-Bar Biceps Curl"
+},
+"Lying_Close-Grip_Barbell_Triceps_Extension_Behind_The_Head": {
+"category": "TRICEPS_EXTENSION",
+"confidence": "alta",
+"exercise": "LYING_TRICEPS_EXTENSION_TO_CLOSE_GRIP_BENCH_PRESS",
+"garmin_name": "Lying Triceps Extension to Close-grip Bench Press"
+},
+"Lying_Close-Grip_Barbell_Triceps_Press_To_Chin": {
+"category": "TRICEPS_EXTENSION",
+"confidence": "alta",
+"exercise": "LYING_TRICEPS_EXTENSION_TO_CLOSE_GRIP_BENCH_PRESS",
+"garmin_name": "Lying Triceps Extension to Close-grip Bench Press"
+},
+"Lying_Crossover": {
+"category": "FLYE",
+"confidence": "generica",
+"exercise": "FLYE",
+"garmin_name": "Fly"
+},
+"Lying_Dumbbell_Tricep_Extension": {
+"category": "TRICEPS_EXTENSION",
+"confidence": "alta",
+"exercise": "DUMBBELL_LYING_TRICEPS_EXTENSION",
+"garmin_name": "Dumbbell Lying Triceps Extension"
+},
+"Lying_Face_Down_Plate_Neck_Resistance": {
+"category": "WARM_UP",
+"confidence": "generica",
+"exercise": "WARM_UP",
+"garmin_name": "Warm-up"
+},
+"Lying_Face_Up_Plate_Neck_Resistance": {
+"category": "WARM_UP",
+"confidence": "generica",
+"exercise": "WARM_UP",
+"garmin_name": "Warm-up"
+},
+"Lying_Glute": {
+"category": "WARM_UP",
+"confidence": "generica",
+"exercise": "WARM_UP",
+"garmin_name": "Warm-up"
+},
+"Lying_Hamstring": {
+"category": "WARM_UP",
+"confidence": "generica",
+"exercise": "WARM_UP",
+"garmin_name": "Warm-up"
+},
+"Lying_High_Bench_Barbell_Curl": {
+"category": "CURL",
+"confidence": "alta",
+"exercise": "BARBELL_BICEPS_CURL",
+"garmin_name": "Barbell Biceps Curl"
+},
+"Lying_Leg_Curls": {
+"category": "LEG_CURL",
+"confidence": "alta",
+"exercise": "LEG_CURL",
+"garmin_name": "Leg Curl"
+},
+"Lying_Machine_Squat": {
+"category": "SQUAT",
+"confidence": "alta",
+"exercise": "SQUAT",
+"garmin_name": "Squat"
+},
+"Lying_One-Arm_Lateral_Raise": {
+"category": "LATERAL_RAISE",
+"confidence": "alta",
+"exercise": "ONE_ARM_CABLE_LATERAL_RAISE",
+"garmin_name": "One-arm Cable Lateral Raise"
+},
+"Lying_Prone_Quadriceps": {
+"category": "WARM_UP",
+"confidence": "generica",
+"exercise": "WARM_UP",
+"garmin_name": "Warm-up"
+},
+"Lying_Rear_Delt_Raise": {
+"category": "LATERAL_RAISE",
+"confidence": "alta",
+"exercise": "LYING_DUMBBELL_RAISE",
+"garmin_name": "Lying Dumbbell Raise"
+},
+"Lying_Supine_Dumbbell_Curl": {
+"category": "CURL",
+"confidence": "alta",
+"exercise": "DUMBBELL_BICEPS_CURL",
+"garmin_name": "Dumbbell Biceps Curl"
+},
+"Lying_T-Bar_Row": {
+"category": "ROW",
+"confidence": "alta",
+"exercise": "T_BAR_ROW",
+"garmin_name": "T-Bar Row"
+},
+"Lying_Triceps_Press": {
+"category": "TRICEPS_EXTENSION",
+"confidence": "alta",
+"exercise": "TRICEPS_PRESS",
+"garmin_name": "Triceps Press"
+},
+"Machine_Bench_Press": {
+"category": "BENCH_PRESS",
+"confidence": "alta",
+"exercise": "SMITH_MACHINE_BENCH_PRESS",
+"garmin_name": "Smith Machine Bench Press"
+},
+"Machine_Bicep_Curl": {
+"category": "CURL",
+"confidence": "alta",
+"exercise": "DEAD_HANG_BICEPS_CURL",
+"garmin_name": "Dead-hang Biceps Curl"
+},
+"Machine_Preacher_Curls": {
+"category": "CURL",
+"confidence": "alta",
+"exercise": "CURL",
+"garmin_name": "Curl"
+},
+"Machine_Shoulder_Military_Press": {
+"category": "SHOULDER_PRESS",
+"confidence": "alta",
+"exercise": "MILITARY_PRESS",
+"garmin_name": "Military Press"
+},
+"Machine_Triceps_Extension": {
+"category": "TRICEPS_EXTENSION",
+"confidence": "alta",
+"exercise": "TRICEPS_EXTENSION",
+"garmin_name": "Triceps Extension"
+},
+"Medicine_Ball_Chest_Pass": {
+"category": "PUSH_UP",
+"confidence": "alta",
+"exercise": "MEDICINE_BALL_CHEST_PASS",
+"garmin_name": "Medicine Ball Chest Pass"
+},
+"Medicine_Ball_Full_Twist": {
+"category": "CORE",
+"confidence": "media",
+"exercise": "RUSSIAN_TWIST",
+"garmin_name": "Russian Twist"
+},
+"Medicine_Ball_Scoop_Throw": {
+"category": "PLYO",
+"confidence": "media",
+"exercise": "MEDICINE_BALL_OVERHEAD_THROWS",
+"garmin_name": "Medicine Ball Overhead Throws"
+},
+"Middle_Back_Shrug": {
+"category": "SHRUG",
+"confidence": "alta",
+"exercise": "BEHIND_THE_BACK_SHRUG",
+"garmin_name": "Behind-the-Back Shrug"
+},
+"Middle_Back_Stretch": {
+"category": "WARM_UP",
+"confidence": "media",
+"exercise": "STRETCH_90_90",
+"garmin_name": "90/90 Stretch"
+},
+"Mixed_Grip_Chin": {
+"category": "PULL_UP",
+"confidence": "alta",
+"exercise": "MIXED_GRIP_CHIN_UP",
+"garmin_name": "Mixed-grip Chin-up"
+},
+"Monster_Walk": {
+"category": "RUN",
+"confidence": "media",
+"exercise": "WALK",
+"garmin_name": "Walk"
+},
+"Mountain_Climbers": {
+"category": "PLANK",
+"confidence": "alta",
+"exercise": "MOUNTAIN_CLIMBER",
+"garmin_name": "Mountain Climber"
+},
+"Moving_Claw_Series": {
+"category": "PLYO",
+"confidence": "generica",
+"exercise": "PLYO",
+"garmin_name": "Plyo"
+},
+"Muscle_Snatch": {
+"category": "OLYMPIC_LIFT",
+"confidence": "alta",
+"exercise": "SNATCH",
+"garmin_name": "Snatch"
+},
+"Muscle_Up": {
+"category": "PULL_UP",
+"confidence": "alta",
+"exercise": "CHIN_UP",
+"garmin_name": "Chin-up"
+},
+"Narrow_Stance_Hack_Squats": {
+"category": "SQUAT",
+"confidence": "media",
+"exercise": "SQUAT",
+"garmin_name": "Squat"
+},
+"Narrow_Stance_Leg_Press": {
+"category": "SQUAT",
+"confidence": "alta",
+"exercise": "LEG_PRESS",
+"garmin_name": "Leg Press"
+},
+"Narrow_Stance_Squats": {
+"category": "SQUAT",
+"confidence": "alta",
+"exercise": "SQUAT",
+"garmin_name": "Squat"
+},
+"Natural_Glute_Ham_Raise": {
+"category": "LEG_CURL",
+"confidence": "generica",
+"exercise": "LEG_CURL",
+"garmin_name": "Leg Curl"
+},
+"Neck-SMR": {
+"category": "WARM_UP",
+"confidence": "alta",
+"exercise": "NECK_ROTATIONS",
+"garmin_name": "Neck Rotations"
+},
+"Neck_Press": {
+"category": "BENCH_PRESS",
+"confidence": "generica",
+"exercise": "BENCH_PRESS",
+"garmin_name": "Bench Press"
+},
+"Oblique_Crunches": {
+"category": "CRUNCH",
+"confidence": "alta",
+"exercise": "CRUNCH",
+"garmin_name": "Crunch"
+},
+"Oblique_Crunches_-_On_The_Floor": {
+"category": "CRUNCH",
+"confidence": "alta",
+"exercise": "CRUNCH",
+"garmin_name": "Crunch"
+},
+"Olympic_Squat": {
+"category": "SQUAT",
+"confidence": "alta",
+"exercise": "SQUAT",
+"garmin_name": "Squat"
+},
+"On-Your-Back_Quad_Stretch": {
+"category": "WARM_UP",
+"confidence": "alta",
+"exercise": "STRETCH_QUAD",
+"garmin_name": "Quad Stretch"
+},
+"On_Your_Side_Quad_Stretch": {
+"category": "WARM_UP",
+"confidence": "alta",
+"exercise": "STRETCH_QUAD",
+"garmin_name": "Quad Stretch"
+},
+"One-Arm_Dumbbell_Row": {
+"category": "ROW",
+"confidence": "alta",
+"exercise": "DUMBBELL_ROW",
+"garmin_name": "Dumbbell Row"
+},
+"One-Arm_Flat_Bench_Dumbbell_Flye": {
+"category": "FLYE",
+"confidence": "alta",
+"exercise": "DUMBBELL_FLYE",
+"garmin_name": "Dumbbell Fly"
+},
+"One-Arm_High-Pulley_Cable_Side_Bends": {
+"category": "CORE",
+"confidence": "alta",
+"exercise": "CABLE_SIDE_BEND",
+"garmin_name": "Cable Side Bend"
+},
+"One-Arm_Incline_Lateral_Raise": {
+"category": "LATERAL_RAISE",
+"confidence": "alta",
+"exercise": "ONE_ARM_CABLE_LATERAL_RAISE",
+"garmin_name": "One-arm Cable Lateral Raise"
+},
+"One-Arm_Kettlebell_Clean": {
+"category": "OLYMPIC_LIFT",
+"confidence": "media",
+"exercise": "SINGLE_ARM_KETTLEBELL_SNATCH",
+"garmin_name": "Single-arm Kettlebell Snatch"
+},
+"One-Arm_Kettlebell_Clean_and_Jerk": {
+"category": "OLYMPIC_LIFT",
+"confidence": "alta",
+"exercise": "CLEAN_AND_JERK",
+"garmin_name": "Clean and Jerk"
+},
+"One-Arm_Kettlebell_Floor_Press": {
+"category": "BENCH_PRESS",
+"confidence": "alta",
+"exercise": "ONE_ARM_FLOOR_PRESS",
+"garmin_name": "One-arm Floor Press"
+},
+"One-Arm_Kettlebell_Jerk": {
+"category": "OLYMPIC_LIFT",
+"confidence": "media",
+"exercise": "SINGLE_ARM_KETTLEBELL_SNATCH",
+"garmin_name": "Single-arm Kettlebell Snatch"
+},
+"One-Arm_Kettlebell_Military_Press_To_The_Side": {
+"category": "SHOULDER_PRESS",
+"confidence": "alta",
+"exercise": "ONE_ARM_PUSH_PRESS",
+"garmin_name": "One-arm Push Press"
+},
+"One-Arm_Kettlebell_Para_Press": {
+"category": "BENCH_PRESS",
+"confidence": "media",
+"exercise": "ONE_ARM_FLOOR_PRESS",
+"garmin_name": "One-arm Floor Press"
+},
+"One-Arm_Kettlebell_Push_Press": {
+"category": "SHOULDER_PRESS",
+"confidence": "alta",
+"exercise": "ONE_ARM_PUSH_PRESS",
+"garmin_name": "One-arm Push Press"
+},
+"One-Arm_Kettlebell_Row": {
+"category": "ROW",
+"confidence": "alta",
+"exercise": "KETTLEBELL_ROW",
+"garmin_name": "Kettlebell Row"
+},
+"One-Arm_Kettlebell_Snatch": {
+"category": "OLYMPIC_LIFT",
+"confidence": "alta",
+"exercise": "SINGLE_ARM_KETTLEBELL_SNATCH",
+"garmin_name": "Single-arm Kettlebell Snatch"
+},
+"One-Arm_Kettlebell_Split_Jerk": {
+"category": "OLYMPIC_LIFT",
+"confidence": "alta",
+"exercise": "SPLIT_JERK",
+"garmin_name": "Split Jerk"
+},
+"One-Arm_Kettlebell_Split_Snatch": {
+"category": "OLYMPIC_LIFT",
+"confidence": "alta",
+"exercise": "SINGLE_ARM_KETTLEBELL_SNATCH",
+"garmin_name": "Single-arm Kettlebell Snatch"
+},
+"One-Arm_Kettlebell_Swings": {
+"category": "HIP_SWING",
+"confidence": "alta",
+"exercise": "ONE_ARM_SWING",
+"garmin_name": "One-arm Swing"
+},
+"One-Arm_Long_Bar_Row": {
+"category": "ROW",
+"confidence": "alta",
+"exercise": "ONE_ARM_BENT_OVER_ROW",
+"garmin_name": "One-arm Bent-over Row"
+},
+"One-Arm_Medicine_Ball_Slam": {
+"category": "PLYO",
+"confidence": "alta",
+"exercise": "MEDICINE_BALL_SLAM",
+"garmin_name": "Medicine Ball Slam"
+},
+"One-Arm_Open_Palm_Kettlebell_Clean": {
+"category": "OLYMPIC_LIFT",
+"confidence": "generica",
+"exercise": "OLYMPIC_LIFT",
+"garmin_name": "Olympic Lift"
+},
+"One-Arm_Overhead_Kettlebell_Squats": {
+"category": "SQUAT",
+"confidence": "alta",
+"exercise": "KETTLEBELL_SQUAT",
+"garmin_name": "Kettlebell Squat"
+},
+"One-Arm_Side_Deadlift": {
+"category": "DEADLIFT",
+"confidence": "alta",
+"exercise": "ONE_ARM_ONE_LEG_DEADLIFT",
+"garmin_name": "One-arm One-leg Deadlift"
+},
+"One-Arm_Side_Laterals": {
+"category": "HIP_SWING",
+"confidence": "media",
+"exercise": "ONE_ARM_SWING",
+"garmin_name": "One-arm Swing"
+},
+"One-Legged_Cable_Kickback": {
+"category": "TRICEPS_EXTENSION",
+"confidence": "generica",
+"exercise": "TRICEPS_EXTENSION",
+"garmin_name": "Triceps Extension"
+},
+"One_Arm_Against_Wall": {
+"category": "HIP_SWING",
+"confidence": "media",
+"exercise": "ONE_ARM_SWING",
+"garmin_name": "One-arm Swing"
+},
+"One_Arm_Chin-Up": {
+"category": "PULL_UP",
+"confidence": "alta",
+"exercise": "CHIN_UP",
+"garmin_name": "Chin-up"
+},
+"One_Arm_Dumbbell_Bench_Press": {
+"category": "BENCH_PRESS",
+"confidence": "alta",
+"exercise": "DUMBBELL_BENCH_PRESS",
+"garmin_name": "Dumbbell Bench Press"
+},
+"One_Arm_Dumbbell_Preacher_Curl": {
+"category": "CURL",
+"confidence": "alta",
+"exercise": "ONE_ARM_PREACHER_CURL",
+"garmin_name": "One-arm Preacher Curl"
+},
+"One_Arm_Floor_Press": {
+"category": "BENCH_PRESS",
+"confidence": "alta",
+"exercise": "ONE_ARM_FLOOR_PRESS",
+"garmin_name": "One-arm Floor Press"
+},
+"One_Arm_Lat_Pulldown": {
+"category": "PULL_UP",
+"confidence": "alta",
+"exercise": "LAT_PULLDOWN",
+"garmin_name": "Lat Pull-down"
+},
+"One_Arm_Pronated_Dumbbell_Triceps_Extension": {
+"category": "TRICEPS_EXTENSION",
+"confidence": "alta",
+"exercise": "TRICEPS_EXTENSION",
+"garmin_name": "Triceps Extension"
+},
+"One_Arm_Supinated_Dumbbell_Triceps_Extension": {
+"category": "TRICEPS_EXTENSION",
+"confidence": "alta",
+"exercise": "TRICEPS_EXTENSION",
+"garmin_name": "Triceps Extension"
+},
+"One_Half_Locust": {
+"category": "WARM_UP",
+"confidence": "generica",
+"exercise": "WARM_UP",
+"garmin_name": "Warm-up"
+},
+"One_Handed_Hang": {
+"category": "WARM_UP",
+"confidence": "generica",
+"exercise": "WARM_UP",
+"garmin_name": "Warm-up"
+},
+"One_Knee_To_Chest": {
+"category": "WARM_UP",
+"confidence": "generica",
+"exercise": "WARM_UP",
+"garmin_name": "Warm-up"
+},
+"One_Leg_Barbell_Squat": {
+"category": "SQUAT",
+"confidence": "alta",
+"exercise": "BARBELL_BACK_SQUAT",
+"garmin_name": "Barbell Back Squat"
+},
+"Open_Palm_Kettlebell_Clean": {
+"category": "OLYMPIC_LIFT",
+"confidence": "media",
+"exercise": "CLEAN_AND_JERK",
+"garmin_name": "Clean and Jerk"
+},
+"Otis-Up": {
+"category": "CORE",
+"confidence": "generica",
+"exercise": "CORE",
+"garmin_name": "Core"
+},
+"Overhead_Cable_Curl": {
+"category": "CURL",
+"confidence": "alta",
+"exercise": "CABLE_BICEPS_CURL",
+"garmin_name": "Cable Biceps Curl"
+},
+"Overhead_Lat": {
+"category": "WARM_UP",
+"confidence": "generica",
+"exercise": "WARM_UP",
+"garmin_name": "Warm-up"
+},
+"Overhead_Slam": {
+"category": "PLYO",
+"confidence": "generica",
+"exercise": "PLYO",
+"garmin_name": "Plyo"
+},
+"Overhead_Squat": {
+"category": "SQUAT",
+"confidence": "alta",
+"exercise": "OVERHEAD_SQUAT",
+"garmin_name": "Overhead Squat"
+},
+"Overhead_Stretch": {
+"category": "WARM_UP",
+"confidence": "alta",
+"exercise": "STRETCH_90_90",
+"garmin_name": "90/90 Stretch"
+},
+"Overhead_Triceps": {
+"category": "TRICEPS_EXTENSION",
+"confidence": "alta",
+"exercise": "TRICEPS_EXTENSION",
+"garmin_name": "Triceps Extension"
+},
+"Pallof_Press": {
+"category": "CORE",
+"confidence": "media",
+"exercise": "CABLE_CORE_PRESS",
+"garmin_name": "Cable Core Press"
+},
+"Pallof_Press_With_Rotation": {
+"category": "CORE",
+"confidence": "media",
+"exercise": "CABLE_CORE_PRESS",
+"garmin_name": "Cable Core Press"
+},
+"Palms-Down_Dumbbell_Wrist_Curl_Over_A_Bench": {
+"category": "CURL",
+"confidence": "alta",
+"exercise": "DUMBBELL_WRIST_CURL",
+"garmin_name": "Dumbbell Wrist Curl"
+},
+"Palms-Down_Wrist_Curl_Over_A_Bench": {
+"category": "CURL",
+"confidence": "media",
+"exercise": "BARBELL_WRIST_CURL",
+"garmin_name": "Barbell Wrist Curl"
+},
+"Palms-Up_Barbell_Wrist_Curl_Over_A_Bench": {
+"category": "CURL",
+"confidence": "alta",
+"exercise": "BARBELL_WRIST_CURL",
+"garmin_name": "Barbell Wrist Curl"
+},
+"Palms-Up_Dumbbell_Wrist_Curl_Over_A_Bench": {
+"category": "CURL",
+"confidence": "alta",
+"exercise": "DUMBBELL_WRIST_CURL",
+"garmin_name": "Dumbbell Wrist Curl"
+},
+"Parallel_Bar_Dip": {
+"category": "TRICEPS_EXTENSION",
+"confidence": "media",
+"exercise": "BENCH_DIP",
+"garmin_name": "Bench Dip"
+},
+"Pelvic_Tilt_Into_Bridge": {
+"category": "HIP_RAISE",
+"confidence": "media",
+"exercise": "CLAM_BRIDGE",
+"garmin_name": "Clam Bridge"
+},
+"Peroneals-SMR": {
+"category": "WARM_UP",
+"confidence": "generica",
+"exercise": "WARM_UP",
+"garmin_name": "Warm-up"
+},
+"Peroneals_Stretch": {
+"category": "WARM_UP",
+"confidence": "alta",
+"exercise": "STRETCH_90_90",
+"garmin_name": "90/90 Stretch"
+},
+"Physioball_Hip_Bridge": {
+"category": "HIP_RAISE",
+"confidence": "media",
+"exercise": "CLAM_BRIDGE",
+"garmin_name": "Clam Bridge"
+},
+"Pin_Presses": {
+"category": "TRICEPS_EXTENSION",
+"confidence": "generica",
+"exercise": "TRICEPS_EXTENSION",
+"garmin_name": "Triceps Extension"
+},
+"Piriformis-SMR": {
+"category": "WARM_UP",
+"confidence": "alta",
+"exercise": "STRETCH_PIRIFORMIS",
+"garmin_name": "Piriformis Stretch"
+},
+"Plank": {
+"category": "PLANK",
+"confidence": "alta",
+"exercise": "PLANK",
+"garmin_name": "Plank"
+},
+"Plate_Pinch": {
+"category": "CURL",
+"confidence": "media",
+"exercise": "PLATE_PINCH_CURL",
+"garmin_name": "Plate Pinch Curl"
+},
+"Plate_Twist": {
+"category": "CORE",
+"confidence": "alta",
+"exercise": "RUSSIAN_TWIST",
+"garmin_name": "Russian Twist"
+},
+"Platform_Hamstring_Slides": {
+"category": "LEG_CURL",
+"confidence": "generica",
+"exercise": "LEG_CURL",
+"garmin_name": "Leg Curl"
+},
+"Plie_Dumbbell_Squat": {
+"category": "SQUAT",
+"confidence": "alta",
+"exercise": "DUMBBELL_SQUAT",
+"garmin_name": "Dumbbell Squat"
+},
+"Plyo_Kettlebell_Pushups": {
+"category": "PLYO",
+"confidence": "media",
+"exercise": "PLYO",
+"garmin_name": "Plyo"
+},
+"Plyo_Push-up": {
+"category": "PLYO",
+"confidence": "alta",
+"exercise": "PLYO",
+"garmin_name": "Plyo"
+},
+"Posterior_Tibialis_Stretch": {
+"category": "WARM_UP",
+"confidence": "media",
+"exercise": "STRETCH_90_90",
+"garmin_name": "90/90 Stretch"
+},
+"Power_Clean": {
+"category": "OLYMPIC_LIFT",
+"confidence": "alta",
+"exercise": "BARBELL_POWER_CLEAN",
+"garmin_name": "Barbell Power Clean"
+},
+"Power_Clean_from_Blocks": {
+"category": "OLYMPIC_LIFT",
+"confidence": "alta",
+"exercise": "BARBELL_POWER_CLEAN",
+"garmin_name": "Barbell Power Clean"
+},
+"Power_Jerk": {
+"category": "OLYMPIC_LIFT",
+"confidence": "alta",
+"exercise": "CLEAN_AND_JERK",
+"garmin_name": "Clean and Jerk"
+},
+"Power_Partials": {
+"category": "SHOULDER_PRESS",
+"confidence": "generica",
+"exercise": "SHOULDER_PRESS",
+"garmin_name": "Shoulder Press"
+},
+"Power_Snatch": {
+"category": "OLYMPIC_LIFT",
+"confidence": "alta",
+"exercise": "BARBELL_POWER_SNATCH",
+"garmin_name": "Barbell Power Snatch"
+},
+"Power_Snatch_from_Blocks": {
+"category": "OLYMPIC_LIFT",
+"confidence": "alta",
+"exercise": "BARBELL_POWER_SNATCH",
+"garmin_name": "Barbell Power Snatch"
+},
+"Power_Stairs": {
+"category": "LEG_CURL",
+"confidence": "generica",
+"exercise": "LEG_CURL",
+"garmin_name": "Leg Curl"
+},
+"Preacher_Curl": {
+"category": "CURL",
+"confidence": "alta",
+"exercise": "CURL",
+"garmin_name": "Curl"
+},
+"Preacher_Hammer_Dumbbell_Curl": {
+"category": "CURL",
+"confidence": "alta",
+"exercise": "DUMBBELL_HAMMER_CURL",
+"garmin_name": "Dumbbell Hammer Curl"
+},
+"Press_Sit-Up": {
+"category": "SIT_UP",
+"confidence": "alta",
+"exercise": "SIT_UP",
+"garmin_name": "Sit-up"
+},
+"Prone_Manual_Hamstring": {
+"category": "LEG_CURL",
+"confidence": "generica",
+"exercise": "LEG_CURL",
+"garmin_name": "Leg Curl"
+},
+"Prowler_Sprint": {
+"category": "RUN",
+"confidence": "media",
+"exercise": "SPRINT",
+"garmin_name": "Sprint"
+},
+"Pull_Through": {
+"category": "HIP_RAISE",
+"confidence": "generica",
+"exercise": "HIP_RAISE",
+"garmin_name": "Hip Raise"
+},
+"Pullups": {
+"category": "PULL_UP",
+"confidence": "alta",
+"exercise": "PULL_UP",
+"garmin_name": "Pull-up"
+},
+"Push-Up_Wide": {
+"category": "PUSH_UP",
+"confidence": "alta",
+"exercise": "WIDE_GRIP_PUSH_UP",
+"garmin_name": "Wide-grip Push-up"
+},
+"Push-Ups_-_Close_Triceps_Position": {
+"category": "TRICEPS_EXTENSION",
+"confidence": "media",
+"exercise": "TRICEPS_EXTENSION",
+"garmin_name": "Triceps Extension"
+},
+"Push-Ups_With_Feet_Elevated": {
+"category": "PLANK",
+"confidence": "media",
+"exercise": "ELEVATED_FEET_PLANK",
+"garmin_name": "Elevated-feet Plank"
+},
+"Push-Ups_With_Feet_On_An_Exercise_Ball": {
+"category": "BENCH_PRESS",
+"confidence": "generica",
+"exercise": "BENCH_PRESS",
+"garmin_name": "Bench Press"
+},
+"Push_Press": {
+"category": "SHOULDER_PRESS",
+"confidence": "alta",
+"exercise": "BARBELL_PUSH_PRESS",
+"garmin_name": "Barbell Push Press"
+},
+"Push_Press_-_Behind_the_Neck": {
+"category": "SHOULDER_PRESS",
+"confidence": "alta",
+"exercise": "BARBELL_PUSH_PRESS",
+"garmin_name": "Barbell Push Press"
+},
+"Push_Up_to_Side_Plank": {
+"category": "PLANK",
+"confidence": "alta",
+"exercise": "SIDE_PLANK",
+"garmin_name": "Side Plank"
+},
+"Pushups": {
+"category": "PUSH_UP",
+"confidence": "alta",
+"exercise": "PUSH_UP",
+"garmin_name": "Push-up"
+},
+"Pushups_Close_and_Wide_Hand_Positions": {
+"category": "PUSH_UP",
+"confidence": "alta",
+"exercise": "CLOSE_HANDS_PUSH_UP",
+"garmin_name": "Close-hands Push-up"
+},
+"Pyramid": {
+"category": "WARM_UP",
+"confidence": "generica",
+"exercise": "WARM_UP",
+"garmin_name": "Warm-up"
+},
+"Quad_Stretch": {
+"category": "WARM_UP",
+"confidence": "alta",
+"exercise": "STRETCH_QUAD",
+"garmin_name": "Quad Stretch"
+},
+"Quadriceps-SMR": {
+"category": "WARM_UP",
+"confidence": "generica",
+"exercise": "WARM_UP",
+"garmin_name": "Warm-up"
+},
+"Quick_Leap": {
+"category": "PLYO",
+"confidence": "generica",
+"exercise": "PLYO",
+"garmin_name": "Plyo"
+},
+"Rack_Delivery": {
+"category": "SHOULDER_PRESS",
+"confidence": "generica",
+"exercise": "SHOULDER_PRESS",
+"garmin_name": "Shoulder Press"
+},
+"Rack_Pull_with_Bands": {
+"category": "DEADLIFT",
+"confidence": "alta",
+"exercise": "RACK_PULL",
+"garmin_name": "Rack Pull"
+},
+"Rack_Pulls": {
+"category": "DEADLIFT",
+"confidence": "alta",
+"exercise": "RACK_PULL",
+"garmin_name": "Rack Pull"
+},
+"Rear_Leg_Raises": {
+"category": "LEG_RAISE",
+"confidence": "alta",
+"exercise": "LEG_RAISE",
+"garmin_name": "Leg Raise"
+},
+"Recumbent_Bike": {
+"category": "BIKE_OUTDOOR",
+"confidence": "media",
+"exercise": "BIKE",
+"garmin_name": "Bike"
+},
+"Return_Push_from_Stance": {
+"category": "PLYO",
+"confidence": "generica",
+"exercise": "PLYO",
+"garmin_name": "Plyo"
+},
+"Reverse_Band_Bench_Press": {
+"category": "BENCH_PRESS",
+"confidence": "alta",
+"exercise": "BENCH_PRESS",
+"garmin_name": "Bench Press"
+},
+"Reverse_Band_Box_Squat": {
+"category": "PLYO",
+"confidence": "media",
+"exercise": "SQUAT_JUMP_ONTO_BOX",
+"garmin_name": "Squat Jump Onto Box"
+},
+"Reverse_Band_Deadlift": {
+"category": "DEADLIFT",
+"confidence": "alta",
+"exercise": "DEADLIFT",
+"garmin_name": "Deadlift"
+},
+"Reverse_Band_Power_Squat": {
+"category": "SQUAT",
+"confidence": "alta",
+"exercise": "SQUATS_WITH_BAND",
+"garmin_name": "Squats with Band"
+},
+"Reverse_Band_Sumo_Deadlift": {
+"category": "DEADLIFT",
+"confidence": "alta",
+"exercise": "SUMO_DEADLIFT",
+"garmin_name": "Sumo Deadlift"
+},
+"Reverse_Barbell_Curl": {
+"category": "CURL",
+"confidence": "alta",
+"exercise": "BARBELL_REVERSE_WRIST_CURL",
+"garmin_name": "Barbell Reverse Wrist Curl"
+},
+"Reverse_Barbell_Preacher_Curls": {
+"category": "CURL",
+"confidence": "alta",
+"exercise": "BARBELL_REVERSE_WRIST_CURL",
+"garmin_name": "Barbell Reverse Wrist Curl"
+},
+"Reverse_Cable_Curl": {
+"category": "CURL",
+"confidence": "alta",
+"exercise": "CABLE_BICEPS_CURL",
+"garmin_name": "Cable Biceps Curl"
+},
+"Reverse_Crunch": {
+"category": "CRUNCH",
+"confidence": "alta",
+"exercise": "REVERSE_CRUNCH",
+"garmin_name": "Reverse Crunch"
+},
+"Reverse_Flyes": {
+"category": "FLYE",
+"confidence": "alta",
+"exercise": "INCLINE_REVERSE_FLYE",
+"garmin_name": "Incline Reverse Fly"
+},
+"Reverse_Flyes_With_External_Rotation": {
+"category": "FLYE",
+"confidence": "media",
+"exercise": "INCLINE_REVERSE_FLYE",
+"garmin_name": "Incline Reverse Fly"
+},
+"Reverse_Grip_Bent-Over_Rows": {
+"category": "ROW",
+"confidence": "alta",
+"exercise": "BENT_OVER_ROW_WITH_BARBELL",
+"garmin_name": "Bent-over Row with Barbell"
+},
+"Reverse_Grip_Triceps_Pushdown": {
+"category": "TRICEPS_EXTENSION",
+"confidence": "alta",
+"exercise": "REVERSE_GRIP_TRICEPS_PRESSDOWN",
+"garmin_name": "Reverse-grip Triceps Press-down"
+},
+"Reverse_Hyperextension": {
+"category": "HYPEREXTENSION",
+"confidence": "alta",
+"exercise": "BENT_KNEE_REVERSE_HYPEREXTENSION",
+"garmin_name": "Bent-knee Reverse Hyperextension"
+},
+"Reverse_Machine_Flyes": {
+"category": "FLYE",
+"confidence": "alta",
+"exercise": "INCLINE_REVERSE_FLYE",
+"garmin_name": "Incline Reverse Fly"
+},
+"Reverse_Plate_Curls": {
+"category": "CURL",
+"confidence": "alta",
+"exercise": "PLATE_PINCH_CURL",
+"garmin_name": "Plate Pinch Curl"
+},
+"Reverse_Triceps_Bench_Press": {
+"category": "BENCH_PRESS",
+"confidence": "alta",
+"exercise": "BENCH_PRESS",
+"garmin_name": "Bench Press"
+},
+"Rhomboids-SMR": {
+"category": "WARM_UP",
+"confidence": "generica",
+"exercise": "WARM_UP",
+"garmin_name": "Warm-up"
+},
+"Rickshaw_Carry": {
+"category": "CARRY",
+"confidence": "alta",
+"exercise": "CARRY",
+"garmin_name": "Carry"
+},
+"Rickshaw_Deadlift": {
+"category": "DEADLIFT",
+"confidence": "alta",
+"exercise": "DEADLIFT",
+"garmin_name": "Deadlift"
+},
+"Ring_Dips": {
+"category": "LATERAL_RAISE",
+"confidence": "alta",
+"exercise": "RING_DIP",
+"garmin_name": "Ring Dip"
+},
+"Rocket_Jump": {
+"category": "PLYO",
+"confidence": "alta",
+"exercise": "BOX_JUMP",
+"garmin_name": "Box Jump"
+},
+"Rocking_Standing_Calf_Raise": {
+"category": "CALF_RAISE",
+"confidence": "alta",
+"exercise": "STANDING_CALF_RAISE",
+"garmin_name": "Standing Calf Raise"
+},
+"Rocky_Pull-Ups_Pulldowns": {
+"category": "PULL_UP",
+"confidence": "alta",
+"exercise": "JUMPING_PULL_UPS",
+"garmin_name": "Jumping Pull-ups"
+},
+"Romanian_Deadlift": {
+"category": "DEADLIFT",
+"confidence": "alta",
+"exercise": "ROMANIAN_DEADLIFT",
+"garmin_name": "Romanian Deadlift"
+},
+"Romanian_Deadlift_from_Deficit": {
+"category": "DEADLIFT",
+"confidence": "alta",
+"exercise": "ROMANIAN_DEADLIFT",
+"garmin_name": "Romanian Deadlift"
+},
+"Rope_Climb": {
+"category": "LATERAL_RAISE",
+"confidence": "alta",
+"exercise": "ROPE_CLIMB",
+"garmin_name": "Rope Climb"
+},
+"Rope_Crunch": {
+"category": "CRUNCH",
+"confidence": "alta",
+"exercise": "CRUNCH",
+"garmin_name": "Crunch"
+},
+"Rope_Jumping": {
+"category": "BATTLE_ROPE",
+"confidence": "media",
+"exercise": "JUMPING_JACKS",
+"garmin_name": "Battle Rope Jumping Jacks"
+},
+"Rope_Straight-Arm_Pulldown": {
+"category": "PULL_UP",
+"confidence": "alta",
+"exercise": "STRAIGHT_ARM_PULLDOWN",
+"garmin_name": "Straight-arm Pull-down"
+},
+"Round_The_World_Shoulder_Stretch": {
+"category": "WARM_UP",
+"confidence": "alta",
+"exercise": "STRETCH_SHOULDER",
+"garmin_name": "Shoulder Stretch"
+},
+"Rowing_Stationary": {
+"category": "CARDIO",
+"confidence": "generica",
+"exercise": "CARDIO",
+"garmin_name": "Cardio"
+},
+"Runners_Stretch": {
+"category": "WARM_UP",
+"confidence": "alta",
+"exercise": "STRETCH_90_90",
+"garmin_name": "90/90 Stretch"
+},
+"Running_Treadmill": {
+"category": "RUN_INDOOR",
+"confidence": "media",
+"exercise": "TREADMILL",
+"garmin_name": "Treadmill"
+},
+"Russian_Twist": {
+"category": "CORE",
+"confidence": "alta",
+"exercise": "RUSSIAN_TWIST",
+"garmin_name": "Russian Twist"
+},
+"Sandbag_Load": {
+"category": "SANDBAG",
+"confidence": "media",
+"exercise": "SANDBAG",
+"garmin_name": "Sandbag"
+},
+"Scapular_Pull-Up": {
+"category": "PULL_UP",
+"confidence": "alta",
+"exercise": "PULL_UP",
+"garmin_name": "Pull-up"
+},
+"Scissor_Kick": {
+"category": "HYPEREXTENSION",
+"confidence": "media",
+"exercise": "KICKS",
+"garmin_name": "Kicks"
+},
+"Scissors_Jump": {
+"category": "PLYO",
+"confidence": "alta",
+"exercise": "BOX_JUMP",
+"garmin_name": "Box Jump"
+},
+"Seated_Band_Hamstring_Curl": {
+"category": "LEG_CURL",
+"confidence": "media",
+"exercise": "LEG_CURL",
+"garmin_name": "Leg Curl"
+},
+"Seated_Barbell_Military_Press": {
+"category": "SHOULDER_PRESS",
+"confidence": "alta",
+"exercise": "SEATED_BARBELL_SHOULDER_PRESS",
+"garmin_name": "Seated Barbell Shoulder Press"
+},
+"Seated_Barbell_Twist": {
+"category": "CORE",
+"confidence": "media",
+"exercise": "RUSSIAN_TWIST",
+"garmin_name": "Russian Twist"
+},
+"Seated_Bent-Over_One-Arm_Dumbbell_Triceps_Extension": {
+"category": "TRICEPS_EXTENSION",
+"confidence": "alta",
+"exercise": "SEATED_DUMBBELL_OVERHEAD_TRICEPS_EXTENSION",
+"garmin_name": "Seated Dumbbell Overhead Triceps Extension"
+},
+"Seated_Bent-Over_Rear_Delt_Raise": {
+"category": "LATERAL_RAISE",
+"confidence": "alta",
+"exercise": "BENT_OVER_LATERAL_RAISE",
+"garmin_name": "Bent-over Lateral Raise"
+},
+"Seated_Bent-Over_Two-Arm_Dumbbell_Triceps_Extension": {
+"category": "TRICEPS_EXTENSION",
+"confidence": "alta",
+"exercise": "SEATED_DUMBBELL_OVERHEAD_TRICEPS_EXTENSION",
+"garmin_name": "Seated Dumbbell Overhead Triceps Extension"
+},
+"Seated_Biceps": {
+"category": "WARM_UP",
+"confidence": "generica",
+"exercise": "WARM_UP",
+"garmin_name": "Warm-up"
+},
+"Seated_Cable_Rows": {
+"category": "ROW",
+"confidence": "alta",
+"exercise": "SEATED_CABLE_ROW",
+"garmin_name": "Seated Cable Row"
+},
+"Seated_Cable_Shoulder_Press": {
+"category": "SHOULDER_PRESS",
+"confidence": "alta",
+"exercise": "SHOULDER_PRESS",
+"garmin_name": "Shoulder Press"
+},
+"Seated_Calf_Raise": {
+"category": "CALF_RAISE",
+"confidence": "alta",
+"exercise": "SEATED_CALF_RAISE",
+"garmin_name": "Seated Calf Raise"
+},
+"Seated_Calf_Stretch": {
+"category": "CALF_RAISE",
+"confidence": "alta",
+"exercise": "SEATED_CALF_RAISE",
+"garmin_name": "Seated Calf Raise"
+},
+"Seated_Close-Grip_Concentration_Barbell_Curl": {
+"category": "CURL",
+"confidence": "media",
+"exercise": "BARBELL_BICEPS_CURL",
+"garmin_name": "Barbell Biceps Curl"
+},
+"Seated_Dumbbell_Curl": {
+"category": "CURL",
+"confidence": "alta",
+"exercise": "SEATED_DUMBBELL_BICEPS_CURL",
+"garmin_name": "Seated Dumbbell Biceps Curl"
+},
+"Seated_Dumbbell_Inner_Biceps_Curl": {
+"category": "CURL",
+"confidence": "alta",
+"exercise": "SEATED_DUMBBELL_BICEPS_CURL",
+"garmin_name": "Seated Dumbbell Biceps Curl"
+},
+"Seated_Dumbbell_Palms-Down_Wrist_Curl": {
+"category": "CURL",
+"confidence": "alta",
+"exercise": "DUMBBELL_WRIST_CURL",
+"garmin_name": "Dumbbell Wrist Curl"
+},
+"Seated_Dumbbell_Palms-Up_Wrist_Curl": {
+"category": "CURL",
+"confidence": "alta",
+"exercise": "DUMBBELL_WRIST_CURL",
+"garmin_name": "Dumbbell Wrist Curl"
+},
+"Seated_Dumbbell_Press": {
+"category": "SHOULDER_PRESS",
+"confidence": "alta",
+"exercise": "SEATED_DUMBBELL_SHOULDER_PRESS",
+"garmin_name": "Seated Dumbbell Shoulder Press"
+},
+"Seated_Flat_Bench_Leg_Pull-In": {
+"category": "CORE",
+"confidence": "generica",
+"exercise": "CORE",
+"garmin_name": "Core"
+},
+"Seated_Floor_Hamstring_Stretch": {
+"category": "WARM_UP",
+"confidence": "alta",
+"exercise": "STRETCH_HAMSTRING",
+"garmin_name": "Hamstring Stretch"
+},
+"Seated_Front_Deltoid": {
+"category": "WARM_UP",
+"confidence": "generica",
+"exercise": "WARM_UP",
+"garmin_name": "Warm-up"
+},
+"Seated_Glute": {
+"category": "WARM_UP",
+"confidence": "generica",
+"exercise": "WARM_UP",
+"garmin_name": "Warm-up"
+},
+"Seated_Good_Mornings": {
+"category": "LEG_CURL",
+"confidence": "media",
+"exercise": "SEATED_BARBELL_GOOD_MORNING",
+"garmin_name": "Seated Barbell Good Morning"
+},
+"Seated_Hamstring": {
+"category": "WARM_UP",
+"confidence": "generica",
+"exercise": "WARM_UP",
+"garmin_name": "Warm-up"
+},
+"Seated_Hamstring_and_Calf_Stretch": {
+"category": "CALF_RAISE",
+"confidence": "alta",
+"exercise": "SEATED_CALF_RAISE",
+"garmin_name": "Seated Calf Raise"
+},
+"Seated_Head_Harness_Neck_Resistance": {
+"category": "WARM_UP",
+"confidence": "generica",
+"exercise": "WARM_UP",
+"garmin_name": "Warm-up"
+},
+"Seated_Leg_Curl": {
+"category": "LEG_CURL",
+"confidence": "alta",
+"exercise": "LEG_CURL",
+"garmin_name": "Leg Curl"
+},
+"Seated_Leg_Tucks": {
+"category": "CRUNCH",
+"confidence": "media",
+"exercise": "SEATED_LEG_U",
+"garmin_name": "Seated Leg U"
+},
+"Seated_One-Arm_Dumbbell_Palms-Down_Wrist_Curl": {
+"category": "CURL",
+"confidence": "alta",
+"exercise": "DUMBBELL_WRIST_CURL",
+"garmin_name": "Dumbbell Wrist Curl"
+},
+"Seated_One-Arm_Dumbbell_Palms-Up_Wrist_Curl": {
+"category": "CURL",
+"confidence": "alta",
+"exercise": "DUMBBELL_WRIST_CURL",
+"garmin_name": "Dumbbell Wrist Curl"
+},
+"Seated_One-arm_Cable_Pulley_Rows": {
+"category": "ROW",
+"confidence": "alta",
+"exercise": "SEATED_CABLE_ROW",
+"garmin_name": "Seated Cable Row"
+},
+"Seated_Overhead_Stretch": {
+"category": "WARM_UP",
+"confidence": "media",
+"exercise": "STRETCH_90_90",
+"garmin_name": "90/90 Stretch"
+},
+"Seated_Palm-Up_Barbell_Wrist_Curl": {
+"category": "CURL",
+"confidence": "alta",
+"exercise": "BARBELL_WRIST_CURL",
+"garmin_name": "Barbell Wrist Curl"
+},
+"Seated_Palms-Down_Barbell_Wrist_Curl": {
+"category": "CURL",
+"confidence": "alta",
+"exercise": "BARBELL_WRIST_CURL",
+"garmin_name": "Barbell Wrist Curl"
+},
+"Seated_Side_Lateral_Raise": {
+"category": "LATERAL_RAISE",
+"confidence": "alta",
+"exercise": "SEATED_LATERAL_RAISE",
+"garmin_name": "Seated Lateral Raise"
+},
+"Seated_Triceps_Press": {
+"category": "TRICEPS_EXTENSION",
+"confidence": "alta",
+"exercise": "TRICEPS_PRESS",
+"garmin_name": "Triceps Press"
+},
+"Seated_Two-Arm_Palms-Up_Low-Pulley_Wrist_Curl": {
+"category": "CURL",
+"confidence": "generica",
+"exercise": "CURL",
+"garmin_name": "Curl"
+},
+"See-Saw_Press_Alternating_Side_Press": {
+"category": "SHOULDER_PRESS",
+"confidence": "generica",
+"exercise": "SHOULDER_PRESS",
+"garmin_name": "Shoulder Press"
+},
+"Shotgun_Row": {
+"category": "ROW",
+"confidence": "alta",
+"exercise": "ROW",
+"garmin_name": "Row"
+},
+"Shoulder_Circles": {
+"category": "WARM_UP",
+"confidence": "alta",
+"exercise": "SHOULDER_CIRCLES",
+"garmin_name": "Shoulder Circles"
+},
+"Shoulder_Press_-_With_Bands": {
+"category": "SHOULDER_PRESS",
+"confidence": "alta",
+"exercise": "SHOULDER_PRESS",
+"garmin_name": "Shoulder Press"
+},
+"Shoulder_Raise": {
+"category": "LATERAL_RAISE",
+"confidence": "alta",
+"exercise": "COMBO_SHOULDER_RAISE",
+"garmin_name": "Combo Shoulder Raise"
+},
+"Shoulder_Stretch": {
+"category": "WARM_UP",
+"confidence": "alta",
+"exercise": "STRETCH_SHOULDER",
+"garmin_name": "Shoulder Stretch"
+},
+"Side-Lying_Floor_Stretch": {
+"category": "WARM_UP",
+"confidence": "alta",
+"exercise": "STRETCH_SIDE",
+"garmin_name": "Side Stretch"
+},
+"Side_Bridge": {
+"category": "HIP_RAISE",
+"confidence": "alta",
+"exercise": "CLAM_BRIDGE",
+"garmin_name": "Clam Bridge"
+},
+"Side_Hop-Sprint": {
+"category": "PLYO",
+"confidence": "media",
+"exercise": "LATERAL_LEAP_AND_HOP",
+"garmin_name": "Lateral Leap and Hop"
+},
+"Side_Jackknife": {
+"category": "SIT_UP",
+"confidence": "generica",
+"exercise": "SIT_UP",
+"garmin_name": "Sit-up"
+},
+"Side_Lateral_Raise": {
+"category": "LATERAL_RAISE",
+"confidence": "alta",
+"exercise": "LATERAL_RAISE",
+"garmin_name": "Lateral Raise"
+},
+"Side_Laterals_to_Front_Raise": {
+"category": "LATERAL_RAISE",
+"confidence": "alta",
+"exercise": "FRONT_RAISE",
+"garmin_name": "Front Raise"
+},
+"Side_Leg_Raises": {
+"category": "LEG_RAISE",
+"confidence": "alta",
+"exercise": "LEG_RAISE",
+"garmin_name": "Leg Raise"
+},
+"Side_Lying_Groin_Stretch": {
+"category": "WARM_UP",
+"confidence": "alta",
+"exercise": "STRETCH_SIDE",
+"garmin_name": "Side Stretch"
+},
+"Side_Neck_Stretch": {
+"category": "WARM_UP",
+"confidence": "alta",
+"exercise": "STRETCH_NECK",
+"garmin_name": "Neck Stretch"
+},
+"Side_Standing_Long_Jump": {
+"category": "PLYO",
+"confidence": "alta",
+"exercise": "SIDE_TO_SIDE_SHUFFLE_JUMP",
+"garmin_name": "Side-to-Side Shuffle Jump"
+},
+"Side_To_Side_Chins": {
+"category": "PULL_UP",
+"confidence": "generica",
+"exercise": "PULL_UP",
+"garmin_name": "Pull-up"
+},
+"Side_Wrist_Pull": {
+"category": "WARM_UP",
+"confidence": "generica",
+"exercise": "WARM_UP",
+"garmin_name": "Warm-up"
+},
+"Side_to_Side_Box_Shuffle": {
+"category": "PLYO",
+"confidence": "alta",
+"exercise": "SIDE_TO_SIDE_SHUFFLE_JUMP",
+"garmin_name": "Side-to-Side Shuffle Jump"
+},
+"Single-Arm_Cable_Crossover": {
+"category": "FLYE",
+"confidence": "alta",
+"exercise": "CABLE_CROSSOVER",
+"garmin_name": "Cable Crossover"
+},
+"Single-Arm_Linear_Jammer": {
+"category": "DEADLIFT",
+"confidence": "media",
+"exercise": "SINGLE_ARM_DEADLIFT",
+"garmin_name": "Single-arm Deadlift"
+},
+"Single-Arm_Push-Up": {
+"category": "PUSH_UP",
+"confidence": "alta",
+"exercise": "PUSH_UP",
+"garmin_name": "Push-up"
+},
+"Single-Cone_Sprint_Drill": {
+"category": "PLYO",
+"confidence": "generica",
+"exercise": "PLYO",
+"garmin_name": "Plyo"
+},
+"Single-Leg_High_Box_Squat": {
+"category": "PLYO",
+"confidence": "media",
+"exercise": "HIGH_BOX_JUMP",
+"garmin_name": "High Box Jump"
+},
+"Single-Leg_Hop_Progression": {
+"category": "PLYO",
+"confidence": "media",
+"exercise": "LATERAL_LEAP_AND_HOP",
+"garmin_name": "Lateral Leap and Hop"
+},
+"Single-Leg_Lateral_Hop": {
+"category": "PLYO",
+"confidence": "alta",
+"exercise": "LATERAL_LEAP_AND_HOP",
+"garmin_name": "Lateral Leap and Hop"
+},
+"Single-Leg_Leg_Extension": {
+"category": "HYPEREXTENSION",
+"confidence": "alta",
+"exercise": "SINGLE_LEG_BACK_EXTENSION",
+"garmin_name": "Single-leg Back Extension"
+},
+"Single-Leg_Stride_Jump": {
+"category": "PLYO",
+"confidence": "media",
+"exercise": "BOX_JUMP",
+"garmin_name": "Box Jump"
+},
+"Single_Dumbbell_Raise": {
+"category": "LATERAL_RAISE",
+"confidence": "media",
+"exercise": "DUMBBELL_DIAGONAL_RAISE",
+"garmin_name": "Dumbbell Diagonal Raise"
+},
+"Single_Leg_Butt_Kick": {
+"category": "TRICEPS_EXTENSION",
+"confidence": "media",
+"exercise": "SINGLE_LEG_BENCH_DIP_AND_KICK",
+"garmin_name": "Single-leg Bench Dip and Kick"
+},
+"Single_Leg_Glute_Bridge": {
+"category": "HIP_RAISE",
+"confidence": "alta",
+"exercise": "BRIDGE_WITH_LEG_EXTENSION",
+"garmin_name": "Bridge with Leg Extension"
+},
+"Single_Leg_Push-off": {
+"category": "TRICEPS_EXTENSION",
+"confidence": "media",
+"exercise": "SINGLE_LEG_DIP",
+"garmin_name": "Single-leg Dip"
+},
+"Sit-Up": {
+"category": "SIT_UP",
+"confidence": "alta",
+"exercise": "SIT_UP",
+"garmin_name": "Sit-up"
+},
+"Sit_Squats": {
+"category": "SQUAT",
+"confidence": "alta",
+"exercise": "SQUAT",
+"garmin_name": "Squat"
+},
+"Skating": {
+"category": "CARDIO",
+"confidence": "generica",
+"exercise": "CARDIO",
+"garmin_name": "Cardio"
+},
+"Sled_Drag_-_Harness": {
+"category": "SLED",
+"confidence": "alta",
+"exercise": "BACKWARD_DRAG",
+"garmin_name": "Sled Backward Drag"
+},
+"Sled_Overhead_Backward_Walk": {
+"category": "SLED",
+"confidence": "alta",
+"exercise": "BACKWARD_DRAG",
+"garmin_name": "Sled Backward Drag"
+},
+"Sled_Overhead_Triceps_Extension": {
+"category": "TRICEPS_EXTENSION",
+"confidence": "alta",
+"exercise": "TRICEPS_EXTENSION",
+"garmin_name": "Triceps Extension"
+},
+"Sled_Push": {
+"category": "SLED",
+"confidence": "alta",
+"exercise": "PUSH",
+"garmin_name": "Sled Push"
+},
+"Sled_Reverse_Flye": {
+"category": "FLYE",
+"confidence": "alta",
+"exercise": "INCLINE_REVERSE_FLYE",
+"garmin_name": "Incline Reverse Fly"
+},
+"Sled_Row": {
+"category": "ROW",
+"confidence": "alta",
+"exercise": "ROW",
+"garmin_name": "Row"
+},
+"Sledgehammer_Swings": {
+"category": "HIP_SWING",
+"confidence": "alta",
+"exercise": "HIP_SWING",
+"garmin_name": "Hip Swing"
+},
+"Smith_Incline_Shoulder_Raise": {
+"category": "LATERAL_RAISE",
+"confidence": "media",
+"exercise": "COMBO_SHOULDER_RAISE",
+"garmin_name": "Combo Shoulder Raise"
+},
+"Smith_Machine_Behind_the_Back_Shrug": {
+"category": "SHRUG",
+"confidence": "alta",
+"exercise": "BEHIND_THE_BACK_SMITH_MACHINE_SHRUG",
+"garmin_name": "Behind-the-Back Smith Machine Shrug"
+},
+"Smith_Machine_Bench_Press": {
+"category": "BENCH_PRESS",
+"confidence": "alta",
+"exercise": "SMITH_MACHINE_BENCH_PRESS",
+"garmin_name": "Smith Machine Bench Press"
+},
+"Smith_Machine_Bent_Over_Row": {
+"category": "ROW",
+"confidence": "alta",
+"exercise": "ONE_ARM_BENT_OVER_ROW",
+"garmin_name": "One-arm Bent-over Row"
+},
+"Smith_Machine_Calf_Raise": {
+"category": "CALF_RAISE",
+"confidence": "alta",
+"exercise": "CALF_RAISE",
+"garmin_name": "Calf Raise"
+},
+"Smith_Machine_Close-Grip_Bench_Press": {
+"category": "BENCH_PRESS",
+"confidence": "alta",
+"exercise": "SMITH_MACHINE_BENCH_PRESS",
+"garmin_name": "Smith Machine Bench Press"
+},
+"Smith_Machine_Decline_Press": {
+"category": "BENCH_PRESS",
+"confidence": "alta",
+"exercise": "SMITH_MACHINE_BENCH_PRESS",
+"garmin_name": "Smith Machine Bench Press"
+},
+"Smith_Machine_Hang_Power_Clean": {
+"category": "OLYMPIC_LIFT",
+"confidence": "alta",
+"exercise": "BARBELL_HANG_POWER_CLEAN",
+"garmin_name": "Barbell Hang Power Clean"
+},
+"Smith_Machine_Hip_Raise": {
+"category": "HIP_RAISE",
+"confidence": "alta",
+"exercise": "HIP_RAISE",
+"garmin_name": "Hip Raise"
+},
+"Smith_Machine_Incline_Bench_Press": {
+"category": "BENCH_PRESS",
+"confidence": "alta",
+"exercise": "INCLINE_SMITH_MACHINE_BENCH_PRESS",
+"garmin_name": "Incline Smith Machine Bench Press"
+},
+"Smith_Machine_Leg_Press": {
+"category": "SQUAT",
+"confidence": "alta",
+"exercise": "LEG_PRESS",
+"garmin_name": "Leg Press"
+},
+"Smith_Machine_One-Arm_Upright_Row": {
+"category": "ROW",
+"confidence": "alta",
+"exercise": "ONE_ARM_BENT_OVER_ROW",
+"garmin_name": "One-arm Bent-over Row"
+},
+"Smith_Machine_Overhead_Shoulder_Press": {
+"category": "SHOULDER_PRESS",
+"confidence": "alta",
+"exercise": "SMITH_MACHINE_OVERHEAD_PRESS",
+"garmin_name": "Smith Machine Overhead Press"
+},
+"Smith_Machine_Pistol_Squat": {
+"category": "SQUAT",
+"confidence": "alta",
+"exercise": "PISTOL_SQUAT",
+"garmin_name": "Pistol Squat"
+},
+"Smith_Machine_Reverse_Calf_Raises": {
+"category": "CALF_RAISE",
+"confidence": "alta",
+"exercise": "CALF_RAISE",
+"garmin_name": "Calf Raise"
+},
+"Smith_Machine_Squat": {
+"category": "SQUAT",
+"confidence": "alta",
+"exercise": "SQUAT",
+"garmin_name": "Squat"
+},
+"Smith_Machine_Stiff-Legged_Deadlift": {
+"category": "DEADLIFT",
+"confidence": "media",
+"exercise": "DEADLIFT",
+"garmin_name": "Deadlift"
+},
+"Smith_Machine_Upright_Row": {
+"category": "ROW",
+"confidence": "media",
+"exercise": "ROW",
+"garmin_name": "Row"
+},
+"Smith_Single-Leg_Split_Squat": {
+"category": "LUNGE",
+"confidence": "media",
+"exercise": "OVERHEAD_BULGARIAN_SPLIT_SQUAT",
+"garmin_name": "Overhead Bulgarian Split Squat"
+},
+"Snatch": {
+"category": "OLYMPIC_LIFT",
+"confidence": "alta",
+"exercise": "SNATCH",
+"garmin_name": "Snatch"
+},
+"Snatch_Balance": {
+"category": "OLYMPIC_LIFT",
+"confidence": "alta",
+"exercise": "SNATCH",
+"garmin_name": "Snatch"
+},
+"Snatch_Deadlift": {
+"category": "DEADLIFT",
+"confidence": "alta",
+"exercise": "DEADLIFT",
+"garmin_name": "Deadlift"
+},
+"Snatch_Pull": {
+"category": "OLYMPIC_LIFT",
+"confidence": "alta",
+"exercise": "SNATCH",
+"garmin_name": "Snatch"
+},
+"Snatch_Shrug": {
+"category": "OLYMPIC_LIFT",
+"confidence": "alta",
+"exercise": "SNATCH",
+"garmin_name": "Snatch"
+},
+"Snatch_from_Blocks": {
+"category": "OLYMPIC_LIFT",
+"confidence": "alta",
+"exercise": "SNATCH",
+"garmin_name": "Snatch"
+},
+"Speed_Band_Overhead_Triceps": {
+"category": "TRICEPS_EXTENSION",
+"confidence": "media",
+"exercise": "TRICEPS_EXTENSION",
+"garmin_name": "Triceps Extension"
+},
+"Speed_Box_Squat": {
+"category": "PLYO",
+"confidence": "media",
+"exercise": "SQUAT_JUMP_ONTO_BOX",
+"garmin_name": "Squat Jump Onto Box"
+},
+"Speed_Squats": {
+"category": "SQUAT",
+"confidence": "alta",
+"exercise": "SQUAT",
+"garmin_name": "Squat"
+},
+"Spell_Caster": {
+"category": "CORE",
+"confidence": "generica",
+"exercise": "CORE",
+"garmin_name": "Core"
+},
+"Spider_Crawl": {
+"category": "CORE",
+"confidence": "generica",
+"exercise": "CORE",
+"garmin_name": "Core"
+},
+"Spider_Curl": {
+"category": "CURL",
+"confidence": "alta",
+"exercise": "CURL",
+"garmin_name": "Curl"
+},
+"Spinal_Stretch": {
+"category": "WARM_UP",
+"confidence": "alta",
+"exercise": "STRETCH_LUNGE_WITH_SPINAL_TWIST",
+"garmin_name": "Lunge with Spinal Twist Stretch"
+},
+"Split_Clean": {
+"category": "OLYMPIC_LIFT",
+"confidence": "alta",
+"exercise": "CLEAN",
+"garmin_name": "Barbell Clean"
+},
+"Split_Jerk": {
+"category": "OLYMPIC_LIFT",
+"confidence": "alta",
+"exercise": "SPLIT_JERK",
+"garmin_name": "Split Jerk"
+},
+"Split_Jump": {
+"category": "PLYO",
+"confidence": "alta",
+"exercise": "DUMBBELL_SPLIT_JUMP",
+"garmin_name": "Dumbbell Split Jump"
+},
+"Split_Snatch": {
+"category": "OLYMPIC_LIFT",
+"confidence": "alta",
+"exercise": "SNATCH",
+"garmin_name": "Snatch"
+},
+"Split_Squat_with_Dumbbells": {
+"category": "LUNGE",
+"confidence": "alta",
+"exercise": "DUMBBELL_BULGARIAN_SPLIT_SQUAT",
+"garmin_name": "Dumbbell Bulgarian Split Squat"
+},
+"Split_Squats": {
+"category": "LUNGE",
+"confidence": "alta",
+"exercise": "BARBELL_SPLIT_SQUAT",
+"garmin_name": "Barbell Split Squat"
+},
+"Squat_Jerk": {
+"category": "OLYMPIC_LIFT",
+"confidence": "alta",
+"exercise": "SQUAT_CLEAN_AND_JERK",
+"garmin_name": "Squat Clean and Jerk"
+},
+"Squat_with_Bands": {
+"category": "SQUAT",
+"confidence": "alta",
+"exercise": "SQUATS_WITH_BAND",
+"garmin_name": "Squats with Band"
+},
+"Squat_with_Chains": {
+"category": "SQUAT",
+"confidence": "alta",
+"exercise": "SQUAT",
+"garmin_name": "Squat"
+},
+"Squat_with_Plate_Movers": {
+"category": "SQUAT",
+"confidence": "alta",
+"exercise": "SQUAT",
+"garmin_name": "Squat"
+},
+"Squats_-_With_Bands": {
+"category": "SQUAT",
+"confidence": "alta",
+"exercise": "SQUATS_WITH_BAND",
+"garmin_name": "Squats with Band"
+},
+"Stairmaster": {
+"category": "CARDIO",
+"confidence": "generica",
+"exercise": "CARDIO",
+"garmin_name": "Cardio"
+},
+"Standing_Alternating_Dumbbell_Press": {
+"category": "BENCH_PRESS",
+"confidence": "alta",
+"exercise": "ALTERNATING_DUMBBELL_CHEST_PRESS",
+"garmin_name": "Alternating Dumbbell Chest Press"
+},
+"Standing_Barbell_Calf_Raise": {
+"category": "CALF_RAISE",
+"confidence": "alta",
+"exercise": "STANDING_BARBELL_CALF_RAISE",
+"garmin_name": "Standing Barbell Calf Raise"
+},
+"Standing_Barbell_Press_Behind_Neck": {
+"category": "SHOULDER_PRESS",
+"confidence": "generica",
+"exercise": "SHOULDER_PRESS",
+"garmin_name": "Shoulder Press"
+},
+"Standing_Bent-Over_One-Arm_Dumbbell_Triceps_Extension": {
+"category": "TRICEPS_EXTENSION",
+"confidence": "media",
+"exercise": "TRICEPS_EXTENSION",
+"garmin_name": "Triceps Extension"
+},
+"Standing_Bent-Over_Two-Arm_Dumbbell_Triceps_Extension": {
+"category": "TRICEPS_EXTENSION",
+"confidence": "media",
+"exercise": "TRICEPS_EXTENSION",
+"garmin_name": "Triceps Extension"
+},
+"Standing_Biceps_Cable_Curl": {
+"category": "CURL",
+"confidence": "alta",
+"exercise": "CABLE_BICEPS_CURL",
+"garmin_name": "Cable Biceps Curl"
+},
+"Standing_Biceps_Stretch": {
+"category": "WARM_UP",
+"confidence": "alta",
+"exercise": "BICEPS_STRETCH",
+"garmin_name": "Biceps Stretch"
+},
+"Standing_Bradford_Press": {
+"category": "SHOULDER_PRESS",
+"confidence": "generica",
+"exercise": "SHOULDER_PRESS",
+"garmin_name": "Shoulder Press"
+},
+"Standing_Cable_Chest_Press": {
+"category": "BENCH_PRESS",
+"confidence": "alta",
+"exercise": "SINGLE_ARM_CABLE_CHEST_PRESS",
+"garmin_name": "Single-arm Cable Chest Press"
+},
+"Standing_Cable_Lift": {
+"category": "LATERAL_RAISE",
+"confidence": "alta",
+"exercise": "STANDING_LIFT",
+"garmin_name": "Standing Lift"
+},
+"Standing_Cable_Wood_Chop": {
+"category": "CHOP",
+"confidence": "alta",
+"exercise": "STANDING_ROTATIONAL_CHOP",
+"garmin_name": "Standing Rotational Chop"
+},
+"Standing_Calf_Raises": {
+"category": "CALF_RAISE",
+"confidence": "alta",
+"exercise": "STANDING_CALF_RAISE",
+"garmin_name": "Standing Calf Raise"
+},
+"Standing_Concentration_Curl": {
+"category": "CURL",
+"confidence": "alta",
+"exercise": "STANDING_DUMBBELL_BICEPS_CURL",
+"garmin_name": "Standing Dumbbell Biceps Curl"
+},
+"Standing_Dumbbell_Calf_Raise": {
+"category": "CALF_RAISE",
+"confidence": "alta",
+"exercise": "STANDING_DUMBBELL_CALF_RAISE",
+"garmin_name": "Standing Dumbbell Calf Raise"
+},
+"Standing_Dumbbell_Press": {
+"category": "BENCH_PRESS",
+"confidence": "media",
+"exercise": "DUMBBELL_BENCH_PRESS",
+"garmin_name": "Dumbbell Bench Press"
+},
+"Standing_Dumbbell_Reverse_Curl": {
+"category": "CURL",
+"confidence": "alta",
+"exercise": "DUMBBELL_REVERSE_WRIST_CURL",
+"garmin_name": "Dumbbell Reverse Wrist Curl"
+},
+"Standing_Dumbbell_Straight-Arm_Front_Delt_Raise_Above_Head": {
+"category": "LATERAL_RAISE",
+"confidence": "media",
+"exercise": "FRONT_RAISE",
+"garmin_name": "Front Raise"
+},
+"Standing_Dumbbell_Triceps_Extension": {
+"category": "TRICEPS_EXTENSION",
+"confidence": "alta",
+"exercise": "TRICEPS_EXTENSION",
+"garmin_name": "Triceps Extension"
+},
+"Standing_Dumbbell_Upright_Row": {
+"category": "ROW",
+"confidence": "alta",
+"exercise": "DUMBBELL_ROW",
+"garmin_name": "Dumbbell Row"
+},
+"Standing_Elevated_Quad_Stretch": {
+"category": "WARM_UP",
+"confidence": "alta",
+"exercise": "STRETCH_QUAD",
+"garmin_name": "Quad Stretch"
+},
+"Standing_Front_Barbell_Raise_Over_Head": {
+"category": "CALF_RAISE",
+"confidence": "media",
+"exercise": "STANDING_BARBELL_CALF_RAISE",
+"garmin_name": "Standing Barbell Calf Raise"
+},
+"Standing_Gastrocnemius_Calf_Stretch": {
+"category": "CALF_RAISE",
+"confidence": "alta",
+"exercise": "STANDING_CALF_RAISE",
+"garmin_name": "Standing Calf Raise"
+},
+"Standing_Hamstring_and_Calf_Stretch": {
+"category": "CALF_RAISE",
+"confidence": "alta",
+"exercise": "STANDING_CALF_RAISE",
+"garmin_name": "Standing Calf Raise"
+},
+"Standing_Hip_Circles": {
+"category": "HIP_STABILITY",
+"confidence": "alta",
+"exercise": "HIP_CIRCLES",
+"garmin_name": "Hip Circles"
+},
+"Standing_Hip_Flexors": {
+"category": "HIP_STABILITY",
+"confidence": "media",
+"exercise": "STANDING_HIP_ABDUCTION",
+"garmin_name": "Standing Hip Abduction"
+},
+"Standing_Inner-Biceps_Curl": {
+"category": "CURL",
+"confidence": "alta",
+"exercise": "STANDING_DUMBBELL_BICEPS_CURL",
+"garmin_name": "Standing Dumbbell Biceps Curl"
+},
+"Standing_Lateral_Stretch": {
+"category": "WARM_UP",
+"confidence": "alta",
+"exercise": "STANDING_HAMSTRING_STRETCH",
+"garmin_name": "Standing Hamstring Stretch"
+},
+"Standing_Leg_Curl": {
+"category": "LEG_CURL",
+"confidence": "alta",
+"exercise": "LEG_CURL",
+"garmin_name": "Leg Curl"
+},
+"Standing_Long_Jump": {
+"category": "PLYO",
+"confidence": "media",
+"exercise": "BOX_JUMP",
+"garmin_name": "Box Jump"
+},
+"Standing_Low-Pulley_Deltoid_Raise": {
+"category": "SHOULDER_PRESS",
+"confidence": "generica",
+"exercise": "SHOULDER_PRESS",
+"garmin_name": "Shoulder Press"
+},
+"Standing_Low-Pulley_One-Arm_Triceps_Extension": {
+"category": "TRICEPS_EXTENSION",
+"confidence": "media",
+"exercise": "TRICEPS_EXTENSION",
+"garmin_name": "Triceps Extension"
+},
+"Standing_Military_Press": {
+"category": "SHOULDER_PRESS",
+"confidence": "alta",
+"exercise": "MILITARY_PRESS",
+"garmin_name": "Military Press"
+},
+"Standing_Olympic_Plate_Hand_Squeeze": {
+"category": "CURL",
+"confidence": "generica",
+"exercise": "CURL",
+"garmin_name": "Curl"
+},
+"Standing_One-Arm_Cable_Curl": {
+"category": "CURL",
+"confidence": "alta",
+"exercise": "ONE_ARM_CONCENTRATION_CURL",
+"garmin_name": "One-arm Concentration Curl"
+},
+"Standing_One-Arm_Dumbbell_Curl_Over_Incline_Bench": {
+"category": "CURL",
+"confidence": "alta",
+"exercise": "INCLINE_DUMBBELL_BICEPS_CURL",
+"garmin_name": "Incline Dumbbell Biceps Curl"
+},
+"Standing_One-Arm_Dumbbell_Triceps_Extension": {
+"category": "TRICEPS_EXTENSION",
+"confidence": "alta",
+"exercise": "TRICEPS_EXTENSION",
+"garmin_name": "Triceps Extension"
+},
+"Standing_Overhead_Barbell_Triceps_Extension": {
+"category": "TRICEPS_EXTENSION",
+"confidence": "alta",
+"exercise": "SEATED_BARBELL_OVERHEAD_TRICEPS_EXTENSION",
+"garmin_name": "Seated Barbell Overhead Triceps Extension"
+},
+"Standing_Palm-In_One-Arm_Dumbbell_Press": {
+"category": "BENCH_PRESS",
+"confidence": "media",
+"exercise": "ONE_ARM_FLOOR_PRESS",
+"garmin_name": "One-arm Floor Press"
+},
+"Standing_Palms-In_Dumbbell_Press": {
+"category": "BENCH_PRESS",
+"confidence": "media",
+"exercise": "DUMBBELL_BENCH_PRESS",
+"garmin_name": "Dumbbell Bench Press"
+},
+"Standing_Palms-Up_Barbell_Behind_The_Back_Wrist_Curl": {
+"category": "CURL",
+"confidence": "alta",
+"exercise": "BEHIND_THE_BACK_BARBELL_REVERSE_WRIST_CURL",
+"garmin_name": "Behind-the-Back Barbell Reverse Wrist Curl"
+},
+"Standing_Pelvic_Tilt": {
+"category": "WARM_UP",
+"confidence": "generica",
+"exercise": "WARM_UP",
+"garmin_name": "Warm-up"
+},
+"Standing_Rope_Crunch": {
+"category": "CRUNCH",
+"confidence": "alta",
+"exercise": "STANDING_CABLE_CRUNCH",
+"garmin_name": "Standing Cable Crunch"
+},
+"Standing_Soleus_And_Achilles_Stretch": {
+"category": "WARM_UP",
+"confidence": "alta",
+"exercise": "STANDING_HAMSTRING_STRETCH",
+"garmin_name": "Standing Hamstring Stretch"
+},
+"Standing_Toe_Touches": {
+"category": "WARM_UP",
+"confidence": "generica",
+"exercise": "WARM_UP",
+"garmin_name": "Warm-up"
+},
+"Standing_Towel_Triceps_Extension": {
+"category": "TRICEPS_EXTENSION",
+"confidence": "alta",
+"exercise": "TRICEPS_EXTENSION",
+"garmin_name": "Triceps Extension"
+},
+"Standing_Two-Arm_Overhead_Throw": {
+"category": "PLYO",
+"confidence": "generica",
+"exercise": "PLYO",
+"garmin_name": "Plyo"
+},
+"Star_Jump": {
+"category": "PLYO",
+"confidence": "alta",
+"exercise": "STAR_JUMP_SQUATS",
+"garmin_name": "Star Jump Squats"
+},
+"Step-up_with_Knee_Raise": {
+"category": "LEG_RAISE",
+"confidence": "alta",
+"exercise": "HANGING_KNEE_RAISE",
+"garmin_name": "Hanging Knee Raise"
+},
+"Step_Mill": {
+"category": "CARDIO",
+"confidence": "generica",
+"exercise": "CARDIO",
+"garmin_name": "Cardio"
+},
+"Stiff-Legged_Barbell_Deadlift": {
+"category": "DEADLIFT",
+"confidence": "alta",
+"exercise": "BARBELL_DEADLIFT",
+"garmin_name": "Barbell Deadlift"
+},
+"Stiff-Legged_Dumbbell_Deadlift": {
+"category": "DEADLIFT",
+"confidence": "alta",
+"exercise": "DUMBBELL_DEADLIFT",
+"garmin_name": "Dumbbell Deadlift"
+},
+"Stiff_Leg_Barbell_Good_Morning": {
+"category": "DEADLIFT",
+"confidence": "media",
+"exercise": "BARBELL_STRAIGHT_LEG_DEADLIFT",
+"garmin_name": "Barbell Straight-leg Deadlift"
+},
+"Stomach_Vacuum": {
+"category": "WARM_UP",
+"confidence": "generica",
+"exercise": "WARM_UP",
+"garmin_name": "Warm-up"
+},
+"Straight-Arm_Dumbbell_Pullover": {
+"category": "PLANK",
+"confidence": "media",
+"exercise": "STRAIGHT_ARM_PLANK",
+"garmin_name": "Straight-arm Plank"
+},
+"Straight-Arm_Pulldown": {
+"category": "PULL_UP",
+"confidence": "alta",
+"exercise": "STRAIGHT_ARM_PULLDOWN",
+"garmin_name": "Straight-arm Pull-down"
+},
+"Straight_Bar_Bench_Mid_Rows": {
+"category": "ROW",
+"confidence": "alta",
+"exercise": "T_BAR_ROW",
+"garmin_name": "T-Bar Row"
+},
+"Straight_Raises_on_Incline_Bench": {
+"category": "SHOULDER_STABILITY",
+"confidence": "media",
+"exercise": "INCLINE_I_RAISE",
+"garmin_name": "Incline I Raise"
+},
+"Stride_Jump_Crossover": {
+"category": "FLYE",
+"confidence": "generica",
+"exercise": "FLYE",
+"garmin_name": "Fly"
+},
+"Sumo_Deadlift": {
+"category": "DEADLIFT",
+"confidence": "alta",
+"exercise": "SUMO_DEADLIFT",
+"garmin_name": "Sumo Deadlift"
+},
+"Sumo_Deadlift_with_Bands": {
+"category": "DEADLIFT",
+"confidence": "alta",
+"exercise": "SUMO_DEADLIFT",
+"garmin_name": "Sumo Deadlift"
+},
+"Sumo_Deadlift_with_Chains": {
+"category": "DEADLIFT",
+"confidence": "alta",
+"exercise": "SUMO_DEADLIFT",
+"garmin_name": "Sumo Deadlift"
+},
+"Superman": {
+"category": "HYPEREXTENSION",
+"confidence": "alta",
+"exercise": "KNEELING_SUPERMAN",
+"garmin_name": "Kneeling Superman"
+},
+"Supine_Chest_Throw": {
+"category": "PLYO",
+"confidence": "generica",
+"exercise": "PLYO",
+"garmin_name": "Plyo"
+},
+"Supine_One-Arm_Overhead_Throw": {
+"category": "PLYO",
+"confidence": "generica",
+"exercise": "PLYO",
+"garmin_name": "Plyo"
+},
+"Supine_Two-Arm_Overhead_Throw": {
+"category": "PLYO",
+"confidence": "generica",
+"exercise": "PLYO",
+"garmin_name": "Plyo"
+},
+"Suspended_Fallout": {
+"category": "CORE",
+"confidence": "generica",
+"exercise": "CORE",
+"garmin_name": "Core"
+},
+"Suspended_Push-Up": {
+"category": "PUSH_UP",
+"confidence": "alta",
+"exercise": "SUSPENDED_PUSH_UP",
+"garmin_name": "Suspended Push-up"
+},
+"Suspended_Reverse_Crunch": {
+"category": "CRUNCH",
+"confidence": "alta",
+"exercise": "REVERSE_CRUNCH",
+"garmin_name": "Reverse Crunch"
+},
+"Suspended_Row": {
+"category": "ROW",
+"confidence": "alta",
+"exercise": "SUSPENDED_INVERTED_ROW",
+"garmin_name": "Suspended Inverted Row"
+},
+"Suspended_Split_Squat": {
+"category": "LUNGE",
+"confidence": "alta",
+"exercise": "BARBELL_SPLIT_SQUAT",
+"garmin_name": "Barbell Split Squat"
+},
+"Svend_Press": {
+"category": "BENCH_PRESS",
+"confidence": "generica",
+"exercise": "BENCH_PRESS",
+"garmin_name": "Bench Press"
+},
+"T-Bar_Row_with_Handle": {
+"category": "ROW",
+"confidence": "alta",
+"exercise": "T_BAR_ROW",
+"garmin_name": "T-Bar Row"
+},
+"Tate_Press": {
+"category": "TRICEPS_EXTENSION",
+"confidence": "generica",
+"exercise": "TRICEPS_EXTENSION",
+"garmin_name": "Triceps Extension"
+},
+"The_Straddle": {
+"category": "WARM_UP",
+"confidence": "media",
+"exercise": "STRETCH_STRADDLE",
+"garmin_name": "Straddle Stretch"
+},
+"Thigh_Abductor": {
+"category": "HIP_STABILITY",
+"confidence": "generica",
+"exercise": "HIP_STABILITY",
+"garmin_name": "Hip Stability"
+},
+"Thigh_Adductor": {
+"category": "HIP_STABILITY",
+"confidence": "generica",
+"exercise": "HIP_STABILITY",
+"garmin_name": "Hip Stability"
+},
+"Tire_Flip": {
+"category": "TIRE",
+"confidence": "alta",
+"exercise": "FLIP",
+"garmin_name": "Tire Flip"
+},
+"Toe_Touchers": {
+"category": "WARM_UP",
+"confidence": "generica",
+"exercise": "WARM_UP",
+"garmin_name": "Warm-up"
+},
+"Torso_Rotation": {
+"category": "WARM_UP",
+"confidence": "generica",
+"exercise": "WARM_UP",
+"garmin_name": "Warm-up"
+},
+"Trail_Running_Walking": {
+"category": "CARDIO",
+"confidence": "generica",
+"exercise": "CARDIO",
+"garmin_name": "Cardio"
+},
+"Trap_Bar_Deadlift": {
+"category": "DEADLIFT",
+"confidence": "alta",
+"exercise": "TRAP_BAR_DEADLIFT",
+"garmin_name": "Trap-bar Deadlift"
+},
+"Tricep_Dumbbell_Kickback": {
+"category": "TRICEPS_EXTENSION",
+"confidence": "media",
+"exercise": "DUMBBELL_LYING_TRICEPS_EXTENSION",
+"garmin_name": "Dumbbell Lying Triceps Extension"
+},
+"Tricep_Side_Stretch": {
+"category": "TRICEPS_EXTENSION",
+"confidence": "media",
+"exercise": "TRICEPS_EXTENSION",
+"garmin_name": "Triceps Extension"
+},
+"Triceps_Overhead_Extension_with_Rope": {
+"category": "TRICEPS_EXTENSION",
+"confidence": "alta",
+"exercise": "CABLE_OVERHEAD_TRICEPS_EXTENSION",
+"garmin_name": "Cable Overhead Triceps Extension"
+},
+"Triceps_Pushdown": {
+"category": "TRICEPS_EXTENSION",
+"confidence": "alta",
+"exercise": "TRICEPS_PRESSDOWN",
+"garmin_name": "Triceps Press-down"
+},
+"Triceps_Pushdown_-_Rope_Attachment": {
+"category": "TRICEPS_EXTENSION",
+"confidence": "media",
+"exercise": "ROPE_PRESSDOWN",
+"garmin_name": "Rope Press-down"
+},
+"Triceps_Pushdown_-_V-Bar_Attachment": {
+"category": "TRICEPS_EXTENSION",
+"confidence": "media",
+"exercise": "TRICEPS_PRESSDOWN",
+"garmin_name": "Triceps Press-down"
+},
+"Triceps_Stretch": {
+"category": "WARM_UP",
+"confidence": "alta",
+"exercise": "STRETCH_TRICEPS",
+"garmin_name": "Triceps Stretch"
+},
+"Tuck_Crunch": {
+"category": "CRUNCH",
+"confidence": "alta",
+"exercise": "CRUNCH",
+"garmin_name": "Crunch"
+},
+"Two-Arm_Dumbbell_Preacher_Curl": {
+"category": "CURL",
+"confidence": "alta",
+"exercise": "ONE_ARM_PREACHER_CURL",
+"garmin_name": "One-arm Preacher Curl"
+},
+"Two-Arm_Kettlebell_Clean": {
+"category": "OLYMPIC_LIFT",
+"confidence": "media",
+"exercise": "SINGLE_ARM_KETTLEBELL_SNATCH",
+"garmin_name": "Single-arm Kettlebell Snatch"
+},
+"Two-Arm_Kettlebell_Jerk": {
+"category": "OLYMPIC_LIFT",
+"confidence": "media",
+"exercise": "SINGLE_ARM_KETTLEBELL_SNATCH",
+"garmin_name": "Single-arm Kettlebell Snatch"
+},
+"Two-Arm_Kettlebell_Military_Press": {
+"category": "SHOULDER_PRESS",
+"confidence": "alta",
+"exercise": "MILITARY_PRESS",
+"garmin_name": "Military Press"
+},
+"Two-Arm_Kettlebell_Row": {
+"category": "ROW",
+"confidence": "alta",
+"exercise": "KETTLEBELL_ROW",
+"garmin_name": "Kettlebell Row"
+},
+"Underhand_Cable_Pulldowns": {
+"category": "PULL_UP",
+"confidence": "alta",
+"exercise": "LAT_PULLDOWN",
+"garmin_name": "Lat Pull-down"
+},
+"Upper_Back-Leg_Grab": {
+"category": "WARM_UP",
+"confidence": "generica",
+"exercise": "WARM_UP",
+"garmin_name": "Warm-up"
+},
+"Upper_Back_Stretch": {
+"category": "WARM_UP",
+"confidence": "media",
+"exercise": "STRETCH_90_90",
+"garmin_name": "90/90 Stretch"
+},
+"Upright_Barbell_Row": {
+"category": "ROW",
+"confidence": "alta",
+"exercise": "BARBELL_ROW",
+"garmin_name": "Barbell Row"
+},
+"Upright_Cable_Row": {
+"category": "ROW",
+"confidence": "alta",
+"exercise": "ROPE_HANDLE_CABLE_ROW",
+"garmin_name": "Rope-handle Cable Row"
+},
+"Upright_Row_-_With_Bands": {
+"category": "ROW",
+"confidence": "alta",
+"exercise": "ROW",
+"garmin_name": "Row"
+},
+"Upward_Stretch": {
+"category": "WARM_UP",
+"confidence": "alta",
+"exercise": "STRETCH_90_90",
+"garmin_name": "90/90 Stretch"
+},
+"V-Bar_Pulldown": {
+"category": "PULL_UP",
+"confidence": "alta",
+"exercise": "LAT_PULLDOWN",
+"garmin_name": "Lat Pull-down"
+},
+"V-Bar_Pullup": {
+"category": "PULL_UP",
+"confidence": "alta",
+"exercise": "PULL_UP",
+"garmin_name": "Pull-up"
+},
+"Vertical_Swing": {
+"category": "HIP_SWING",
+"confidence": "alta",
+"exercise": "HIP_SWING",
+"garmin_name": "Hip Swing"
+},
+"Walking_Treadmill": {
+"category": "RUN_INDOOR",
+"confidence": "media",
+"exercise": "TREADMILL",
+"garmin_name": "Treadmill"
+},
+"Weighted_Ball_Hyperextension": {
+"category": "HYPEREXTENSION",
+"confidence": "alta",
+"exercise": "WEIGHTED_SWISS_BALL_HYPEREXTENSION",
+"garmin_name": "Weighted Swiss Ball Hyperextension"
+},
+"Weighted_Ball_Side_Bend": {
+"category": "CORE",
+"confidence": "alta",
+"exercise": "WEIGHTED_SIDE_BEND",
+"garmin_name": "Weighted Side Bend"
+},
+"Weighted_Bench_Dip": {
+"category": "TRICEPS_EXTENSION",
+"confidence": "alta",
+"exercise": "WEIGHTED_BENCH_DIP",
+"garmin_name": "Weighted Bench Dip"
+},
+"Weighted_Crunches": {
+"category": "CRUNCH",
+"confidence": "alta",
+"exercise": "WEIGHTED_CRUNCH",
+"garmin_name": "Weighted Crunch"
+},
+"Weighted_Jump_Squat": {
+"category": "PLYO",
+"confidence": "alta",
+"exercise": "WEIGHTED_JUMP_SQUAT",
+"garmin_name": "Weighted Jump Squat"
+},
+"Weighted_Pull_Ups": {
+"category": "PULL_UP",
+"confidence": "alta",
+"exercise": "WEIGHTED_JUMPING_PULL_UPS",
+"garmin_name": "Weighted Jumping Pull-ups"
+},
+"Weighted_Sissy_Squat": {
+"category": "SQUAT",
+"confidence": "alta",
+"exercise": "WEIGHTED_SQUAT",
+"garmin_name": "Weighted Squat"
+},
+"Weighted_Sit-Ups_-_With_Bands": {
+"category": "CORE",
+"confidence": "media",
+"exercise": "WEIGHTED_L_SIT",
+"garmin_name": "Weighted L Sit"
+},
+"Weighted_Squat": {
+"category": "SQUAT",
+"confidence": "alta",
+"exercise": "WEIGHTED_SQUAT",
+"garmin_name": "Weighted Squat"
+},
+"Wide-Grip_Barbell_Bench_Press": {
+"category": "BENCH_PRESS",
+"confidence": "alta",
+"exercise": "WIDE_GRIP_BARBELL_BENCH_PRESS",
+"garmin_name": "Wide-grip Barbell Bench Press"
+},
+"Wide-Grip_Decline_Barbell_Bench_Press": {
+"category": "BENCH_PRESS",
+"confidence": "alta",
+"exercise": "WIDE_GRIP_BARBELL_BENCH_PRESS",
+"garmin_name": "Wide-grip Barbell Bench Press"
+},
+"Wide-Grip_Decline_Barbell_Pullover": {
+"category": "DEADLIFT",
+"confidence": "media",
+"exercise": "WIDE_GRIP_BARBELL_DEADLIFT",
+"garmin_name": "Wide-grip Barbell Deadlift"
+},
+"Wide-Grip_Lat_Pulldown": {
+"category": "PULL_UP",
+"confidence": "alta",
+"exercise": "WIDE_GRIP_LAT_PULLDOWN",
+"garmin_name": "Wide-grip Lat Pull-down"
+},
+"Wide-Grip_Pulldown_Behind_The_Neck": {
+"category": "PULL_UP",
+"confidence": "alta",
+"exercise": "WIDE_GRIP_LAT_PULLDOWN",
+"garmin_name": "Wide-grip Lat Pull-down"
+},
+"Wide-Grip_Rear_Pull-Up": {
+"category": "PULL_UP",
+"confidence": "alta",
+"exercise": "WIDE_GRIP_PULL_UP",
+"garmin_name": "Wide-grip Pull-up"
+},
+"Wide-Grip_Standing_Barbell_Curl": {
+"category": "CURL",
+"confidence": "alta",
+"exercise": "BARBELL_BICEPS_CURL",
+"garmin_name": "Barbell Biceps Curl"
+},
+"Wide_Stance_Barbell_Squat": {
+"category": "SQUAT",
+"confidence": "alta",
+"exercise": "WIDE_STANCE_BARBELL_SQUAT",
+"garmin_name": "Wide-stance Barbell Squat"
+},
+"Wide_Stance_Stiff_Legs": {
+"category": "DEADLIFT",
+"confidence": "media",
+"exercise": "STRAIGHT_LEG_DEADLIFT",
+"garmin_name": "Straight-leg Deadlift"
+},
+"Wind_Sprints": {
+"category": "RUN",
+"confidence": "media",
+"exercise": "SPRINT",
+"garmin_name": "Sprint"
+},
+"Windmills": {
+"category": "CORE",
+"confidence": "alta",
+"exercise": "WINDMILL_SWITCHES",
+"garmin_name": "Windmill Switches"
+},
+"Worlds_Greatest_Stretch": {
+"category": "WARM_UP",
+"confidence": "media",
+"exercise": "STRETCH_90_90",
+"garmin_name": "90/90 Stretch"
+},
+"Wrist_Circles": {
+"category": "WARM_UP",
+"confidence": "generica",
+"exercise": "WARM_UP",
+"garmin_name": "Warm-up"
+},
+"Wrist_Roller": {
+"category": "CURL",
+"confidence": "generica",
+"exercise": "CURL",
+"garmin_name": "Curl"
+},
+"Wrist_Rotations_with_Straight_Bar": {
+"category": "CURL",
+"confidence": "generica",
+"exercise": "CURL",
+"garmin_name": "Curl"
+},
+"Yoke_Walk": {
+"category": "RUN",
+"confidence": "media",
+"exercise": "WALK",
+"garmin_name": "Walk"
+},
+"Zercher_Squats": {
+"category": "SQUAT",
+"confidence": "alta",
+"exercise": "ZERCHER_SQUAT",
+"garmin_name": "Zercher Squat"
+},
+"Zottman_Curl": {
+"category": "CURL",
+"confidence": "alta",
+"exercise": "CURL",
+"garmin_name": "Curl"
+},
+"Zottman_Preacher_Curl": {
+"category": "CURL",
+"confidence": "alta",
+"exercise": "CURL",
+"garmin_name": "Curl"
+}
+}
