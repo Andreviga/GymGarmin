@@ -31,6 +31,10 @@ CARDIO_MERGE = {
     "cardio_corda": ["Rope_Jumping"],
 }
 
+OUTDOOR_SPORT_IDS = {"corrida_rua", "corrida_trilha", "corrida_pista", "ciclismo_estrada", "ciclismo_rolo",
+                     "ciclismo_mtb", "natacao_piscina", "natacao_aguas_abertas", "remo_agua", "caminhada_rua",
+                     "trilha_hiking"}
+
 # Correções de dados do free-exercise-db (músculos errados na fonte)
 MUSCLE_FIXES = {
     "Cable_Hip_Adduction": (["adductors"], ["glutes"]),
@@ -294,7 +298,9 @@ def _load() -> tuple[list[dict], dict[str, dict]]:
             "params": c["params"],
             "timed": True,
             "popular": True,
-            "machine": True,
+            # aparelhos de academia; corrida na rua, natação etc. são modalidades (sports.py)
+            "machine": c.get("id") not in OUTDOOR_SPORT_IDS,
+            "endurance": bool(c.get("endurance")),
         })
 
     for it in items:

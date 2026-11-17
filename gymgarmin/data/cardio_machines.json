@@ -1,167 +1,820 @@
 [
-  {
-    "id": "cardio_esteira_caminhada",
-    "name": "Esteira – caminhada / caminhada inclinada",
-    "name_en": "Treadmill walk",
-    "impact": "baixo",
-    "primaryMuscles": ["quadriceps", "glutes", "calves"],
-    "secondaryMuscles": ["hamstrings"],
-    "met": {"leve": 3.5, "moderado": 5.0, "vigoroso": 7.0},
-    "garmin_step": {"category": "RUN_INDOOR", "exercise": "TREADMILL"},
-    "fit_step": {"category": "run_indoor", "exercise": "treadmill"},
-    "fit_sport": {"sport": "running", "sub_sport": "treadmill"},
-    "connect_sport": "running",
-    "params": ["velocidade_kmh", "inclinacao_pct"],
-    "tips": "Inclinação de 8–12% a 5–6 km/h dá estímulo de zona 2 com baixo impacto."
+ {
+  "id": "cardio_esteira_caminhada",
+  "name": "Esteira – caminhada / caminhada inclinada",
+  "name_en": "Treadmill walk",
+  "impact": "baixo",
+  "primaryMuscles": [
+   "quadriceps",
+   "glutes",
+   "calves"
+  ],
+  "secondaryMuscles": [
+   "hamstrings"
+  ],
+  "met": {
+   "leve": 3.5,
+   "moderado": 5.0,
+   "vigoroso": 7.0
   },
-  {
-    "id": "cardio_esteira_corrida",
-    "name": "Esteira – corrida",
-    "name_en": "Treadmill run",
-    "impact": "alto",
-    "primaryMuscles": ["quadriceps", "glutes", "calves", "hamstrings"],
-    "secondaryMuscles": ["abdominals"],
-    "met": {"leve": 7.0, "moderado": 9.8, "vigoroso": 11.8},
-    "garmin_step": {"category": "RUN_INDOOR", "exercise": "TREADMILL"},
-    "fit_step": {"category": "run_indoor", "exercise": "treadmill"},
-    "fit_sport": {"sport": "running", "sub_sport": "treadmill"},
-    "connect_sport": "running",
-    "params": ["velocidade_kmh", "inclinacao_pct"],
-    "tips": "Use 1% de inclinação para compensar a ausência de resistência do ar."
+  "garmin_step": {
+   "category": "RUN_INDOOR",
+   "exercise": "TREADMILL"
   },
-  {
-    "id": "cardio_bike_vertical",
-    "name": "Bicicleta ergométrica vertical",
-    "name_en": "Upright stationary bike",
-    "impact": "baixo",
-    "primaryMuscles": ["quadriceps", "glutes"],
-    "secondaryMuscles": ["hamstrings", "calves"],
-    "met": {"leve": 4.0, "moderado": 6.8, "vigoroso": 8.8},
-    "garmin_step": {"category": "INDOOR_BIKE", "exercise": "STATIONARY_BIKE"},
-    "fit_step": {"category": "indoor_bike", "exercise": "stationary_bike"},
-    "fit_sport": {"sport": "cycling", "sub_sport": "indoor_cycling"},
-    "connect_sport": "cycling",
-    "params": ["nivel_carga", "rpm"],
-    "tips": "Ajuste o banco na altura do quadril: joelho levemente flexionado no ponto mais baixo."
+  "fit_step": {
+   "category": "run_indoor",
+   "exercise": "treadmill"
   },
-  {
-    "id": "cardio_bike_horizontal",
-    "name": "Bicicleta ergométrica horizontal (reclinada)",
-    "name_en": "Recumbent bike",
-    "impact": "baixo",
-    "primaryMuscles": ["quadriceps", "glutes"],
-    "secondaryMuscles": ["hamstrings"],
-    "met": {"leve": 3.5, "moderado": 5.5, "vigoroso": 8.0},
-    "garmin_step": {"category": "INDOOR_BIKE", "exercise": "STATIONARY_BIKE"},
-    "fit_step": {"category": "indoor_bike", "exercise": "stationary_bike"},
-    "fit_sport": {"sport": "cycling", "sub_sport": "indoor_cycling"},
-    "connect_sport": "cycling",
-    "params": ["nivel_carga", "rpm"],
-    "tips": "Boa opção para quem tem dor lombar: encosto apoia a coluna."
+  "fit_sport": {
+   "sport": "running",
+   "sub_sport": "treadmill"
   },
-  {
-    "id": "cardio_spinning",
-    "name": "Bike de spinning",
-    "name_en": "Spin bike",
-    "impact": "baixo",
-    "primaryMuscles": ["quadriceps", "glutes", "calves"],
-    "secondaryMuscles": ["hamstrings", "abdominals"],
-    "met": {"leve": 5.5, "moderado": 7.0, "vigoroso": 10.0},
-    "garmin_step": {"category": "INDOOR_BIKE", "exercise": "INDOOR_BIKE"},
-    "fit_step": {"category": "indoor_bike", "exercise": "stationary_bike"},
-    "fit_sport": {"sport": "cycling", "sub_sport": "indoor_cycling"},
-    "connect_sport": "cycling",
-    "params": ["nivel_carga", "rpm"],
-    "tips": "Pedalar em pé aumenta o recrutamento de glúteos e o impacto nos joelhos."
+  "connect_sport": "running",
+  "params": [
+   "velocidade_kmh",
+   "inclinacao_pct"
+  ],
+  "tips": "Inclinação de 8–12% a 5–6 km/h dá estímulo de zona 2 com baixo impacto.",
+  "endurance": true
+ },
+ {
+  "id": "cardio_esteira_corrida",
+  "name": "Esteira – corrida",
+  "name_en": "Treadmill run",
+  "impact": "alto",
+  "primaryMuscles": [
+   "quadriceps",
+   "glutes",
+   "calves",
+   "hamstrings"
+  ],
+  "secondaryMuscles": [
+   "abdominals"
+  ],
+  "met": {
+   "leve": 7.0,
+   "moderado": 9.8,
+   "vigoroso": 11.8
   },
-  {
-    "id": "cardio_air_bike",
-    "name": "Air bike / Assault bike",
-    "name_en": "Air bike",
-    "impact": "baixo",
-    "primaryMuscles": ["quadriceps", "glutes", "shoulders"],
-    "secondaryMuscles": ["chest", "lats", "triceps", "hamstrings"],
-    "met": {"leve": 5.0, "moderado": 8.0, "vigoroso": 12.0},
-    "garmin_step": {"category": "INDOOR_BIKE", "exercise": "AIR_BIKE"},
-    "fit_step": {"category": "indoor_bike", "exercise": "air_bike"},
-    "fit_sport": {"sport": "cycling", "sub_sport": "indoor_cycling"},
-    "connect_sport": "cycling",
-    "params": ["watts", "rpm"],
-    "tips": "Excelente para intervalados curtos (HIIT) com corpo inteiro."
+  "garmin_step": {
+   "category": "RUN_INDOOR",
+   "exercise": "TREADMILL"
   },
-  {
-    "id": "cardio_eliptico",
-    "name": "Elíptico / Transport",
-    "name_en": "Elliptical",
-    "impact": "baixo",
-    "primaryMuscles": ["quadriceps", "glutes"],
-    "secondaryMuscles": ["hamstrings", "calves", "shoulders", "chest", "lats"],
-    "met": {"leve": 4.5, "moderado": 5.5, "vigoroso": 7.5},
-    "garmin_step": {"category": "ELLIPTICAL", "exercise": "ELLIPTICAL"},
-    "fit_step": {"category": "elliptical", "exercise": "elliptical"},
-    "fit_sport": {"sport": "fitness_equipment", "sub_sport": "elliptical"},
-    "connect_sport": "cardio_training",
-    "params": ["nivel_carga", "inclinacao", "spm"],
-    "tips": "Substituto de corrida para joelho/tornozelo sensível."
+  "fit_step": {
+   "category": "run_indoor",
+   "exercise": "treadmill"
   },
-  {
-    "id": "cardio_remo",
-    "name": "Remo ergômetro",
-    "name_en": "Rowing machine",
-    "impact": "baixo",
-    "primaryMuscles": ["lats", "middle back", "quadriceps", "glutes"],
-    "secondaryMuscles": ["biceps", "hamstrings", "lower back", "shoulders", "forearms"],
-    "met": {"leve": 4.8, "moderado": 7.0, "vigoroso": 8.5},
-    "garmin_step": {"category": "ROW", "exercise": "INDOOR_ROW"},
-    "fit_step": {"category": "indoor_row", "exercise": "rowing_machine"},
-    "fit_sport": {"sport": "rowing", "sub_sport": "indoor_rowing"},
-    "connect_sport": "cardio_training",
-    "params": ["damper", "spm", "pace_500m"],
-    "tips": "Sequência: pernas → tronco → braços. 60% da força vem das pernas."
+  "fit_sport": {
+   "sport": "running",
+   "sub_sport": "treadmill"
   },
-  {
-    "id": "cardio_escada",
-    "name": "Escada / Stair climber",
-    "name_en": "Stair climber",
-    "impact": "moderado",
-    "primaryMuscles": ["quadriceps", "glutes", "calves"],
-    "secondaryMuscles": ["hamstrings"],
-    "met": {"leve": 4.0, "moderado": 8.8, "vigoroso": 10.0},
-    "garmin_step": {"category": "STAIR_STEPPER", "exercise": "STAIR_STEPPER"},
-    "fit_step": {"category": "stair_stepper", "exercise": "stair_stepper"},
-    "fit_sport": {"sport": "fitness_equipment", "sub_sport": "stair_climbing"},
-    "connect_sport": "cardio_training",
-    "params": ["nivel"],
-    "tips": "Evite apoiar o peso do corpo no corrimão — reduz muito o gasto."
+  "connect_sport": "running",
+  "params": [
+   "velocidade_kmh",
+   "inclinacao_pct"
+  ],
+  "tips": "Use 1% de inclinação para compensar a ausência de resistência do ar.",
+  "endurance": true
+ },
+ {
+  "id": "cardio_bike_vertical",
+  "name": "Bicicleta ergométrica vertical",
+  "name_en": "Upright stationary bike",
+  "impact": "baixo",
+  "primaryMuscles": [
+   "quadriceps",
+   "glutes"
+  ],
+  "secondaryMuscles": [
+   "hamstrings",
+   "calves"
+  ],
+  "met": {
+   "leve": 4.0,
+   "moderado": 6.8,
+   "vigoroso": 8.8
   },
-  {
-    "id": "cardio_ski_erg",
-    "name": "Ski erg",
-    "name_en": "Ski erg",
-    "impact": "baixo",
-    "primaryMuscles": ["lats", "triceps", "abdominals"],
-    "secondaryMuscles": ["shoulders", "glutes", "hamstrings"],
-    "met": {"leve": 5.0, "moderado": 7.5, "vigoroso": 10.0},
-    "garmin_step": {"category": "CARDIO", "exercise": "CARDIO"},
-    "fit_step": {"category": "cardio", "exercise": null},
-    "fit_sport": {"sport": "fitness_equipment", "sub_sport": "cardio_training"},
-    "connect_sport": "cardio_training",
-    "params": ["damper", "spm"],
-    "tips": "Movimento de quadril (hinge) puxando os cabos até a linha da coxa."
+  "garmin_step": {
+   "category": "INDOOR_BIKE",
+   "exercise": "STATIONARY_BIKE"
   },
-  {
-    "id": "cardio_corda",
-    "name": "Pular corda",
-    "name_en": "Jump rope",
-    "impact": "alto",
-    "primaryMuscles": ["calves", "quadriceps"],
-    "secondaryMuscles": ["shoulders", "forearms", "glutes"],
-    "met": {"leve": 8.8, "moderado": 11.8, "vigoroso": 12.3},
-    "garmin_step": {"category": "CARDIO", "exercise": "JUMP_ROPE"},
-    "fit_step": {"category": "cardio", "exercise": "jump_rope"},
-    "fit_sport": {"sport": "jump_rope", "sub_sport": "generic"},
-    "connect_sport": "cardio_training",
-    "params": ["saltos_min"],
-    "tips": "Saltos baixos, na ponta dos pés; alto impacto para tornozelo/joelho."
-  }
+  "fit_step": {
+   "category": "indoor_bike",
+   "exercise": "stationary_bike"
+  },
+  "fit_sport": {
+   "sport": "cycling",
+   "sub_sport": "indoor_cycling"
+  },
+  "connect_sport": "cycling",
+  "params": [
+   "nivel_carga",
+   "rpm"
+  ],
+  "tips": "Ajuste o banco na altura do quadril: joelho levemente flexionado no ponto mais baixo."
+ },
+ {
+  "id": "cardio_bike_horizontal",
+  "name": "Bicicleta ergométrica horizontal (reclinada)",
+  "name_en": "Recumbent bike",
+  "impact": "baixo",
+  "primaryMuscles": [
+   "quadriceps",
+   "glutes"
+  ],
+  "secondaryMuscles": [
+   "hamstrings"
+  ],
+  "met": {
+   "leve": 3.5,
+   "moderado": 5.5,
+   "vigoroso": 8.0
+  },
+  "garmin_step": {
+   "category": "INDOOR_BIKE",
+   "exercise": "STATIONARY_BIKE"
+  },
+  "fit_step": {
+   "category": "indoor_bike",
+   "exercise": "stationary_bike"
+  },
+  "fit_sport": {
+   "sport": "cycling",
+   "sub_sport": "indoor_cycling"
+  },
+  "connect_sport": "cycling",
+  "params": [
+   "nivel_carga",
+   "rpm"
+  ],
+  "tips": "Boa opção para quem tem dor lombar: encosto apoia a coluna."
+ },
+ {
+  "id": "cardio_spinning",
+  "name": "Bike de spinning",
+  "name_en": "Spin bike",
+  "impact": "baixo",
+  "primaryMuscles": [
+   "quadriceps",
+   "glutes",
+   "calves"
+  ],
+  "secondaryMuscles": [
+   "hamstrings",
+   "abdominals"
+  ],
+  "met": {
+   "leve": 5.5,
+   "moderado": 7.0,
+   "vigoroso": 10.0
+  },
+  "garmin_step": {
+   "category": "INDOOR_BIKE",
+   "exercise": "INDOOR_BIKE"
+  },
+  "fit_step": {
+   "category": "indoor_bike",
+   "exercise": "stationary_bike"
+  },
+  "fit_sport": {
+   "sport": "cycling",
+   "sub_sport": "indoor_cycling"
+  },
+  "connect_sport": "cycling",
+  "params": [
+   "nivel_carga",
+   "rpm"
+  ],
+  "tips": "Pedalar em pé aumenta o recrutamento de glúteos e o impacto nos joelhos.",
+  "endurance": true
+ },
+ {
+  "id": "cardio_air_bike",
+  "name": "Air bike / Assault bike",
+  "name_en": "Air bike",
+  "impact": "baixo",
+  "primaryMuscles": [
+   "quadriceps",
+   "glutes",
+   "shoulders"
+  ],
+  "secondaryMuscles": [
+   "chest",
+   "lats",
+   "triceps",
+   "hamstrings"
+  ],
+  "met": {
+   "leve": 5.0,
+   "moderado": 8.0,
+   "vigoroso": 12.0
+  },
+  "garmin_step": {
+   "category": "INDOOR_BIKE",
+   "exercise": "AIR_BIKE"
+  },
+  "fit_step": {
+   "category": "indoor_bike",
+   "exercise": "air_bike"
+  },
+  "fit_sport": {
+   "sport": "cycling",
+   "sub_sport": "indoor_cycling"
+  },
+  "connect_sport": "cycling",
+  "params": [
+   "watts",
+   "rpm"
+  ],
+  "tips": "Excelente para intervalados curtos (HIIT) com corpo inteiro."
+ },
+ {
+  "id": "cardio_eliptico",
+  "name": "Elíptico / Transport",
+  "name_en": "Elliptical",
+  "impact": "baixo",
+  "primaryMuscles": [
+   "quadriceps",
+   "glutes"
+  ],
+  "secondaryMuscles": [
+   "hamstrings",
+   "calves",
+   "shoulders",
+   "chest",
+   "lats"
+  ],
+  "met": {
+   "leve": 4.5,
+   "moderado": 5.5,
+   "vigoroso": 7.5
+  },
+  "garmin_step": {
+   "category": "ELLIPTICAL",
+   "exercise": "ELLIPTICAL"
+  },
+  "fit_step": {
+   "category": "elliptical",
+   "exercise": "elliptical"
+  },
+  "fit_sport": {
+   "sport": "fitness_equipment",
+   "sub_sport": "elliptical"
+  },
+  "connect_sport": "cardio_training",
+  "params": [
+   "nivel_carga",
+   "inclinacao",
+   "spm"
+  ],
+  "tips": "Substituto de corrida para joelho/tornozelo sensível."
+ },
+ {
+  "id": "cardio_remo",
+  "name": "Remo ergômetro",
+  "name_en": "Rowing machine",
+  "impact": "baixo",
+  "primaryMuscles": [
+   "lats",
+   "middle back",
+   "quadriceps",
+   "glutes"
+  ],
+  "secondaryMuscles": [
+   "biceps",
+   "hamstrings",
+   "lower back",
+   "shoulders",
+   "forearms"
+  ],
+  "met": {
+   "leve": 4.8,
+   "moderado": 7.0,
+   "vigoroso": 8.5
+  },
+  "garmin_step": {
+   "category": "ROW",
+   "exercise": "INDOOR_ROW"
+  },
+  "fit_step": {
+   "category": "indoor_row",
+   "exercise": "rowing_machine"
+  },
+  "fit_sport": {
+   "sport": "rowing",
+   "sub_sport": "indoor_rowing"
+  },
+  "connect_sport": "cardio_training",
+  "params": [
+   "damper",
+   "spm",
+   "pace_500m"
+  ],
+  "tips": "Sequência: pernas → tronco → braços. 60% da força vem das pernas.",
+  "endurance": true
+ },
+ {
+  "id": "cardio_escada",
+  "name": "Escada / Stair climber",
+  "name_en": "Stair climber",
+  "impact": "moderado",
+  "primaryMuscles": [
+   "quadriceps",
+   "glutes",
+   "calves"
+  ],
+  "secondaryMuscles": [
+   "hamstrings"
+  ],
+  "met": {
+   "leve": 4.0,
+   "moderado": 8.8,
+   "vigoroso": 10.0
+  },
+  "garmin_step": {
+   "category": "STAIR_STEPPER",
+   "exercise": "STAIR_STEPPER"
+  },
+  "fit_step": {
+   "category": "stair_stepper",
+   "exercise": "stair_stepper"
+  },
+  "fit_sport": {
+   "sport": "fitness_equipment",
+   "sub_sport": "stair_climbing"
+  },
+  "connect_sport": "cardio_training",
+  "params": [
+   "nivel"
+  ],
+  "tips": "Evite apoiar o peso do corpo no corrimão — reduz muito o gasto."
+ },
+ {
+  "id": "cardio_ski_erg",
+  "name": "Ski erg",
+  "name_en": "Ski erg",
+  "impact": "baixo",
+  "primaryMuscles": [
+   "lats",
+   "triceps",
+   "abdominals"
+  ],
+  "secondaryMuscles": [
+   "shoulders",
+   "glutes",
+   "hamstrings"
+  ],
+  "met": {
+   "leve": 5.0,
+   "moderado": 7.5,
+   "vigoroso": 10.0
+  },
+  "garmin_step": {
+   "category": "CARDIO",
+   "exercise": "CARDIO"
+  },
+  "fit_step": {
+   "category": "cardio",
+   "exercise": null
+  },
+  "fit_sport": {
+   "sport": "fitness_equipment",
+   "sub_sport": "cardio_training"
+  },
+  "connect_sport": "cardio_training",
+  "params": [
+   "damper",
+   "spm"
+  ],
+  "tips": "Movimento de quadril (hinge) puxando os cabos até a linha da coxa."
+ },
+ {
+  "id": "cardio_corda",
+  "name": "Pular corda",
+  "name_en": "Jump rope",
+  "impact": "alto",
+  "primaryMuscles": [
+   "calves",
+   "quadriceps"
+  ],
+  "secondaryMuscles": [
+   "shoulders",
+   "forearms",
+   "glutes"
+  ],
+  "met": {
+   "leve": 8.8,
+   "moderado": 11.8,
+   "vigoroso": 12.3
+  },
+  "garmin_step": {
+   "category": "CARDIO",
+   "exercise": "JUMP_ROPE"
+  },
+  "fit_step": {
+   "category": "cardio",
+   "exercise": "jump_rope"
+  },
+  "fit_sport": {
+   "sport": "jump_rope",
+   "sub_sport": "generic"
+  },
+  "connect_sport": "cardio_training",
+  "params": [
+   "saltos_min"
+  ],
+  "tips": "Saltos baixos, na ponta dos pés; alto impacto para tornozelo/joelho."
+ },
+ {
+  "id": "corrida_rua",
+  "name": "Corrida (rua)",
+  "name_en": "Outdoor run",
+  "impact": "alto",
+  "primaryMuscles": [
+   "quadriceps",
+   "hamstrings",
+   "calves"
+  ],
+  "secondaryMuscles": [
+   "glutes"
+  ],
+  "met": {
+   "leve": 7.0,
+   "moderado": 9.8,
+   "vigoroso": 11.8
+  },
+  "garmin_step": {
+   "category": "RUN",
+   "exercise": "RUN"
+  },
+  "fit_step": {
+   "category": "run",
+   "exercise": "run"
+  },
+  "fit_sport": {
+   "sport": "running",
+   "sub_sport": "generic"
+  },
+  "connect_sport": "running",
+  "params": [],
+  "tips": "Ritmo leve de verdade: dá para conversar. Aumente o volume semanal em até ~10%.",
+  "endurance": true
+ },
+ {
+  "id": "corrida_trilha",
+  "name": "Corrida (trilha)",
+  "name_en": "Trail run",
+  "impact": "alto",
+  "primaryMuscles": [
+   "quadriceps",
+   "hamstrings",
+   "calves"
+  ],
+  "secondaryMuscles": [
+   "glutes",
+   "abdominals"
+  ],
+  "met": {
+   "leve": 8.0,
+   "moderado": 9.0,
+   "vigoroso": 11.0
+  },
+  "garmin_step": {
+   "category": "RUN",
+   "exercise": "RUN"
+  },
+  "fit_step": {
+   "category": "run",
+   "exercise": "run"
+  },
+  "fit_sport": {
+   "sport": "running",
+   "sub_sport": "trail"
+  },
+  "connect_sport": "running",
+  "params": [],
+  "tips": "Na trilha, controle por esforço/FC: o ritmo varia com o terreno.",
+  "endurance": true
+ },
+ {
+  "id": "corrida_pista",
+  "name": "Corrida (pista)",
+  "name_en": "Track run",
+  "impact": "alto",
+  "primaryMuscles": [
+   "quadriceps",
+   "hamstrings",
+   "calves"
+  ],
+  "secondaryMuscles": [
+   "glutes"
+  ],
+  "met": {
+   "leve": 8.0,
+   "moderado": 10.0,
+   "vigoroso": 12.5
+  },
+  "garmin_step": {
+   "category": "RUN",
+   "exercise": "RUN"
+  },
+  "fit_step": {
+   "category": "run",
+   "exercise": "run"
+  },
+  "fit_sport": {
+   "sport": "running",
+   "sub_sport": "track"
+  },
+  "connect_sport": "running",
+  "params": [],
+  "tips": "Tiros na pista: 400 m por volta na raia 1.",
+  "endurance": true
+ },
+ {
+  "id": "ciclismo_estrada",
+  "name": "Ciclismo (estrada)",
+  "name_en": "Road cycling",
+  "impact": "baixo",
+  "primaryMuscles": [
+   "quadriceps",
+   "glutes"
+  ],
+  "secondaryMuscles": [
+   "hamstrings",
+   "calves"
+  ],
+  "met": {
+   "leve": 5.8,
+   "moderado": 8.0,
+   "vigoroso": 10.0
+  },
+  "garmin_step": {
+   "category": "INDOOR_BIKE",
+   "exercise": "INDOOR_BIKE"
+  },
+  "fit_step": {
+   "category": "indoor_bike",
+   "exercise": "indoor_bike"
+  },
+  "fit_sport": {
+   "sport": "cycling",
+   "sub_sport": "road"
+  },
+  "connect_sport": "cycling",
+  "params": [],
+  "tips": "Com medidor de potência, os alvos vêm em watts (% do FTP); sem ele, use a FC.",
+  "endurance": true
+ },
+ {
+  "id": "ciclismo_rolo",
+  "name": "Ciclismo (rolo / smart trainer)",
+  "name_en": "Indoor trainer",
+  "impact": "baixo",
+  "primaryMuscles": [
+   "quadriceps",
+   "glutes"
+  ],
+  "secondaryMuscles": [
+   "hamstrings",
+   "calves"
+  ],
+  "met": {
+   "leve": 5.5,
+   "moderado": 7.0,
+   "vigoroso": 8.8
+  },
+  "garmin_step": {
+   "category": "INDOOR_BIKE",
+   "exercise": "INDOOR_BIKE"
+  },
+  "fit_step": {
+   "category": "indoor_bike",
+   "exercise": "indoor_bike"
+  },
+  "fit_sport": {
+   "sport": "cycling",
+   "sub_sport": "indoor_cycling"
+  },
+  "connect_sport": "cycling",
+  "params": [],
+  "tips": "No rolo, 1 h equivale a ~1h15 na rua (sem descidas nem paradas).",
+  "endurance": true
+ },
+ {
+  "id": "ciclismo_mtb",
+  "name": "Mountain bike",
+  "name_en": "Mountain biking",
+  "impact": "medio",
+  "primaryMuscles": [
+   "quadriceps",
+   "glutes"
+  ],
+  "secondaryMuscles": [
+   "hamstrings",
+   "calves",
+   "abdominals"
+  ],
+  "met": {
+   "leve": 6.8,
+   "moderado": 8.5,
+   "vigoroso": 14.0
+  },
+  "garmin_step": {
+   "category": "INDOOR_BIKE",
+   "exercise": "INDOOR_BIKE"
+  },
+  "fit_step": {
+   "category": "indoor_bike",
+   "exercise": "indoor_bike"
+  },
+  "fit_sport": {
+   "sport": "cycling",
+   "sub_sport": "mountain"
+  },
+  "connect_sport": "cycling",
+  "params": [],
+  "tips": "Terreno técnico: controle por FC/esforço.",
+  "endurance": true
+ },
+ {
+  "id": "natacao_piscina",
+  "name": "Natação (piscina)",
+  "name_en": "Pool swimming",
+  "impact": "baixo",
+  "primaryMuscles": [
+   "lats",
+   "shoulders"
+  ],
+  "secondaryMuscles": [
+   "triceps",
+   "chest",
+   "abdominals"
+  ],
+  "met": {
+   "leve": 5.8,
+   "moderado": 8.3,
+   "vigoroso": 10.0
+  },
+  "garmin_step": {
+   "category": "CARDIO",
+   "exercise": "CARDIO"
+  },
+  "fit_step": {
+   "category": "cardio",
+   "exercise": "cardio"
+  },
+  "fit_sport": {
+   "sport": "swimming",
+   "sub_sport": "lap_swimming"
+  },
+  "connect_sport": "swimming",
+  "params": [],
+  "tips": "Ritmo por 100 m a partir do CSS (teste 400 m + 200 m). Ótima recuperação ativa para as pernas.",
+  "endurance": true
+ },
+ {
+  "id": "natacao_aguas_abertas",
+  "name": "Natação (águas abertas)",
+  "name_en": "Open water swimming",
+  "impact": "baixo",
+  "primaryMuscles": [
+   "lats",
+   "shoulders"
+  ],
+  "secondaryMuscles": [
+   "triceps",
+   "chest",
+   "abdominals"
+  ],
+  "met": {
+   "leve": 6.0,
+   "moderado": 8.3,
+   "vigoroso": 10.0
+  },
+  "garmin_step": {
+   "category": "CARDIO",
+   "exercise": "CARDIO"
+  },
+  "fit_step": {
+   "category": "cardio",
+   "exercise": "cardio"
+  },
+  "fit_sport": {
+   "sport": "swimming",
+   "sub_sport": "open_water"
+  },
+  "connect_sport": "swimming",
+  "params": [],
+  "tips": "Nunca sozinho; treine a navegação (olhar à frente a cada 6–10 braçadas).",
+  "endurance": true
+ },
+ {
+  "id": "remo_agua",
+  "name": "Remo (na água)",
+  "name_en": "On-water rowing",
+  "impact": "baixo",
+  "primaryMuscles": [
+   "quadriceps",
+   "lats",
+   "middle back"
+  ],
+  "secondaryMuscles": [
+   "biceps",
+   "glutes",
+   "hamstrings"
+  ],
+  "met": {
+   "leve": 5.8,
+   "moderado": 7.0,
+   "vigoroso": 12.0
+  },
+  "garmin_step": {
+   "category": "ROW",
+   "exercise": "INDOOR_ROW"
+  },
+  "fit_step": {
+   "category": "row",
+   "exercise": "indoor_row"
+  },
+  "fit_sport": {
+   "sport": "rowing",
+   "sub_sport": "generic"
+  },
+  "connect_sport": "other",
+  "params": [],
+  "tips": "Técnica: pernas, tronco, braços — e volta na ordem inversa.",
+  "endurance": true
+ },
+ {
+  "id": "caminhada_rua",
+  "name": "Caminhada",
+  "name_en": "Walking",
+  "impact": "baixo",
+  "primaryMuscles": [
+   "quadriceps",
+   "glutes",
+   "calves"
+  ],
+  "secondaryMuscles": [
+   "hamstrings"
+  ],
+  "met": {
+   "leve": 3.0,
+   "moderado": 4.3,
+   "vigoroso": 5.0
+  },
+  "garmin_step": {
+   "category": "CARDIO",
+   "exercise": "CARDIO"
+  },
+  "fit_step": {
+   "category": "cardio",
+   "exercise": "cardio"
+  },
+  "fit_sport": {
+   "sport": "walking",
+   "sub_sport": "generic"
+  },
+  "connect_sport": "other",
+  "params": [],
+  "tips": "Passos rápidos (~100+ por minuto) já contam como atividade moderada.",
+  "endurance": true
+ },
+ {
+  "id": "trilha_hiking",
+  "name": "Trilha / hiking",
+  "name_en": "Hiking",
+  "impact": "medio",
+  "primaryMuscles": [
+   "quadriceps",
+   "glutes",
+   "calves"
+  ],
+  "secondaryMuscles": [
+   "hamstrings",
+   "abdominals"
+  ],
+  "met": {
+   "leve": 5.3,
+   "moderado": 6.0,
+   "vigoroso": 7.8
+  },
+  "garmin_step": {
+   "category": "CARDIO",
+   "exercise": "CARDIO"
+  },
+  "fit_step": {
+   "category": "cardio",
+   "exercise": "cardio"
+  },
+  "fit_sport": {
+   "sport": "hiking",
+   "sub_sport": "generic"
+  },
+  "connect_sport": "other",
+  "params": [],
+  "tips": "Subidas contam muito: some ~10 min para cada 100 m de desnível.",
+  "endurance": true
+ }
 ]
