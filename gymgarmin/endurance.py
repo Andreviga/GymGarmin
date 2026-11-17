@@ -269,7 +269,7 @@ def _week_volume(sport: str, c: dict, level: str, week_idx: int, ws: date, recen
             rec = -weeks_to
             if rec <= 2:
                 return {"volume": top * (0.45 if rec == 1 else 0.6), "phase": "recuperacao", "weeks_to_race": weeks_to}
-            return {"volume": top * 0.75, "phase": "manutencao", "weeks_to_race": weeks_to}
+            return {"volume": top * 0.75, "phase": "manutencao", "weeks_to_race": weeks_to, "after_race": True}
         if weeks_to == 0:
             return {"volume": top * 0.4, "phase": "prova", "weeks_to_race": 0}
         if weeks_to <= taper:
@@ -745,7 +745,8 @@ def week_plan(profile: dict, ws: date, start: date, tier_key: str = "intermediar
                 s["endurance"]["note"] = (s["endurance"].get("note") + " · " if s["endurance"].get("note") else "") + msg
         out[sport] = {"volume": _round_vol(sport, wv["volume"]), "unit": VOLUME[sport]["unit"], "phase": wv["phase"],
                       **({"adjusted": True, "planned_volume": _round_vol(sport, wv["planned_volume"])} if wv.get("adjusted") else {}),
-                      "phase_pt": PHASE_PT.get(wv["phase"], wv["phase"]), "weeks_to_race": wv.get("weeks_to_race"),
+                      "phase_pt": ("Manutenção pós-prova — defina a próxima meta em Esportes" if wv.get("after_race")
+                                   else PHASE_PT.get(wv["phase"], wv["phase"])), "weeks_to_race": wv.get("weeks_to_race"),
                       "sessions": sessions}
     _cap_hard(out, level, anchors, max_hard)
     return {"week_idx": week_idx, "sports": out, "bricks": _bricks(profile, out, week_idx)}

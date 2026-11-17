@@ -169,6 +169,7 @@ def build_week(plan: dict, profile: dict, ws: date, from_date: date | None = Non
     days = plan.get("days") or []
     wp = _endurance_week(plan, profile, ws)
     sessions_by_day = _assign_sessions(days, wp) if wp else {}
+    taper = _race_taper(wp, profile, ws)
     # séries extras do acúmulo só até o volume máximo recuperável de cada músculo na semana
     from .generator import _weekly_volume
     from .muscles import MUSCLES
@@ -193,6 +194,8 @@ def build_week(plan: dict, profile: dict, ws: date, from_date: date | None = Non
         base_items = generator.rotate_accessories(day.get("items", []), pos.get("cycle"), profile, gen.get("tier"))
         items = apply_cycle(base_items, pos, int(gen.get("ramp_sets") or 0),
                             budget_min=session_budget(profile, plan), allowance=allowance)
+        if taper and _kind(day) == "forca":
+            items = _taper_strength(items, taper, day, wd)
         name = _clean_name(day.get("name") or f"Treino {idx + 1}")
         extra = {}
         if day.get("endurance_slot") and wp:
@@ -241,6 +244,46 @@ def fit_same_session(entries: list[dict], days: list[dict], budget: float) -> No
                 _fit_time([d], target, protect_post=True)
                 e["items"] = d["items"]
                 e.setdefault("changes", []).append(f"ajustado para caber com o esporte do dia ({int(budget)} min no total)")
+
+
+def _race_taper(wp: dict | None, profile: dict, ws: date) -> dict | None:
+    """Semana de polimento ou de prova de uma modalidade de resistência: a musculação acompanha."""
+    cfg = endurance.config(profile)
+    for sport, d in ((wp or {}).get("sports") or {}).items():
+        if d.get("phase") in ("polimento", "prova"):
+            race_wd = None
+            if d["phase"] == "prova":
+                rd = _d(((cfg.get(sport) or {}).get("goal") or {}).get("date"))
+                race_wd = (rd - ws).days if rd and 0 <= (rd - ws).days <= 6 else 6
+            return {"phase": d["phase"], "sport": sport, "race_wd": race_wd}
+    return None
+
+
+def _taper_strength(items: list[dict], taper: dict, day: dict, wd: int) -> list[dict]:
+    """Polimento: mantém a carga e corta ~1/3 das séries (a força não cai em 2–3 semanas, a fadiga sim).
+    Semana da prova: volume de deload e, nos 2 dias antes da prova, nada pesado de perna."""
+    from .generator import HEAVY_LEGS
+
+    out = copy.deepcopy(items)
+    race_week = taper["phase"] == "prova"
+    near_race = race_week and taper.get("race_wd") is not None and 0 <= taper["race_wd"] - wd <= 2
+    legs_heavy = day.get("template") in HEAVY_LEGS
+    keep = []
+    for it in out:
+        if it.get("phase") not in (None, "principal") or not it.get("sets"):
+            keep.append(it)
+            continue
+        if near_race and legs_heavy and taper["sport"] in ("corrida", "ciclismo", "multi", "trilha", "caminhada"):
+            prim = (catalog.get(it.get("exercise_id")) or {}).get("primaryMuscles") or []
+            if any(m in ("quadriceps", "hamstrings", "glutes", "calves", "adductors", "abductors") for m in prim):
+                continue  # pernas descansadas para a prova
+        f = 0.55 if race_week else 0.7
+        it["sets"] = max(1, round(it["sets"] * f))
+        it["taper"] = True
+        it["notes"] = ((it.get("notes") or "") + (" · semana da prova: menos séries, mesma carga, sem ir à falha" if race_week
+                                                   else " · polimento: menos séries, mesma carga")).strip(" ·")
+        keep.append(it)
+    return keep
 
 
 def _sessions_in_week(ws: date) -> list[dict]:

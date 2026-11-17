@@ -114,3 +114,33 @@ def test_same_session_week_stays_within_daily_minutes_as_runs_grow(tmp_path, mon
     for e in schedule.build_week(plan2, long_prof, date(2026, 11, 23)):
         if e["kind"] == "forca":
             assert generator.time_breakdown(e["items"])["total"] >= generator.STRENGTH_MIN_COMBINED - 3
+
+
+def test_strength_tapers_with_race_and_legs_rest_before_race(tmp_path, monkeypatch):
+    """Polimento: menos séries; semana da prova: deload e nada pesado de perna nos 2 dias antes."""
+    from datetime import date
+
+    from gymgarmin import catalog, generator, schedule
+
+    monkeypatch.setenv("GYMGARMIN_HOME", str(tmp_path))
+    monkeypatch.setenv("GYMGARMIN_DB", str(tmp_path / "t.sqlite3"))
+    prof = {"age": 34, "training_months": 72, "goal": "hipertrofia", "session_minutes": 90, "available_days": list(range(7)),
+            "same_session": True, "endurance": {"sports": {"corrida": {"enabled": True, "env": "esteira", "sessions": 4, "long_day": 6,
+                                                                       "goal": {"type": "prova", "distance": 5, "date": "2027-02-28"}}}}}
+    plan = generator.generate(prof, 0, recent={"corrida": 16.0}, today=date(2026, 11, 16))
+    plan["id"] = 1
+    plan["generator"]["cycle_start"] = "2026-11-16"
+
+    def sets(ws):
+        es = schedule.build_week(plan, prof, ws)
+        return es, sum(i.get("sets") or 0 for e in es if e["kind"] == "forca" for i in e["items"] if i.get("phase") == "principal")
+
+    _, normal = sets(date(2027, 2, 8))
+    _, taper = sets(date(2027, 2, 15))
+    race_es, race = sets(date(2027, 2, 22))
+    assert taper < normal * 0.85 and race < normal * 0.7
+    legs = {"quadriceps", "hamstrings", "glutes", "calves"}
+    for e in race_es:
+        if e["kind"] == "forca" and e["date"] >= "2027-02-26":
+            assert not any(set((catalog.get(i["exercise_id"]) or {}).get("primaryMuscles") or []) & legs
+                           for i in e["items"] if i.get("phase") == "principal" and i.get("sets")), e["day_name"]
