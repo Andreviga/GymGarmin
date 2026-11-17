@@ -53,6 +53,7 @@ def fetch_day(api, day: date) -> dict:
     """Um dia de dados do relógio. A noite de sono de `day` é a que termina na manhã de `day`."""
     d = day.isoformat()
     out: dict = {"date": d, "fetched_at": clock.now().isoformat(timespec="minutes")}
+    errors = 0
     try:
         sl = (api.get_sleep_data(d) or {})
         dto = sl.get("dailySleepDTO") or {}
@@ -78,8 +79,8 @@ def fetch_day(api, day: date) -> dict:
                 "nap_h": round((_num(dto.get("napTimeSeconds")) or 0) / 3600, 2) or None,
             }
             out["sleep"] = {k: v for k, v in out["sleep"].items() if v is not None}
-    except Exception:  # noqa: BLE001 - relógio sem o sensor ou dia sem dado
-        pass
+    except Exception:  # noqa: BLE001 - falha da chamada (rede, 5xx): vale tentar de novo
+        errors += 1
     try:
         h = ((api.get_hrv_data(d) or {}).get("hrvSummary")) or {}
         if h.get("lastNightAvg") or h.get("status"):
@@ -88,7 +89,7 @@ def fetch_day(api, day: date) -> dict:
                 "last_night": _num(h.get("lastNightAvg")), "weekly": _num(h.get("weeklyAvg")), "status": h.get("status"),
                 "low": _num(b.get("balancedLow")), "high": _num(b.get("balancedUpper"))}.items() if v is not None}
     except Exception:  # noqa: BLE001
-        pass
+        errors += 1
     try:
         s = api.get_stats(d) or {}
         m = {"rhr": "restingHeartRate", "stress_avg": "averageStressLevel", "stress_max": "maxStressLevel",
@@ -101,7 +102,7 @@ def fetch_day(api, day: date) -> dict:
             if v is not None and not (k.startswith("stress") and v < 0):  # -1/-2 = sem dado no Garmin
                 out[k] = v
     except Exception:  # noqa: BLE001
-        pass
+        errors += 1
     if out.get("rhr") is None:
         try:
             rhr = api.get_rhr_day(d) or {}
@@ -110,6 +111,8 @@ def fetch_day(api, day: date) -> dict:
                 out["rhr"] = _num(vals[0]["value"])
         except Exception:  # noqa: BLE001
             pass
+    if errors:
+        out["errors"] = errors
     return out
 
 
@@ -178,28 +181,44 @@ def collect(api, today: date, kv_get, kv_set, backfill: int = BACKFILL_PER_RUN) 
     """Atualiza os dias que faltam (hoje, ontem e alguns para trás) e as métricas semanais."""
     now = clock.now()
     fetched = []
+    # índice num registro só (evita ler 28 chaves a cada sincronização): data → "final" | tentativas
+    idx = json.loads(kv_get("health_index") or "{}")
     todo = [today, today - timedelta(days=1)]
-    missing = [today - timedelta(days=i) for i in range(2, 29) if not kv_get(f"health:{(today - timedelta(days=i)).isoformat()}")]
-    todo += missing[:backfill]
+    pending = [today - timedelta(days=i) for i in range(2, 29) if idx.get((today - timedelta(days=i)).isoformat()) != "final"]
+    pending.sort(key=lambda d: (d.isoformat() in idx, -d.toordinal()))  # primeiro os nunca buscados, do mais recente
+    todo += pending[:backfill]
     for d in todo:
         raw = kv_get(f"health:{d.isoformat()}")
         cur = json.loads(raw) if raw else None
         if cur and cur.get("final"):
+            idx[d.isoformat()] = "final"
             continue
         if cur and d == today:
             try:
                 age = now - datetime.fromisoformat(cur["fetched_at"])
-                # com o sono da noite já lido, só atualiza (passos, estresse) a cada 4 h; sem ele, a cada 45 min
-                if age < (timedelta(hours=4) if cur.get("sleep") else timedelta(minutes=45)):
+                # com o sono da noite já lido (ou depois do meio-dia), só atualiza passos/estresse a cada 4 h;
+                # de manhã, sem o sono ainda, tenta de novo a cada 45 min
+                wait = timedelta(hours=4) if cur.get("sleep") or now.hour >= 12 else timedelta(minutes=45)
+                if age < wait and not cur.get("errors"):
                     continue
             except (KeyError, ValueError):
                 pass
         data = fetch_day(api, d)
-        data["final"] = d < today  # o dia já acabou: os totais não mudam mais
-        if cur and not data.get("sleep") and cur.get("sleep"):
-            data["sleep"] = cur["sleep"]
+        for k in ("sleep", "hrv", "rhr"):  # falha passageira não apaga o que já tinha vindo
+            if cur and not data.get(k) and cur.get(k):
+                data[k] = cur[k]
+        tries = int((cur or {}).get("tries") or 0) + 1
+        data["tries"] = tries
+        # o dia já acabou: os totais não mudam mais — mas noite/FC que falharam ganham até 3 tentativas
+        # o dia já acabou: os totais não mudam mais — só repete (até 3×) se a busca deu erro;
+        # "sem dado" (relógio fora do pulso à noite) é resposta final
+        data["final"] = d < today and (not data.get("errors") or tries >= 3)
         kv_set(f"health:{d.isoformat()}", json.dumps(data))
+        idx[d.isoformat()] = "final" if data["final"] else tries
         fetched.append(d.isoformat())
+    if fetched:
+        cut = (today - timedelta(days=KEEP_DAYS)).isoformat()
+        kv_set("health_index", json.dumps({k: v for k, v in idx.items() if k >= cut}))
     wk = json.loads(kv_get("health_weekly") or "{}")
     if not wk or wk.get("date", "") <= (today - timedelta(days=WEEKLY_EVERY_DAYS)).isoformat():
         w = fetch_weekly(api, today)
@@ -241,13 +260,18 @@ def _f(v, d: int = 1, sign: bool = False) -> str:
     return ("+" if v >= 0 else "−") + txt if sign else ("−" if v < 0 else "") + txt
 
 
+def _valid(xs):
+    """Ignora vazios e leituras inválidas do relógio (0 ou negativo = sensor sem dado)."""
+    return [x for x in xs if x is not None and x > 0]
+
+
 def _mean(xs):
-    xs = [x for x in xs if x is not None]
+    xs = _valid(xs)
     return sum(xs) / len(xs) if xs else None
 
 
 def _median(xs):
-    xs = [x for x in xs if x is not None]
+    xs = _valid(xs)
     return st.median(xs) if xs else None
 
 
@@ -315,7 +339,9 @@ def report(days: dict[str, dict], weekly: dict | None, daily_load: dict[date, fl
     need = sleep_need(profile.get("age"))
     D = lambda i: (today - timedelta(days=i)).isoformat()  # noqa: E731
     get = lambda i: days.get(D(i)) or {}  # noqa: E731
-    sleep = lambda i: get(i).get("sleep") or {}  # noqa: E731
+    def sleep(i):  # noite válida (duração < 1 h = leitura falha do relógio ou cochilo)
+        sl = get(i).get("sleep") or {}
+        return sl if (sl.get("duration_h") or 0) >= 1 else {}
     out: dict = {"has_data": bool(days), "need": need, "areas": [], "alerts": [], "effects": [], "last_night": None}
     if not days:
         return out
@@ -389,11 +415,31 @@ def report(days: dict[str, dict], weekly: dict | None, daily_load: dict[date, fl
             parts.append(f"HRV média da semana {hrv7:.0f} ms{faixa}")
             if hrv_low:
                 lvl = "atencao"
-        if rhr_delta is not None and rhr_delta >= 5 and hrv_low:
+        # sinal agudo (doença começando, noite muito ruim): últimos 2–3 dias, que a média da semana dilui
+        rhr_base_vals = _valid([get(i).get("rhr") for i in range(7, 36)])
+        rhr_sd = st.pstdev(rhr_base_vals) if len(rhr_base_vals) >= 7 else 2.0
+        rhr2 = _mean([get(i).get("rhr") for i in range(0, 2)])
+        d2 = (rhr2 - rhr_base) if rhr2 is not None and rhr_base is not None else None
+        high_days = sum(1 for i in range(0, 3) if (get(i).get("rhr") or 0) > 0 and rhr_base and get(i)["rhr"] - rhr_base >= 5)
+        hrv3 = _mean([(get(i).get("hrv") or {}).get("last_night") for i in range(0, 3)])
+        hrv3_low = hrv3 is not None and lo is not None and hrv3 < lo
+        acute = d2 is not None and high_days >= 2 and (
+            (d2 >= 5 and hrv3_low) or (d2 >= max(6.0, 3 * rhr_sd)) or (d2 >= 4 and hrv3 is not None and lo is not None and hrv3 < 0.85 * lo))
+        if acute:
             lvl = "alerta"
-            tip = "FC de repouso alta + HRV baixa: corpo ainda se recuperando (ou começo de gripe). Faça 1–2 dias leves."
+            tip = "FC de repouso alta" + (" + HRV baixa" if hrv3_low else "") + ": corpo ainda se recuperando (ou começo de gripe). Faça 1–2 dias leves."
+            out["alerts"].append(f"FC de repouso {_f(d2)} bpm acima do normal nos últimos dias"
+                                 + (" e HRV abaixo da sua faixa" if hrv3_low else "") +
+                                 ": sinal de recuperação incompleta, estresse ou início de doença. Dia leve ou folga; "
+                                 "se vier com febre ou dor no corpo, nada de treino.")
+        elif rhr_delta is not None and rhr_delta >= 5 and hrv_low:
+            lvl = "alerta"
+            tip = "FC de repouso alta + HRV baixa há dias: corpo pedindo recuperação. Faça 1–2 dias leves."
             out["alerts"].append(f"FC de repouso {_f(rhr_delta)} bpm acima do normal e HRV abaixo da sua faixa: "
                                  "sinal de recuperação incompleta, estresse ou início de doença. Dia leve ou folga.")
+        elif hrv3_low and not hrv_low and lvl == "ok":
+            lvl = "atencao"
+            tip = "HRV abaixo da sua faixa nas últimas noites: vá com calma nos treinos fortes."
         elif lvl == "ok":
             tip = "Recuperação em dia: dá para manter o plano." if not hrv_high else "HRV acima da faixa: ótima recuperação."
         out["areas"].append(_area(lvl, "Recuperação", "; ".join(parts) + ".", tip))
@@ -459,7 +505,7 @@ def report(days: dict[str, dict], weekly: dict | None, daily_load: dict[date, fl
     for i in range(0, 56):
         d = today - timedelta(days=i)
         sl = (days.get(d.isoformat()) or {}).get("sleep") or {}
-        if not sl:
+        if (sl.get("duration_h") or 0) < 1:
             continue
         prev = d - timedelta(days=1)
         nights.append({"load": daily_load.get(prev, 0.0), "score": sl.get("score"), "dur": sl.get("duration_h"),
@@ -474,27 +520,34 @@ def report(days: dict[str, dict], weekly: dict | None, daily_load: dict[date, fl
         easy = [n for n in nights if n["load"] < 15]
 
         def cmp(key, label, unit, better_high=True, min_diff=3.0):
-            a, b = _mean([n[key] for n in heavy]), _mean([n[key] for n in easy])
-            na = sum(1 for n in heavy if n[key] is not None)
-            nb = sum(1 for n in easy if n[key] is not None)
-            if a is None or b is None or na < 3 or nb < 3:
+            xa = [n[key] for n in heavy if n[key]]
+            xb = [n[key] for n in easy if n[key]]
+            if len(xa) < 3 or len(xb) < 3:
                 return
+            a, b = st.mean(xa), st.mean(xb)
             diff = a - b
-            if abs(diff) < min_diff:
+            se = math.sqrt(st.pvariance(xa) / (len(xa) - 1) + st.pvariance(xb) / (len(xb) - 1)) or 1e-9
+            t = diff / se
+            worse = diff < 0 if better_high else diff > 0
+            if abs(diff) >= min_diff and abs(t) >= 2.6:  # diferença grande e consistente (não é acaso de poucas noites)
+                out["effects"].append(f"{label}: {a:.0f}{unit} nas noites depois de treino pesado × {b:.0f}{unit} depois de dia leve"
+                                      + (" — o treino forte está pesando na recuperação." if worse else "."))
+            elif abs(diff) < min_diff and 2 * se < min_diff * 1.5:
                 out["effects"].append(f"{label}: praticamente igual depois de treino pesado e de dia leve "
                                       f"({a:.0f}{unit} × {b:.0f}{unit}) — você está absorvendo bem a carga.")
-                return
-            worse = diff < 0 if better_high else diff > 0
-            out["effects"].append(f"{label}: {a:.0f}{unit} nas noites depois de treino pesado × {b:.0f}{unit} depois de dia leve"
-                                  + (" — o treino forte está pesando na recuperação." if worse else "."))
+            else:
+                out["effects"].append(f"{label}: {a:.0f}{unit} depois de treino pesado × {b:.0f}{unit} depois de dia leve — "
+                                      "ainda sem diferença clara (as noites variam muito); com mais semanas fica mais preciso.")
         cmp("score", "Nota do sono", "", True, 4)
         cmp("hrv", "HRV", " ms", True, 4)
         cmp("rhr", "FC de repouso", " bpm", False, 2)
         late = [n for n in nights if n["late"]]
         early = [n for n in nights if n["trained"] and not n["late"]]
-        a, b = _mean([n["score"] for n in late]), _mean([n["score"] for n in early])
-        if a is not None and b is not None and len(late) >= 3 and len(early) >= 3:
-            if b - a >= 5:
+        la, ea = [n["score"] for n in late if n["score"]], [n["score"] for n in early if n["score"]]
+        a, b = _mean(la), _mean(ea)
+        if a is not None and b is not None and len(la) >= 3 and len(ea) >= 3:
+            se = math.sqrt(st.pvariance(la) / (len(la) - 1) + st.pvariance(ea) / (len(ea) - 1)) or 1e-9
+            if b - a >= 5 and (b - a) / se >= 2.6:
                 out["effects"].append(f"Treinar à noite (depois das 19h30) derrubou seu sono: nota {a:.0f} × {b:.0f} quando treina mais cedo. "
                                       "Se der, deixe os treinos fortes para mais cedo ou termine 3 h antes de deitar.")
             else:
@@ -504,8 +557,8 @@ def report(days: dict[str, dict], weekly: dict | None, daily_load: dict[date, fl
 
     # ---- séries para gráficos (28 dias, do mais antigo ao mais novo)
     out["series"] = [{"date": D(i), "sleep_h": sleep(i).get("duration_h"), "sleep_score": sleep(i).get("score"),
-                      "rhr": get(i).get("rhr"), "hrv": (get(i).get("hrv") or {}).get("last_night"),
-                      "stress": get(i).get("stress_avg"), "steps": get(i).get("steps"), "load": daily_load.get(today - timedelta(days=i), 0)}
+                      "rhr": get(i).get("rhr") or None, "hrv": (get(i).get("hrv") or {}).get("last_night") or None,
+                      "stress": (get(i).get("stress_avg") if (get(i).get("stress_avg") or -1) >= 0 else None), "steps": get(i).get("steps"), "load": daily_load.get(today - timedelta(days=i), 0)}
                      for i in range(27, -1, -1)]
     out["weekly"] = {k: weekly.get(k) for k in ("vo2max", "vo2max_bike", "fitness_age", "chron_age", "achievable_age", "weight_kg",
                                                  "body_fat", "training_status", "acwr_pct") if weekly.get(k) is not None}

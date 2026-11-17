@@ -1,5 +1,6 @@
 """Saúde e sono pelo relógio: coleta defensiva, análise e efeitos do treino."""
 import json
+import math
 import random
 from datetime import date, datetime, timedelta, timezone
 
@@ -59,7 +60,8 @@ def test_fetch_parses_and_survives_missing_sensors():
     assert d["sleep"]["start"] == "23:10" and d["hrv"]["low"] == 44 and d["rhr"] == 52 and d["steps"] == 9100
     w = health.fetch_weekly(FakeApi(), TODAY)
     assert w["vo2max"] == 51.4 and w["training_status"] == "PRODUCTIVE" and w["fitness_age"] == 31.2 and w["weight_kg"] == 79.8
-    assert set(health.fetch_day(BrokenApi(), TODAY)) == {"date", "fetched_at"}
+    broken = health.fetch_day(BrokenApi(), TODAY)
+    assert set(broken) == {"date", "fetched_at", "errors"} and broken["errors"] == 3
     assert health.fetch_weekly(BrokenApi(), TODAY) == {"date": TODAY.isoformat()}
 
 
@@ -156,3 +158,71 @@ def test_readiness_reuses_health_data_without_extra_calls():
     data = readiness.fetch(c, TODAY, known)
     assert [x[0] for x in c.calls] == ["tr"]  # sono, HRV e FC de repouso vieram da saúde
     assert data["sleep_score"] == 81 and data["hrv_status"] == "BALANCED" and data["rhr"] == 52 and n == 3
+
+
+# ------------------------------------------------- regressões da simulação de saúde ---
+def _stable(rng, days=56, hrv=True):
+    out = {}
+    for i in range(days, -1, -1):
+        d = (TODAY - timedelta(days=i)).isoformat()
+        rec = {"date": d, "rhr": round(55 + rng.gauss(0, 1.6)),
+               "sleep": {"duration_h": round(7.4 + rng.gauss(0, 0.4), 2), "score": round(77 + rng.gauss(0, 5)), "start": "23:20"}}
+        if hrv:
+            rec["hrv"] = {"last_night": round(50 * math.exp(rng.gauss(0, 0.11)))}
+        out[d] = rec
+    return out
+
+
+def test_illness_detected_from_short_window_even_without_hrv():
+    rng = random.Random(5)
+    for hrv in (True, False):
+        days = _stable(rng, hrv=hrv)
+        assert not health.report(days, {}, {}, {"age": 35}, TODAY)["alerts"]
+        for i in range(0, 3):  # gripe começando: FC de repouso +7 e HRV −28% nos últimos 3 dias
+            r = days[(TODAY - timedelta(days=i)).isoformat()]
+            r["rhr"] += 7
+            if hrv:
+                r["hrv"]["last_night"] = round(r["hrv"]["last_night"] * 0.72)
+        rep = health.report(days, {}, {}, {"age": 35}, TODAY)
+        assert any("FC de repouso" in a for a in rep["alerts"]), hrv
+
+
+def test_noise_does_not_claim_training_hurts_and_invalid_readings_ignored():
+    rng = random.Random(9)
+    claims = 0
+    for _ in range(40):
+        days = _stable(rng)
+        load = {TODAY - timedelta(days=i): (130.0 if i % 3 == 0 else 0.0) for i in range(60)}  # treino sem efeito real
+        claims += "pesando" in " ".join(health.report(days, {}, load, {"age": 35}, TODAY)["effects"])
+    assert claims <= 2  # antes: ~10% de alarme falso por acaso
+    days = _stable(rng)
+    days[TODAY.isoformat()]["sleep"]["duration_h"] = 0  # leitura falha do relógio
+    days[TODAY.isoformat()]["rhr"] = 0
+    rep = health.report(days, {}, {}, {"age": 35}, TODAY)
+    assert rep["last_night"]["date"] != TODAY.isoformat() and not rep["alerts"]
+    assert "0h00" not in " ".join(rep["last_night"]["reasons"])
+
+
+def test_failed_night_is_retried_before_final():
+    class Flaky(FakeApi):
+        fails = 2
+
+        def get_sleep_data(self, d):
+            if Flaky.fails > 0:
+                Flaky.fails -= 1
+                raise RuntimeError("503")
+            return super().get_sleep_data(d)
+
+    store = {}
+    api = Flaky()
+    clock.freeze(datetime(2026, 11, 17, 8, 0))
+    try:
+        health.collect(api, TODAY, store.get, store.__setitem__, backfill=1)
+        d = json.loads(store["health:2026-11-16"])
+        assert not d.get("sleep") and not d["final"]  # falhou: ainda não é final
+        for h in (9, 10, 11):
+            clock.freeze(datetime(2026, 11, 17, h, 0))
+            health.collect(api, TODAY, store.get, store.__setitem__, backfill=1)
+        assert json.loads(store["health:2026-11-16"]).get("sleep")
+    finally:
+        clock.freeze(None)
