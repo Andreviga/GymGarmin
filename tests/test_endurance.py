@@ -236,3 +236,62 @@ def test_endurance_fit_and_connect_roundtrip():
     brick = ge.to_connect_json({"name": "Brick", "items": [en.build_session("ciclismo", "longo", 2, {}, a, "intermediario"),
                                                             en.build_session("corrida", "leve", 5, {}, a, "intermediario")]})
     assert brick["sportType"]["sportTypeKey"] == "multi_sport" and len(brick["workoutSegments"]) == 2
+
+
+# ---------------------------------------------------- regressões das simulações
+def test_long_is_biggest_and_volume_matches():
+    a = {"run_vdot": 45, "ftp_w": 220}
+    for sport, vols in (("corrida", [8, 15, 25, 40, 60]), ("ciclismo", [1.5, 3, 5, 9]), ("remo", [10000, 26000])):
+        for v in vols:
+            c = {"sessions": 3, "goal": {"type": "volume", "weekly": v}, "current_weekly": v}
+            prof = {"endurance": {"sports": {sport: {"enabled": True, **c}}, "anchors": a}}
+            d = en.week_plan(prof, MONDAY, MONDAY, "intermediario")["sports"][sport]
+            vol = lambda x: en._vol(x)  # noqa: E731
+            longs = [x for x in d["sessions"] if x["endurance"]["role"] == "longo"]
+            others = [x for x in d["sessions"] if x["endurance"]["role"] != "longo"]
+            if longs and others:
+                assert vol(longs[0]) >= max(vol(o) for o in others) * 0.95, (sport, v, [(x["endurance"]["title"], vol(x)) for x in d["sessions"]])
+            built = sum(vol(x) for x in d["sessions"])
+            assert 0.75 <= built / d["volume"] <= 1.3, (sport, v, d["volume"], built)
+
+
+def test_low_volume_uses_fewer_sessions_and_single_session_is_continuous():
+    prof = {"endurance": {"sports": {"natacao": {"enabled": True, "sessions": 5, "current_weekly": 2500}}}}
+    d = en.week_plan(prof, MONDAY + timedelta(weeks=1), MONDAY, "intermediario")["sports"]["natacao"]
+    assert len(d["sessions"]) < 5 and all(en._vol(x) >= 1000 for x in d["sessions"])
+    one = {"endurance": {"sports": {"ciclismo": {"enabled": True, "sessions": 1}}}}
+    d1 = en.week_plan(one, MONDAY, MONDAY, "intermediario")["sports"]["ciclismo"]
+    assert len(d1["sessions"]) == 1 and d1["sessions"][0]["endurance"]["type"] == "longo"  # nem teste nem tiro
+
+
+def test_taper_and_deload_still_reduce_when_capped():
+    c = {"sessions": 2, "current_weekly": 30, "goal": {"type": "prova", "distance": 21.1, "date": "2026-12-30"}}
+    prof = {"endurance": {"sports": {"corrida": {"enabled": True, **c}}, "anchors": {"run_vdot": 40}}}
+    vols = {w: en.week_plan(prof, MONDAY + timedelta(weeks=w), MONDAY, "intermediario")["sports"]["corrida"] for w in range(7)}
+    assert vols[3]["phase"] == "semana_leve" and vols[3]["volume"] < vols[2]["volume"]
+    taper = [v for v in vols.values() if v["phase"] == "polimento"]
+    assert taper and all(t["volume"] < vols[2]["volume"] * 0.9 for t in taper)
+
+
+def test_never_more_than_two_sessions_per_day_and_warns():
+    prof = {"training_months": 12, "goal": "hibrido", "session_minutes": 60, "available_days": [1, 2, 4],
+            "endurance": {"sports": {"caminhada": {"enabled": True, "sessions": 3}, "natacao": {"enabled": True, "sessions": 5}}}}
+    plan = generator.generate(prof, today=MONDAY)
+    from collections import Counter
+
+    assert max(Counter(d["weekday"] for d in plan["days"]).values()) <= 2
+    assert plan["endurance_plan"]["sessions"] and any("máx. 2 treinos por dia" in r for r in plan["rationale"])
+
+
+def test_impossible_target_is_ignored_with_warning():
+    c = {"enabled": True, "sessions": 3, "goal": {"type": "prova", "distance": 10, "target": "8:00", "date": "2027-01-10"}}
+    assert en._goal_pace("corrida", c) is None and en.goal_warning("corrida", c)
+    plan = generator.generate({"training_months": 12, "goal": "hibrido", "available_days": list(range(7)),
+                               "endurance": {"sports": {"corrida": c}}}, today=MONDAY)
+    assert any("fora do possível" in r for r in plan["rationale"])
+
+
+def test_short_sessions_scale_with_athlete_speed():
+    fast = {"run_vdot": 65}
+    assert en.min_session("corrida", fast) > 4  # 20 min no ritmo leve de quem tem VDOT 65
+    assert en.session_max("natacao", {"css_s100": 150}) < 6000  # natação lenta: limitada a ~110 min

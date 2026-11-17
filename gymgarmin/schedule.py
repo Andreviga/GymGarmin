@@ -86,7 +86,8 @@ def _endurance_week(plan: dict, profile: dict, ws: date) -> dict | None:
     if not ep or not endurance.active(profile):
         return None
     start = _d(ep.get("start")) or ws
-    return endurance.week_plan(profile, ws, start, ep.get("tier") or "intermediario")
+    return endurance.week_plan(profile, ws, start, ep.get("tier") or "intermediario", sessions_override=ep.get("sessions"),
+                               max_hard=ep.get("max_hard"))
 
 
 def _assign_sessions(days: list[dict], wp: dict) -> dict[int, dict | None]:

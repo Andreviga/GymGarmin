@@ -477,8 +477,36 @@ def generate(profile: dict, seed: int = 0, recent: dict | None = None, today=Non
     today = today or _date.today()
     week0 = today - _td(days=today.weekday())
     n_avail = len(avail)
+    sess_override = None
     if end_on:
-        wp = endurance.week_plan(p, week0, week0, tier_key, recent=recent)
+        # no máximo 2 treinos por dia: o que não couber nos dias livres sai (das modalidades com mais sessões)
+        cfg0 = endurance.config(p)
+        ev0 = ((p.get("endurance") or {}).get("event") or {}).get("type")
+        n_str_guess = int(p.get("strength_days") or (2 if ev0 or n_avail < 4 else 3))
+        n_str_guess = max(1, min(n_str_guess, tier["max_strength_days"], n_avail))
+        room = 2 * n_avail - n_str_guess
+        counts = {k: int(c["sessions"]) for k, c in cfg0.items()}
+        if sum(counts.values()) > room:
+            before = dict(counts)
+            while sum(counts.values()) > room and any(v > 1 for v in counts.values()):
+                k = max(counts, key=lambda x: (counts[x], x != "natacao"))
+                counts[k] -= 1
+            sess_override = counts
+            cut = ", ".join(f"{endurance.sp.SPORTS[k]['name']} {before[k]}→{counts[k]}" for k in counts if counts[k] != before[k])
+            rationale.append(f"Sessões de resistência demais para {n_avail} dias (máx. 2 treinos por dia): {cut}. "
+                             "Libere mais dias para manter todas.")
+        for k, c in cfg0.items():
+            w = endurance.goal_warning(k, c)
+            if w:
+                rationale.append(w)
+        # sessões fortes: deixa pelo menos 1 dia sem longo/forte de perna
+        cfg_eff = endurance.config(p, sess_override)
+        n_leg_longs = sum(1 for k, c in cfg_eff.items() if k in endurance.LEG_SPORTS and int(c["sessions"]) >= 2
+                          or k in ("trilha",))
+        max_hard = max(1, n_avail - n_leg_longs - 1)
+        # slots para todas as sessões configuradas (semanas de pouco volume deixam alguns vazios)
+        wp = endurance.week_plan(p, week0, week0, tier_key, recent=recent, sessions_override=sess_override, full_slots=True,
+                                 max_hard=max_hard)
         slots = []
         for sport_key, d in wp["sports"].items():
             for i, sess in enumerate(d["sessions"]):
@@ -492,7 +520,7 @@ def generate(profile: dict, seed: int = 0, recent: dict | None = None, today=Non
             # híbrido: 3 dias de força se sobrarem 3 dias sem longo/qualidade de perna (leves dividem o dia);
             # evento: 2 (manutenção)
             heavy = sum(1 for x in slots if x["role"] == "qualidade" or (x["role"] == "longo" and x["sport"] in endurance.LEG_SPORTS))
-            n_strength = 2 if ev or n_avail - heavy < 3 else 3
+            n_strength = 2 if ev or n_avail < 4 or n_avail - heavy < 3 else 3
         n_strength = max(1, min(n_strength, tier["max_strength_days"], n_avail))
         long_pref = {k: int(c["long_day"]) for k, c in endurance.config(p).items() if c.get("long_day") not in (None, "")}
         alloc = endurance.allocate(slots, avail, n_strength, long_pref)
@@ -627,6 +655,26 @@ def generate(profile: dict, seed: int = 0, recent: dict | None = None, today=Non
                 d["double"] = True
         if lims_mz < 5:
             rationale.append(f"Limitação de intensidade: sessões fortes de resistência vão no máximo à zona {lims_mz}.")
+        # avisos de arranjo apertado e de meta acima do que cabe
+        hard_leg = {d["weekday"] for d in days if d.get("kind") == "resistencia" and d["endurance_slot"]["sport"] in endurance.LEG_SPORTS
+                    and d["endurance_slot"]["role"] in ("qualidade", "longo")}
+        q_leg = {d["weekday"] for d in days if d.get("kind") == "resistencia" and d["endurance_slot"]["sport"] in endurance.LEG_SPORTS
+                 and d["endurance_slot"]["role"] == "qualidade"}
+        tight = any((w + 1) % 7 in hard_leg or (w - 1) % 7 in q_leg for w in q_leg) or any(
+            d["kind"] == "forca" and d.get("template") in HEAVY_LEGS and (d["weekday"] + 1) % 7 in hard_leg for d in days)
+        if tight:
+            rationale.append("Agenda apertada: algumas sessões fortes ficaram em dias seguidos (ou perna pesada na véspera). "
+                             "Dá para fazer, mas segure a intensidade; liberar mais um dia resolve.")
+        for k, c in endurance.config(p, sess_override).items():
+            g = c.get("goal") or {}
+            if g.get("type") == "volume" and g.get("weekly"):
+                cap = min(endurance.weekly_cap(k, int(c["sessions"])),
+                          endurance.session_max(k, endurance.sp.anchors_of(p), c.get("env"))
+                          * (1 if int(c["sessions"]) <= 1 else (0.55 + 0.45 * (int(c["sessions"]) - 1)) * 0.9))
+                if float(g["weekly"]) > cap * 1.02:
+                    u = endurance.VOLUME[k]["unit"]
+                    rationale.append(f"Meta de {endurance.sp.SPORTS[k]['name'].lower()} ({g['weekly']:g} {u}/semana) não cabe em "
+                                     f"{c['sessions']} sessão(ões) — máx. ~{endurance._round_vol(k, cap):g} {u}. Aumente as sessões.")
         _end_rationale(rationale, wp, alloc, p, budget)
         leg_end = sum(1 for d in days if d.get("kind") == "resistencia" and d["endurance_slot"]["sport"] in endurance.LEG_SPORTS)
     if cardio_days and goal.get("hybrid"):
@@ -705,7 +753,7 @@ def generate(profile: dict, seed: int = 0, recent: dict | None = None, today=Non
             "session_minutes": budget, "available_days": avail, "targets": targets,
             "cardio_target": cardio_target, "cardio_planned_equiv": week_cardio, "rpe": tier["rpe"],
         },
-        **({"endurance_plan": {"start": week0.isoformat(), "tier": tier_key,
+        **({"endurance_plan": {"start": week0.isoformat(), "tier": tier_key, "sessions": sess_override, "max_hard": max_hard,
                                "week0": {k: {kk: v[kk] for kk in ("volume", "unit", "phase", "phase_pt")} for k, v in wp["sports"].items()}}}
            if wp else {}),
         "goals_week": {

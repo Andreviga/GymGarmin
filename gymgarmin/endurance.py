@@ -29,14 +29,32 @@ WEEKDAYS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"]
 
 # unidade de volume, volume inicial por nível, mínimo por sessão, sessões padrão
 VOLUME = {
-    "corrida": {"unit": "km", "start": {"iniciante": 8, "intermediario": 15, "avancado": 25, "elite": 40}, "min": 3, "sessions": 3},
-    "ciclismo": {"unit": "h", "start": {"iniciante": 1.5, "intermediario": 3, "avancado": 5, "elite": 8}, "min": 0.5, "sessions": 2},
-    "natacao": {"unit": "m", "start": {"iniciante": 1500, "intermediario": 3000, "avancado": 5000, "elite": 8000}, "min": 800, "sessions": 2},
-    "remo": {"unit": "m", "start": {"iniciante": 8000, "intermediario": 15000, "avancado": 25000, "elite": 40000}, "min": 3000, "sessions": 2},
-    "caminhada": {"unit": "km", "start": {"iniciante": 10, "intermediario": 15, "avancado": 20, "elite": 25}, "min": 2, "sessions": 3},
-    "trilha": {"unit": "h", "start": {"iniciante": 2, "intermediario": 3, "avancado": 4, "elite": 5}, "min": 1, "sessions": 1},
+    "corrida": {"unit": "km", "start": {"iniciante": 8, "intermediario": 15, "avancado": 25, "elite": 40}, "min": 2.5, "max": 35, "sessions": 3},
+    "ciclismo": {"unit": "h", "start": {"iniciante": 1.5, "intermediario": 3, "avancado": 5, "elite": 8}, "min": 0.5, "max": 6, "sessions": 2},
+    "natacao": {"unit": "m", "start": {"iniciante": 1500, "intermediario": 3000, "avancado": 5000, "elite": 8000}, "min": 1000, "max": 6000, "sessions": 2},
+    "remo": {"unit": "m", "start": {"iniciante": 8000, "intermediario": 15000, "avancado": 25000, "elite": 40000}, "min": 4000, "max": 20000, "sessions": 2},
+    "caminhada": {"unit": "km", "start": {"iniciante": 10, "intermediario": 15, "avancado": 20, "elite": 25}, "min": 2, "max": 25, "sessions": 3},
+    "trilha": {"unit": "h", "start": {"iniciante": 2, "intermediario": 3, "avancado": 4, "elite": 5}, "min": 1, "max": 8, "sessions": 1},
 }
 UNIT_PT = {"km": "km", "h": "h", "m": "m"}
+MAX_SESSION_MIN = {"corrida": 210, "ciclismo": 360, "natacao": 110, "remo": 110, "caminhada": 300, "trilha": 480}
+MIN_SESSION_MIN = {"corrida": 20, "ciclismo": 30, "natacao": 15, "remo": 15, "caminhada": 20, "trilha": 60}
+
+
+def session_max(sport: str, anchors: dict, env: str | None = None) -> float:
+    """Maior sessão possível: teto da modalidade ou o tempo máximo no ritmo leve do atleta."""
+    unit = VOLUME[sport]["unit"]
+    secs = MAX_SESSION_MIN[sport] * 60
+    by_time = secs / 3600 if unit == "h" else secs * sp.speed_mps(sport, 2, anchors, env) / (1000 if unit == "km" else 1)
+    return min(VOLUME[sport]["max"], by_time)
+
+
+def min_session(sport: str, anchors: dict, env: str | None = None) -> float:
+    """Volume mínimo de uma sessão: o maior entre o mínimo da modalidade e ~20 min (corredor rápido não faz 11 min)."""
+    unit = VOLUME[sport]["unit"]
+    secs = MIN_SESSION_MIN[sport] * 60
+    by_time = secs / 3600 if unit == "h" else secs * sp.speed_mps(sport, 2, anchors, env) / (1000 if unit == "km" else 1)
+    return max(VOLUME[sport]["min"], by_time)
 
 LEVEL_FACTOR = {"iniciante": 0.6, "intermediario": 0.85, "avancado": 1.0, "elite": 1.2}
 SESSIONS_FACTOR = {1: 0.45, 2: 0.65, 3: 0.82, 4: 1.0, 5: 1.12, 6: 1.22, 7: 1.3}
@@ -120,8 +138,16 @@ def _d(v) -> date | None:
 
 
 # ------------------------------------------------------------- configuração
-def config(profile: dict) -> dict:
+def config(profile: dict, sessions_override: dict | None = None) -> dict:
     """Configuração efetiva: modalidades ativas, metas e sessões (evento sobrepõe metas)."""
+    out = _config(profile)
+    for k, n in (sessions_override or {}).items():
+        if k in out:
+            out[k]["sessions"] = int(n)
+    return out
+
+
+def _config(profile: dict) -> dict:
     end = (profile or {}).get("endurance") or {}
     out = {}
     for s, c in (end.get("sports") or {}).items():
@@ -172,27 +198,46 @@ def _taper(sport: str, c: dict) -> int:
     return 0
 
 
-def week_volume(sport: str, c: dict, level: str, week_idx: int, ws: date, recent: dict | None = None) -> dict:
-    """Volume da semana e fase. week_idx = semanas desde o início do plano (0 = primeira)."""
-    start, peak = _current(sport, c, level, recent), _peak(sport, c, level)
+def weekly_cap(sport: str, n_sessions: int) -> float:
+    """Teto semanal que cabe no número de sessões (o longo é o maior)."""
+    mx = VOLUME[sport]["max"]
+    return mx if n_sessions <= 1 else mx * (0.55 + 0.45 * (n_sessions - 1)) * 0.9
+
+
+def _trend(start: float, peak: float, n: int) -> float:
+    build_weeks = max(0, n) - max(0, n) // 4  # semanas leves não sobem
+    return min(peak, start * (1.08 ** build_weeks)) if peak >= start else peak
+
+
+def week_volume(sport: str, c: dict, level: str, week_idx: int, ws: date, recent: dict | None = None,
+                cap: float | None = None) -> dict:
+    """Volume da semana e fase. week_idx = semanas desde o início do plano (0 = primeira).
+
+    `cap` = teto semanal (sessões × tempo máximo no ritmo do atleta); entra antes da semana leve
+    e do polimento, para que eles continuem reduzindo de verdade.
+    """
+    cap = min(cap or 1e12, weekly_cap(sport, int(c.get("sessions") or VOLUME[sport]["sessions"])))
+    start, peak = min(_current(sport, c, level, recent), cap), min(_peak(sport, c, level), cap)
     g = c.get("goal") or {}
     race = _d(g.get("date")) if g.get("type") in ("prova", "evento") else None
+    n = max(0, week_idx)
     if race:
         weeks_to = (race - ws).days // 7
         taper = max(1, _taper(sport, c))
+        # polimento/prova/recuperação partem do volume realmente atingido antes do polimento
+        top = _trend(start, peak, n + weeks_to - taper - 1)
         if weeks_to < 0:
             rec = -weeks_to
-            return {"volume": peak * (0.45 if rec <= 1 else 0.6 if rec <= 2 else 0.7), "phase": "recuperacao",
-                    "weeks_to_race": weeks_to}
+            if rec <= 2:
+                return {"volume": top * (0.45 if rec == 1 else 0.6), "phase": "recuperacao", "weeks_to_race": weeks_to}
+            return {"volume": top * 0.75, "phase": "manutencao", "weeks_to_race": weeks_to}
         if weeks_to == 0:
-            return {"volume": peak * 0.4, "phase": "prova", "weeks_to_race": 0}
+            return {"volume": top * 0.4, "phase": "prova", "weeks_to_race": 0}
         if weeks_to <= taper:
-            frac = {1: 0.6, 2: 0.75, 3: 0.85}.get(weeks_to, 0.85) if taper > 1 else 0.6
-            return {"volume": peak * frac, "phase": "polimento", "weeks_to_race": weeks_to}
+            frac = {1: 0.55, 2: 0.7, 3: 0.8}.get(weeks_to, 0.8) if taper > 1 else 0.6
+            return {"volume": top * frac, "phase": "polimento", "weeks_to_race": weeks_to}
     # progressão: +8%/semana a partir do atual, semana leve a cada 4ª, teto no pico
-    n = max(0, week_idx)
-    build_weeks = n - n // 4  # semanas leves não sobem
-    trend = min(peak, start * (1.08 ** build_weeks)) if peak >= start else peak
+    trend = _trend(start, peak, n)
     deload = n % 4 == 3
     vol = trend * (0.75 if deload else 1.0)
     if race:
@@ -263,9 +308,19 @@ def _goal_pace(sport: str, c: dict) -> float | None:
     if not t or not g.get("distance"):
         return None
     if sport == "corrida":
-        return t / float(g["distance"])
+        vd = sp.vdot(float(g["distance"]), t)
+        return t / float(g["distance"]) if vd and 20 <= vd <= 85 else None  # meta impossível é ignorada
     if sport == "natacao":
-        return t / (float(g["distance"]) / 100)
+        pace = t / (float(g["distance"]) / 100)
+        return pace if 55 <= pace <= 240 else None
+    return None
+
+
+def goal_warning(sport: str, c: dict) -> str | None:
+    g = c.get("goal") or {}
+    if g.get("type") == "prova" and g.get("target") and sport in ("corrida", "natacao") and _goal_pace(sport, c) is None:
+        return (f"Tempo alvo de {sp.SPORTS[sport]['name'].lower()} ({g['target']} em {g.get('distance')}) fora do possível "
+                "para humanos ou mal digitado — ignorado; os treinos usam suas zonas.")
     return None
 
 
@@ -485,6 +540,8 @@ def _week_roles(sport: str, c: dict, level: str, week_idx: int, phase: str, n: i
         return (["ativacao"] if sport == "corrida" else ["leve"]) + ["regenerativo"] * (n - 2 if n > 2 else 0)
     if phase == "recuperacao":
         return ["regenerativo"] * n
+    if n == 1:  # uma sessão só na semana: contínua (sem teste nem tiros)
+        return ["longo"] if sport in LEG_SPORTS or sport == "caminhada" else ["leve"]
     roles = ["longo"] if n >= 2 or sport in ("trilha", "caminhada") else []
     rot = QUALITY_ROTATION.get(sport) or []
     n_quality = 0
@@ -517,49 +574,98 @@ def _week_roles(sport: str, c: dict, level: str, week_idx: int, phase: str, n: i
     return out[:n] if len(out) > n else out
 
 
-def _split_volume(sport: str, roles: list[str], vol: float, c: dict, level: str) -> list[float]:
-    n = len(roles)
-    if not n:
-        return []
-    mn = VOLUME[sport]["min"]
-    shares = {}
-    g = c.get("goal") or {}
-    if "longo" in roles:
-        long_v = vol * LONG_SHARE.get(min(n, 7), 0.22)
-        dist = float(g.get("distance") or 0)
-        if sport in LONG_CAP and (g.get("type") in ("prova", "evento") and dist):
-            cap = _lookup(LONG_CAP[sport], dist)
-            if sport == "natacao":
-                cap = max(cap, dist * 1.2)
-            long_v = min(long_v, cap)
-        shares["longo"] = max(mn, long_v)
+def _vol(it: dict) -> float:
+    e = it["endurance"]
+    u = VOLUME[e["sport"]]["unit"]
+    return (e.get("dist_m") or 0) / 1000 if u == "km" else (e.get("dist_m") or 0) if u == "m" else e["dur_s"] / 3600
+
+
+def _compose(sport: str, roles: list[str], vol: float, c: dict, anchors: dict, level: str, week_idx: int, phase: str) -> list[dict]:
+    """Monta as sessões da semana somando o volume planejado.
+
+    1) sessões fortes/teste com o tamanho real delas (aquecimento + trabalho + volta);
+       se a semana não comporta (forte + longo maior que ela + leves no mínimo), vira leve;
+    2) longo: fatia do volume, nunca menor que a sessão forte (pernas) e dentro dos tetos;
+    3) o que sobra vai para as leves (no mínimo da modalidade).
+    """
+    mn, mx = min_session(sport, anchors, c.get("env")), VOLUME[sport]["max"]
     q_share = QUALITY_SHARE.get(sport, 0.2)
-    out = []
-    used = sum(shares.values())
-    quality = [r for r in roles if r not in ("longo", "leve", "regenerativo", "ativacao")]
-    q_min = {"corrida": 5.0 if level == "iniciante" else 6.5, "ciclismo": 1.0, "natacao": 1500, "remo": 6000}.get(sport, mn)
-    q_vol = max(q_min, vol * q_share)
-    used += q_vol * len(quality)
-    easy_n = sum(1 for r in roles if r in ("leve", "regenerativo", "ativacao"))
-    easy_v = max(mn, (vol - used) / easy_n) if easy_n else 0
+    g = c.get("goal") or {}
+    special = ("ativacao", "prova")
+    roles = list(roles)
+    while True:
+        quality_roles = [r for r in roles if r not in ("longo", "leve", "regenerativo") + special]
+        q_target = {"corrida": 5.0 if level == "iniciante" else 6.5, "ciclismo": 1.0, "natacao": 1500, "remo": 6000}.get(sport, mn)
+        q_target = max(q_target, vol * q_share)
+        q_items = [build_session(sport, r, _round_vol(sport, q_target), c, anchors, level, week_idx, phase) for r in quality_roles]
+        q_built = sum(_vol(x) for x in q_items)
+        n_long = roles.count("longo")
+        n_easy = sum(1 for r in roles if r in ("leve", "regenerativo") + special)
+        long_floor = max([mn] + ([max(_vol(x) for x in q_items)] if q_items and sport in LEG_SPORTS else []))
+        need = q_built + n_long * long_floor + n_easy * mn
+        if quality_roles and need > vol * 1.15:
+            # não cabe: a forte (ou o teste) vira leve nesta semana
+            i = max(i for i, r in enumerate(roles) if r in quality_roles)
+            roles[i] = "leve"
+            continue
+        break
+    long_v = 0.0
+    if n_long:
+        long_v = vol * LONG_SHARE.get(min(len(roles), 7), 0.22)
+        dist = float(g.get("distance") or 0)
+        if sport in LONG_CAP and g.get("type") in ("prova", "evento") and dist:
+            cap = _lookup(LONG_CAP[sport], dist)
+            long_v = min(long_v, max(cap, dist * 1.2) if sport == "natacao" else cap)
+        long_v = min(mx, max(long_floor, long_v))
+        long_v = min(long_v, max(long_floor, vol - q_built - n_easy * mn))
+        if not n_easy:  # sem sessões leves: o longo leva o que sobra
+            long_v = min(mx, max(long_floor, vol - q_built))
+    # teto por tempo (ritmo do atleta): natação lenta não vira 3 h de piscina
+    unit = VOLUME[sport]["unit"]
+    v2 = sp.speed_mps(sport, 2, anchors, c.get("env"))
+    t_cap = MAX_SESSION_MIN[sport] * 60
+    time_cap = t_cap / 3600 if unit == "h" else t_cap * v2 / (1000 if unit == "km" else 1)
+    mx = min(mx, time_cap)
+    long_cap_bind = False
+    if n_long:
+        before = long_v
+        long_v = min(long_v, mx)
+        long_cap_bind = long_v < before or (g.get("type") in ("prova", "evento") and g.get("distance"))
+    easy_v = max(mn, (vol - q_built - long_v) / n_easy) if n_easy else 0
+    if n_easy and easy_v > long_v and n_long and sport in LEG_SPORTS:
+        tot = vol - q_built
+        new_long = min(mx, max(long_v, tot / (n_easy + 1) * 1.15))
+        if long_cap_bind and new_long > long_v:
+            easy_v = max(mn, long_v * 0.9)  # o longo está no teto da prova: as leves não passam dele
+        else:
+            long_v = new_long
+            easy_v = max(mn, (tot - long_v) / n_easy)
+    easy_v = min(easy_v, mx, long_v if (n_long and sport in LEG_SPORTS) else mx)
+    out, qi = [], iter(q_items)
     for r in roles:
-        out.append(shares["longo"] if r == "longo" else q_vol if r in quality and r != "ativacao" else easy_v)
+        if r == "longo":
+            out.append(build_session(sport, "longo", _round_vol(sport, long_v), c, anchors, level, week_idx, phase))
+        elif r in ("leve", "regenerativo") + special:
+            out.append(build_session(sport, r, _round_vol(sport, easy_v), c, anchors, level, week_idx, phase))
+        else:
+            out.append(next(qi))
     return out
 
 
 def _round_vol(sport: str, v: float) -> float:
     unit = VOLUME[sport]["unit"]
     if unit == "km":
-        return round(v * 2) / 2
+        return round(v * 2) / 2 if v >= 10 else round(v * 4) / 4
     if unit == "h":
-        return round(v * 4) / 4
+        return round(v * 12) / 12  # 5 min
     return int(round(v / 100) * 100)
 
 
 def week_plan(profile: dict, ws: date, start: date, tier_key: str = "intermediario",
-              recent: dict | None = None, today: date | None = None) -> dict:
+              recent: dict | None = None, today: date | None = None, sessions_override: dict | None = None,
+              full_slots: bool = False, max_hard: int | None = None) -> dict:
     """Todas as sessões de resistência da semana, por modalidade (sem dia definido)."""
-    cfg = config(profile)
+    cfg = config(profile, sessions_override)
     level = _level(tier_key)
     anchors = sp.anchors_of(profile)
     week_idx = max(0, (ws - start).days // 7)
@@ -567,7 +673,9 @@ def week_plan(profile: dict, ws: date, start: date, tier_key: str = "intermediar
     out = {}
     test_slot_used = False
     for sport, c in cfg.items():
-        wv = week_volume(sport, c, level, week_idx, ws, recent)
+        n_cfg = int(c["sessions"])
+        t_cap = session_max(sport, anchors, c.get("env")) * (1 if n_cfg <= 1 else (0.55 + 0.45 * (n_cfg - 1)) * 0.9)
+        wv = week_volume(sport, c, level, week_idx, ws, recent, cap=t_cap)
         n = int(c["sessions"])
         test_due = False
         if end_cfg.get("tests", True) and sport in ANCHOR_KEY and not test_slot_used:
@@ -579,23 +687,24 @@ def week_plan(profile: dict, ws: date, start: date, tier_key: str = "intermediar
             test_due = (missing and week_idx in (0, 1)) or stale
             if test_due:
                 test_slot_used = True
-        roles = _week_roles(sport, c, level, week_idx, wv["phase"], n, test_due)
-        vols = _split_volume(sport, roles, wv["volume"], c, level)
-        sessions = []
-        for r, v in zip(roles, vols):
-            s = build_session(sport, r, _round_vol(sport, v), c, anchors, level, week_idx, wv["phase"])
-            s["endurance"]["role"] = "longo" if r == "longo" else ("qualidade" if s["endurance"]["hard"] else "leve")
-            sessions.append(s)
+        mn = min_session(sport, anchors, c.get("env"))
+        n_week = n if full_slots else min(n, max(1, int(wv["volume"] // (mn * 1.1)) or 1))
+        roles = _week_roles(sport, c, level, week_idx, wv["phase"], n_week, test_due)
+        sessions = _compose(sport, roles, wv["volume"], c, anchors, level, week_idx, wv["phase"])
+        for r, s in zip(roles, sessions):
+            s["endurance"]["role"] = "longo" if s["endurance"]["type"] == "longo" else ("qualidade" if s["endurance"]["hard"] else "leve")
         out[sport] = {"volume": _round_vol(sport, wv["volume"]), "unit": VOLUME[sport]["unit"], "phase": wv["phase"],
                       "phase_pt": PHASE_PT.get(wv["phase"], wv["phase"]), "weeks_to_race": wv.get("weeks_to_race"),
                       "sessions": sessions}
-    _cap_hard(out, level, anchors)
+    _cap_hard(out, level, anchors, max_hard)
     return {"week_idx": week_idx, "sports": out, "bricks": _bricks(profile, out, week_idx)}
 
 
-def _cap_hard(out: dict, level: str, anchors: dict) -> None:
-    """No máximo 3 sessões fortes na semana (2 para iniciante): o resto vira leve."""
+def _cap_hard(out: dict, level: str, anchors: dict, max_hard: int | None = None) -> None:
+    """No máximo 3 sessões fortes na semana (2 para iniciante, menos com poucos dias livres): o resto vira leve."""
     cap = 2 if level == "iniciante" else 3
+    if max_hard is not None:
+        cap = max(0, min(cap, max_hard))
     hard = [(s, i) for s, d in out.items() for i, x in enumerate(d["sessions"]) if x["endurance"]["hard"]
             and x["endurance"]["type"] != "teste"]
     goal_first = sorted(hard, key=lambda t: 0 if t[0] == "corrida" else 1)
@@ -606,7 +715,7 @@ def _cap_hard(out: dict, level: str, anchors: dict) -> None:
         c = {"env": old["endurance"]["env"]}
         new = build_session(s, "leve", _round_vol(s, vol), c, anchors, level)
         new["endurance"]["role"] = "leve"
-        new["endurance"]["note"] = "Era sessão forte: virou leve para não passar de 3 intensas na semana"
+        new["endurance"]["note"] = "Era sessão forte: virou leve para não acumular sessões intensas demais na semana"
         out[s]["sessions"][i] = new
 
 
@@ -663,12 +772,15 @@ def allocate(slots: list[dict], avail: list[int], n_strength: int, long_day_pref
     # 2) qualidade: longe dos longos e de outras qualidades
     for s in [x for x in slots if x["role"] == "qualidade"]:
         def score(d):
-            if any(o["role"] in ("longo", "qualidade") for o in day_load[d]):
-                return -100
+            load = day_load[d]
+            if any(o["role"] in ("longo", "qualidade") for o in load) or len(load) >= 2:
+                return -100 - 10 * len(load) - sum(5 for o in load if o["role"] == "qualidade")
             near_long = min((dist(d, l) for l in longs), default=7)
             near_q = min((dist(d, placed[k]) for k in placed if any(x["key"] == k and x["role"] == "qualidade" for x in slots)), default=7)
             before_long = any((d + 1) % 7 == l for l in longs)
-            return min(near_long, 3) * 2 + min(near_q, 3) - (3 if before_long else 0) - len(day_load[d])
+            after_long = any((d - 1) % 7 == l for l in longs)
+            return (min(near_long, 3) * 2 + min(near_q, 3) * 2 - (4 if near_q == 1 else 0) - (3 if before_long else 0)
+                    - (2 if after_long else 0) - len(load))
         day = max(avail, key=score)
         day_load[day].append(s)
         placed[s["key"]] = day
@@ -692,13 +804,16 @@ def allocate(slots: list[dict], avail: list[int], n_strength: int, long_day_pref
     strength.sort()
     # 4) leves: dia livre (sem força nem resistência) → dia de força sem perna pesada → menos carregado
     doubles = []
+    def n_on(d):
+        return len(day_load[d]) + (1 if d in strength else 0)
+
     for s in [x for x in slots if not is_long(x) and x["role"] != "qualidade"]:
         empty = [d for d in avail if not day_load[d] and d not in strength]
         if empty:
             day = max(empty, key=lambda d: min((dist(d, l) for l in hard_leg_days), default=7))
         else:
             def sc(d):
-                return (len(day_load[d]) + (1 if d in strength else 0)
+                return (100 * max(0, n_on(d) - 1) + len(day_load[d]) + (1 if d in strength else 0)
                         + (1 if any(o["role"] == "qualidade" or is_long(o) for o in day_load[d]) else 0)
                         + (2 if s["sport"] in LEG_SPORTS and d in hard_leg_days else 0)
                         + (1 if any(o["sport"] == s["sport"] for o in day_load[d]) else 0))
