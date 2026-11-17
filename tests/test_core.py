@@ -87,6 +87,7 @@ def test_template_swaps_avoided_exercises():
 # ---------------------------------------------------------------- análise
 def test_weekly_report_detects_imbalance_and_neglect():
     sessions = [
+        sess(15, [st("Barbell_Bench_Press_-_Medium_Grip", 3)]),  # já usa o app há mais de 10 dias
         sess(1, [st("Barbell_Bench_Press_-_Medium_Grip", 4), st("Incline_Dumbbell_Press", 4), st("Triceps_Pushdown", 4)]),
         sess(3, [st("Barbell_Squat", 4), st("Leg_Extensions", 4)]),
         sess(4, [{"exercise_id": "cardio_esteira_caminhada", "duration_min": 40, "zone": 2}]),
@@ -193,3 +194,36 @@ def test_csv_roundtrip():
     assert len(res["unmatched"]) == 1
     again = plans_io.import_csv(plans_io.export_csv(plan))
     assert again["plan"]["days"] == plan["days"]
+
+
+# ------------------------------------------------- regressões da simulação da análise semanal ---
+def _warns(r):
+    return [x for x in r["recommendations"] if x["level"] in ("atencao", "alerta")]
+
+
+def test_weekly_no_false_alarms_new_user_deload_watch_and_plan():
+    one = [sess(1, [st("Barbell_Bench_Press_-_Medium_Grip", 4)])]
+    r = analysis.weekly_report(one, {}, NOW)
+    assert not _warns(r) and any("10 dias" in x["text"] for x in r["recommendations"])  # 1º treino: nada de "esquecido"
+    hist = [sess(20, [st("Barbell_Squat", 3)])] + [sess(2, [st("Barbell_Bench_Press_-_Medium_Grip", 2)])]
+    r = analysis.weekly_report(hist, {}, NOW, deload=True)
+    assert not [x for x in _warns(r) if "mínimo" in x["text"] or "esquecido" in x["text"]]
+    watch = [sess(20, [st("Barbell_Squat", 3)]), sess(2, [{"exercise_id": "Garmin_musculacao", "strength_min": 50, "duration_min": 50}])]
+    r = analysis.weekly_report(watch, {}, NOW)
+    assert not [x for x in _warns(r) if x.get("muscle")] and any("relógio" in x["text"] for x in r["recommendations"])
+    # quem cumpre o que o plano prevê (objetivo saúde, menos volume) não recebe "abaixo do mínimo"
+    plan_week = [sess(20, [st("Barbell_Squat", 3)]), sess(2, [st("Barbell_Bench_Press_-_Medium_Grip", 3)])]
+    r = analysis.weekly_report(plan_week, {}, NOW, expected={"chest": 3, "triceps": 1.5, "shoulders": 1.5})
+    assert not [x for x in _warns(r) if x.get("muscle") == "chest"]
+
+
+def test_weekly_runner_context_tiny_volume_and_number_format():
+    runs = [sess(k, [{"exercise_id": "corrida_rua", "sport": "corrida", "distance_km": 12, "duration_min": 65}]) for k in (1, 3, 5)]
+    upper = [sess(20, [st("Barbell_Squat", 3)]), sess(2, [st("Barbell_Bench_Press_-_Medium_Grip", 4), st("Bent_Over_Barbell_Row", 4)])]
+    r = analysis.weekly_report(runs + upper, {}, NOW)
+    legs = [x for x in r["recommendations"] if x.get("muscle") in ("quadriceps", "hamstrings", "glutes")]
+    assert legs and all(x["level"] == "dica" and "corrida" in x["text"] for x in legs)
+    tiny = [sess(20, [st("Barbell_Squat", 3)]), sess(2, [st("Bent_Over_Barbell_Row", 2)])]
+    bal = {b["id"]: b for b in analysis.weekly_report(tiny, {}, NOW)["balance"]}
+    assert bal["push_pull"]["status"] == "sem_dados"  # 2 séries não dão para julgar equilíbrio
+    assert analysis._n(7.0) == "7" and analysis._n(0.45) == "0,5"

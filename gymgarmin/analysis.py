@@ -276,7 +276,19 @@ def suggest_for_muscle(muscle: str, user_limitations: list[dict], exclude: set[s
     return (buckets[0] + buckets[1] + buckets[2])[:n]
 
 
-def weekly_report(sessions: list[dict], profile: dict | None = None, now: datetime | None = None) -> dict:
+def _n(v) -> str:
+    """Número em pt-BR sem casas inúteis: 7.0 → "7", 0.4 → "0,4"."""
+    v = round(float(v), 1)
+    return (f"{v:.0f}" if v == int(v) else f"{v:.1f}").replace(".", ",")
+
+
+LEG_SPORTS = {"corrida", "ciclismo", "caminhada", "trilha", "remo"}
+
+
+def weekly_report(sessions: list[dict], profile: dict | None = None, now: datetime | None = None,
+                  expected: dict[str, float] | None = None, deload: bool = False) -> dict:
+    """`expected` = séries/semana que o PLANO prevê por músculo (o objetivo saúde prevê menos que hipertrofia):
+    quem cumpre o plano não recebe aviso de "abaixo do mínimo". `deload` = semana leve do ciclo."""
     now = now or clock.now()
     end = now
     start7 = now - timedelta(days=7)
@@ -309,31 +321,74 @@ def weekly_report(sessions: list[dict], profile: dict | None = None, now: dateti
     bal = balance(vol7)
     cardio = cardio_summary(sessions, start7, end, profile)
 
+    # contexto que muda a leitura: começo de uso, treino do relógio sem séries, corrida/pedal treinando as pernas
+    dated = [_to_dt(s["date"]) for s in sessions]
+    first = min(dated) if dated else None
+    new_user = first is not None and (now - first).days < 10
+    week = [s for s in sessions if start7 <= _to_dt(s["date"]) <= end]
+    no_sets = sum(1 for s in week if any(it.get("strength_min") or it.get("exercise_id") == "Garmin_musculacao"
+                                         for it in s.get("items", [])) and not any(_hard_sets(it) for it in s.get("items", [])))
+    with_sets = sum(1 for s in week if any(_hard_sets(it) for it in s.get("items", []) if (catalog.get(it.get("exercise_id")) or {}).get("kind") == "strength"))
+    from .load import sport_of
+    leg_min = sum(float(it.get("duration_min") or 0) for s in week for it in s.get("items", []) if sport_of(it) in LEG_SPORTS)
+
     recs: list[dict] = []
     trained_ids = {it.get("exercise_id") for s in sessions for it in s.get("items", [])}
     for mm in muscles:
         if mm["muscle"] == "neck":
             continue
+        exp = (expected or {}).get(mm["muscle"])
+        # quem cumpre o que o plano prevê (≥ 85%) não está "abaixo": o objetivo pede menos volume
+        on_plan = exp is not None and mm["sets_7d"] >= 0.85 * exp
+        if mm["status"] in ("esquecido", "abaixo") and (deload or new_user or on_plan or (no_sets and no_sets >= with_sets)):
+            continue
+        if mm["status"] == "esquecido" and exp is not None and exp < 1:
+            continue  # o plano não trabalha esse músculo (limitação ou objetivo)
         if mm["status"] == "esquecido":
             recs.append({"level": "alerta", "muscle": mm["muscle"],
                          "text": f"{mm['pt']} está esquecido" + (f" (último estímulo há {round(mm['days_since'])} dias)." if mm["days_since"] else " (nenhum registro)."),
                          "suggestions": suggest_for_muscle(mm["muscle"], lims, trained_ids)})
         elif mm["status"] == "abaixo" and MUSCLES[mm["muscle"]]["size"] != "pequeno":
-            falta = round(mm["landmarks"]["mev"] - mm["sets_7d"], 1)
+            goal = min(mm["landmarks"]["mev"], exp) if exp else mm["landmarks"]["mev"]
+            falta = max(0.5, goal - mm["sets_7d"])
+            ref = "o que o seu plano prevê" if exp and exp < mm["landmarks"]["mev"] else "o mínimo efetivo"
             recs.append({"level": "atencao", "muscle": mm["muscle"],
-                         "text": f"{mm['pt']}: {mm['sets_7d']} séries na semana — faltam ~{falta} para o mínimo efetivo.",
+                         "text": f"{mm['pt']}: {_n(mm['sets_7d'])} {'série' if mm['sets_7d'] == 1 else 'séries'} na semana — faltam ~{_n(falta)} para {ref}.",
                          "suggestions": suggest_for_muscle(mm["muscle"], lims, trained_ids)})
         elif mm["status"] == "excesso":
             recs.append({"level": "alerta", "muscle": mm["muscle"],
-                         "text": f"{mm['pt']}: {mm['sets_7d']} séries — acima do volume recuperável (~{mm['landmarks']['mrv']}). Considere reduzir ou fazer um deload.",
+                         "text": f"{mm['pt']}: {_n(mm['sets_7d'])} séries — acima do volume recuperável (~{_n(mm['landmarks']['mrv'])}). Considere reduzir ou fazer um deload.",
                          "suggestions": []})
         if mm["frequency_7d"] == 1 and mm["sets_7d"] >= 10:
             recs.append({"level": "dica", "muscle": mm["muscle"],
                          "text": f"{mm['pt']}: todo o volume em uma só sessão. Dividir em 2× por semana tende a render mais.",
                          "suggestions": []})
+    # corrida/pedal: perna treinada de forma aeróbia — o aviso de força de perna vira dica, com o contexto
+    if leg_min >= 90:
+        for r in recs:
+            if r.get("muscle") in ("quadriceps", "hamstrings", "glutes", "calves", "adductors", "abductors") and "recuperável" not in r["text"]:
+                r["level"] = "dica"
+                r["text"] += f" A corrida/pedal ({round(leg_min)} min na semana) treina as pernas de forma aeróbia; 1–2 exercícios de força de perna ainda ajudam a prevenir lesão."
+    if no_sets:
+        recs.append({"level": "dica", "muscle": None, "suggestions": [],
+                     "text": f"{no_sets} treino{'s' if no_sets > 1 else ''} de musculação veio do relógio sem as séries: a análise por músculo "
+                             "fica incompleta. Registre no app (Treinar) ou deixe o relógio contar as séries para ver tudo."})
+    if deload:
+        recs.insert(0, {"level": "dica", "muscle": None, "suggestions": [],
+                        "text": "Semana de deload: volume baixo é o plano — o corpo assimila o ciclo e volta mais forte na próxima."})
+    if new_user and sessions:
+        recs.append({"level": "dica", "muscle": None, "suggestions": [],
+                     "text": "Primeiros dias de registro: músculos esquecidos e equilíbrio aparecem depois de ~10 dias de treinos."})
     for b in bal:
-        if b["status"] == "baixo":
-            recs.append({"level": "atencao", "muscle": None, "text": b["message"], "suggestions": []})
+        if b["status"] in ("baixo", "alto") and (b["a"] + b["b"]) < 8:
+            b["status"], b["message"] = "sem_dados", "Pouco volume na semana para comparar."
+        if b["status"] == "baixo" and not new_user and not deload:
+            if b["id"] == "lower_upper" and leg_min >= 90:
+                recs.append({"level": "dica", "muscle": None, "suggestions": [],
+                             "text": b["message"] + f" Com {round(leg_min)} min de corrida/pedal na semana as pernas não estão paradas — "
+                                                    "mas 1–2 exercícios de força de perna ajudam a prevenir lesão."})
+            else:
+                recs.append({"level": "atencao", "muscle": None, "text": b["message"], "suggestions": []})
     if cardio["who_equivalent"] < 150:
         recs.append({"level": "dica", "muscle": None, "text": "Cardio: " + cardio["message"], "suggestions": []})
     mz = max_zone(lims)
@@ -383,8 +438,8 @@ def plan_report(plan: dict, profile: dict | None = None) -> dict:
             if ex["kind"] == "cardio":
                 cardio_min[int(it.get("zone") or 2)] += float(it.get("duration_min") or 0) * rotation
                 continue
-            if ex["kind"] == "stretching":
-                continue
+            if ex["kind"] == "stretching" or (it.get("phase") or "principal") != "principal":
+                continue  # aquecimento/mobilidade não é volume de treino (e não é registrado como série)
             n = int(it.get("sets") or 0) * rotation
             for m in ex["primaryMuscles"]:
                 if m in vol:

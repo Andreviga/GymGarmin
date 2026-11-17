@@ -364,7 +364,15 @@ def history_exercise(exercise_id: str):
 @app.get("/api/report/weekly")
 def weekly(date: str | None = None):
     now = datetime.fromisoformat(date) if date else clock.now()
-    return analysis.weekly_report(db.list_sessions(limit=1000), _profile(), now)
+    prof = _profile()
+    expected, deload = None, False
+    plan = schedule.schedule_plan(prof)
+    if plan:  # o que o plano prevê por músculo e se é semana de deload
+        expected = {m["muscle"]: m["sets_week"] for m in analysis.plan_report(plan, prof)["muscles"]}
+        gen = plan.get("generator") or {}
+        deload = progression.cycle_position(gen.get("cycle_start") or plan.get("created_at"),
+                                            schedule.week_start(now.date()), gen.get("cycle_weeks") or 5)["deload"]
+    return analysis.weekly_report(db.list_sessions(limit=1000), prof, now, expected=expected, deload=deload)
 
 
 # -------------------------------------------------------------- Garmin ----
