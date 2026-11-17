@@ -168,14 +168,14 @@ def balance(vol: dict[str, dict]) -> list[dict]:
     checks = [
         {
             "id": "push_pull", "label": "Puxar ÷ Empurrar (membros superiores)",
-            "a": round(pull, 1), "b": round(push, 1), "ratio": _ratio(pull, push), "ideal": (1.0, 1.5),
+            "a": round(pull, 1), "b": round(push, 1), "ratio": _ratio(pull, push), "ideal": (0.9, 1.6),
             "low_msg": "Você empurra mais do que puxa — risco para postura e saúde do ombro. Adicione remadas/puxadas.",
             "high_msg": "Volume de puxar bem acima do de empurrar. Ok se intencional; senão equilibre com supinos/desenvolvimentos.",
         },
         {
             "id": "ham_quad", "label": "Posteriores ÷ Quadríceps",
             "a": round(s["hamstrings"], 1), "b": round(s["quadriceps"], 1), "ratio": _ratio(s["hamstrings"], s["quadriceps"]),
-            "ideal": (0.6, 1.2),
+            "ideal": (0.6, 1.6),
             "low_msg": "Posteriores de coxa pouco treinados em relação ao quadríceps (fator de risco para lesão de joelho/isquiotibiais). Inclua flexora, stiff ou RDL.",
             "high_msg": "Posteriores acima do quadríceps. Verifique se o quadríceps não está esquecido.",
         },

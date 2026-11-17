@@ -92,3 +92,14 @@ def test_generator_and_agenda_flow(client):
         assert r["changes"]
         assert client.post(f"/api/schedule/{e['id']}/undo").status_code == 200
     assert client.post("/api/schedule/push-week", json={}).status_code in (200, 401)
+
+
+def test_backup_roundtrip(client):
+    client.put("/api/profile", json={"name": "Teste", "age": 30})
+    client.post("/api/plans", json={"template": "fullbody"})
+    b = client.get("/api/backup").json()
+    assert b["version"] == 1 and b["plans"]
+    client.put("/api/profile", json={"name": "Outro"})
+    r = client.post("/api/backup", json=b).json()
+    assert r["plans"] == len(b["plans"])
+    assert client.get("/api/profile").json()["name"] == "Teste"

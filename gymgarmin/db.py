@@ -93,13 +93,27 @@ DEFAULT_PROFILE = {
 }
 
 
+def home_dir() -> Path:
+    """Pasta de dados: $GYMGARMIN_HOME, /tmp no Vercel (único lugar gravável) ou ~/.gymgarmin."""
+    env = os.environ.get("GYMGARMIN_HOME")
+    if env:
+        p = Path(env)
+    elif os.environ.get("VERCEL"):
+        p = Path("/tmp/gymgarmin")
+    else:
+        p = Path.home() / ".gymgarmin"
+    p.mkdir(parents=True, exist_ok=True)
+    return p
+
+
 def db_path() -> Path:
     env = os.environ.get("GYMGARMIN_DB")
     if env:
         return Path(env)
-    home = Path(os.environ.get("GYMGARMIN_HOME", Path.home() / ".gymgarmin"))
-    home.mkdir(parents=True, exist_ok=True)
-    return home / "gymgarmin.sqlite3"
+    return home_dir() / "gymgarmin.sqlite3"
+
+
+_ready: set[str] = set()
 
 
 def now() -> str:
@@ -108,7 +122,11 @@ def now() -> str:
 
 @contextmanager
 def conn():
-    c = sqlite3.connect(db_path())
+    path = db_path()
+    if str(path) not in _ready:
+        _ready.add(str(path))
+        init()
+    c = sqlite3.connect(path)
     c.row_factory = sqlite3.Row
     try:
         yield c
@@ -118,6 +136,7 @@ def conn():
 
 
 def init() -> None:
+    _ready.add(str(db_path()))
     with conn() as c:
         c.executescript(SCHEMA)
         if not c.execute("SELECT 1 FROM users WHERE id = 1").fetchone():
@@ -320,3 +339,32 @@ def save_entry(e: dict, user_id: int = 1) -> dict:
 def delete_entry(entry_id: int, user_id: int = 1) -> None:
     with conn() as c:
         c.execute("DELETE FROM schedule WHERE id = ? AND user_id = ?", (entry_id, user_id))
+
+
+# ---- backup ------------------------------------------------------------------
+
+BACKUP_TABLES = ("users", "plans", "sessions", "schedule", "garmin_override")
+
+
+def export_all() -> dict:
+    out = {"version": 1, "exported_at": now()}
+    with conn() as c:
+        for t in BACKUP_TABLES:
+            out[t] = [dict(r) for r in c.execute(f"SELECT * FROM {t}").fetchall()]
+    return out
+
+
+def import_all(data: dict) -> dict:
+    counts = {}
+    with conn() as c:
+        for t in BACKUP_TABLES:
+            rows = data.get(t)
+            if rows is None:
+                continue
+            c.execute(f"DELETE FROM {t}")
+            for r in rows:
+                cols = list(r.keys())
+                c.execute(f"INSERT INTO {t} ({', '.join(cols)}) VALUES ({', '.join('?' for _ in cols)})",
+                          [r[k] for k in cols])
+            counts[t] = len(rows)
+    return counts

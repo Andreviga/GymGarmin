@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
@@ -55,6 +56,7 @@ def meta():
         "hr_max": fc,
         "equipment": [{"key": k, "pt": v} for k, v in EQUIPMENT_PT.items() if k],
         "templates": templates.list_templates(),
+        "ephemeral_storage": bool(os.environ.get("VERCEL")) and not os.environ.get("GYMGARMIN_DB"),
     }
 
 
@@ -565,6 +567,21 @@ def schedule_push_week(body: dict = Body(default={})):
     entries = [e for e in db.list_schedule(today.isoformat(), (ws + timedelta(days=6)).isoformat())
                if e["status"] == "planejado" and (not only_outdated or e.get("garmin_outdated") or not e.get("garmin_workout_id"))]
     return _garmin_call(lambda: [{"date": e["date"], **_push_entry(e)} for e in entries])
+
+
+# --------------------------------------------------------------- backup ----
+
+@app.get("/api/backup")
+def backup():
+    fname = f"gymgarmin-backup-{date.today().isoformat()}.json"
+    return JSONResponse(db.export_all(), headers={"Content-Disposition": f'attachment; filename="{fname}"'})
+
+
+@app.post("/api/backup")
+def restore(body: dict = Body(...)):
+    if body.get("version") != 1:
+        raise HTTPException(400, "Arquivo de backup inválido")
+    return db.import_all(body)
 
 
 # ------------------------------------------------------------- estático ----

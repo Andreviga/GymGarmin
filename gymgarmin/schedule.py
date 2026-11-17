@@ -242,7 +242,7 @@ def handle_missed(entry_id: int, profile: dict, today: date | None = None) -> di
     entries = db.list_schedule(ws.isoformat(), (ws + timedelta(days=6)).isoformat())
     snapshot = [copy.deepcopy(e) for e in entries if e["id"] != missed["id"]]
     plan = db.get_plan(missed["plan_id"]) if missed.get("plan_id") else None
-    budget = session_budget(profile, plan) * 1.10
+    budget = session_budget(profile, plan) * 1.15  # compensação pode alongar um pouco a sessão
     changes: list[str] = []
     unrecovered: list[str] = []
     created: list[int] = []
@@ -357,10 +357,37 @@ def handle_missed(entry_id: int, profile: dict, today: date | None = None) -> di
                                 done = True
                                 break
                 if not done:
+                    # troca: tira 1 série de um músculo que está sobrando na semana para abrir espaço
+                    for e in sorted(strength_future, key=lambda x: _minutes(x)):
+                        tgt = next((it for it in _strength_items(e) if m in catalog.get(it["exercise_id"])["primaryMuscles"]
+                                    and it.get("added", 0) < 2 and it["sets"] < 6), None)
+                        if not tgt:
+                            continue
+                        donor = next((it for it in sorted(_strength_items(e), key=lambda x: -x["sets"])
+                                      if it is not tgt and it.get("role") in ("acc", "sec") and it["sets"] > 2
+                                      and m not in catalog.get(it["exercise_id"])["primaryMuscles"]
+                                      and all(projected[x] - 1 >= targets.get(x, 0)
+                                              for x in catalog.get(it["exercise_id"])["primaryMuscles"])), None)
+                        if not donor:
+                            continue
+                        donor["sets"] -= 1
+                        if _minutes(e) + _set_minutes(tgt) <= budget:
+                            for x in catalog.get(donor["exercise_id"])["primaryMuscles"]:
+                                projected[x] -= 1
+                            tgt["sets"] += 1
+                            tgt["added"] = tgt.get("added", 0) + 1
+                            _note(e, f"−1 série em {catalog.get(donor['exercise_id'])['name']} (volume já sobrando) → "
+                                     f"+1 em {catalog.get(tgt['exercise_id'])['name']}")
+                            need -= 1
+                            placed += 1
+                            done = True
+                            break
+                        donor["sets"] += 1
+                if not done:
                     break
             if placed:
                 changes.append(f"{muscle_pt(m)}: {placed} séries redistribuídas na semana.")
-            if need > 0:
+            if need >= 2:
                 unrecovered.append(f"{muscle_pt(m)} ({need} séries)")
         if not deficits:
             changes.append("O volume da semana continua dentro do alvo sem esse treino — nada precisou ser compensado.")
@@ -370,12 +397,12 @@ def handle_missed(entry_id: int, profile: dict, today: date | None = None) -> di
         lost = _cardio_equiv([{"items": _cardio_items(missed)}])
         machine = next((i["exercise_id"] for i in _cardio_items(missed)), "cardio_bike_vertical")
         left = _place_cardio(lost, [x for x in future if x["status"] == "planejado"], missed["day_name"], budget, machine, changes)
-        if left >= 5:
+        if left >= 10:
             unrecovered.append(f"cardio (~{int(left)} min)")
     if moved_cardio_left >= 5:
         left = _place_cardio(moved_cardio_left, [x for x in future if x["status"] == "planejado" and x["id"] not in created],
                              "cardio substituído", budget, moved_cardio_machine, changes)
-        if left >= 5:
+        if left >= 10:
             unrecovered.append(f"cardio (~{int(left)} min)")
 
     for e in others:

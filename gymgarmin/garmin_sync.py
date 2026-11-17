@@ -31,9 +31,9 @@ _pending_mfa: dict[str, Any] = {}
 
 
 def home_dir() -> Path:
-    p = Path(os.environ.get("GYMGARMIN_HOME", Path.home() / ".gymgarmin"))
-    p.mkdir(parents=True, exist_ok=True)
-    return p
+    from .db import home_dir as _home
+
+    return _home()
 
 
 def token_dir() -> Path:

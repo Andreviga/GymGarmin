@@ -82,6 +82,10 @@ GOALS = {
                 "cardio_target": 240, "hiit": 1, "finisher": True, "hybrid": True},
 }
 
+# fração de cada treino de força reservada ao cardio quando os dias de cardio não bastam
+CARDIO_SHARE = {"hipertrofia": 0.1, "forca": 0.05, "emagrecimento": 0.3, "condicionamento": 0.35, "saude": 0.25,
+                "hibrido": 0.25}
+
 # ---------------------------------------------------- padrões de movimento ---
 PATTERNS = {
     "squat": ["Barbell_Squat", "Hack_Squat", "Leg_Press", "Smith_Machine_Squat", "Goblet_Squat", "Front_Barbell_Squat", "Dumbbell_Squat"],
@@ -111,7 +115,7 @@ DAY_TEMPLATES = {
     "FB_B": ("Full body B", [("hinge", "main"), ("v_pull", "main"), ("incline_push", "main"), ("single_leg", "sec"), ("rear_delt", "acc"), ("triceps", "acc"), ("calf", "acc")]),
     "FB_C": ("Full body C", [("squat", "main"), ("v_push", "main"), ("h_pull", "main"), ("leg_curl", "sec"), ("chest_fly", "acc"), ("glute", "acc"), ("core", "acc")]),
     "UP_A": ("Superior A", [("h_push", "main"), ("v_pull", "main"), ("v_push", "sec"), ("h_pull", "sec"), ("lateral", "acc"), ("biceps", "acc"), ("triceps", "acc")]),
-    "UP_B": ("Superior B", [("incline_push", "main"), ("h_pull", "main"), ("v_pull", "sec"), ("chest_fly", "acc"), ("rear_delt", "acc"), ("triceps", "acc"), ("biceps", "acc")]),
+    "UP_B": ("Superior B", [("incline_push", "main"), ("h_pull", "main"), ("v_pull", "sec"), ("chest_fly", "acc"), ("rear_delt", "acc"), ("triceps", "acc"), ("biceps", "acc"), ("core", "acc")]),
     "LO_A": ("Inferior A", [("squat", "main"), ("hinge", "sec"), ("single_leg", "sec"), ("leg_curl", "acc"), ("calf", "acc"), ("adductor", "acc"), ("core", "acc")]),
     "LO_B": ("Inferior B", [("hinge", "main"), ("squat", "sec"), ("leg_ext", "acc"), ("leg_curl", "acc"), ("glute", "acc"), ("calf", "acc"), ("core", "acc")]),
     "PUSH": ("Empurrar", [("h_push", "main"), ("incline_push", "sec"), ("v_push", "sec"), ("lateral", "acc"), ("chest_fly", "acc"), ("triceps", "acc"), ("triceps", "acc")]),
@@ -272,6 +276,54 @@ class _Picker:
         return choice
 
 
+PATTERN_MUSCLES = {
+    "squat": ["quadriceps", "glutes"], "hinge": ["hamstrings", "glutes"], "single_leg": ["quadriceps", "glutes"],
+    "leg_curl": ["hamstrings"], "leg_ext": ["quadriceps"], "glute": ["glutes"], "calf": ["calves"], "adductor": ["adductors"],
+    "h_push": ["chest"], "incline_push": ["chest"], "chest_fly": ["chest"], "v_push": ["shoulders"],
+    "lateral": ["shoulders"], "rear_delt": ["shoulders"], "v_pull": ["lats"], "h_pull": ["middle back", "lats"],
+    "traps": ["traps"], "biceps": ["biceps"], "triceps": ["triceps"], "core": ["abdominals"],
+}
+
+
+def _heavy(template: str) -> set[str]:
+    return {m for pat, role in DAY_TEMPLATES[template][1] if role in ("main", "sec") for m in PATTERN_MUSCLES[pat]}
+
+
+def _adjacent_conflicts(days: list[int], split: list[str]) -> int:
+    by = dict(zip(days, split))
+    n = 0
+    for d, t in by.items():
+        nxt = by.get((d + 1) % 7)
+        if nxt and _heavy(t) & _heavy(nxt):
+            n += 1
+    return n
+
+
+def _choose_split(days: list[int], tier_key: str, goal: dict) -> list[str]:
+    """Escolhe a divisão e a ordem que evitam treinar os mesmos músculos em dias seguidos."""
+    import itertools
+
+    n = len(days)
+    preferred = _split(n, tier_key, goal)
+    candidates = [preferred]
+    alts = {2: [["UP_A", "LO_A"]], 3: [["PUSH", "PULL", "LEGS"], ["UP_A", "LO_A", "FB_C"]],
+            4: [["PUSH", "PULL", "LEGS", "UP_A"]], 5: [["PUSH", "PULL", "LEGS", "UP_A", "LO_A"]]}
+    candidates += [c for c in alts.get(n, []) if c != preferred]
+    best, best_key = preferred, None
+    for ci, cand in enumerate(candidates):
+        seen = set()
+        for perm in itertools.permutations(cand):
+            if perm in seen:
+                continue
+            seen.add(perm)
+            key = (_adjacent_conflicts(days, list(perm)), ci, perm != tuple(cand))
+            if best_key is None or key < best_key:
+                best, best_key = list(perm), key
+        if best_key and best_key[0] == 0:
+            break
+    return best
+
+
 def _split(n: int, tier_key: str, goal: dict) -> list[str]:
     if n <= 1:
         return ["FB_A"]
@@ -328,9 +380,9 @@ def _prep_items(regions: set[str], lims, rotation: int, warm_machine: str, warm_
 
 
 def _post_items(muscle_load: dict[str, float], lims, minutes: float = 5) -> list[dict]:
-    top = [m for m, _ in sorted(muscle_load.items(), key=lambda kv: -kv[1]) if m in STRETCHES][:5]
+    top = [m for m, v in sorted(muscle_load.items(), key=lambda kv: -kv[1]) if m in STRETCHES and v >= 1.5][:6]
     items = []
-    per = 40 if minutes >= 5 else 30
+    per = 30
     for m in top:
         for sid in STRETCHES[m]:
             ex = catalog.get(sid)
@@ -357,11 +409,24 @@ def _muscle_load(items: list[dict]) -> dict[str, float]:
     return load
 
 
+# Músculos que recebem bastante estímulo indireto ou não precisam de volume direto alto
+OPTIONAL_MUSCLES = {"traps", "forearms", "adductors", "abductors", "lower back"}
+
+
 def weekly_targets(tier_key: str, goal_key: str, volume_factor: float = 1.0) -> dict[str, float]:
     t = TIERS[tier_key]
     g = GOALS.get(goal_key, GOALS["hipertrofia"])
-    return {m: round(t["volume"](info) * g["volume"] * float(volume_factor or 1), 1)
-            for m, info in MUSCLES.items() if m != "neck"}
+    out = {}
+    for m, info in MUSCLES.items():
+        if m == "neck":
+            continue
+        v = t["volume"](info)
+        if m in OPTIONAL_MUSCLES:
+            v = min(v, info["mev"] + (info["mav"][0] - info["mev"]) * 0.3)
+        elif m == "abdominals":  # recebe muito estímulo indireto (estabilização) nos compostos
+            v = min(v, info["mev"] + (info["mav"][0] - info["mev"]) * 0.6)
+        out[m] = round(v * g["volume"] * float(volume_factor or 1), 1)
+    return out
 
 
 # ================================================================== gerador ===
@@ -392,7 +457,7 @@ def generate(profile: dict, seed: int = 0) -> dict:
     n_strength = max(1, n_strength)
     strength_days = _spread(avail, n_strength)
     cardio_days = [d for d in avail if d not in strength_days]
-    split = _split(n_strength, tier_key, goal)
+    split = _choose_split(strength_days, tier_key, goal)
     months = p.get("training_months")
     rationale.append(f"Tempo de prática {('%.0f meses' % months) if months is not None else '(nível do perfil)'} → "
                      f"nível {tier['label']}: {tier['sets']['main']} séries nos principais, reps "
@@ -462,13 +527,16 @@ def generate(profile: dict, seed: int = 0) -> dict:
         machine = _cardio_machine(lims, cardio_prefs, ci + 1)
         if hiit_left and not next_is_legs:
             hm = _cardio_machine(lims, cardio_prefs, ci, hiit=True)
-            items = [{"exercise_id": hm, "warmup_min": 8, "cooldown_min": 5, "phase": "principal",
-                      "intervals": {"repeats": 6 if tier_key == "iniciante" else 8, "work_s": 30 if tier_key == "iniciante" else 40,
+            warm_c, cool_c = (8 if budget >= 45 else 5), (5 if budget >= 40 else 3)
+            work_s = 30 if tier_key == "iniciante" else 40
+            fit_reps = int((budget - 3 - warm_c - cool_c) * 60 // (work_s + 90))
+            items = [{"exercise_id": hm, "warmup_min": warm_c, "cooldown_min": cool_c, "phase": "principal",
+                      "intervals": {"repeats": max(3, min(6 if tier_key == "iniciante" else 8, fit_reps)), "work_s": work_s,
                                     "work_zone": hard_zone + (1 if hard_zone == 4 and mz >= 5 else 0), "rest_s": 90, "rest_zone": 1}}]
             name = "Intervalado (HIIT)"
             hiit_left -= 1
         else:
-            items = [{"exercise_id": machine, "duration_min": 30, "zone": min(2, mz), "phase": "principal",
+            items = [{"exercise_id": machine, "duration_min": int(min(30, budget - 5) // 5 * 5), "zone": min(2, mz), "phase": "principal",
                       "notes": "zona 2: dá para conversar em frases curtas"}]
             name = "Cardio zona 2" + (" (recuperação ativa)" if prev_is_legs else "")
         mob = _prep_items({"inferior", "superior"}, lims, ci + 3, machine, 0)[1:3]
@@ -483,10 +551,23 @@ def generate(profile: dict, seed: int = 0) -> dict:
 
     # ---- ajuste ao tempo e balanceamento de volume
     targets = weekly_targets(tier_key, goal_key, p.get("volume_factor") or 1.0)
-    _fit_time(days, budget)
-    adj = _balance(days, targets, budget)
+    cardio_from_days = min(cardio_target, len(cardio_days) * min(60, budget - 5))
+    reserve = 0.0
+    if cardio_from_days < cardio_target * 0.9 and n_strength:
+        reserve = round(budget * CARDIO_SHARE[goal_key] / 5) * 5
+        if reserve >= 5:
+            rationale.append(f"Reservados ~{int(reserve)} min de cada treino de força para cardio (objetivo {goal['label']}).")
+    strength_budget = budget - reserve
+    _fit_time([d for d in days if d["kind"] == "forca"], strength_budget, all_days=days, targets=targets)
+    _fit_time([d for d in days if d["kind"] != "forca"], budget)
+    adj = _balance(days, targets, strength_budget)
+    added = _add_complements(days, targets, strength_budget, picker, tier, reps, rest_mult)
+    if added:
+        adj += _balance(days, targets, strength_budget)
+        rationale.append("Complementos adicionados onde sobrou tempo: " + ", ".join(added) + ".")
     if adj:
-        rationale.append(f"Balanceamento de volume: {adj} ajustes de séries para aproximar cada músculo do alvo semanal.")
+        rationale.append(f"Balanceamento de volume: {adj} ajustes de séries para aproximar cada músculo do alvo semanal "
+                         "e manter puxar ≥ empurrar.")
 
     # ---- cardio: finalizadores até a meta
     _cardio_fill(days, cardio_target, budget, lims, cardio_prefs, mz, goal)
@@ -496,7 +577,7 @@ def generate(profile: dict, seed: int = 0) -> dict:
         if d["kind"] != "forca":
             continue
         d["items"] += _post_items(_muscle_load(d["items"]), lims, 5)
-        _fit_time([d], budget, protect_post=True)
+        _fit_time([d], budget, protect_post=True, all_days=days, targets=targets)
 
     days.sort(key=lambda d: d["weekday"])
     for d in days:
@@ -510,6 +591,11 @@ def generate(profile: dict, seed: int = 0) -> dict:
     else:
         rationale.append(f"Cardio planejado: ~{week_cardio} min equivalentes/semana (meta {int(cardio_target)}).")
     vol = _weekly_volume(days)
+    short = [MUSCLES[m]["pt"] for m, t in targets.items() if t >= 4 and vol.get(m, 0) < 0.7 * t]
+    if short and n_strength:
+        weekly_min = int(sum(d["time"]["total"] for d in days if d["kind"] == "forca"))
+        rationale.append(f"Com ~{weekly_min} min/semana de musculação, priorizei os grandes grupos; abaixo do ideal: "
+                         f"{', '.join(short)}. Mais um dia ou sessões mais longas resolvem.")
     rationale.append(f"Todo treino de força começa com aquecimento ({warm_min} min) + mobilidade/ativação dos músculos do dia "
                      "e termina com alongamento dos músculos mais trabalhados.")
     rationale.append(f"Sessões de até {int(budget)} min: tempo calculado por repetição (~{SEC_PER_REP}s), descanso entre séries e trocas de aparelho.")
@@ -545,20 +631,35 @@ def _day_total(d: dict) -> float:
     return sum(item_time(i)["total"] for i in d["items"]) / 60
 
 
-def _fit_time(days: list[dict], budget: float, protect_post: bool = False) -> None:
-    """Corta volume até caber no tempo: acessórios perdem séries, depois saem; mobilidade encurta."""
+def _surplus_ratio(it: dict, vol: dict[str, float], targets: dict[str, float] | None) -> float:
+    """Quanto o(s) músculo(s) principal(is) do exercício já passam do alvo semanal (maior = pode cortar)."""
+    if not targets:
+        return 1.0
+    ex = catalog.get(it["exercise_id"]) or {}
+    ratios = [vol.get(m, 0) / targets[m] + (1.0 if m in OPTIONAL_MUSCLES else 0.0)
+              for m in ex.get("primaryMuscles", []) if targets.get(m)]
+    return min(ratios) if ratios else 9.0
+
+
+def _fit_time(days: list[dict], budget: float, protect_post: bool = False,
+              all_days: list[dict] | None = None, targets: dict[str, float] | None = None) -> None:
+    """Corta até caber no tempo. Corta primeiro o que é de músculo que já está sobrando na semana."""
     for d in days:
         guard = 0
-        while _day_total(d) > budget and guard < 60:
+        while _day_total(d) > budget + 0.05 and guard < 120:
             guard += 1
             items = d["items"]
+            vol = _weekly_volume(all_days or days)
+            by_surplus = lambda xs: sorted(xs, key=lambda i: -_surplus_ratio(i, vol, targets))  # noqa: E731
             post = [i for i in items if i.get("phase") == "pos"]
-            if protect_post and len(post) > 3:
+            if protect_post and len(post) > 4:
                 items.remove(post[-1])
                 continue
             accs = [i for i in items if i.get("role") == "acc"]
             secs = [i for i in items if i.get("role") == "sec"]
             mains = [i for i in items if i.get("role") == "main"]
+            mob = [i for i in items if i.get("phase") == "preparo" and i.get("duration_s")]
+            warm = next((i for i in items if i.get("phase") == "preparo" and i.get("duration_min")), None)
             fin = [i for i in items if i.get("finisher")]
             if fin:
                 f = fin[-1]
@@ -567,25 +668,42 @@ def _fit_time(days: list[dict], budget: float, protect_post: bool = False) -> No
                 else:
                     items.remove(f)
                 continue
-            cand = next((i for i in reversed(accs) if i["sets"] > 2), None) \
-                or next((i for i in reversed(secs) if i["sets"] > 2), None)
+            cand = next((i for i in by_surplus(accs) if i["sets"] > 2), None) \
+                or next((i for i in by_surplus(secs) if i["sets"] > 2), None)
             if cand:
                 cand["sets"] -= 1
                 continue
             if len(accs) > 1:
-                items.remove(accs[-1])
+                items.remove(by_surplus(accs)[0])
                 continue
-            mob = [i for i in items if i.get("phase") == "preparo" and i.get("duration_s")]
             if len(mob) > 2:
                 items.remove(mob[-1])
                 continue
-            cand = next((i for i in reversed(mains) if i["sets"] > 2), None)
+            cand = next((i for i in by_surplus(mains) if i["sets"] > 2), None)
             if cand:
                 cand["sets"] -= 1
+                continue
+            if warm and float(warm["duration_min"]) > 3:
+                warm["duration_min"] = 3
+                continue
+            if accs and len(mains) + len(secs) >= 3:
+                items.remove(accs[0])
+                continue
+            if len(mob) > 1:
+                items.remove(mob[-1])
+                continue
+            if len(secs) > 1:
+                items.remove(by_surplus(secs)[0])
                 continue
             r = next((i for i in items if i.get("phase") == "principal" and (i.get("rest_s") or 0) > 60), None)
             if r:
                 r["rest_s"] -= 15
+                continue
+            if protect_post and len(post) > 2:
+                items.remove(post[-1])
+                continue
+            if secs and len(mains) >= 2:
+                items.remove(secs[0])
                 continue
             break
 
@@ -598,18 +716,112 @@ def _weekly_volume(days: list[dict]) -> dict[str, float]:
     return vol
 
 
+PUSH_MUSCLES = ("chest", "triceps")
+PULL_MUSCLES = ("lats", "middle back", "biceps")
+
+
+def _push_pull(vol: dict[str, float]) -> float:
+    push = vol.get("chest", 0) + vol.get("triceps", 0) + 0.5 * vol.get("shoulders", 0)
+    pull = vol.get("lats", 0) + vol.get("middle back", 0) + vol.get("biceps", 0) + 0.5 * vol.get("traps", 0)
+    return pull / push if push else 9.0
+
+
+MUSCLE_PATTERN = {
+    "chest": "chest_fly", "lats": "v_pull", "middle back": "h_pull", "shoulders": "lateral", "biceps": "biceps",
+    "triceps": "triceps", "quadriceps": "leg_ext", "hamstrings": "leg_curl", "glutes": "glute", "calves": "calf",
+    "abdominals": "core", "adductors": "adductor", "traps": "traps",
+}
+
+
+def _add_complements(days, targets, budget, picker, tier, reps, rest_mult, limit: int = 8) -> list[str]:
+    """Onde sobrou tempo, adiciona um exercício para o músculo mais abaixo do alvo semanal."""
+    added: list[str] = []
+    for _ in range(limit):
+        vol = _weekly_volume(days)
+        deficits = sorted(((vol.get(m, 0) / t, m) for m, t in targets.items() if t >= 3 and m in MUSCLE_PATTERN
+                           and vol.get(m, 0) < 0.8 * t))
+        if not deficits:
+            break
+        placed = False
+        for _, m in deficits:
+            pattern = MUSCLE_PATTERN[m]
+            strength = [d for d in days if d["kind"] == "forca"]
+            for d in sorted(strength, key=_day_total):
+                used = {i["exercise_id"] for i in d["items"]}
+                # não coloca o músculo colado em outro dia que já o treina pesado
+                neighbors = [x for x in strength if x is not d and abs(x["weekday"] - d["weekday"]) in (1, 6)]
+                if any(_muscle_load(x["items"]).get(m, 0) >= 4 for x in neighbors):
+                    continue
+                ch = picker.pick(pattern, "acc", used, len(d["items"]))
+                if not ch:
+                    continue
+                ex = catalog.get(ch[0])
+                item = {"exercise_id": ch[0], "sets": max(2, tier["sets"]["acc"] - 1), "role": "acc", "pattern": pattern,
+                        "phase": "principal", "rpe_target": tier["rpe"], "complement": True,
+                        "rest_s": int(round(tier["rest"]["acc"] * rest_mult / 15) * 15)}
+                if ex.get("timed"):
+                    item["duration_s"] = tier["timed_s"]
+                else:
+                    item["reps"] = reps["acc"]
+                if _day_total({"items": d["items"] + [item]}) <= budget:
+                    posts = [i for i in d["items"] if i.get("phase") == "pos" or i.get("finisher")]
+                    d["items"].insert(d["items"].index(posts[0]) if posts else len(d["items"]), item)
+                    added.append(f"{ex['name']} ({_short(d['name'])})")
+                    placed = True
+                    break
+            if placed:
+                break
+        if not placed:
+            break
+    return added
+
+
+def _short(name: str) -> str:
+    return name.split(" – ")[-1]
+
+
 def _balance(days: list[dict], targets: dict[str, float], budget: float) -> int:
-    """Sobe séries de músculos abaixo do alvo e corta de quem passou do máximo, dentro do tempo."""
+    """Sobe séries de músculos abaixo do alvo, corta de quem passou do máximo e mantém puxar ≥ empurrar."""
     changes = 0
-    for _ in range(40):
+
+    def prim(i):
+        return (catalog.get(i["exercise_id"]) or {}).get("primaryMuscles", [])
+
+    def can_add(d, it):
+        extra = item_time({**it, "sets": 1, "approach_sets": False})["work"] / 60 + (it.get("rest_s") or 60) / 60
+        return d["kind"] == "forca" and _day_total(d) + extra <= budget
+
+    for _ in range(80):
         vol = _weekly_volume(days)
         over = [(m, vol[m] - MUSCLES[m]["mrv"]) for m in vol if m in MUSCLES and vol[m] > MUSCLES[m]["mrv"]]
         if over:
             m = max(over, key=lambda x: x[1])[0]
-            cands = [(d, i) for d in days for i in d["items"] if i.get("role") in ("acc", "sec")
-                     and m in (catalog.get(i["exercise_id"]) or {}).get("primaryMuscles", []) and i["sets"] > 2]
-            if cands:
-                cands[-1][1]["sets"] -= 1
+            cands = [(d, i) for d in days for i in d["items"] if i.get("role") and m in prim(i)]
+            cands.sort(key=lambda di: ({"acc": 0, "sec": 1, "main": 2}[di[1]["role"]], -di[1]["sets"]))
+            cut = next(((d, i) for d, i in cands if i["sets"] > (3 if i["role"] == "main" else 2)), None)
+            if cut:
+                cut[1]["sets"] -= 1
+                changes += 1
+                continue
+            rm = next(((d, i) for d, i in cands if i["role"] == "acc"), None)
+            if rm:
+                rm[0]["items"].remove(rm[1])
+                changes += 1
+                continue
+        # puxar ≥ empurrar (saúde do ombro e postura)
+        if _push_pull(vol) < 1.0 and vol.get("chest", 0) > 0:
+            pulls = [(d, i) for d in days for i in d["items"] if i.get("role") and set(prim(i)) & set(PULL_MUSCLES)
+                     and i["sets"] < (5 if i["role"] == "main" else 4)]
+            pulls.sort(key=lambda di: (_day_total(di[0]), di[1]["sets"]))
+            added = next(((d, i) for d, i in pulls if can_add(d, i)), None)
+            if added:
+                added[1]["sets"] += 1
+                changes += 1
+                continue
+            pushes = [(d, i) for d in days for i in d["items"] if i.get("role") in ("acc", "sec")
+                      and set(prim(i)) & set(PUSH_MUSCLES) and i["sets"] > 2]
+            if pushes:
+                pushes[0][1]["sets"] -= 1
                 changes += 1
                 continue
         deficits = sorted(((targets[m] - vol.get(m, 0)) / max(1, targets[m]), m) for m in targets)
@@ -619,17 +831,29 @@ def _balance(days: list[dict], targets: dict[str, float], budget: float) -> int:
         done = False
         for _, m in reversed(deficits):
             cands = [(d, i) for d in days for i in d["items"]
-                     if i.get("phase") == "principal" and i.get("role")
-                     and m in (catalog.get(i["exercise_id"]) or {}).get("primaryMuscles", [])
+                     if i.get("phase") == "principal" and i.get("role") and m in prim(i)
                      and i["sets"] < (5 if i["role"] == "main" else 4)]
             cands.sort(key=lambda di: (_day_total(di[0]), di[1]["sets"]))
             for d, it in cands:
-                extra = item_time({**it, "sets": 1})["work"] / 60 + (it.get("rest_s") or 60) / 60
-                if _day_total(d) + extra <= budget:
-                    it["sets"] += 1
-                    changes += 1
-                    done = True
-                    break
+                ex = catalog.get(it["exercise_id"])
+                if any(vol.get(x, 0) + 1 > MUSCLES[x]["mrv"] for x in ex["primaryMuscles"] if x in MUSCLES):
+                    continue
+                if not can_add(d, it):
+                    # troca no mesmo treino: tira 1 série de um músculo que já passou do alvo
+                    donor = next((i for i in sorted(d["items"], key=lambda x: -(x.get("sets") or 0))
+                                  if i is not it and i.get("role") in ("acc", "sec") and i["sets"] > 2
+                                  and m not in prim(i) and prim(i)
+                                  and all(vol.get(x, 0) - 1 >= 1.15 * targets.get(x, 0) for x in prim(i))), None)
+                    if not donor:
+                        continue
+                    donor["sets"] -= 1
+                    if not can_add(d, it):
+                        donor["sets"] += 1
+                        continue
+                it["sets"] += 1
+                changes += 1
+                done = True
+                break
             if done:
                 break
         if not done:
@@ -665,15 +889,22 @@ def _cardio_fill(days, target, budget, lims, prefs, mz, goal) -> None:
         progressed = False
         for d in [x for x in days if x["kind"] == "cardio"]:
             z2 = next((i for i in d["items"] if i.get("duration_min") and i.get("phase") == "principal"), None)
-            if z2 and z2["duration_min"] < min(60, budget - 5):
+            if not z2 and budget - _day_total(d) >= 10:  # dia de intervalado: completa com zona 2
+                z2 = {"exercise_id": _cardio_machine(lims, prefs, 2), "duration_min": 5, "zone": min(2, mz),
+                      "phase": "principal", "notes": "zona 2 depois do intervalado"}
+                posts = [i for i in d["items"] if i.get("phase") == "pos"]
+                d["items"].insert(d["items"].index(posts[0]) if posts else len(d["items"]), z2)
+                progressed = True
+                break
+            if z2 and z2["duration_min"] < 60 and _day_total(d) + 5 <= budget:
                 z2["duration_min"] += 5
                 progressed = True
                 break
         if progressed:
             continue
         for d in sorted([x for x in days if x["kind"] == "forca"], key=_day_total):
-            slack = budget - _day_total(d) - 5  # reserva para o alongamento
-            if slack < 8:
+            slack = budget - _day_total(d) - 4  # reserva para o alongamento
+            if slack < 5:
                 continue
             fin = next((i for i in d["items"] if i.get("finisher")), None)
             if fin:
@@ -683,7 +914,7 @@ def _cardio_fill(days, target, budget, lims, prefs, mz, goal) -> None:
                     break
                 continue
             machine = _cardio_machine(lims, prefs, len(d["items"]))
-            d["items"].append({"exercise_id": machine, "duration_min": min(15, int(slack)), "zone": min(2, mz),
+            d["items"].append({"exercise_id": machine, "duration_min": min(15, int(slack // 5 * 5)), "zone": min(2, mz),
                                "phase": "principal", "finisher": True, "notes": "cardio pós-força (zona 2)"})
             progressed = True
             break

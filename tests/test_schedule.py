@@ -126,7 +126,7 @@ def test_skip_redistributes_when_no_free_day(fresh_db):
     assert added > 0 and res["changes"]
     for k, e in after.items():
         if k != first["id"]:
-            assert generator.time_breakdown(e["items"])["total"] <= 75 * 1.1 + 0.5
+            assert generator.time_breakdown(e["items"])["total"] <= 75 * 1.15 + 0.5
     assert after[first["id"]]["status"] == "pulado"
 
 

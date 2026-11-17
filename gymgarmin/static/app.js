@@ -775,6 +775,11 @@ async function viewPerfil() {
     <div class="field"><label>Outros exercícios a evitar (separe por vírgula, PT ou EN)</label><input id="custom-avoid" value="${esc(custom.custom_avoid || "")}" placeholder="ex.: leg press, burpee, levantamento terra"></div>
     <button class="btn" id="save-profile">Salvar perfil</button>
   </div>
+  <div class="card"><h2>Backup dos seus dados</h2>
+    <p class="small muted">Perfil, planilhas, treinos registrados e agenda em um arquivo .json.</p>
+    <div class="row gap wrap"><a class="btn sm ghost" href="/api/backup">Baixar backup</a>
+      <label class="btn sm ghost" style="margin:0">Restaurar backup<input type="file" id="restore" accept=".json,application/json" hidden></label></div>
+  </div>
   <div class="card"><h2>Garmin Connect</h2>
     ${!g.library_installed ? `<p class="pill bad">Biblioteca garminconnect não instalada no servidor: <code>pip install "garminconnect>=0.3.20"</code></p>` : ""}
     ${g.connected ? `<p><span class="pill ok">conectado</span> ${esc(g.display_name || "")}</p>
@@ -806,6 +811,13 @@ async function viewPerfil() {
     state.profile = await api("/api/profile", { method: "PUT", body });
     state.meta = await api("/api/meta");
     toast("Perfil salvo");
+  };
+  $("#restore").onchange = async (e) => {
+    const f = e.target.files[0]; if (!f) return;
+    try {
+      const r = await api("/api/backup", { method: "POST", body: JSON.parse(await f.text()) });
+      state.meta = null; toast(`Restaurado: ${r.sessions || 0} treinos, ${r.plans || 0} planilhas`); route();
+    } catch (err) { toast(err.message, 5000); }
   };
   const gl = $("#g-login");
   if (gl) gl.onclick = async () => {
@@ -845,7 +857,12 @@ async function route() {
   view.oninput = view.onchange = view.onclick = null;
   view.innerHTML = `<p class="muted">Carregando…</p>`;
   try {
-    if (!state.meta) [state.meta, state.profile] = await Promise.all([api("/api/meta"), api("/api/profile")]);
+    if (!state.meta) {
+      [state.meta, state.profile] = await Promise.all([api("/api/meta"), api("/api/profile")]);
+      if (state.meta.ephemeral_storage && !$("#eph")) {
+        document.querySelector(".topbar").insertAdjacentHTML("afterend", `<div id="eph" class="rec atencao small" style="margin:8px 16px 0">Versão de teste online: os dados podem ser apagados pelo servidor. Use <a href="#perfil">Perfil → Backup</a> para salvar e restaurar.</div>`);
+      }
+    }
     const routes = { hoje: () => viewHoje(a), planilhas: viewPlanilhas, plano: () => viewPlano(a), treinar: () => viewTreinar(a, b), analise: viewAnalise, exercicios: viewExercicios, perfil: viewPerfil };
     await (routes[name] || viewHoje)();
     if (!view.onclick) view.onclick = (e) => { const id = e.target.dataset && e.target.dataset.ex; if (id) showExercise(id); };
