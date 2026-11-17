@@ -27,7 +27,7 @@ from __future__ import annotations
 import math
 from collections import defaultdict
 
-from . import catalog
+from . import catalog, endurance
 from .limitations import check_exercise, max_zone
 from .muscles import HR_ZONES, MUSCLES, PRIMARY_WEIGHT, SECONDARY_WEIGHT
 
@@ -431,7 +431,28 @@ def weekly_targets(tier_key: str, goal_key: str, volume_factor: float = 1.0) -> 
 
 # ================================================================== gerador ===
 
-def generate(profile: dict, seed: int = 0) -> dict:
+def _leg_penalty(days: list[int], split: list[str], hard_leg_days: set[int]) -> int:
+    """Perna pesada na véspera (ou no mesmo dia) de longão/qualidade de corrida, bike, remo ou trilha."""
+    n = 0
+    for d, t in zip(days, split):
+        if t in HEAVY_LEGS and ((d + 1) % 7 in hard_leg_days or d in hard_leg_days):
+            n += 1
+    return n
+
+
+def _choose_split_endurance(days: list[int], tier_key: str, goal: dict, hard_leg_days: set[int]) -> list[str]:
+    import itertools
+
+    base = _choose_split(days, tier_key, goal)
+    best, best_key = base, None
+    for perm in set(itertools.permutations(base)):
+        key = (_leg_penalty(days, list(perm), hard_leg_days) * 2 + _adjacent_conflicts(days, list(perm)), list(perm) != base)
+        if best_key is None or key < best_key:
+            best, best_key = list(perm), key
+    return best
+
+
+def generate(profile: dict, seed: int = 0, recent: dict | None = None, today=None) -> dict:
     p = profile or {}
     lims = p.get("limitations") or []
     tier_key = tier_for(p.get("training_months") if p.get("training_months") is not None else
@@ -448,16 +469,45 @@ def generate(profile: dict, seed: int = 0) -> dict:
     hard_zone = min(mz, 4)
     rationale: list[str] = []
 
-    # ---- dias de força x cardio
+    # ---- modalidades de resistência (corrida, bike, natação, remo, caminhada, trilha, evento)
+    from datetime import date as _date, timedelta as _td
+
+    end_on = endurance.active(p)
+    wp, alloc = None, None
+    today = today or _date.today()
+    week0 = today - _td(days=today.weekday())
     n_avail = len(avail)
-    if goal.get("hybrid"):
-        n_strength = min(tier["max_strength_days"], max(2, math.ceil(n_avail * 0.6)))
+    if end_on:
+        wp = endurance.week_plan(p, week0, week0, tier_key, recent=recent)
+        slots = []
+        for sport_key, d in wp["sports"].items():
+            for i, sess in enumerate(d["sessions"]):
+                slots.append({"key": f"{sport_key}:{i}", "sport": sport_key, "role": sess["endurance"]["role"],
+                              "minutes": sess["duration_min"]})
+        ev = ((p.get("endurance") or {}).get("event") or {}).get("type")
+        pref = p.get("strength_days")
+        if pref:
+            n_strength = int(pref)
+        else:
+            # híbrido: 3 dias de força se sobrarem 3 dias sem longo/qualidade de perna (leves dividem o dia);
+            # evento: 2 (manutenção)
+            heavy = sum(1 for x in slots if x["role"] == "qualidade" or (x["role"] == "longo" and x["sport"] in endurance.LEG_SPORTS))
+            n_strength = 2 if ev or n_avail - heavy < 3 else 3
+        n_strength = max(1, min(n_strength, tier["max_strength_days"], n_avail))
+        long_pref = {k: int(c["long_day"]) for k, c in endurance.config(p).items() if c.get("long_day") not in (None, "")}
+        alloc = endurance.allocate(slots, avail, n_strength, long_pref)
+        strength_days = alloc["_strength"]
+        cardio_days = []
+        split = _choose_split_endurance(strength_days, tier_key, goal, set(alloc["_hard_leg_days"]))
     else:
-        n_strength = min(tier["max_strength_days"], n_avail)
-    n_strength = max(1, n_strength)
-    strength_days = _spread(avail, n_strength)
-    cardio_days = [d for d in avail if d not in strength_days]
-    split = _choose_split(strength_days, tier_key, goal)
+        if goal.get("hybrid"):
+            n_strength = min(tier["max_strength_days"], max(2, math.ceil(n_avail * 0.6)))
+        else:
+            n_strength = min(tier["max_strength_days"], n_avail)
+        n_strength = max(1, n_strength)
+        strength_days = _spread(avail, n_strength)
+        cardio_days = [d for d in avail if d not in strength_days]
+        split = _choose_split(strength_days, tier_key, goal)
     months = p.get("training_months")
     rationale.append(f"Tempo de prática {('%.0f meses' % months) if months is not None else '(nível do perfil)'} → "
                      f"nível {tier['label']}: {tier['sets']['main']} séries nos principais, reps "
@@ -466,7 +516,8 @@ def generate(profile: dict, seed: int = 0) -> dict:
                      f"{int(cardio_target)} min/semana.")
     rationale.append(f"{n_avail} dias livres ({', '.join(WEEKDAYS[d] for d in avail)}) → {n_strength} de força "
                      f"({', '.join(DAY_TEMPLATES[s][0] for s in split)})"
-                     + (f" + {len(cardio_days)} de cardio" if cardio_days else "") + ".")
+                     + (f" + {len(cardio_days)} de cardio" if cardio_days else "")
+                     + (f" + {sum(len(d['sessions']) for d in wp['sports'].values())} sessões de resistência" if wp else "") + ".")
     if n_avail > tier["max_strength_days"] and not goal.get("hybrid"):
         rationale.append(f"Nível {tier['label']} rende melhor com até {tier['max_strength_days']} dias de força; "
                          "os outros dias viram cardio/recuperação ativa.")
@@ -545,13 +596,54 @@ def generate(profile: dict, seed: int = 0) -> dict:
             m["notes"] = "mobilidade pós-cardio"
         days.append({"name": f"{WEEKDAYS[wd]} – {name}", "weekday": wd, "kind": "cardio", "template": "CARDIO",
                      "items": items + mob})
+    if wp:
+        lims_mz = max_zone(lims) or 5
+        for sport_key, d in wp["sports"].items():
+            for i, sess in enumerate(d["sessions"]):
+                key = f"{sport_key}:{i}"
+                wd = alloc[key]
+                items = [sess]
+                if sport_key in endurance.LEG_SPORTS:
+                    mob = _prep_items({"inferior"}, lims, i + 5, sess["exercise_id"], 0)[1:3]
+                    for m in mob:
+                        m["phase"] = "pos"
+                        m["notes"] = "mobilidade pós-treino"
+                    items += mob
+                title = sess["endurance"]["title"]
+                days.append({"name": f"{WEEKDAYS[wd]} – {endurance.sp.SPORTS[sport_key]['name']}: {title}", "weekday": wd,
+                             "kind": "resistencia", "template": "END", "double": key in alloc["_doubles"],
+                             "endurance_slot": {"sport": sport_key, "role": sess["endurance"]["role"], "index": i},
+                             "items": items})
+        for b in wp.get("bricks") or []:
+            bike_long = next((x for x in days if (x.get("endurance_slot") or {}).get("sport") == "ciclismo"
+                              and x["endurance_slot"]["role"] == "longo"), None)
+            if bike_long:
+                bike_long["items"] = [i for i in bike_long["items"] if i.get("phase") != "pos"] + b["items"]
+                bike_long["name"] += " + transição (brick)"
+                bike_long["brick"] = True
+        shared = {d["weekday"] for d in days if d.get("double")}
+        for d in days:
+            if d["weekday"] in shared:
+                d["double"] = True
+        if lims_mz < 5:
+            rationale.append(f"Limitação de intensidade: sessões fortes de resistência vão no máximo à zona {lims_mz}.")
+        _end_rationale(rationale, wp, alloc, p, budget)
+        leg_end = sum(1 for d in days if d.get("kind") == "resistencia" and d["endurance_slot"]["sport"] in endurance.LEG_SPORTS)
     if cardio_days and goal.get("hybrid"):
         rationale.append("Híbrido: intervalado longe da véspera de pernas, cardio sempre depois da força e em "
                          "aparelhos de baixo impacto para reduzir a interferência no ganho de força.")
 
     # ---- ajuste ao tempo e balanceamento de volume
     targets = weekly_targets(tier_key, goal_key, p.get("volume_factor") or 1.0)
+    if wp and leg_end >= 3:
+        for m in ("quadriceps", "hamstrings", "glutes", "calves"):
+            if m in targets:
+                targets[m] = round(targets[m] * 0.8, 1)
+        rationale.append(f"{leg_end} sessões de resistência com as pernas na semana → volume de musculação das pernas "
+                         "−20% para não comprometer a recuperação (efeito de interferência).")
     cardio_from_days = min(cardio_target, len(cardio_days) * min(60, budget - 5))
+    if wp:
+        cardio_from_days = _cardio_equiv([d for d in days if d.get("kind") == "resistencia"])
     reserve = 0.0
     if cardio_from_days < cardio_target * 0.9 and n_strength:
         reserve = round(budget * CARDIO_SHARE[goal_key] / 5) * 5
@@ -559,7 +651,7 @@ def generate(profile: dict, seed: int = 0) -> dict:
             rationale.append(f"Reservados ~{int(reserve)} min de cada treino de força para cardio (objetivo {goal['label']}).")
     strength_budget = budget - reserve
     _fit_time([d for d in days if d["kind"] == "forca"], strength_budget, all_days=days, targets=targets)
-    _fit_time([d for d in days if d["kind"] != "forca"], budget)
+    _fit_time([d for d in days if d["kind"] == "cardio"], budget)
     adj = _balance(days, targets, strength_budget)
     added = _add_complements(days, targets, strength_budget, picker, tier, reps, rest_mult)
     if added:
@@ -613,6 +705,9 @@ def generate(profile: dict, seed: int = 0) -> dict:
             "session_minutes": budget, "available_days": avail, "targets": targets,
             "cardio_target": cardio_target, "cardio_planned_equiv": week_cardio, "rpe": tier["rpe"],
         },
+        **({"endurance_plan": {"start": week0.isoformat(), "tier": tier_key,
+                               "week0": {k: {kk: v[kk] for kk in ("volume", "unit", "phase", "phase_pt")} for k, v in wp["sports"].items()}}}
+           if wp else {}),
         "goals_week": {
             "sessions": len(days), "strength_sessions": n_strength, "cardio_equiv_min": cardio_target,
             "minutes_total": round(sum(d["time"]["total"] for d in days)),
@@ -920,3 +1015,38 @@ def _cardio_fill(days, target, budget, lims, prefs, mz, goal) -> None:
             break
         if not progressed:
             return
+
+
+def _end_rationale(rationale: list[str], wp: dict, alloc: dict, p: dict, budget: float) -> None:
+    from .sports import SPORTS, anchors_of
+
+    unit_pt = {"km": "km", "h": "h", "m": "m"}
+    parts = []
+    for sport_key, d in wp["sports"].items():
+        vol = d["volume"]
+        vol_txt = f"{vol:g} {unit_pt[d['unit']]}" if d["unit"] != "m" else f"{int(vol)} m"
+        wtr = d.get("weeks_to_race")
+        parts.append(f"{SPORTS[sport_key]['name']}: {vol_txt} na semana ({d['phase_pt']}"
+                     + (f", faltam {wtr} semanas para a prova" if wtr not in (None, 0) and wtr > 0 else "") + ")")
+    rationale.append("Resistência — " + "; ".join(parts) + ". Progressão de até ~8%/semana, semana leve a cada 4ª.")
+    hard = sum(1 for d in wp["sports"].values() for x in d["sessions"] if x["endurance"]["hard"])
+    total = sum(len(d["sessions"]) for d in wp["sports"].values())
+    if total:
+        rationale.append(f"Distribuição polarizada: {total - hard} de {total} sessões leves e {hard} fortes "
+                         "(no máximo 3 fortes por semana, longe do longão e nunca na véspera de perna pesada).")
+    if alloc.get("_doubles"):
+        rationale.append("Dias com dois treinos (força + resistência): faça a musculação primeiro ou separe por 6 h+; "
+                         "natação e treinos leves são os que melhor combinam.")
+    longs = [x for d in wp["sports"].values() for x in d["sessions"] if x["endurance"]["role"] == "longo"]
+    big = [x for x in longs if x["duration_min"] > budget + 10]
+    if big:
+        rationale.append("Longões passam do tempo normal de sessão (" + ", ".join(f"{x['endurance']['title']} ~{x['duration_min']} min" for x in big)
+                         + ") — por isso ficam no fim de semana.")
+    a = anchors_of(p)
+    missing = [SPORTS[s]["name"] for s in wp["sports"] if s in ("corrida", "ciclismo", "natacao", "remo")
+               and not a.get({"corrida": "run_vdot", "ciclismo": "ftp_w", "natacao": "css_s100", "remo": "row_2k_s"}[s])]
+    if missing:
+        rationale.append("Sem referência de ritmo/potência em " + ", ".join(missing) + ": os alvos saem por frequência "
+                         "cardíaca e o app agenda um teste nas primeiras semanas para calibrar.")
+    if wp.get("bricks"):
+        rationale.append("Brick semanal (corrida logo após o pedal longo) para treinar a transição.")

@@ -1,0 +1,800 @@
+"""Planejador de resistência: corrida, ciclismo, natação, remo, caminhada, trilha e eventos multiesporte.
+
+Configuração em profile["endurance"]:
+    sports: {corrida: {enabled, env, sessions, long_day, current_weekly,
+                       goal: {type: "volume", weekly} | {type: "prova", distance, target, date}}, ...}
+    event:  {type: "tri_olimpico" | ..., date, target}      (opcional; define metas e brick)
+    anchors: {run_vdot, ftp_w, css_s100, row_2k_s, lthr, hrmax, ...}
+    tests: bool  (agenda testes quando a âncora falta ou tem mais de 8 semanas)
+
+Princípios aplicados:
+- progressão de volume de até ~8%/semana, semana mais leve a cada 4ª, teto na meta;
+- prova/evento: base → construção → pico → polimento → prova → recuperação;
+- distribuição polarizada (~80% leve): 1 sessão de qualidade por modalidade
+  (2 para avançados com 5+ sessões), no máximo 3 sessões fortes na semana;
+- longão no fim de semana; qualidade longe do longão e de perna pesada.
+
+O plano guarda "slots" (dia da semana + modalidade + papel). As sessões de cada
+semana são montadas na hora (volume e tipo mudam semana a semana, e as zonas
+usam as âncoras atuais — recalibrou, o próximo treino já sai com os ritmos novos).
+"""
+from __future__ import annotations
+
+import math
+from datetime import date, datetime, timedelta
+
+from . import sports as sp
+
+WEEKDAYS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"]
+
+# unidade de volume, volume inicial por nível, mínimo por sessão, sessões padrão
+VOLUME = {
+    "corrida": {"unit": "km", "start": {"iniciante": 8, "intermediario": 15, "avancado": 25, "elite": 40}, "min": 3, "sessions": 3},
+    "ciclismo": {"unit": "h", "start": {"iniciante": 1.5, "intermediario": 3, "avancado": 5, "elite": 8}, "min": 0.5, "sessions": 2},
+    "natacao": {"unit": "m", "start": {"iniciante": 1500, "intermediario": 3000, "avancado": 5000, "elite": 8000}, "min": 800, "sessions": 2},
+    "remo": {"unit": "m", "start": {"iniciante": 8000, "intermediario": 15000, "avancado": 25000, "elite": 40000}, "min": 3000, "sessions": 2},
+    "caminhada": {"unit": "km", "start": {"iniciante": 10, "intermediario": 15, "avancado": 20, "elite": 25}, "min": 2, "sessions": 3},
+    "trilha": {"unit": "h", "start": {"iniciante": 2, "intermediario": 3, "avancado": 4, "elite": 5}, "min": 1, "sessions": 1},
+}
+UNIT_PT = {"km": "km", "h": "h", "m": "m"}
+
+LEVEL_FACTOR = {"iniciante": 0.6, "intermediario": 0.85, "avancado": 1.0, "elite": 1.2}
+SESSIONS_FACTOR = {1: 0.45, 2: 0.65, 3: 0.82, 4: 1.0, 5: 1.12, 6: 1.22, 7: 1.3}
+
+# pico semanal (intermediário/avançado) para provas de uma modalidade
+RACE_PEAK = {
+    "corrida": [(5, 30), (10, 40), (21.1, 50), (42.2, 65)],        # distância km → km/semana
+    "ciclismo": [(20, 4), (40, 5.5), (90, 8), (180, 11)],           # km → h/semana
+    "natacao": [(750, 6000), (1500, 8000), (3000, 10000), (3800, 12000)],  # m → m/semana
+    "remo": [(2000, 30000), (5000, 35000), (21097, 50000)],
+    "caminhada": [(10, 25), (21.1, 35), (42.2, 45)],
+    "trilha": [(15, 5), (30, 7), (60, 9)],
+}
+LONG_CAP = {"corrida": [(5, 12), (10, 16), (21.1, 22), (42.2, 32)], "ciclismo": [(20, 2.0), (40, 2.75), (90, 4.0), (180, 5.5)],
+            "natacao": [(750, 2000), (1500, 3000), (3000, 4000), (3800, 4500)], "remo": [(2000, 12000), (21097, 21000)],
+            "caminhada": [(10, 12), (42.2, 30)], "trilha": [(15, 4), (60, 8)]}
+TAPER_WEEKS = {"corrida": [(5, 1), (10, 1), (21.1, 2), (42.2, 3)], "ciclismo": [(40, 1), (180, 2)],
+               "natacao": [(1500, 1), (3800, 2)], "remo": [(5000, 1), (21097, 2)], "caminhada": [(42.2, 1)],
+               "trilha": [(60, 1)]}
+
+EVENTS = {
+    "tri_supersprint": {"name": "Triathlon super sprint", "legs": [("natacao", 400), ("ciclismo", 10), ("corrida", 2.5)],
+                        "peak": {"natacao": 3500, "ciclismo": 2.5, "corrida": 15}, "fatigue": 1.03, "taper": 1},
+    "tri_sprint": {"name": "Triathlon sprint", "legs": [("natacao", 750), ("ciclismo", 20), ("corrida", 5)],
+                   "peak": {"natacao": 4500, "ciclismo": 3.5, "corrida": 18}, "fatigue": 1.04, "taper": 1},
+    "tri_olimpico": {"name": "Triathlon olímpico", "legs": [("natacao", 1500), ("ciclismo", 40), ("corrida", 10)],
+                     "peak": {"natacao": 6500, "ciclismo": 5.0, "corrida": 25}, "fatigue": 1.06, "taper": 1},
+    "tri_meio": {"name": "Meio Ironman (70.3)", "legs": [("natacao", 1900), ("ciclismo", 90), ("corrida", 21.1)],
+                 "peak": {"natacao": 8000, "ciclismo": 7.5, "corrida": 35}, "fatigue": 1.10, "taper": 2},
+    "tri_ironman": {"name": "Ironman", "legs": [("natacao", 3800), ("ciclismo", 180), ("corrida", 42.2)],
+                    "peak": {"natacao": 10000, "ciclismo": 11.0, "corrida": 45}, "fatigue": 1.15, "taper": 3},
+    "duathlon_sprint": {"name": "Duathlon sprint", "legs": [("corrida", 5), ("ciclismo", 20), ("corrida", 2.5)],
+                        "peak": {"ciclismo": 3.0, "corrida": 22}, "fatigue": 1.05, "taper": 1},
+    "duathlon_padrao": {"name": "Duathlon padrão", "legs": [("corrida", 10), ("ciclismo", 40), ("corrida", 5)],
+                        "peak": {"ciclismo": 4.5, "corrida": 30}, "fatigue": 1.07, "taper": 1},
+    "aquathlon": {"name": "Aquathlon", "legs": [("natacao", 1000), ("corrida", 5)],
+                  "peak": {"natacao": 5000, "corrida": 20}, "fatigue": 1.04, "taper": 1},
+}
+EVENT_SESSIONS = {"tri_supersprint": {"natacao": 2, "ciclismo": 2, "corrida": 2},
+                  "tri_sprint": {"natacao": 2, "ciclismo": 2, "corrida": 3},
+                  "tri_olimpico": {"natacao": 2, "ciclismo": 2, "corrida": 3},
+                  "tri_meio": {"natacao": 3, "ciclismo": 3, "corrida": 3},
+                  "tri_ironman": {"natacao": 3, "ciclismo": 3, "corrida": 3},
+                  "duathlon_sprint": {"ciclismo": 2, "corrida": 3}, "duathlon_padrao": {"ciclismo": 2, "corrida": 3},
+                  "aquathlon": {"natacao": 2, "corrida": 3}}
+
+QUALITY_ROTATION = {"corrida": ["intervalado", "ritmo"], "ciclismo": ["sweet_spot", "limiar", "vo2"],
+                    "natacao": ["css", "velocidade"], "remo": ["intervalos_1000", "intervalos_500"],
+                    "caminhada": [], "trilha": []}
+QUALITY_SHARE = {"corrida": 0.18, "ciclismo": 0.22, "natacao": 0.32, "remo": 0.25}
+LONG_SHARE = {1: 1.0, 2: 0.55, 3: 0.4, 4: 0.33, 5: 0.28, 6: 0.25, 7: 0.22}
+TEST_EVERY_WEEKS = 8
+ANCHOR_KEY = {"corrida": "run_vdot", "ciclismo": "ftp_w", "natacao": "css_s100", "remo": "row_2k_s"}
+
+
+def _lookup(table: list[tuple[float, float]], x: float) -> float:
+    """Interpolação linear numa tabela (distância → valor)."""
+    pts = sorted(table)
+    if x <= pts[0][0]:
+        return pts[0][1] * (x / pts[0][0]) ** 0.5
+    for (x0, y0), (x1, y1) in zip(pts, pts[1:]):
+        if x <= x1:
+            return y0 + (y1 - y0) * (x - x0) / (x1 - x0)
+    return pts[-1][1]
+
+
+def _level(tier_key: str) -> str:
+    return {"iniciante": "iniciante", "intermediario": "intermediario", "avancado": "avancado", "elite": "elite"}.get(
+        tier_key, "intermediario")
+
+
+def _d(v) -> date | None:
+    if not v:
+        return None
+    if isinstance(v, date):
+        return v
+    try:
+        return datetime.fromisoformat(str(v)[:10]).date()
+    except ValueError:
+        return None
+
+
+# ------------------------------------------------------------- configuração
+def config(profile: dict) -> dict:
+    """Configuração efetiva: modalidades ativas, metas e sessões (evento sobrepõe metas)."""
+    end = (profile or {}).get("endurance") or {}
+    out = {}
+    for s, c in (end.get("sports") or {}).items():
+        if s in sp.SPORTS and c and c.get("enabled"):
+            out[s] = {**c, "sessions": int(c.get("sessions") or VOLUME[s]["sessions"])}
+    ev = end.get("event") or {}
+    if ev.get("type") in EVENTS and _d(ev.get("date")):
+        e = EVENTS[ev["type"]]
+        for s, n in EVENT_SESSIONS[ev["type"]].items():
+            base = out.get(s) or {"env": next(iter(sp.SPORTS[s]["envs"]))}
+            dist = sum(d for ls, d in e["legs"] if ls == s)
+            out[s] = {**base, "enabled": True, "sessions": max(int(base.get("sessions") or 0), n),
+                      "goal": {"type": "evento", "event": ev["type"], "distance": dist, "date": ev["date"]}}
+    return out
+
+
+def active(profile: dict) -> bool:
+    return bool(config(profile))
+
+
+# ---------------------------------------------------------------- volume
+def _current(sport: str, c: dict, level: str, recent: dict | None) -> float:
+    if c.get("current_weekly"):
+        return float(c["current_weekly"])
+    if recent and recent.get(sport):
+        return float(recent[sport])
+    return float(VOLUME[sport]["start"][level])
+
+
+def _peak(sport: str, c: dict, level: str) -> float:
+    g = c.get("goal") or {}
+    n = int(c.get("sessions") or VOLUME[sport]["sessions"])
+    if g.get("type") == "volume" and g.get("weekly"):
+        return float(g["weekly"])
+    if g.get("type") == "evento":
+        return EVENTS[g["event"]]["peak"].get(sport, 0) * LEVEL_FACTOR[level] / 0.85
+    if g.get("type") == "prova" and g.get("distance"):
+        return _lookup(RACE_PEAK[sport], float(g["distance"])) * LEVEL_FACTOR[level] * SESSIONS_FACTOR.get(min(n, 7), 1)
+    return _current(sport, c, level, None) * 1.3
+
+
+def _taper(sport: str, c: dict) -> int:
+    g = c.get("goal") or {}
+    if g.get("type") == "evento":
+        return EVENTS[g["event"]]["taper"]
+    if g.get("type") == "prova" and g.get("distance"):
+        return int(round(_lookup(TAPER_WEEKS[sport], float(g["distance"]))))
+    return 0
+
+
+def week_volume(sport: str, c: dict, level: str, week_idx: int, ws: date, recent: dict | None = None) -> dict:
+    """Volume da semana e fase. week_idx = semanas desde o início do plano (0 = primeira)."""
+    start, peak = _current(sport, c, level, recent), _peak(sport, c, level)
+    g = c.get("goal") or {}
+    race = _d(g.get("date")) if g.get("type") in ("prova", "evento") else None
+    if race:
+        weeks_to = (race - ws).days // 7
+        taper = max(1, _taper(sport, c))
+        if weeks_to < 0:
+            rec = -weeks_to
+            return {"volume": peak * (0.45 if rec <= 1 else 0.6 if rec <= 2 else 0.7), "phase": "recuperacao",
+                    "weeks_to_race": weeks_to}
+        if weeks_to == 0:
+            return {"volume": peak * 0.4, "phase": "prova", "weeks_to_race": 0}
+        if weeks_to <= taper:
+            frac = {1: 0.6, 2: 0.75, 3: 0.85}.get(weeks_to, 0.85) if taper > 1 else 0.6
+            return {"volume": peak * frac, "phase": "polimento", "weeks_to_race": weeks_to}
+    # progressão: +8%/semana a partir do atual, semana leve a cada 4ª, teto no pico
+    n = max(0, week_idx)
+    build_weeks = n - n // 4  # semanas leves não sobem
+    trend = min(peak, start * (1.08 ** build_weeks)) if peak >= start else peak
+    deload = n % 4 == 3
+    vol = trend * (0.75 if deload else 1.0)
+    if race:
+        weeks_to = (race - ws).days // 7
+        build_left = weeks_to - max(1, _taper(sport, c))
+        phase = "pico" if build_left <= 3 else ("construcao" if trend >= start * 1.15 or build_left <= 8 else "base")
+    else:
+        phase = "manutencao" if trend >= peak * 0.98 else ("base" if n < 4 else "construcao")
+    if deload:
+        phase = "semana_leve"
+    return {"volume": vol, "phase": phase, "weeks_to_race": (race - ws).days // 7 if race else None}
+
+
+PHASE_PT = {"base": "Base", "construcao": "Construção", "pico": "Pico", "polimento": "Polimento", "prova": "Semana da prova",
+            "recuperacao": "Recuperação pós-prova", "manutencao": "Manutenção (meta atingida)", "semana_leve": "Semana mais leve"}
+
+
+# ------------------------------------------------------------- passos
+def _steady(sport, kind, zone, anchors, env, dist_m=None, dur_s=None, note=None):
+    step = {"kind": kind, "zone": zone, "target": sp.target_for(sport, zone, anchors)}
+    v = sp.speed_mps(sport, zone, anchors, env)
+    if dist_m:
+        step["dist_m"] = int(round(dist_m))
+        step["dur_s"] = int(round(dist_m / v))
+    else:
+        step["dur_s"] = int(round(dur_s))
+        step["dist_m"] = int(round(dur_s * v)) if sport not in ("ciclismo",) or anchors.get("ftp_w") is None else None
+    if note:
+        step["note"] = note
+    return step
+
+
+def _rest(dur_s, kind="recovery", zone=1, sport=None, anchors=None, env=None, note=None):
+    st = {"kind": kind, "dur_s": int(dur_s), "zone": zone}
+    if sport and kind == "recovery":
+        st["target"] = sp.target_for(sport, zone, anchors or {})
+        st["dist_m"] = int(dur_s * sp.speed_mps(sport, zone, anchors or {}, env)) if sport != "natacao" else 0
+    if note:
+        st["note"] = note
+    return st
+
+
+def _repeat(n, steps):
+    return {"kind": "repeat", "n": int(n), "steps": steps}
+
+
+def _custom_pace_target(sport: str, sec: float, spread: float = 5) -> dict:
+    if sport == "corrida":
+        return {"type": "pace", "fast_s_km": round(sec - spread), "slow_s_km": round(sec + spread),
+                "label": f"{sp.fmt_pace(sec - spread)}–{sp.fmt_pace(sec + spread)}"}
+    if sport == "natacao":
+        return {"type": "swim_pace", "fast_s_100": round(sec - 2), "slow_s_100": round(sec + 2),
+                "label": f"{sp.fmt_pace(sec - 2, '/100m')}–{sp.fmt_pace(sec + 2, '/100m')}"}
+    return {}
+
+
+def _pct_ftp_target(ftp: float | None, lo: float, hi: float, zone: int, anchors: dict) -> dict:
+    if ftp:
+        return {"type": "power", "low_w": round(ftp * lo), "high_w": round(ftp * hi),
+                "label": f"{round(ftp * lo)}–{round(ftp * hi)} W ({int(lo * 100)}–{int(hi * 100)}% FTP)"}
+    return sp.target_for("ciclismo", zone, anchors)
+
+
+def _goal_pace(sport: str, c: dict) -> float | None:
+    """Ritmo alvo da prova (s/km na corrida, s/100 m na natação)."""
+    g = c.get("goal") or {}
+    t = sp.parse_duration(g.get("target"))
+    if not t or not g.get("distance"):
+        return None
+    if sport == "corrida":
+        return t / float(g["distance"])
+    if sport == "natacao":
+        return t / (float(g["distance"]) / 100)
+    return None
+
+
+# -------------------------------------------------- sessões por modalidade
+def _run(kind, km, c, anchors, env, level, week_idx, phase):
+    S = "corrida"
+    note = None
+    if kind == "longo":
+        steps = [_steady(S, "steady", 2, anchors, env, dist_m=km * 1000)]
+        gp = _goal_pace(S, c)
+        dist = float((c.get("goal") or {}).get("distance") or 0)
+        if gp and dist >= 21 and phase in ("construcao", "pico") and week_idx % 2 == 1:
+            fin = round(km * 0.25, 1)
+            steps = [_steady(S, "steady", 2, anchors, env, dist_m=(km - fin) * 1000),
+                     {**_steady(S, "interval", 3, anchors, env, dist_m=fin * 1000), "target": _custom_pace_target(S, gp),
+                      "note": "final no ritmo de prova"}]
+            note = f"Longão com os últimos {fin:g} km no ritmo da prova"
+        return "Longão", steps, note
+    if kind == "leve":
+        strides = level == "iniciante" or week_idx % 2 == 0
+        return "Rodagem leve", [_steady(S, "steady", 2, anchors, env, dist_m=km * 1000,
+                                        note="6 × 20 s soltos (educativos) no final" if strides else None)], None
+    if kind == "regenerativo":
+        return "Regenerativo", [_steady(S, "steady", 1, anchors, env, dist_m=km * 1000)], None
+    warm, cool = 2.0, 1.5
+    work = max(3.0 if kind == "ritmo" else 1.5, km - warm - cool)
+    if kind == "intervalado":
+        rep = 800 if level == "iniciante" else 1000
+        n = max(3, min(8, round(work * 1000 / rep / 1.6)))  # ~60% do miolo é tiro
+        return f"Intervalado {n} × {rep} m", [
+            _steady(S, "warmup", 2, anchors, env, dist_m=warm * 1000),
+            _repeat(n, [_steady(S, "interval", 5, anchors, env, dist_m=rep), _rest(120 if rep >= 1000 else 90, sport=S, anchors=anchors, env=env)]),
+            _steady(S, "cooldown", 1, anchors, env, dist_m=cool * 1000)], "Tiros no ritmo I: forte, mas igual do primeiro ao último"
+    if kind == "ritmo":
+        if work <= 4.5:
+            return f"Ritmo contínuo {work:g} km", [_steady(S, "warmup", 2, anchors, env, dist_m=warm * 1000),
+                                                    _steady(S, "interval", 4, anchors, env, dist_m=work * 1000),
+                                                    _steady(S, "cooldown", 1, anchors, env, dist_m=cool * 1000)], "Ritmo de limiar: 'confortavelmente difícil'"
+        n = max(2, round(work / 2))
+        return f"Ritmo {n} × 2 km", [_steady(S, "warmup", 2, anchors, env, dist_m=warm * 1000),
+                                       _repeat(n, [_steady(S, "interval", 4, anchors, env, dist_m=2000), _rest(60, sport=S, anchors=anchors, env=env)]),
+                                       _steady(S, "cooldown", 1, anchors, env, dist_m=cool * 1000)], "Ritmo de limiar: 'confortavelmente difícil'"
+    if kind == "ritmo_prova":
+        gp = _goal_pace(S, c) or sp.pace_at(anchors.get("run_vdot") or 40, 0.88)
+        dist = float((c.get("goal") or {}).get("distance") or 10)
+        rep, n, rec = ((1000, 5, 120) if dist <= 5 else (2000, 3, 90) if dist <= 10 else (3000, 3, 120) if dist <= 21.1 else (5000, 2, 180))
+        n = max(2, min(n, int(work * 1000 // (rep * 1.15))))  # cabe no volume da semana (polimento encurta)
+        return f"Ritmo de prova {n} × {rep // 1000 if rep >= 1000 else rep} {'km' if rep >= 1000 else 'm'}", [
+            _steady(S, "warmup", 2, anchors, env, dist_m=warm * 1000),
+            _repeat(n, [{**_steady(S, "interval", 4, anchors, env, dist_m=rep), "target": _custom_pace_target(S, gp)},
+                        _rest(rec, sport=S, anchors=anchors, env=env)]),
+            _steady(S, "cooldown", 1, anchors, env, dist_m=cool * 1000)], f"No ritmo alvo da prova ({sp.fmt_pace(gp)})"
+    if kind == "ativacao":
+        gp = _goal_pace(S, c) or sp.pace_at(anchors.get("run_vdot") or 40, 0.95)
+        return "Ativação pré-prova", [_steady(S, "warmup", 2, anchors, env, dist_m=2000),
+                                      _repeat(4, [{**_steady(S, "interval", 4, anchors, env, dist_m=200), "target": _custom_pace_target(S, gp)},
+                                                  _rest(60, sport=S, anchors=anchors, env=env)]),
+                                      _steady(S, "cooldown", 1, anchors, env, dist_m=1000)], "Curto e solto: só para lembrar o ritmo da prova"
+    if kind == "prova":
+        gp = _goal_pace(S, c)
+        dist = float((c.get("goal") or {}).get("distance") or km)
+        step = _steady(S, "interval", 4, anchors, env, dist_m=dist * 1000)
+        if gp:
+            step["target"] = _custom_pace_target(S, gp, 3)
+            step["dur_s"] = int(gp * dist)
+        return f"PROVA {dist:g} km", [_steady(S, "warmup", 1, anchors, env, dist_m=1500, note="aquecimento leve + 3 acelerações"),
+                                      step], f"Dia da prova! Ritmo alvo {sp.fmt_pace(gp)}" if gp else "Dia da prova!"
+    if kind == "teste":
+        return "Teste: 5 km no máximo sustentável", [
+            _steady(S, "warmup", 2, anchors, env, dist_m=2000, note="inclua 3 acelerações de 20 s"),
+            {**_steady(S, "interval", 5, anchors, env, dist_m=5000), "target": {"type": "open", "label": "máximo sustentável"},
+             "note": "registre o tempo: o app recalcula seus ritmos"},
+            _steady(S, "cooldown", 1, anchors, env, dist_m=1500)], "Teste de 5 km (recalibra o VDOT)"
+    raise ValueError(kind)
+
+
+def _bike(kind, hours, c, anchors, env, level, week_idx, phase):
+    S = "ciclismo"
+    ftp = anchors.get("ftp_w")
+    mins = hours * 60
+    if kind in ("longo", "leve", "regenerativo"):
+        z = {"longo": 2, "leve": 2, "regenerativo": 1}[kind]
+        title = {"longo": "Pedal longo", "leve": "Pedal de endurance", "regenerativo": "Giro regenerativo"}[kind]
+        return title, [_steady(S, "steady", z, anchors, env, dur_s=mins * 60,
+                               note="cadência 85–95 rpm" if kind != "longo" else "coma e beba a cada 20–30 min")], None
+    warm, cool = 15, 10
+    if kind == "teste":
+        return "Teste de FTP (20 min)", [
+            _steady(S, "warmup", 2, anchors, env, dur_s=20 * 60),
+            {**_steady(S, "interval", 5, anchors, env, dur_s=5 * 60), "note": "5 min forte para 'abrir'"},
+            _steady(S, "recovery", 1, anchors, env, dur_s=10 * 60),
+            {**_steady(S, "interval", 5, anchors, env, dur_s=20 * 60), "target": {"type": "open", "label": "máximo constante"},
+             "note": "registre a potência média: FTP = 95% dela"},
+            _steady(S, "cooldown", 1, anchors, env, dur_s=10 * 60)], "Teste de FTP de 20 min"
+    spec = {"sweet_spot": ("Sweet spot", 20, 0.88, 0.93, 3, 5 * 60),
+            "limiar": ("Limiar", 10, 0.95, 1.05, 4, 5 * 60),
+            "vo2": ("VO2máx", 4, 1.06, 1.20, 5, 4 * 60)}[kind]
+    title, rep_min, lo, hi, zone, rec = spec
+    avail = max(rep_min, mins - warm - cool)
+    n = max(2, min(6 if kind == "vo2" else 4, int(avail // (rep_min + rec / 60))))
+    if level == "iniciante" and kind != "sweet_spot":
+        n = max(2, n - 1)
+    return f"{title} {n} × {rep_min} min", [
+        _steady(S, "warmup", 2, anchors, env, dur_s=warm * 60),
+        _repeat(n, [{**_steady(S, "interval", zone, anchors, env, dur_s=rep_min * 60), "target": _pct_ftp_target(ftp, lo, hi, zone, anchors)},
+                    _steady(S, "recovery", 1, anchors, env, dur_s=rec)]),
+        _steady(S, "cooldown", 1, anchors, env, dur_s=cool * 60)], f"{int(lo * 100)}–{int(hi * 100)}% do FTP"
+
+
+def _swim(kind, meters, c, anchors, env, level, week_idx, phase):
+    S = "natacao"
+    m = max(600, int(round(meters / 50) * 50))
+    if kind == "teste":
+        return "Teste CSS (400 m + 200 m)", [
+            _steady(S, "warmup", 2, anchors, env, dist_m=400),
+            {**_steady(S, "interval", 5, anchors, env, dist_m=400), "target": {"type": "open", "label": "máximo constante"}},
+            _rest(300, kind="rest", note="5 min de descanso"),
+            {**_steady(S, "interval", 5, anchors, env, dist_m=200), "target": {"type": "open", "label": "máximo"}},
+            _steady(S, "cooldown", 1, anchors, env, dist_m=200)], "Registre os tempos de 400 e 200: o app calcula o CSS"
+    if env == "aguas_abertas" or kind == "longo":
+        return "Nado contínuo", [_steady(S, "steady", 2, anchors, env, dist_m=m, note="respire bilateral; olhe à frente a cada 6–10 braçadas")], None
+    warm, cool = 300, 200
+    main = max(200, m - warm - cool)
+    if kind in ("leve", "regenerativo"):
+        n = max(2, main // 200)
+        return "Aeróbico + técnica", [
+            _steady(S, "warmup", 2, anchors, env, dist_m=warm, note="inclua 4 × 25 m de educativo"),
+            _repeat(n, [_steady(S, "interval", 2, anchors, env, dist_m=200), _rest(20, kind="rest")]),
+            _steady(S, "cooldown", 1, anchors, env, dist_m=cool)], "Aeróbico: braçada longa, contando as braçadas"
+    if kind == "css":
+        n = max(4, min(16, main // 100))
+        return f"CSS {n} × 100 m", [
+            _steady(S, "warmup", 2, anchors, env, dist_m=warm),
+            _repeat(n, [_steady(S, "interval", 4, anchors, env, dist_m=100), _rest(15, kind="rest")]),
+            _steady(S, "cooldown", 1, anchors, env, dist_m=cool)], "Todos os 100 m no CSS, saída a cada ~15 s de pausa"
+    if kind == "velocidade":
+        n = max(6, min(16, (main // 2) // 50))
+        rest_m = max(200, main - n * 50)
+        return f"Velocidade {n} × 50 m", [
+            _steady(S, "warmup", 2, anchors, env, dist_m=warm),
+            _repeat(n, [_steady(S, "interval", 5, anchors, env, dist_m=50), _rest(20, kind="rest")]),
+            _steady(S, "steady", 2, anchors, env, dist_m=rest_m, note="pull buoy, técnica"),
+            _steady(S, "cooldown", 1, anchors, env, dist_m=cool)], "50 m rápidos com técnica limpa"
+    raise ValueError(kind)
+
+
+def _row(kind, meters, c, anchors, env, level, week_idx, phase):
+    S = "remo"
+    m = max(2000, int(round(meters / 500) * 500))
+    if kind == "teste":
+        return "Teste de 2 km", [_steady(S, "warmup", 2, anchors, env, dist_m=2000),
+                                 {**_steady(S, "interval", 5, anchors, env, dist_m=2000), "target": {"type": "open", "label": "máximo"}},
+                                 _steady(S, "cooldown", 1, anchors, env, dist_m=1000)], "Registre o tempo: o app recalcula os splits"
+    if kind in ("leve", "longo", "regenerativo"):
+        return "Remo contínuo (UT2)", [_steady(S, "steady", 2 if kind != "regenerativo" else 1, anchors, env, dist_m=m,
+                                               note="18–22 remadas/min")], None
+    warm, cool = 2000, 1000
+    if kind == "intervalos_1000":
+        n = max(3, min(5, (m - warm - cool) // 1500))
+        return f"Intervalos {n} × 1000 m", [_steady(S, "warmup", 2, anchors, env, dist_m=warm),
+                                             _repeat(n, [_steady(S, "interval", 4, anchors, env, dist_m=1000), _rest(180, kind="rest")]),
+                                             _steady(S, "cooldown", 1, anchors, env, dist_m=cool)], "Split do limiar, 24–28 remadas/min"
+    n = max(4, min(8, (m - warm - cool) // 750))
+    return f"Intervalos {n} × 500 m", [_steady(S, "warmup", 2, anchors, env, dist_m=warm),
+                                        _repeat(n, [_steady(S, "interval", 5, anchors, env, dist_m=500), _rest(120, kind="rest")]),
+                                        _steady(S, "cooldown", 1, anchors, env, dist_m=cool)], "Ritmo de prova de 2 km"
+
+
+def _walk(kind, vol, c, anchors, env, level, week_idx, phase, sport):
+    if sport == "trilha":
+        return "Trilha", [_steady(sport, "steady", 2, anchors, env, dur_s=vol * 3600,
+                                  note="some ~10 min para cada 100 m de subida; bastões ajudam na descida")], None
+    title = "Caminhada longa" if kind == "longo" else "Caminhada"
+    return title, [_steady(sport, "steady", 2, anchors, env, dist_m=vol * 1000, note="passo firme, ~100+ passos/min")], None
+
+
+def build_session(sport: str, kind: str, volume: float, c: dict, anchors: dict, level: str,
+                  week_idx: int = 0, phase: str = "base") -> dict:
+    """Uma sessão de resistência pronta (passos, alvos, duração e distância estimadas)."""
+    env, ex_id = sp.sport_env(sport, c.get("env"))
+    if kind in ("ativacao", "prova") and sport != "corrida":
+        kind = "leve"
+    if sport == "corrida":
+        title, steps, note = _run(kind, volume, c, anchors, env, level, week_idx, phase)
+    elif sport == "ciclismo":
+        title, steps, note = _bike(kind, volume, c, anchors, env, level, week_idx, phase)
+    elif sport == "natacao":
+        title, steps, note = _swim(kind, volume, c, anchors, env, level, week_idx, phase)
+    elif sport == "remo":
+        title, steps, note = _row(kind, volume, c, anchors, env, level, week_idx, phase)
+    else:
+        title, steps, note = _walk(kind, volume, c, anchors, env, level, week_idx, phase, sport)
+    flat = []
+    for st in steps:
+        flat += [x for _ in range(st["n"]) for x in st["steps"]] if st["kind"] == "repeat" else [st]
+    dur = sum(s.get("dur_s") or 0 for s in flat)
+    dist = sum(s.get("dist_m") or 0 for s in flat)
+    hard = kind in ("intervalado", "ritmo", "ritmo_prova", "sweet_spot", "limiar", "vo2", "css", "velocidade",
+                    "intervalos_1000", "intervalos_500", "teste", "prova")
+    zone = max((s.get("zone") or 1) for s in flat) if hard else (2 if kind != "regenerativo" else 1)
+    end = {"sport": sport, "env": env, "type": kind, "title": title, "steps": steps, "hard": hard, "zone": zone,
+           "dur_s": int(dur), "dist_m": int(dist) if dist else None, "note": note, "phase": phase}
+    if sport == "natacao":
+        end["pool_m"] = int(c.get("pool_m") or 25) if env == "piscina" else None
+    return {"exercise_id": ex_id, "phase": "principal", "sport": sport, "endurance": end,
+            "duration_min": round(dur / 60), "zone": zone, **({"distance_km": round(dist / 1000, 2)} if dist else {})}
+
+
+# ------------------------------------------------------- semana de uma modalidade
+def _week_roles(sport: str, c: dict, level: str, week_idx: int, phase: str, n: int, test_due: bool) -> list[str]:
+    """Papéis das sessões da semana: longo, qualidade(s) e leves."""
+    if n <= 0:
+        return []
+    g = c.get("goal") or {}
+    if phase == "prova":
+        # a prova entra na agenda no próprio dia; aqui só ativação e rodagens curtas
+        return (["ativacao"] if sport == "corrida" else ["leve"]) + ["regenerativo"] * (n - 2 if n > 2 else 0)
+    if phase == "recuperacao":
+        return ["regenerativo"] * n
+    roles = ["longo"] if n >= 2 or sport in ("trilha", "caminhada") else []
+    rot = QUALITY_ROTATION.get(sport) or []
+    n_quality = 0
+    if rot and phase not in ("recuperacao",):
+        n_quality = 1 if (n >= 3 or (n >= 2 and sport in ("natacao", "ciclismo", "remo"))) else 0
+        if n >= 5 and level in ("avancado", "elite") and phase not in ("polimento", "semana_leve", "prova"):
+            n_quality = 2
+        if sport == "corrida" and level == "iniciante" and week_idx < 4:
+            n_quality = 0  # iniciante: primeiro constrói base (educativos na rodagem)
+    q = []
+    for i in range(n_quality):
+        kind = rot[(week_idx + i) % len(rot)]
+        if sport == "corrida" and g.get("type") in ("prova", "evento") and phase in ("pico", "polimento") and i == 0:
+            kind = "ritmo_prova" if _goal_pace(sport, c) else kind
+        if sport == "ciclismo" and level == "iniciante":
+            kind = "sweet_spot"
+        q.append(kind)
+    if test_due and rot and phase in ("base", "construcao", "manutencao", "semana_leve"):
+        if q:
+            q[0] = "teste"
+        else:
+            q.append("teste")
+    if sport == "natacao" and (c.get("env") == "aguas_abertas"):
+        q = []
+    rest = n - len(roles) - len(q)
+    easy = ["leve"] * max(0, rest)
+    if phase == "recuperacao":
+        easy = ["regenerativo"] * len(easy)
+    out = roles + q + easy
+    return out[:n] if len(out) > n else out
+
+
+def _split_volume(sport: str, roles: list[str], vol: float, c: dict, level: str) -> list[float]:
+    n = len(roles)
+    if not n:
+        return []
+    mn = VOLUME[sport]["min"]
+    shares = {}
+    g = c.get("goal") or {}
+    if "longo" in roles:
+        long_v = vol * LONG_SHARE.get(min(n, 7), 0.22)
+        dist = float(g.get("distance") or 0)
+        if sport in LONG_CAP and (g.get("type") in ("prova", "evento") and dist):
+            cap = _lookup(LONG_CAP[sport], dist)
+            if sport == "natacao":
+                cap = max(cap, dist * 1.2)
+            long_v = min(long_v, cap)
+        shares["longo"] = max(mn, long_v)
+    q_share = QUALITY_SHARE.get(sport, 0.2)
+    out = []
+    used = sum(shares.values())
+    quality = [r for r in roles if r not in ("longo", "leve", "regenerativo", "ativacao")]
+    q_min = {"corrida": 5.0 if level == "iniciante" else 6.5, "ciclismo": 1.0, "natacao": 1500, "remo": 6000}.get(sport, mn)
+    q_vol = max(q_min, vol * q_share)
+    used += q_vol * len(quality)
+    easy_n = sum(1 for r in roles if r in ("leve", "regenerativo", "ativacao"))
+    easy_v = max(mn, (vol - used) / easy_n) if easy_n else 0
+    for r in roles:
+        out.append(shares["longo"] if r == "longo" else q_vol if r in quality and r != "ativacao" else easy_v)
+    return out
+
+
+def _round_vol(sport: str, v: float) -> float:
+    unit = VOLUME[sport]["unit"]
+    if unit == "km":
+        return round(v * 2) / 2
+    if unit == "h":
+        return round(v * 4) / 4
+    return int(round(v / 100) * 100)
+
+
+def week_plan(profile: dict, ws: date, start: date, tier_key: str = "intermediario",
+              recent: dict | None = None, today: date | None = None) -> dict:
+    """Todas as sessões de resistência da semana, por modalidade (sem dia definido)."""
+    cfg = config(profile)
+    level = _level(tier_key)
+    anchors = sp.anchors_of(profile)
+    week_idx = max(0, (ws - start).days // 7)
+    end_cfg = (profile or {}).get("endurance") or {}
+    out = {}
+    test_slot_used = False
+    for sport, c in cfg.items():
+        wv = week_volume(sport, c, level, week_idx, ws, recent)
+        n = int(c["sessions"])
+        test_due = False
+        if end_cfg.get("tests", True) and sport in ANCHOR_KEY and not test_slot_used:
+            meta = (end_cfg.get("anchors_meta") or {}).get(ANCHOR_KEY[sport]) or {}
+            last = _d(meta.get("date"))
+            missing = not anchors.get(ANCHOR_KEY[sport])
+            stale = last is not None and (ws - last).days >= TEST_EVERY_WEEKS * 7
+            # teste só fora de semana de prova/polimento e no máximo um por semana
+            test_due = (missing and week_idx in (0, 1)) or stale
+            if test_due:
+                test_slot_used = True
+        roles = _week_roles(sport, c, level, week_idx, wv["phase"], n, test_due)
+        vols = _split_volume(sport, roles, wv["volume"], c, level)
+        sessions = []
+        for r, v in zip(roles, vols):
+            s = build_session(sport, r, _round_vol(sport, v), c, anchors, level, week_idx, wv["phase"])
+            s["endurance"]["role"] = "longo" if r == "longo" else ("qualidade" if s["endurance"]["hard"] else "leve")
+            sessions.append(s)
+        out[sport] = {"volume": _round_vol(sport, wv["volume"]), "unit": VOLUME[sport]["unit"], "phase": wv["phase"],
+                      "phase_pt": PHASE_PT.get(wv["phase"], wv["phase"]), "weeks_to_race": wv.get("weeks_to_race"),
+                      "sessions": sessions}
+    _cap_hard(out, level, anchors)
+    return {"week_idx": week_idx, "sports": out, "bricks": _bricks(profile, out, week_idx)}
+
+
+def _cap_hard(out: dict, level: str, anchors: dict) -> None:
+    """No máximo 3 sessões fortes na semana (2 para iniciante): o resto vira leve."""
+    cap = 2 if level == "iniciante" else 3
+    hard = [(s, i) for s, d in out.items() for i, x in enumerate(d["sessions"]) if x["endurance"]["hard"]
+            and x["endurance"]["type"] != "teste"]
+    goal_first = sorted(hard, key=lambda t: 0 if t[0] == "corrida" else 1)
+    for s, i in goal_first[cap:]:
+        old = out[s]["sessions"][i]
+        vol = (old.get("distance_km") or 0) if VOLUME[s]["unit"] == "km" else (
+            old["duration_min"] / 60 if VOLUME[s]["unit"] == "h" else (old["endurance"].get("dist_m") or 1000))
+        c = {"env": old["endurance"]["env"]}
+        new = build_session(s, "leve", _round_vol(s, vol), c, anchors, level)
+        new["endurance"]["role"] = "leve"
+        new["endurance"]["note"] = "Era sessão forte: virou leve para não passar de 3 intensas na semana"
+        out[s]["sessions"][i] = new
+
+
+def _bricks(profile: dict, out: dict, week_idx: int) -> list[dict]:
+    """Brick (bike + corrida em seguida) 1×/semana na construção e no pico de triathlon/duathlon."""
+    ev = ((profile or {}).get("endurance") or {}).get("event") or {}
+    if ev.get("type") not in EVENTS or "corrida" not in out or "ciclismo" not in out:
+        return []
+    phase = out["corrida"]["phase"]
+    if phase not in ("construcao", "pico") or not ev["type"].startswith(("tri", "duathlon")):
+        return []
+    anchors = sp.anchors_of(profile)
+    run_c = {"env": "rua"}
+    run = build_session("corrida", "leve", 3.0 if "sprint" in ev["type"] else 5.0, run_c, anchors, "intermediario")
+    run["endurance"].update(title="Transição: corrida logo após o pedal", role="brick",
+                            note="Saia da bike e corra em até 5 min; os primeiros 1–2 km parecem pesados — é o treino")
+    run["endurance"]["steps"][0]["zone"] = 3
+    run["endurance"]["steps"][0]["target"] = sp.target_for("corrida", 3, anchors)
+    return [{"sport": "multi", "items": [run], "attach_to": "ciclismo:longo"}]
+
+
+# ------------------------------------------------------------- dias da semana
+LEG_SPORTS = {s for s, d in sp.SPORTS.items() if d["legs"]}
+
+
+def allocate(slots: list[dict], avail: list[int], n_strength: int, long_day_pref: dict[str, int] | None = None) -> dict:
+    """Escolhe o dia de cada sessão de resistência e os dias de força.
+
+    slots: [{key, sport, role: longo|qualidade|leve, minutes}]
+    Retorna {key: weekday, ..., "_strength": [weekdays], "_doubles": [keys em dia de força]}.
+    """
+    avail = sorted(set(avail))
+    long_day_pref = long_day_pref or {}
+    day_load: dict[int, list[dict]] = {d: [] for d in avail}
+    placed: dict[str, int] = {}
+
+    def dist(a, b):
+        return min((a - b) % 7, (b - a) % 7)
+
+    weekend = [d for d in (5, 6) if d in avail] or avail[-1:]
+
+    def is_long(x):  # longo que pesa (pernas); nado contínuo entra como sessão leve
+        return x["role"] == "longo" and x["sport"] in LEG_SPORTS
+
+    # 1) longos: dia preferido → fim de semana → último dia; um longo por dia
+    for s in sorted([x for x in slots if is_long(x)], key=lambda x: -x["minutes"]):
+        prefs = ([long_day_pref[s["sport"]]] if s["sport"] in long_day_pref else []) + weekend + avail[::-1]
+        day = next((d for d in prefs if d in day_load and not any(o["role"] == "longo" for o in day_load[d])), None)
+        if day is None:
+            day = min(avail, key=lambda d: len(day_load[d]))
+        day_load[day].append(s)
+        placed[s["key"]] = day
+    longs = [placed[s["key"]] for s in slots if is_long(s)]
+    # 2) qualidade: longe dos longos e de outras qualidades
+    for s in [x for x in slots if x["role"] == "qualidade"]:
+        def score(d):
+            if any(o["role"] in ("longo", "qualidade") for o in day_load[d]):
+                return -100
+            near_long = min((dist(d, l) for l in longs), default=7)
+            near_q = min((dist(d, placed[k]) for k in placed if any(x["key"] == k and x["role"] == "qualidade" for x in slots)), default=7)
+            before_long = any((d + 1) % 7 == l for l in longs)
+            return min(near_long, 3) * 2 + min(near_q, 3) - (3 if before_long else 0) - len(day_load[d])
+        day = max(avail, key=score)
+        day_load[day].append(s)
+        placed[s["key"]] = day
+    # 3) dias de força: dias sem longo/qualidade, espalhados; longo e qualidade só em último caso
+    hard_leg_days = {placed[s["key"]] for s in slots if (is_long(s) or s["role"] == "qualidade") and s["sport"] in LEG_SPORTS}
+    strength: list[int] = []
+
+    def s_score(d):
+        load = day_load[d]
+        pen = 0
+        if any(is_long(o) for o in load):
+            pen += 100
+        if any(o["role"] == "qualidade" for o in load):
+            pen += 50 if any(o["sport"] in LEG_SPORTS for o in load) else 20
+        pen += 10 * sum(1 for x in strength if dist(d, x) <= 1)  # evita força em dias seguidos
+        pen += 5 if any((d - 1) % 7 == l for l in longs) else 0  # dia seguinte ao longão: pernas cansadas
+        return pen
+    while len(strength) < n_strength and len(strength) < len(avail):
+        d = min((x for x in avail if x not in strength), key=s_score)
+        strength.append(d)
+    strength.sort()
+    # 4) leves: dia livre (sem força nem resistência) → dia de força sem perna pesada → menos carregado
+    doubles = []
+    for s in [x for x in slots if not is_long(x) and x["role"] != "qualidade"]:
+        empty = [d for d in avail if not day_load[d] and d not in strength]
+        if empty:
+            day = max(empty, key=lambda d: min((dist(d, l) for l in hard_leg_days), default=7))
+        else:
+            def sc(d):
+                return (len(day_load[d]) + (1 if d in strength else 0)
+                        + (1 if any(o["role"] == "qualidade" or is_long(o) for o in day_load[d]) else 0)
+                        + (2 if s["sport"] in LEG_SPORTS and d in hard_leg_days else 0)
+                        + (1 if any(o["sport"] == s["sport"] for o in day_load[d]) else 0))
+            day = min(avail, key=sc)
+        day_load[day].append(s)
+        placed[s["key"]] = day
+        if day in strength:
+            doubles.append(s["key"])
+    for s in slots:
+        d = placed[s["key"]]
+        if d in strength or len(day_load[d]) > 1:
+            doubles.append(s["key"])
+    doubles = sorted(set(doubles))
+    return {**placed, "_strength": strength, "_doubles": doubles, "_hard_leg_days": sorted(hard_leg_days)}
+
+
+# ------------------------------------------------------------ previsões
+def bike_speed_kmh(power_w: float, weight_kg: float = 75, cda: float = 0.32, crr: float = 0.004) -> float:
+    """Velocidade no plano para uma potência (modelo físico simples, sem vento)."""
+    m, g, rho, eta = weight_kg + 9, 9.81, 1.2, 0.97
+    lo, hi = 0.5, 25.0
+    for _ in range(60):
+        v = (lo + hi) / 2
+        p = (crr * m * g + 0.5 * rho * cda * v * v) * v / eta
+        lo, hi = (v, hi) if p < power_w else (lo, v)
+    return round(v * 3.6, 1)
+
+
+def predictions(profile: dict) -> dict:
+    """Previsões por modalidade e do evento a partir das âncoras atuais."""
+    a = sp.anchors_of(profile)
+    cfg = config(profile)
+    out: dict = {"sports": {}}
+    for s, c in cfg.items():
+        g = c.get("goal") or {}
+        if s == "corrida" and a.get("run_vdot"):
+            dists = [5, 10, 21.1, 42.2]
+            out["sports"][s] = {"vdot": a["run_vdot"], "times": {str(d): sp.fmt_duration(sp.predict_time(a["run_vdot"], d)) for d in dists}}
+            if g.get("type") == "prova" and g.get("distance"):
+                pred = sp.predict_time(a["run_vdot"], float(g["distance"]))
+                tgt = sp.parse_duration(g.get("target"))
+                out["sports"][s]["goal"] = _goal_check(pred, tgt, g, a["run_vdot"], float(g["distance"]))
+        elif s == "natacao" and a.get("css_s100"):
+            out["sports"][s] = {"css": sp.fmt_pace(a["css_s100"], "/100m"),
+                                "times": {str(d): sp.fmt_duration((a["css_s100"] + (2 if d <= 400 else 5)) * d / 100) for d in (400, 750, 1500, 1900, 3800)}}
+        elif s == "ciclismo" and a.get("ftp_w"):
+            w = float((profile or {}).get("weight_kg") or 75)
+            out["sports"][s] = {"ftp": a["ftp_w"], "w_kg": round(a["ftp_w"] / w, 2),
+                                "speed_kmh": {"1h (100%)": bike_speed_kmh(a["ftp_w"], w), "olímpico (88%)": bike_speed_kmh(a["ftp_w"] * 0.88, w),
+                                              "70.3 (78%)": bike_speed_kmh(a["ftp_w"] * 0.78, w), "Ironman (70%)": bike_speed_kmh(a["ftp_w"] * 0.70, w)}}
+        elif s == "remo" and a.get("row_2k_s"):
+            out["sports"][s] = {"2k": sp.fmt_duration(a["row_2k_s"]), "split": sp.fmt_pace(sp.row_split(a["row_2k_s"]), "/500m")}
+    ev = ((profile or {}).get("endurance") or {}).get("event") or {}
+    if ev.get("type") in EVENTS:
+        out["event"] = event_prediction(profile, ev)
+    return out
+
+
+def _goal_check(pred: float, tgt: float | None, g: dict, vd: float, dist: float) -> dict:
+    res = {"predicted": sp.fmt_duration(pred), "target": sp.fmt_duration(tgt) if tgt else None}
+    if tgt:
+        need = sp.vdot(dist, tgt) or vd
+        race = _d(g.get("date"))
+        weeks = max(0, (race - date.today()).days // 7) if race else 12
+        realistic_gain = weeks / 4 * 1.0  # ~1 ponto de VDOT a cada 4 semanas de treino consistente
+        res.update(gap_s=round(pred - tgt), vdot_needed=need,
+                   status="no_alvo" if pred <= tgt else ("possivel" if need - vd <= realistic_gain else "ambicioso"))
+        if res["status"] == "ambicioso":
+            res["realistic"] = sp.fmt_duration(sp.predict_time(vd + realistic_gain, dist))
+    return res
+
+
+def event_prediction(profile: dict, ev: dict) -> dict:
+    e = EVENTS[ev["type"]]
+    a = sp.anchors_of(profile)
+    w = float((profile or {}).get("weight_kg") or 75)
+    parts, total, missing = [], 0.0, []
+    bike_frac = {"tri_supersprint": 0.92, "tri_sprint": 0.9, "tri_olimpico": 0.85, "tri_meio": 0.78, "tri_ironman": 0.70,
+                 "duathlon_sprint": 0.88, "duathlon_padrao": 0.84, "aquathlon": 0.8}[ev["type"]]
+    for s, d in e["legs"]:
+        t = None
+        if s == "natacao" and a.get("css_s100"):
+            t = (a["css_s100"] + 4) * d / 100
+        elif s == "ciclismo" and a.get("ftp_w"):
+            t = d / bike_speed_kmh(a["ftp_w"] * bike_frac, w) * 3600
+        elif s == "corrida" and a.get("run_vdot"):
+            t = sp.predict_time(a["run_vdot"], d) * e["fatigue"]
+        if t is None:
+            missing.append(sp.SPORTS[s]["name"])
+        else:
+            total += t
+        parts.append({"sport": s, "distance": d, "time": sp.fmt_duration(t) if t else None})
+    trans = 120 if "supersprint" in ev["type"] or "sprint" in ev["type"] else 240 if "olimpico" in ev["type"] or "padrao" in ev["type"] else 480
+    total += trans if not missing else 0
+    tgt = sp.parse_duration(ev.get("target"))
+    return {"name": e["name"], "date": ev.get("date"), "legs": parts, "transitions": sp.fmt_duration(trans),
+            "predicted": sp.fmt_duration(total) if not missing else None, "missing_anchors": missing,
+            "target": sp.fmt_duration(tgt) if tgt else None,
+            "gap_s": round(total - tgt) if tgt and not missing else None}

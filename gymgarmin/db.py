@@ -325,7 +325,8 @@ def get_plan(plan_id: int, user_id: int = 1) -> dict | None:
 
 
 def _plan_data(plan: dict) -> str:
-    keep = {k: plan.get(k) for k in ("days", "days_per_week", "notes", "goal", "generator", "goals_week", "rationale")
+    keep = {k: plan.get(k) for k in ("days", "days_per_week", "notes", "goal", "generator", "goals_week", "rationale",
+                                     "endurance_plan")
             if k in plan}
     keep.setdefault("days", [])
     return json.dumps(keep, ensure_ascii=False)

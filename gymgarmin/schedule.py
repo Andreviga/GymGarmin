@@ -16,6 +16,10 @@ Fluxo:
     3. Cardio perdido vira minutos extras nos dias de cardio ou finalizadores.
     4. O que não couber é informado, e o reajuste pode ser DESFEITO.
 - Treinos já enviados ao Garmin que mudaram ficam marcados para reenviar.
+- Resistência (corrida, bike, natação…): as sessões são remontadas a cada semana com o
+  volume e a fase daquela semana; a prova entra no próprio dia. Longão ou sessão forte
+  perdidos vão para um dia livre sem colar em outro forte; se não houver, a próxima
+  sessão leve da modalidade vira a forte (ou o longão é parcialmente compensado).
 """
 
 from __future__ import annotations
@@ -25,7 +29,7 @@ import math
 from collections import defaultdict
 from datetime import date, datetime, timedelta
 
-from . import catalog, db
+from . import catalog, db, endurance, load
 from .generator import WEEKDAYS, _cardio_equiv, _default_days, item_time, time_breakdown, weekly_targets, tier_for
 from .muscles import PRIMARY_WEIGHT, muscle_pt
 from .progression import apply_cycle, cycle_position
@@ -77,29 +81,128 @@ def session_budget(profile: dict, plan: dict | None = None) -> float:
     return float(profile.get("session_minutes") or gen.get("session_minutes") or 60)
 
 
+def _endurance_week(plan: dict, profile: dict, ws: date) -> dict | None:
+    ep = plan.get("endurance_plan")
+    if not ep or not endurance.active(profile):
+        return None
+    start = _d(ep.get("start")) or ws
+    return endurance.week_plan(profile, ws, start, ep.get("tier") or "intermediario")
+
+
+def _assign_sessions(days: list[dict], wp: dict) -> dict[int, dict | None]:
+    """Distribui as sessões da semana nos slots da planilha, casando pelo papel (longo/forte/leve)."""
+    out: dict[int, dict | None] = {}
+    for sport, d in (wp or {}).get("sports", {}).items():
+        slots = [(i, day) for i, day in enumerate(days) if (day.get("endurance_slot") or {}).get("sport") == sport]
+        sessions = list(d["sessions"])
+        free = {i: day for i, day in slots}
+        long_wd = next((day["weekday"] for i, day in slots if day["endurance_slot"]["role"] == "longo"), None)
+
+        def take(role_slot, pred):
+            for i, day in list(free.items()):
+                if day["endurance_slot"]["role"] == role_slot:
+                    sess = next((x for x in sessions if pred(x)), None)
+                    if sess:
+                        out[i] = sess
+                        sessions.remove(sess)
+                        free.pop(i)
+        take("longo", lambda x: x["endurance"]["role"] == "longo")
+        take("qualidade", lambda x: x["endurance"]["hard"])
+        # sessões fortes que sobraram vão no slot leve mais longe do longão
+        for sess in [x for x in sessions if x["endurance"]["hard"]]:
+            if not free:
+                break
+            i = max(free, key=lambda k: min((free[k]["weekday"] - long_wd) % 7, (long_wd - free[k]["weekday"]) % 7)
+                    if long_wd is not None else 0)
+            out[i] = sess
+            sessions.remove(sess)
+            free.pop(i)
+        for i in list(free):
+            out[i] = sessions.pop(0) if sessions else None
+    return out
+
+
+def _race_entries(plan: dict, profile: dict, ws: date, wp: dict | None) -> list[dict]:
+    """Prova (ou evento multiesporte) no próprio dia, quando cai nesta semana."""
+    if not wp:
+        return []
+    out = []
+    cfg = endurance.config(profile)
+    anchors = endurance.sp.anchors_of(profile)
+    ev = ((profile or {}).get("endurance") or {}).get("event") or {}
+    ev_date = _d(ev.get("date")) if ev.get("type") in endurance.EVENTS else None
+    if ev_date and ws <= ev_date < ws + timedelta(days=7):
+        e = endurance.EVENTS[ev["type"]]
+        items = []
+        for s_key, dist in e["legs"]:
+            c = cfg.get(s_key) or {"env": next(iter(endurance.sp.SPORTS[s_key]["envs"]))}
+            vol = dist if s_key != "ciclismo" else dist / endurance.sp.speed_mps("ciclismo", 4, anchors) / 3.6
+            kind = "leve"
+            it = endurance.build_session(s_key, kind, vol if s_key != "natacao" else dist, c, anchors, "intermediario")
+            it["endurance"].update(title=f"{endurance.sp.SPORTS[s_key]['name']} {dist:g} {'m' if s_key == 'natacao' else 'km'}",
+                                   type="prova", hard=True, role="prova")
+            for st in it["endurance"]["steps"]:
+                st["zone"] = 4 if s_key != "ciclismo" else 3
+                st["target"] = endurance.sp.target_for(s_key, st["zone"], anchors)
+            items.append(it)
+        out.append({"date": ev_date.isoformat(), "plan_id": plan["id"], "day_idx": None, "status": "planejado",
+                    "day_name": f"EVENTO: {e['name']}", "kind": "resistencia", "race": True, "items": items, "changes": []})
+        return out
+    for s_key, c in cfg.items():
+        g = c.get("goal") or {}
+        rd = _d(g.get("date")) if g.get("type") == "prova" else None
+        if rd and ws <= rd < ws + timedelta(days=7):
+            it = endurance.build_session(s_key, "prova", float(g.get("distance") or 5), c, anchors, "intermediario")
+            out.append({"date": rd.isoformat(), "plan_id": plan["id"], "day_idx": None, "status": "planejado",
+                        "day_name": it["endurance"]["title"], "kind": "resistencia", "race": True, "items": [it], "changes": []})
+    return out
+
+
 def build_week(plan: dict, profile: dict, ws: date, from_date: date | None = None) -> list[dict]:
     gen = plan.get("generator") or {}
     pos = cycle_position(gen.get("cycle_start") or plan.get("created_at"), ws, gen.get("cycle_weeks") or 5)
     avail = available_days(profile)
-    used: set[int] = set()
+    days = plan.get("days") or []
+    wp = _endurance_week(plan, profile, ws)
+    sessions_by_day = _assign_sessions(days, wp) if wp else {}
+    used: dict[int, list[dict]] = defaultdict(list)
     entries = []
     free = iter([d for d in avail])
-    for idx, day in enumerate(plan.get("days") or []):
+    for idx, day in enumerate(days):
         wd = day.get("weekday")
-        if wd is None or wd in used:
-            wd = next((d for d in free if d not in used), None)
-            if wd is None:
+        # dois treinos no mesmo dia só quando a planilha marca (força + resistência)
+        if wd is None or (used.get(wd) and not day.get("double") and not any(x.get("double") for x in used[wd])):
+            nwd = next((d for d in free if d not in used), None)
+            if nwd is None and wd is None:
                 break
-        used.add(wd)
+            wd = nwd if nwd is not None else wd  # sem dia livre: mantém no dia (dois treinos)
+        used[wd].append(day)
         dt = ws + timedelta(days=wd)
         if from_date and dt < from_date:
             continue
+        items = apply_cycle(day.get("items", []), pos, int(gen.get("ramp_sets") or 0))
+        name = _clean_name(day.get("name") or f"Treino {idx + 1}")
+        extra = {}
+        if day.get("endurance_slot") and wp:
+            sess = sessions_by_day.get(idx)
+            if sess is None:
+                continue  # semana com menos sessões (prova, recuperação)
+            sport = day["endurance_slot"]["sport"]
+            items = [sess] + [i for i in day.get("items", []) if i.get("phase") == "pos"]
+            if day.get("brick"):
+                items = [sess] + [b for br in (wp.get("bricks") or []) for b in br["items"]]
+            name = f"{endurance.sp.SPORTS[sport]['name']}: {sess['endurance']['title']}"
+            extra = {"sport": sport, "endurance_phase": wp["sports"][sport]["phase_pt"]}
         entries.append({
             "date": dt.isoformat(), "plan_id": plan["id"], "day_idx": idx, "status": "planejado",
-            "day_name": _clean_name(day.get("name") or f"Treino {idx + 1}"), "kind": _kind(day),
-            "items": apply_cycle(day.get("items", []), pos, int(gen.get("ramp_sets") or 0)),
-            "cycle": pos, "changes": [],
+            "day_name": name, "kind": _kind(day), "items": items, "cycle": pos, "changes": [], **extra,
         })
+    for race in _race_entries(plan, profile, ws, wp):
+        if not from_date or _d(race["date"]) >= from_date:
+            # no dia da prova, os outros treinos daquele dia saem
+            entries = [e for e in entries if e["date"] != race["date"]]
+            entries.append(race)
+    entries.sort(key=lambda e: (e["date"], e.get("kind") != "forca"))
     return entries
 
 
@@ -115,11 +218,27 @@ def sync_status(entries: list[dict], sessions: list[dict], today: date) -> list[
     for s in sessions:
         if not s.get("schedule_id"):
             by_date[s["date"][:10]].append(s)
+    per_date = defaultdict(int)
+    for e in entries:
+        per_date[e["date"]] += 1
+
+    def matches(e, sess_list):
+        if per_date[e["date"]] <= 1:
+            return bool(sess_list)
+        for sx in sess_list:
+            sports_done = {load.sport_of(it) for it in sx.get("items", []) if load.sport_of(it)}
+            strength_done = any(it.get("sets") for it in sx.get("items", []))
+            if e.get("kind") == "resistencia" and e.get("sport") in sports_done:
+                return True
+            if e.get("kind") == "forca" and strength_done:
+                return True
+        return False
+
     out = []
     for e in entries:
         status = e["status"]
         if status in ("planejado", "perdido"):
-            if e["id"] in by_sched or by_date.get(e["date"]):
+            if e["id"] in by_sched or matches(e, by_date.get(e["date"], [])):
                 status = "feito"
             elif _d(e["date"]) < today and status == "planejado":
                 status = "perdido"
@@ -255,6 +374,17 @@ def handle_missed(entry_id: int, profile: dict, today: date | None = None) -> di
     future = [e for e in others if e["status"] == "planejado" and _d(e["date"]) >= today]
     if _d(missed["date"]) == today:
         future = [e for e in future if _d(e["date"]) > today]
+
+    if missed.get("kind") == "resistencia":
+        strategy, changes, unrecovered, created = _missed_endurance(missed, others, future, profile, ws, today)
+        for e in others:
+            if e.get("changes") != next((x.get("changes") for x in snapshot if x["id"] == e["id"]), None) or \
+                    e["items"] != next((x["items"] for x in snapshot if x["id"] == e["id"]), None):
+                db.save_entry(e)
+        missed["undo"] = {"snapshot": snapshot, "created": created}
+        missed["skip_result"] = {"strategy": strategy, "changes": changes, "at": datetime.now().isoformat(timespec="minutes")}
+        db.save_entry(missed)
+        return {"strategy": strategy, "changes": changes, "unrecovered": unrecovered}
 
     # ---------- 1) mover para um dia livre
     if missed.get("kind") == "forca" and _strength_items(missed):
@@ -417,6 +547,81 @@ def handle_missed(entry_id: int, profile: dict, today: date | None = None) -> di
     return {"strategy": strategy, "changes": changes, "unrecovered": unrecovered}
 
 
+def _end_item(e: dict) -> dict | None:
+    return next((i for i in e.get("items", []) if i.get("endurance")), None)
+
+
+def _is_heavy_end(e: dict) -> bool:
+    it = _end_item(e)
+    return bool(it and (it["endurance"].get("hard") or it["endurance"].get("role") == "longo")
+                and it.get("sport") in endurance.LEG_SPORTS)
+
+
+def _missed_endurance(missed: dict, others: list[dict], future: list[dict], profile: dict, ws: date, today: date):
+    """Longão/forte perdido: mover para dia livre seguro; senão trocar com a próxima leve; leve: só registra."""
+    it = _end_item(missed)
+    changes, unrecovered, created = [], [], []
+    if not it:
+        return "dispensar", ["Sem sessão de resistência para reajustar."], [], []
+    end = it["endurance"]
+    sport = it.get("sport")
+    role = end.get("role")
+    if role == "leve" and not end.get("hard"):
+        changes.append("Sessão leve perdida: não precisa compensar — o que constrói o condicionamento é a "
+                       "consistência das próximas semanas, não recuperar cada quilômetro.")
+        return "dispensar", changes, [], []
+    active_entries = [e for e in others if e["status"] in ("planejado", "feito")]
+    first = max(today + timedelta(days=1), ws)
+    for wd in available_days(profile):
+        cand = ws + timedelta(days=wd)
+        if cand < first or cand.isoformat() == missed["date"]:
+            continue
+        same = [e for e in active_entries if e["date"] == cand.isoformat()]
+        if any(e.get("kind") == "resistencia" for e in same):
+            continue
+        near = [e for e in active_entries if abs((_d(e["date"]) - cand).days) == 1]
+        if any(_is_heavy_end(e) for e in near) and sport in endurance.LEG_SPORTS:
+            continue
+        new = {k: copy.deepcopy(v) for k, v in missed.items() if k not in ("id", "undo", "garmin_workout_id", "garmin_outdated")}
+        new.update(date=cand.isoformat(), status="planejado", moved_from=missed["date"], changes=[])
+        _note(new, f"Movido de {_fmt(missed['date'])}")
+        saved = db.save_entry(new)
+        created.append(saved["id"])
+        changes.append(f"{missed['day_name']} foi para {_fmt(saved['date'])}" + (" (dia com musculação: faça em outro horário)" if same else "") + ".")
+        return "mover", changes, unrecovered, created
+    # sem dia livre: a próxima leve da modalidade vira a sessão perdida (forte) ou ganha volume (longão)
+    easy = [e for e in future if e.get("kind") == "resistencia" and e.get("sport") == sport and _end_item(e)
+            and not _end_item(e)["endurance"].get("hard") and _end_item(e)["endurance"].get("role") == "leve"]
+    if easy:
+        tgt = easy[0]
+        if end.get("hard"):
+            old_items = tgt["items"]
+            tgt["items"] = [copy.deepcopy(it)] + [i for i in old_items if not i.get("endurance")]
+            tgt["day_name"] = f"{endurance.sp.SPORTS[sport]['name']}: {end['title']}"
+            _note(tgt, f"Virou a sessão forte perdida em {_fmt(missed['date'])} (a leve sai)")
+            changes.append(f"{end['title']} entra no lugar da sessão leve de {_fmt(tgt['date'])}.")
+            return "trocar", changes, unrecovered, created
+        t_it = _end_item(tgt)
+        add = 0.3
+        for st in t_it["endurance"]["steps"]:
+            if st.get("kind") != "repeat":
+                for k in ("dist_m", "dur_s"):
+                    if st.get(k):
+                        st[k] = int(st[k] * (1 + add))
+        for k in ("duration_min", "distance_km"):
+            if t_it.get(k):
+                t_it[k] = round(t_it[k] * (1 + add), 2)
+        t_it["endurance"]["dur_s"] = int(t_it["endurance"]["dur_s"] * (1 + add))
+        _note(tgt, f"+30% de volume (compensa parte do longão de {_fmt(missed['date'])})")
+        changes.append(f"Sem dia livre: a sessão leve de {_fmt(tgt['date'])} ganhou 30% de volume. Não tente "
+                       "repor o longão inteiro de uma vez.")
+        unrecovered.append(f"{end['title']} (parte)")
+        return "redistribuir", changes, unrecovered, created
+    changes.append("Sem dia livre nem sessão leve para ajustar nesta semana: siga o plano da próxima.")
+    unrecovered.append(end["title"])
+    return "dispensar", changes, unrecovered, created
+
+
 def undo(entry_id: int) -> None:
     e = db.get_entry(entry_id)
     if not e or not e.get("undo"):
@@ -466,7 +671,43 @@ def week_goals(entries: list[dict], profile: dict, ws: date) -> dict:
     done_sets = sum(len(it.get("sets") or []) for s in sessions for it in s.get("items", []) if it.get("sets"))
     planned_sets = sum(int(i.get("sets") or 0) for e in planned for i in _strength_items(e))
     minutes_done = sum(time_breakdown(e.get("items", []))["total"] for e in entries if e["status"] == "feito")
+    end_goals = {}
+    plan_end = [e for e in planned if e.get("kind") == "resistencia" and e["status"] != "pulado"]
+    if plan_end:
+        from .sports import anchors_of
+
+        anchors = anchors_of(profile)
+        unit = {s: endurance.VOLUME[s]["unit"] for s in endurance.VOLUME}
+        done = defaultdict(float)
+        for sx in sessions:
+            st = load.session_stress(sx, anchors)
+            for sport_key, km in st["km"].items():
+                if unit.get(sport_key) == "km":
+                    done[sport_key] += km
+                elif unit.get(sport_key) == "m":
+                    done[sport_key] += km * 1000
+            for sport_key, mins in st["minutes"].items():
+                if unit.get(sport_key) == "h":
+                    done[sport_key] += mins / 60
+        plan_vol = defaultdict(float)
+        for e in plan_end:
+            for it in e["items"]:
+                en = it.get("endurance")
+                if not en:
+                    continue
+                u = unit.get(it.get("sport"))
+                if u == "km":
+                    plan_vol[it["sport"]] += (en.get("dist_m") or 0) / 1000
+                elif u == "m":
+                    plan_vol[it["sport"]] += en.get("dist_m") or 0
+                elif u == "h":
+                    plan_vol[it["sport"]] += (en.get("dur_s") or 0) / 3600
+        for sport_key, v in plan_vol.items():
+            r = 1 if unit[sport_key] != "m" else 0
+            end_goals[sport_key] = {"done": round(done.get(sport_key, 0), r), "planned": round(v, r), "unit": unit[sport_key],
+                                    "name": endurance.sp.SPORTS[sport_key]["name"]}
     return {
+        "endurance": end_goals,
         "sessions": {"done": sum(1 for e in entries if e["status"] == "feito") or len(sessions),
                      "planned": sum(1 for e in planned if e["status"] != "pulado")},
         "cardio": {"done": cardio["who_equivalent"], "target": round(target_cardio)},
