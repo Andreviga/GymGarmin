@@ -32,7 +32,24 @@ app = FastAPI(title="GymGarmin", version="0.1.0", lifespan=lifespan)
 
 
 def _profile() -> dict:
-    return db.get_profile()
+    """Perfil salvo; idade e peso em branco vêm do Garmin (zonas de FC e 1RM de barra dependem deles)."""
+    p = db.get_profile()
+    if p.get("age") and p.get("weight_kg"):
+        return p
+    try:
+        wk = json.loads(db.kv_get("health_weekly") or "{}")
+    except (TypeError, ValueError):
+        return p
+    filled = []
+    if not p.get("age") and wk.get("chron_age"):
+        p["age"] = int(wk["chron_age"])
+        filled.append("age")
+    if not p.get("weight_kg") and wk.get("weight_kg"):
+        p["weight_kg"] = round(float(wk["weight_kg"]), 1)
+        filled.append("weight_kg")
+    if filled:
+        p["_from_garmin"] = filled
+    return p
 
 
 def _with_status(ex: dict, lims: list[dict], overrides: dict | None = None) -> dict:
@@ -118,6 +135,7 @@ def get_profile():
 @app.put("/api/profile")
 def put_profile(body: dict = Body(...)):
     body.pop("hr_max_calc", None)
+    body.pop("_from_garmin", None)
     if body.get("training_months") not in (None, ""):
         body["level"] = generator.TIERS[generator.tier_for(body["training_months"])]["level"]
     return db.save_profile(body)

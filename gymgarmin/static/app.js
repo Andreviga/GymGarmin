@@ -1185,7 +1185,7 @@ async function viewPerfil() {
   <div class="card"><h2>Seus dados</h2>
     <div class="grid2">
       <div class="field"><label>Nome</label><input data-p="name" value="${esc(p.name || "")}"></div>
-      ${num("age", "Idade")}${num("weight_kg", "Peso (kg)", 'step="0.1"')}${num("height_cm", "Altura (cm)")}
+      ${num("age", `Idade${(p._from_garmin || []).includes("age") ? ' <span class="muted">(do Garmin)</span>' : ""}`)}${num("weight_kg", `Peso (kg)${(p._from_garmin || []).includes("weight_kg") ? ' <span class="muted">(do Garmin)</span>' : ""}`, 'step="0.1"')}${num("height_cm", "Altura (cm)")}
       ${num("hr_max", `FC máx. medida <span class="muted">(calculada: ${p.hr_max_calc ?? "—"})</span>`)}${num("hr_rest", "FC repouso")}
       <div class="field"><label>Sexo</label><select data-p="sex"><option value=""></option><option value="M" ${p.sex === "M" ? "selected" : ""}>Masculino</option><option value="F" ${p.sex === "F" ? "selected" : ""}>Feminino</option></select></div>
       <div class="field"><label>Nível</label><select data-p="level">${[["iniciante", "Iniciante (< 1 ano)"], ["intermediario", "Intermediário"], ["avancado", "Avançado (> 3 anos)"]].map(([v, t]) => `<option value="${v}" ${p.level === v ? "selected" : ""}>${t}</option>`).join("")}</select></div>

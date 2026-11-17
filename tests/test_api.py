@@ -103,3 +103,17 @@ def test_backup_roundtrip(client):
     r = client.post("/api/backup", json=b).json()
     assert r["plans"] == len(b["plans"])
     assert client.get("/api/profile").json()["name"] == "Teste"
+
+
+def test_profile_age_and_weight_fall_back_to_garmin(client):
+    import json as _j
+
+    from gymgarmin import db as _db
+
+    _db.kv_set("health_weekly", _j.dumps({"chron_age": 34.0, "weight_kg": 78.25, "date": "2026-11-17"}))
+    p = client.get("/api/profile").json()
+    assert p["age"] == 34 and p["weight_kg"] == 78.2 and set(p["_from_garmin"]) == {"age", "weight_kg"}
+    assert p["hr_max_calc"]  # zonas de FC já saem com a idade do relógio
+    client.put("/api/profile", json={**p, "age": 40})
+    p2 = client.get("/api/profile").json()
+    assert p2["age"] == 40 and p2["weight_kg"] == 78.2 and "_from_garmin" not in p2  # salvou: vale o perfil
