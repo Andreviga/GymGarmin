@@ -281,7 +281,7 @@ def create_session(body: dict = Body(...)):
             if e:
                 e["status"] = "feito"
                 db.save_entry(e)
-        return {**saved, "prs": history.session_prs(db.list_sessions(limit=1000), saved)}
+        return {**saved, "prs": history.session_prs(db.list_sessions(limit=5000), saved, _profile().get("weight_kg"))}
     except ValueError as e:
         raise HTTPException(409, str(e)) from e
 
@@ -351,12 +351,12 @@ def session_prefill(plan_id: int, idx: int):
 @app.get("/api/history")
 def history_overview():
     """Exercícios com histórico (tendência, recordes) e recordes dos últimos 30 dias."""
-    return history.overview(db.list_sessions(limit=5000))
+    return history.overview(db.list_sessions(limit=5000), bodyweight=_profile().get("weight_kg"))
 
 
 @app.get("/api/history/{exercise_id}")
 def history_exercise(exercise_id: str):
-    return history.exercise_history(db.list_sessions(limit=5000), exercise_id)
+    return history.exercise_history(db.list_sessions(limit=5000), exercise_id, bodyweight=_profile().get("weight_kg"))
 
 
 # ------------------------------------------------------------- análise ----

@@ -244,3 +244,4 @@ details > summary { cursor: pointer; padding: 10px 0; }
 .link-card { display: flex; text-decoration: none; color: var(--ink); min-height: 56px; }
 .link-card .chev { font-size: 26px; color: var(--ink-2); }
 .area + .area { border-top: 1px solid var(--line); padding-top: 8px; }
+.hist-table tr.suspect-row td { opacity: .55; text-decoration: line-through; }
