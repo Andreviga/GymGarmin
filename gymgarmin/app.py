@@ -14,8 +14,8 @@ from fastapi.staticfiles import StaticFiles
 
 from datetime import date, timedelta
 
-from . import (analysis, catalog, db, garmin_export, garmin_sync, generator, history, limitations, plans_io,
-               progression, schedule, templates)
+from . import (analysis, calibration, catalog, db, endurance, garmin_export, garmin_sync, generator, history, limitations,
+               load, plans_io, progression, readiness, schedule, sports, templates)
 from .muscles import EQUIPMENT_PT, HR_ZONES, MUSCLES, hr_max, zone_bpm
 
 STATIC = Path(__file__).resolve().parent / "static"
@@ -391,10 +391,24 @@ def _run_sync(trigger: str) -> dict:
     plan_ids = {it.get("exercise_id") for p in db.list_plans() for d in p.get("days", []) for it in d.get("items", [])}
     p = _profile()
     try:
-        return garmin_sync.sync(db.save_session, db.garmin_imported_ids(), plan_ids,
-                                hr_max(p.get("age"), p.get("hr_max")), trigger=trigger)
+        r = garmin_sync.sync(db.save_session, db.garmin_imported_ids(), plan_ids,
+                             hr_max(p.get("age"), p.get("hr_max")), trigger=trigger)
     except garmin_sync.GarminUnavailable as e:
         raise HTTPException(501, str(e)) from e
+    if r.get("ok") and garmin_sync._client is not None:
+        today = date.today()
+        if trigger != "cron":  # à noite a prontidão do dia já não importa
+            try:
+                _refresh_readiness(today, auto_apply=True)
+            except Exception:  # noqa: BLE001 - prontidão é opcional
+                pass
+        try:
+            gm = json.loads(db.kv_get("garmin_metrics") or "{}")
+            if not gm or gm.get("date", "") < (today - timedelta(days=3)).isoformat():
+                db.kv_set("garmin_metrics", json.dumps(calibration.garmin_metrics(garmin_sync._client, today)))
+        except Exception:  # noqa: BLE001
+            pass
+    return r
 
 
 @app.post("/api/garmin/sync")
@@ -432,6 +446,157 @@ def g_import(activity_id: int):
         raise HTTPException(401, str(e)) from e
 
 
+# ------------------------------------------------- resistência / multiesporte ----
+
+def _recent(prof: dict) -> dict:
+    return endurance.recent_volumes(db.list_sessions(limit=400), prof)
+
+
+def _endurance_cfg(prof: dict) -> dict:
+    return dict(prof.get("endurance") or {})
+
+
+@app.get("/api/endurance/options")
+def endurance_options():
+    return endurance.options()
+
+
+@app.get("/api/endurance/overview")
+def endurance_overview():
+    """Âncoras, zonas, previsões, sugestões de recalibração, carga e prontidão."""
+    prof = _profile()
+    anchors = sports.anchors_of(prof)
+    cfg = endurance.config(prof)
+    sessions = db.list_sessions(limit=2000)
+    gm = json.loads(db.kv_get("garmin_metrics") or "{}")
+    meta = (_endurance_cfg(prof).get("anchors_meta") or {})
+    anchors_out = []
+    for key, label in calibration.ANCHOR_LABEL.items():
+        anchors_out.append({"key": key, "label": label, "value": anchors.get(key),
+                            "text": calibration.fmt_anchor(key, anchors.get(key)),
+                            "date": (meta.get(key) or {}).get("date"), "source": (meta.get(key) or {}).get("source")})
+    return {
+        "config": _endurance_cfg(prof),
+        "active": list(cfg),
+        "anchors": anchors_out,
+        "zones": {s: sports.zones_table(s, anchors) for s in cfg},
+        "predictions": endurance.predictions(prof),
+        "suggestions": calibration.suggestions(sessions, anchors, gm),
+        "garmin_metrics": gm,
+        "recent": endurance.recent_volumes(sessions, prof),
+        "load": {k: v for k, v in load.pmc(sessions, prof).items() if k != "series"},
+        "readiness": _readiness_view(date.today()),
+    }
+
+
+@app.put("/api/endurance")
+def endurance_save(body: dict = Body(...)):
+    """Salva modalidades/evento/opções (mantém âncoras e o histórico delas)."""
+    prof = _profile()
+    cur = _endurance_cfg(prof)
+    for k in ("sports", "event", "tests", "readiness_auto"):
+        if k in body:
+            cur[k] = body[k]
+    db.save_profile({"endurance": cur})
+    return cur
+
+
+def _set_anchor(key: str, value: float, source: str) -> dict:
+    if key not in calibration.ANCHOR_LABEL:
+        raise HTTPException(400, "Âncora desconhecida")
+    prof = _profile()
+    cur = _endurance_cfg(prof)
+    anchors = dict(cur.get("anchors") or {})
+    meta = dict(cur.get("anchors_meta") or {})
+    anchors[key] = round(float(value), 1)
+    meta[key] = {"date": date.today().isoformat(), "source": source}
+    cur.update(anchors=anchors, anchors_meta=meta)
+    db.save_profile({"endurance": cur})
+    return {"key": key, "value": anchors[key], "text": calibration.fmt_anchor(key, anchors[key]), "source": source}
+
+
+@app.post("/api/anchors")
+def anchors_set(body: dict = Body(...)):
+    return _set_anchor(body.get("key"), body.get("value"), body.get("source") or "manual")
+
+
+@app.post("/api/anchors/test")
+def anchors_test(body: dict = Body(...)):
+    try:
+        key, value = calibration.from_test(body.get("sport"), body.get("data") or {})
+    except (ValueError, TypeError) as e:
+        raise HTTPException(400, str(e)) from e
+    return _set_anchor(key, value, f"teste ({date.today().strftime('%d/%m')})")
+
+
+@app.get("/api/load")
+def load_chart(days: int = 90):
+    return load.pmc(db.list_sessions(limit=5000), _profile(), days=days)
+
+
+# ---- prontidão
+
+def _readiness_view(day: date) -> dict | None:
+    raw = db.kv_get(f"readiness:{day.isoformat()}")
+    if not raw:
+        return None
+    data = json.loads(raw)
+    sc = readiness.score(data, load.pmc(db.list_sessions(limit=2000), _profile(), days=14)["form"])
+    return {**data, **sc, "text": readiness.ACTION_TEXT[sc["action"]]}
+
+
+def _refresh_readiness(day: date, auto_apply: bool = False) -> dict | None:
+    data = readiness.fetch(garmin_sync.client(), day)
+    db.kv_set(f"readiness:{day.isoformat()}", json.dumps(data))
+    view = _readiness_view(day)
+    if auto_apply and view and _endurance_cfg(_profile()).get("readiness_auto"):
+        _apply_readiness(day, view["action"])
+    return view
+
+
+def _apply_readiness(day: date, action: str) -> list[dict]:
+    anchors = sports.anchors_of(_profile())
+    out = []
+    for e in db.list_schedule(day.isoformat(), day.isoformat()):
+        new = readiness.adjust_entry(e, action, anchors)
+        if new:
+            out.append(db.save_entry(new))
+    return out
+
+
+@app.get("/api/readiness")
+def readiness_get():
+    return _readiness_view(date.today()) or {"score": None, "level": "sem_dados", "action": "seguir"}
+
+
+@app.post("/api/readiness/refresh")
+def readiness_refresh():
+    try:
+        return _refresh_readiness(date.today())
+    except RuntimeError as e:
+        raise HTTPException(401, str(e)) from e
+
+
+@app.post("/api/readiness/apply")
+def readiness_apply(body: dict = Body(default={})):
+    view = _readiness_view(date.today())
+    action = body.get("action") or (view or {}).get("action") or "seguir"
+    if action not in readiness.ACTION_TEXT:
+        raise HTTPException(400, "Ação inválida")
+    return {"action": action, "changed": [e["day_name"] for e in _apply_readiness(date.today(), action)]}
+
+
+@app.post("/api/readiness/undo/{entry_id}")
+def readiness_undo(entry_id: int):
+    e = db.get_entry(entry_id)
+    if not e:
+        raise HTTPException(404, "Treino não encontrado")
+    try:
+        return db.save_entry(readiness.undo_entry(e))
+    except ValueError as err:
+        raise HTTPException(400, str(err)) from err
+
+
 # ----------------------------------------------------- gerador automático ----
 
 @app.get("/api/generator/options")
@@ -447,7 +612,7 @@ def generator_options():
 @app.post("/api/generator/preview")
 def generator_preview(body: dict = Body(default={})):
     prof = {**_profile(), **(body.get("profile") or {})}
-    plan = generator.generate(prof, int(body.get("seed") or 0))
+    plan = generator.generate(prof, int(body.get("seed") or 0), recent=_recent(prof))
     plan["analysis"] = analysis.plan_report(plan, prof)
     return plan
 
@@ -460,7 +625,7 @@ def generator_apply(body: dict = Body(default={})):
         db.save_profile(overrides)
     prof = _profile()
     seed = int(body.get("seed") or 0)
-    plan = generator.generate(prof, seed)
+    plan = generator.generate(prof, seed, recent=_recent(prof))
     plan["generator"]["cycle_start"] = schedule.week_start(date.today()).isoformat()
     for p in db.list_plans():
         if p.get("generator") and p.get("active"):

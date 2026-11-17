@@ -798,3 +798,47 @@ def event_prediction(profile: dict, ev: dict) -> dict:
             "predicted": sp.fmt_duration(total) if not missing else None, "missing_anchors": missing,
             "target": sp.fmt_duration(tgt) if tgt else None,
             "gap_s": round(total - tgt) if tgt and not missing else None}
+
+
+def recent_volumes(sessions: list[dict], profile: dict, today: date | None = None, weeks: int = 4) -> dict:
+    """Volume semanal médio das últimas semanas por modalidade (na unidade de cada uma)."""
+    from . import load
+
+    today = today or date.today()
+    since = today - timedelta(weeks=weeks)
+    anchors = sp.anchors_of(profile)
+    tot: dict[str, float] = {}
+    first = None
+    for s in sessions:
+        try:
+            d = datetime.fromisoformat(str(s.get("date"))[:19]).date()
+        except ValueError:
+            continue
+        if d < since or d > today:
+            continue
+        first = d if first is None or d < first else first
+        st = load.session_stress(s, anchors)
+        for sport, km in st["km"].items():
+            if sport in VOLUME and VOLUME[sport]["unit"] in ("km", "m"):
+                tot[sport] = tot.get(sport, 0) + (km if VOLUME[sport]["unit"] == "km" else km * 1000)
+        for sport, mins in st["minutes"].items():
+            if sport in VOLUME and VOLUME[sport]["unit"] == "h":
+                tot[sport] = tot.get(sport, 0) + mins / 60
+    if not tot:
+        return {}
+    span = max(1.0, min(weeks, ((today - first).days + 1) / 7)) if first else weeks
+    return {k: round(v / span, 2) for k, v in tot.items()}
+
+
+def options() -> dict:
+    env_pt = {"rua": "Rua", "esteira": "Esteira", "trilha": "Trilha", "pista": "Pista", "estrada": "Estrada",
+              "rolo": "Rolo / smart trainer", "spinning": "Spinning (academia)", "mtb": "Mountain bike",
+              "piscina": "Piscina", "aguas_abertas": "Águas abertas", "indoor": "Remo ergômetro", "agua": "Na água"}
+    return {
+        "sports": [{"id": k, "name": d["name"], "unit": VOLUME[k]["unit"], "sessions": VOLUME[k]["sessions"],
+                    "anchor": d["anchor"], "envs": [{"id": e, "name": env_pt.get(e, e)} for e in d["envs"]],
+                    "race_distances": [x for x, _ in RACE_PEAK.get(k, [])]}
+                   for k, d in sp.SPORTS.items()],
+        "events": [{"id": k, "name": v["name"], "legs": v["legs"]} for k, v in EVENTS.items()],
+        "phases": PHASE_PT,
+    }
