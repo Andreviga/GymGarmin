@@ -517,12 +517,14 @@ async function showExercise(id) {
     <p><b>Primários:</b> ${esc(ex.primary_pt.join(", ") || "—")}<br><b>Secundários:</b> ${esc(ex.secondary_pt.join(", ") || "—")}</p>
     ${ex.limitation.status !== "ok" ? `<div class="rec ${ex.limitation.status === "evitar" ? "alerta" : "atencao"}"><b>${LIM_TXT[ex.limitation.status].toUpperCase()}</b><br>${ex.limitation.reasons.map(esc).join("<br>")}</div>` : ex.limitation.reasons.length ? `<div class="rec">${ex.limitation.reasons.map(esc).join("<br>")}</div>` : ""}
     ${ex.last ? `<p class="small"><b>Última vez</b> (${fmtDate(ex.last.date)}): ${ex.last.sets ? ex.last.sets.map((s) => `${s.reps ?? "-"}×${s.load_kg ?? 0}kg`).join(", ") : `${ex.last.duration_min} min Z${ex.last.zone}`}</p>` : ""}
+    ${ex.last && ex.last.sets ? `<p><a class="btn sm ghost" href="#evolucao/${encodeURIComponent(ex.id)}" data-close>📈 Ver evolução</a></p>` : ""}
     ${ex.instructions && ex.instructions.length ? `<details><summary>Execução</summary><ol class="small">${ex.instructions.map((s) => `<li>${esc(s)}</li>`).join("")}</ol></details>` : ""}
     <div class="hr"></div>
     <div class="row between gap wrap"><div class="small">No Garmin: <b>${esc(g.garmin_name || g.category)}</b> <span class="muted">(${esc(g.category)} / ${esc(g.exercise)})</span>
       <span class="pill ${g.confidence === "alta" || g.confidence === "manual" ? "ok" : "warn"}">${esc(g.confidence)}</span></div>
       ${ex.machine ? "" : `<button class="btn sm ghost" id="g-edit">Alterar</button>`}</div>
     <div id="g-box"></div>`);
+  const evo = $("[data-close]", body); if (evo) evo.onclick = () => closeModal();
   const ge = $("#g-edit", body);
   if (ge) ge.onclick = () => {
     $("#g-box", body).innerHTML = `<input id="g-q" placeholder="Buscar no catálogo do Garmin (inglês)" value="${esc(ex.name_en.split(" ").slice(0, 2).join(" "))}"><ul class="list small" id="g-list"></ul>`;
@@ -657,9 +659,11 @@ function bindSession() {
         : { exercise_id: it.exercise_id, sets: it.sets.filter((x) => x.done).map(({ reps, load_kg, rpe, duration_s }) => ({ reps, load_kg, rpe, duration_s })) })
         .filter((it) => it && (it.duration_min || (it.sets && it.sets.length))),
     };
-    await api("/api/sessions", { method: "POST", body: payload });
+    const saved = await api("/api/sessions", { method: "POST", body: payload });
     store("gg_session", null); state.session = null; stopTimer();
-    toast("Treino salvo! 🎉"); location.hash = s.schedule_id ? "#hoje" : "#analise";
+    const prs = (saved && saved.prs) || [];
+    toast(prs.length ? `Treino salvo! 🏆 Recorde em ${prs.map((p) => `${p.name} (${prText(p)})`).join(", ")}` : "Treino salvo! 🎉", prs.length ? 6000 : 2600);
+    location.hash = s.schedule_id ? "#hoje" : "#analise";
   };
 }
 
@@ -685,7 +689,9 @@ $("#timer").addEventListener("click", (e) => {
 async function viewAnalise() {
   const [rep, sessions] = await Promise.all([api("/api/report/weekly"), api("/api/sessions?limit=30")]);
   const c = rep.cardio;
+  const hist = await api("/api/history").catch(() => ({ exercises: [], recent_prs: [] }));
   view.innerHTML = `
+  ${historyCard(hist)}
   <div class="card"><h2>Volume por músculo — últimos 7 dias</h2>${muscleBars(rep.muscles, "sets_7d")}
     <details><summary class="small">Detalhes por músculo</summary><ul class="list small">${rep.muscles.map((m) => `<li><b>${esc(m.pt)}</b>: ${m.sets_7d} séries (${m.direct_7d} diretas, ${m.indirect_7d} indiretas) · média 4 sem. ${m.sets_avg_4w} · ${m.frequency_7d}× na semana · ${m.days_since === null ? "nunca treinado" : `há ${m.days_since} dias`} · tonelagem ${m.tonnage_7d} kg</li>`).join("")}</ul></details></div>
   <div class="card"><h2>O que ajustar</h2>${recsHtml(rep.recommendations)}</div>
@@ -700,9 +706,91 @@ async function viewAnalise() {
       <span class="small muted">${s.items.length} exercícios · ${s.items.reduce((a, it) => a + (it.sets ? it.sets.length : 0), 0)} séries</span></span>
       <button class="icon-btn" data-del="${s.id}" title="Excluir">🗑</button></li>`).join("")}</ul>` : `<p class="empty">Nenhum treino registrado.</p>`}</div>`;
   view.onclick = async (e) => {
+    const h = e.target.closest("[data-hist]"); if (h) { location.hash = `#evolucao/${encodeURIComponent(h.dataset.hist)}`; return; }
     if (e.target.dataset.ex) return showExercise(e.target.dataset.ex);
     if (e.target.dataset.del && confirm("Excluir este registro?")) { await api(`/api/sessions/${e.target.dataset.del}`, { method: "DELETE" }); viewAnalise(); }
   };
+}
+
+/* ------------------------------------------------- EVOLUÇÃO DE CARGAS -- */
+const METRIC = {
+  carga: { label: "1RM estimado", unit: " kg", fmt: (v) => `${(+v).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} kg` },
+  reps: { label: "Reps máximas", unit: " reps", fmt: (v) => `${v} reps` },
+  tempo: { label: "Tempo máximo", unit: " s", fmt: (v) => fmtSec(v) },
+};
+const PR_TXT = { e1rm: "1RM est.", top_load: "carga", volume: "volume", max_reps: "reps", max_duration_s: "tempo" };
+const HIST_STATUS = { progredindo: ["Progredindo", "ok"], estavel: ["Estável", ""], estagnado: ["Estagnado", "warn"], caindo: ["Caindo", "bad"], inicio: ["Começando", "muted"] };
+const fmtKg = (v) => `${(+v || 0).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} kg`;
+function fmtSec(v) { v = Math.round(v || 0); return v >= 60 ? `${Math.floor(v / 60)}:${String(v % 60).padStart(2, "0")} min` : `${v} s`; }
+function prText(p) {
+  if (p.metric === "carga" && p.best_set) return `${fmtKg(p.best_set.load_kg)} × ${p.best_set.reps}`;
+  if (p.metric === "reps") return `${p.max_reps} reps`;
+  return fmtSec(p.max_duration_s);
+}
+function pctTxt(v) { return v === null || v === undefined ? "—" : `${v > 0 ? "+" : ""}${v.toLocaleString("pt-BR")}%`; }
+function spark(vals) {
+  if (!vals || vals.length < 2) return `<svg class="spark" viewBox="0 0 80 24" aria-hidden="true"></svg>`;
+  const mn = Math.min(...vals), mx = Math.max(...vals), r = mx - mn || 1;
+  const pts = vals.map((v, i) => `${(i / (vals.length - 1)) * 78 + 1},${22 - ((v - mn) / r) * 20}`).join(" ");
+  return `<svg class="spark" viewBox="0 0 80 24" aria-hidden="true"><polyline points="${pts}" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg>`;
+}
+function historyCard(h) {
+  if (!h.exercises.length) return `<div class="card"><h2>Evolução de cargas</h2><p class="empty">Registre treinos (no app ou importando do Garmin) para ver a evolução de cada exercício.</p></div>`;
+  const prs = h.recent_prs.slice(0, 6);
+  return `<div class="card"><h2>Evolução de cargas</h2>
+    ${prs.length ? `<div class="pr-strip">${prs.map((p) => `<button class="pr-chip" data-hist="${esc(p.exercise_id)}">🏆 <b>${esc(p.name)}</b><span class="small muted">${ddmm(p.date)} · ${esc(prText(p))}</span></button>`).join("")}</div>` : ""}
+    <ul class="list hist-list">${h.exercises.map((r) => { const sm = r.summary; const st = HIST_STATUS[sm.status] || ["", ""]; const m = METRIC[sm.metric] || METRIC.carga;
+      return `<li class="hist-row" data-hist="${esc(r.exercise_id)}">
+        <span class="grow"><b>${esc(r.name)}</b> <span class="pill small ${st[1]}">${st[0]}</span><br>
+        <span class="small muted">${sm.sessions} treino${sm.sessions > 1 ? "s" : ""} · último ${ddmm(sm.last_date)} · 30 dias ${pctTxt(sm.change_30d_pct)}</span></span>
+        <span class="hist-val">${spark(r.spark)}<b>${esc(m.fmt(sm.last_value))}</b></span></li>`; }).join("")}</ul>
+    <p class="small muted">Valor principal: 1RM estimado (fórmula de Epley) para exercícios com carga; reps máximas no peso corporal; tempo máximo nos isométricos.</p></div>`;
+}
+function historyChart(points, metric) {
+  if (points.length < 2) return `<p class="empty">O gráfico aparece a partir do segundo treino deste exercício.</p>`;
+  const W = 340, H = 180, L = 40, R = 10, T = 12, B = 26;
+  const day = (iso) => new Date(iso + "T12:00:00").getTime();
+  const x0 = day(points[0].date), x1 = day(points[points.length - 1].date) || x0 + 1;
+  const series = [points.map((p) => p.value)];
+  if (metric === "carga") series.push(points.map((p) => p.top_load));
+  const all = series.flat().filter((v) => v > 0);
+  let mn = Math.min(...all), mx = Math.max(...all); const pad = (mx - mn) * 0.12 || mx * 0.05 || 1; mn = Math.max(0, mn - pad); mx += pad;
+  const X = (iso) => L + ((day(iso) - x0) / ((x1 - x0) || 1)) * (W - L - R);
+  const Y = (v) => T + (1 - (v - mn) / (mx - mn)) * (H - T - B);
+  const path = (vals) => vals.map((v, i) => `${i ? "L" : "M"}${X(points[i].date).toFixed(1)},${Y(v).toFixed(1)}`).join(" ");
+  const ticks = [mn, (mn + mx) / 2, mx];
+  const m = METRIC[metric];
+  return `<svg class="hist-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Gráfico de ${esc(m.label)} ao longo do tempo">
+    ${ticks.map((t) => `<line x1="${L}" x2="${W - R}" y1="${Y(t)}" y2="${Y(t)}" class="grid"/><text x="${L - 4}" y="${Y(t) + 3}" text-anchor="end" class="axis">${Math.round(t)}</text>`).join("")}
+    <text x="${L}" y="${H - 6}" class="axis">${ddmm(points[0].date)}</text><text x="${W - R}" y="${H - 6}" text-anchor="end" class="axis">${ddmm(points[points.length - 1].date)}</text>
+    ${series[1] ? `<path d="${path(series[1])}" class="line2"/>` : ""}
+    <path d="${path(series[0])}" class="line1"/>
+    ${points.map((p) => `<circle cx="${X(p.date)}" cy="${Y(p.value)}" r="${p.prs.length ? 4.5 : 3}" class="${p.prs.length ? "dot pr" : "dot"}"><title>${ddmm(p.date)}: ${m.fmt(p.value)}${p.best_set ? ` (${fmtKg(p.best_set.load_kg)} × ${p.best_set.reps})` : ""}${p.prs.length ? " — recorde" : ""}</title></circle>`).join("")}
+  </svg>
+  <div class="row gap small muted"><span><i class="lg lg1"></i>${esc(m.label)}</span>${series[1] ? `<span><i class="lg lg2"></i>Carga máxima</span>` : ""}<span><i class="lg lgpr"></i>Recorde</span></div>`;
+}
+async function viewEvolucao(id) {
+  const h = await api(`/api/history/${encodeURIComponent(id)}`);
+  const sm = h.summary;
+  if (!sm.sessions) { view.innerHTML = `<div class="card"><a href="#analise" class="small">← Análise</a><h2>${esc(h.name)}</h2><p class="empty">Ainda não há treinos registrados com este exercício.</p></div>`; return; }
+  const m = METRIC[sm.metric] || METRIC.carga; const st = HIST_STATUS[sm.status] || ["", ""];
+  const kpis = sm.metric === "carga"
+    ? [["1RM estimado (melhor)", m.fmt(sm.best.e1rm)], ["Carga máxima", fmtKg(sm.best.top_load)], ["Maior volume", `${Math.round(sm.best.volume).toLocaleString("pt-BR")} kg`], ["Desde o início", pctTxt(sm.change_total_pct)]]
+    : sm.metric === "reps" ? [["Reps máximas", `${sm.best.max_reps}`], ["Desde o início", pctTxt(sm.change_total_pct)], ["30 dias", pctTxt(sm.change_30d_pct)], ["Treinos", sm.sessions]]
+    : [["Tempo máximo", fmtSec(sm.best.max_duration_s)], ["Desde o início", pctTxt(sm.change_total_pct)], ["30 dias", pctTxt(sm.change_30d_pct)], ["Treinos", sm.sessions]];
+  const rows = [...h.points].reverse();
+  view.innerHTML = `<div class="card"><a href="#analise" class="small">← Análise</a>
+    <h2>${esc(h.name)}</h2><p class="small muted">${esc(h.primary_pt.join(", "))}</p>
+    <p><span class="pill ${st[1]}">${st[0]}</span> <span class="small">${esc(sm.message)}</span></p>
+    <div class="grid2 kpis">${kpis.map(([k, v]) => `<div><div class="kpi">${esc(v)}</div><div class="small muted">${esc(k)}</div></div>`).join("")}</div></div>
+  <div class="card"><h3>${esc(m.label)} ao longo do tempo</h3>${historyChart(h.points, sm.metric)}</div>
+  <div class="card"><h3>Treinos</h3><div class="table-wrap"><table class="hist-table"><thead><tr><th>Data</th><th>Melhor série</th><th>${sm.metric === "carga" ? "1RM est." : "Máx."}</th><th>Volume</th><th>Séries</th></tr></thead><tbody>
+    ${rows.map((p) => `<tr${p.prs.length ? ' class="pr-row"' : ""}><td>${ddmm(p.date)}${p.prs.length ? ` <span title="Recorde: ${p.prs.map((k) => PR_TXT[k]).join(", ")}">🏆</span>` : ""}${p.source === "garmin" ? ' <span class="small muted" title="Importado do Garmin">G</span>' : ""}</td>
+      <td>${p.best_set ? `${fmtKg(p.best_set.load_kg)} × ${p.best_set.reps}` : sm.metric === "tempo" ? fmtSec(p.max_duration_s) : `${p.max_reps} reps`}</td>
+      <td>${esc(m.fmt(p.value))}${p.e1rm_weak ? '<span class="small muted" title="Muitas reps: estimativa menos precisa">*</span>' : ""}</td>
+      <td>${p.volume ? Math.round(p.volume).toLocaleString("pt-BR") : "—"}</td>
+      <td>${p.sets}</td></tr>`).join("")}
+  </tbody></table></div><p class="small muted">🏆 = recorde · G = importado do Garmin</p>${rows.some((p) => p.e1rm_weak) ? `<p class="small muted">* série com mais de 12 reps: o 1RM estimado é menos preciso.</p>` : ""}</div>`;
 }
 
 /* ---------------------------------------------------------- EXERCÍCIOS -- */
@@ -853,7 +941,7 @@ async function updateGarminPill() {
 /* --------------------------------------------------------------- router -- */
 async function route() {
   const [name, a, b] = (location.hash.slice(1) || "hoje").split("/");
-  $$(".tabbar a").forEach((el) => el.classList.toggle("active", el.dataset.tab === (name === "plano" ? "planilhas" : name)));
+  $$(".tabbar a").forEach((el) => el.classList.toggle("active", el.dataset.tab === ({ plano: "planilhas", evolucao: "analise" }[name] || name)));
   view.oninput = view.onchange = view.onclick = null;
   view.innerHTML = `<p class="muted">Carregando…</p>`;
   try {
@@ -863,7 +951,7 @@ async function route() {
         document.querySelector(".topbar").insertAdjacentHTML("afterend", `<div id="eph" class="rec atencao small" style="margin:8px 16px 0">Versão de teste online: os dados podem ser apagados pelo servidor. Use <a href="#perfil">Perfil → Backup</a> para salvar e restaurar.</div>`);
       }
     }
-    const routes = { hoje: () => viewHoje(a), planilhas: viewPlanilhas, plano: () => viewPlano(a), treinar: () => viewTreinar(a, b), analise: viewAnalise, exercicios: viewExercicios, perfil: viewPerfil };
+    const routes = { hoje: () => viewHoje(a), planilhas: viewPlanilhas, plano: () => viewPlano(a), treinar: () => viewTreinar(a, b), analise: viewAnalise, evolucao: () => viewEvolucao(decodeURIComponent(a || "")), exercicios: viewExercicios, perfil: viewPerfil };
     await (routes[name] || viewHoje)();
     if (!view.onclick) view.onclick = (e) => { const id = e.target.dataset && e.target.dataset.ex; if (id) showExercise(id); };
   } catch (e) { view.innerHTML = `<div class="card"><p class="pill bad">Erro: ${esc(e.message)}</p></div>`; }

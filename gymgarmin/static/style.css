@@ -182,3 +182,27 @@ pre.json { font-size: 11px; overflow: auto; max-height: 50vh; background: var(--
 ul.plain { margin: 4px 0 8px; padding-left: 18px; }
 .chip input { width: auto; min-height: 0; margin: 0 4px 0 0; vertical-align: middle; }
 label.chip { display: inline-flex; align-items: center; color: var(--ink); font-size: 13px; }
+
+/* ---- evolução de cargas ---- */
+.pr-strip { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 6px; margin-bottom: 6px; }
+.pr-chip { flex: 0 0 auto; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left;
+  background: var(--ok-bg, #e7f6ec); color: var(--ink); border: 1px solid var(--line); border-radius: 12px; padding: 8px 10px; cursor: pointer; font: inherit; }
+.hist-list .hist-row { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+.hist-val { display: flex; align-items: center; gap: 8px; white-space: nowrap; color: var(--brand); }
+.hist-val b { color: var(--ink); min-width: 4.5em; text-align: right; }
+.spark { width: 80px; height: 24px; }
+.hist-chart { width: 100%; height: auto; display: block; margin: 6px 0; }
+.hist-chart .grid { stroke: var(--line); stroke-width: 1; }
+.hist-chart .axis { fill: var(--ink-2); font-size: 10px; }
+.hist-chart .line1 { fill: none; stroke: var(--brand); stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
+.hist-chart .line2 { fill: none; stroke: var(--ink-2); stroke-width: 1.5; stroke-dasharray: 4 3; }
+.hist-chart .dot { fill: var(--card); stroke: var(--brand); stroke-width: 2; }
+.hist-chart .dot.pr { fill: var(--warn); stroke: var(--warn); }
+.lg { display: inline-block; width: 14px; height: 3px; vertical-align: middle; margin-right: 4px; border-radius: 2px; }
+.lg1 { background: var(--brand); } .lg2 { background: var(--ink-2); } .lgpr { width: 8px; height: 8px; border-radius: 50%; background: var(--warn); }
+.kpis { margin-top: 8px; }
+.table-wrap { overflow-x: auto; }
+.hist-table { width: 100%; border-collapse: collapse; font-size: .92rem; }
+.hist-table th, .hist-table td { text-align: left; padding: 6px 6px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.hist-table th { font-weight: 600; color: var(--ink-2); font-size: .8rem; }
+.hist-table tr.pr-row td { background: var(--ok-bg); }

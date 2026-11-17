@@ -14,8 +14,8 @@ from fastapi.staticfiles import StaticFiles
 
 from datetime import date, timedelta
 
-from . import (analysis, catalog, db, garmin_export, garmin_sync, generator, limitations, plans_io, progression,
-               schedule, templates)
+from . import (analysis, catalog, db, garmin_export, garmin_sync, generator, history, limitations, plans_io,
+               progression, schedule, templates)
 from .muscles import EQUIPMENT_PT, HR_ZONES, MUSCLES, hr_max, zone_bpm
 
 STATIC = Path(__file__).resolve().parent / "static"
@@ -265,7 +265,7 @@ def create_session(body: dict = Body(...)):
             if e:
                 e["status"] = "feito"
                 db.save_entry(e)
-        return saved
+        return {**saved, "prs": history.session_prs(db.list_sessions(limit=1000), saved)}
     except ValueError as e:
         raise HTTPException(409, str(e)) from e
 
@@ -323,6 +323,19 @@ def session_prefill(plan_id: int, idx: int):
     day = _day(plan, idx)
     return {"plan_id": plan_id, "day_name": day.get("name"), "date": datetime.now().isoformat(timespec="minutes"),
             "items": _prefill_items(day.get("items", []))}
+
+
+# ----------------------------------------------------- evolução de cargas ----
+
+@app.get("/api/history")
+def history_overview():
+    """Exercícios com histórico (tendência, recordes) e recordes dos últimos 30 dias."""
+    return history.overview(db.list_sessions(limit=5000))
+
+
+@app.get("/api/history/{exercise_id}")
+def history_exercise(exercise_id: str):
+    return history.exercise_history(db.list_sessions(limit=5000), exercise_id)
 
 
 # ------------------------------------------------------------- análise ----
