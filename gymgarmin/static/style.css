@@ -83,14 +83,16 @@ main { max-width: 880px; margin: 0 auto; padding: 12px 16px; }
 }
 .btn.ghost { background: transparent; color: var(--brand); }
 .btn.danger { background: transparent; border-color: var(--bad); color: var(--bad); }
-.btn.sm { padding: 5px 10px; min-height: 32px; font-size: 13px; }
+.btn.sm { padding: 6px 12px; min-height: 40px; font-size: 14px; }
+a.btn { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
 .btn:disabled { opacity: .5; cursor: default; }
 .icon-btn { appearance: none; background: none; border: 1px solid var(--line); color: var(--ink-2); border-radius: 8px;
-  width: 34px; height: 34px; cursor: pointer; font-size: 15px; }
+  width: 44px; height: 44px; cursor: pointer; font-size: 18px; }
 
 input, select, textarea {
-  font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 10px;
-  padding: 8px 10px; min-height: 40px; width: 100%;
+  font: inherit; font-size: 16px; /* < 16 px faz o iPhone dar zoom ao tocar no campo */
+  color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 10px;
+  padding: 8px 10px; min-height: 44px; width: 100%;
 }
 textarea { min-height: 120px; }
 label { display: block; font-size: 13px; color: var(--ink-2); margin-bottom: 4px; }
@@ -120,8 +122,8 @@ input[type="checkbox"] { width: auto; min-height: 0; }
 @media (max-width: 420px) { .bars .bar-row { grid-template-columns: 96px 1fr 44px; } }
 
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
-.chip { border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px; font-size: 12px; background: var(--card);
-  cursor: pointer; color: var(--ink); }
+.chip { border: 1px solid var(--line); border-radius: 999px; padding: 8px 14px; font-size: 14px; background: var(--card);
+  cursor: pointer; color: var(--ink); min-height: 40px; }
 .rec { padding: 10px 12px; border-radius: 10px; margin-bottom: 8px; background: var(--info-bg); }
 .rec.alerta { background: var(--bad-bg); }
 .rec.atencao { background: var(--warn-bg); }
@@ -136,29 +138,36 @@ input[type="checkbox"] { width: auto; min-height: 0; }
 
 .tabs { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 6px; margin-bottom: 8px; }
 .tabs button { flex: none; border: 1px solid var(--line); background: var(--card); color: var(--ink); border-radius: 999px;
-  padding: 6px 12px; font: inherit; cursor: pointer; }
+  padding: 6px 14px; min-height: 42px; font: inherit; cursor: pointer; }
 .tabs button.on { background: var(--brand); color: var(--brand-ink); border-color: var(--brand); }
 
 .plan-item { border: 1px solid var(--line); border-radius: 12px; padding: 10px; margin-bottom: 8px; }
 .plan-item .fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(72px, 1fr)); gap: 6px; margin-top: 8px; }
 .plan-item .fields label { font-size: 11px; margin-bottom: 2px; }
-.plan-item .fields input, .plan-item .fields select { min-height: 34px; padding: 4px 6px; }
+.plan-item .fields input, .plan-item .fields select { min-height: 40px; padding: 4px 6px; }
 
 .modal { position: fixed; inset: 0; z-index: 20; background: rgba(0,0,0,.45); display: flex; align-items: flex-end; justify-content: center; }
 .modal[hidden] { display: none; }
-.modal-card { position: relative; background: var(--card); width: 100%; max-width: 720px; max-height: 88vh; overflow: auto;
-  border-radius: 18px 18px 0 0; padding: 18px 16px 24px; }
+.modal-card { position: relative; background: var(--card); width: 100%; max-width: 720px; max-height: 88vh; max-height: 88dvh;
+  overflow: auto; overscroll-behavior: contain; border-radius: 18px 18px 0 0;
+  padding: 10px 16px calc(24px + env(safe-area-inset-bottom)); }
 @media (min-width: 720px) { .modal { align-items: center; } .modal-card { border-radius: 18px; } }
-.modal-close { position: absolute; right: 10px; top: 8px; border: 0; background: none; font-size: 26px; color: var(--ink-2); cursor: pointer; }
+/* fica visível mesmo rolando um modal comprido */
+.modal-close { position: sticky; top: 0; float: right; z-index: 2; width: 44px; height: 44px; margin: 0 -6px 0 8px;
+  border: 0; border-radius: 50%; background: var(--card); font-size: 28px; line-height: 1; color: var(--ink-2); cursor: pointer; }
 .imgs { display: flex; gap: 8px; overflow-x: auto; }
 .imgs img { height: 160px; border-radius: 10px; background: var(--line); }
 
-.timer { position: fixed; left: 16px; right: 16px; bottom: calc(80px + env(safe-area-inset-bottom)); z-index: 15; max-width: 480px;
-  margin: 0 auto; background: var(--ink); color: var(--bg); border-radius: 16px; padding: 12px 16px; text-align: center; }
+.timer { position: fixed; left: 16px; right: 16px; bottom: calc(76px + env(safe-area-inset-bottom)); z-index: 15; max-width: 480px;
+  margin: 0 auto; background: var(--ink); color: var(--bg); border-radius: 16px; padding: 8px 14px; text-align: center;
+  display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 4px 12px; }
+.timer .timer-label { grid-column: 1; font-size: 13px; text-align: left; }
+.timer .timer-value { grid-column: 1; text-align: left; }
+.timer .row { grid-column: 2; grid-row: 1 / span 2; justify-content: flex-end; flex-wrap: wrap; }
+body.timer-on { padding-bottom: calc(72px + 130px + env(safe-area-inset-bottom)); }
 .timer[hidden] { display: none; }
 .timer .btn.ghost { color: var(--bg); border-color: var(--bg); }
-.timer-value { font-size: 40px; font-weight: 700; font-variant-numeric: tabular-nums; }
-.timer .row { justify-content: center; }
+.timer-value { font-size: 34px; line-height: 1.1; font-weight: 700; font-variant-numeric: tabular-nums; }
 .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(84px + env(safe-area-inset-bottom)); z-index: 30;
   background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 10px; max-width: calc(100% - 32px); }
 .toast[hidden] { display: none; }
@@ -181,7 +190,7 @@ pre.json { font-size: 11px; overflow: auto; max-height: 50vh; background: var(--
 .changes { margin: 6px 0; padding-left: 18px; color: var(--ink-2); }
 ul.plain { margin: 4px 0 8px; padding-left: 18px; }
 .chip input { width: auto; min-height: 0; margin: 0 4px 0 0; vertical-align: middle; }
-label.chip { display: inline-flex; align-items: center; color: var(--ink); font-size: 13px; }
+label.chip { display: inline-flex; align-items: center; color: var(--ink); font-size: 14px; min-width: 52px; justify-content: center; }
 
 /* ---- evolução de cargas ---- */
 .pr-strip { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 6px; margin-bottom: 6px; }
@@ -193,7 +202,7 @@ label.chip { display: inline-flex; align-items: center; color: var(--ink); font-
 .spark { width: 80px; height: 24px; }
 .hist-chart { width: 100%; height: auto; display: block; margin: 6px 0; }
 .hist-chart .grid { stroke: var(--line); stroke-width: 1; }
-.hist-chart .axis { fill: var(--ink-2); font-size: 10px; }
+.hist-chart .axis { fill: var(--ink-2); font-size: 12px; }
 .hist-chart .line1 { fill: none; stroke: var(--brand); stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
 .hist-chart .line2 { fill: none; stroke: var(--ink-2); stroke-width: 1.5; stroke-dasharray: 4 3; }
 .hist-chart .dot { fill: var(--card); stroke: var(--brand); stroke-width: 2; }
@@ -211,10 +220,22 @@ label.chip { display: inline-flex; align-items: center; color: var(--ink); font-
 .steps { margin: 4px 0 0; padding-left: 20px; }
 .steps li { margin: 2px 0; }
 .sport-box { border: 1px solid var(--line); border-radius: 12px; padding: 8px 10px; }
-.sport-box > summary { cursor: pointer; list-style: none; }
+.sport-box > summary { cursor: pointer; list-style: none; padding: 10px 0; }
 .sport-box[open] > summary { margin-bottom: 8px; }
 .readiness.ok { border-left: 4px solid var(--ok); }
 .readiness.warn { border-left: 4px solid var(--warn); }
 .readiness.bad { border-left: 4px solid var(--bad); }
 .hist-chart .line-tsb { fill: none; stroke: var(--warn); stroke-width: 1.5; opacity: .8; }
 .lgtsb { background: var(--warn); }
+
+/* toque confortável: "Ver treino", "Detalhes por músculo" etc. */
+details > summary { cursor: pointer; padding: 10px 0; }
+.tabbar a { min-height: 52px; }
+/* nome do exercício abre os detalhes: área de toque maior sem mudar o visual */
+#view b[data-ex], #view .link[data-ex] { display: inline-block; padding: 9px 0; }
+/* nomes longos (ou sem espaço) quebram em vez de passar por cima dos botões */
+.grow { overflow-wrap: break-word; }
+/* editor da planilha: nome do exercício com espaço; ↑ ↓ ✕ descem para a linha de baixo se faltar lugar */
+.plan-item > .row { flex-wrap: wrap; }
+.plan-item > .row > .grow { flex: 1 1 60%; }
+.plan-item > .row > .icon-btn { flex: none; }

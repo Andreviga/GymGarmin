@@ -10,7 +10,11 @@ const state = { meta: null, profile: null, draftPlan: null, planTab: 0, session:
 async function api(path, opts = {}) {
   const o = { ...opts, headers: { "Content-Type": "application/json", ...(opts.headers || {}) } };
   if (o.body && typeof o.body !== "string") o.body = JSON.stringify(o.body);
-  const r = await fetch(path, o);
+  let r;
+  try { r = await fetch(path, o); } catch (_) {
+    const err = new Error("Sem conexão com a internet. Tente de novo quando o sinal voltar.");
+    err.offline = true; throw err;
+  }
   if (!r.ok) {
     let msg = r.statusText;
     try { const j = await r.json(); msg = j.detail || msg; } catch (_) { /* sem corpo */ }
@@ -136,7 +140,8 @@ async function viewHoje(weekDate) {
   const outdated = sch.entries.some((e) => e.garmin_outdated && e.status === "planejado");
   const cyc = sch.cycle;
   view.innerHTML = `
-  ${readinessCard(rd, sch.entries.some((e) => e.date === sch.today && e.status === "planejado"))}
+  ${readinessCard(rd, sch.entries.some((e) => e.date === sch.today && e.status === "planejado"),
+    sch.entries.some((e) => e.date === sch.today && e.status === "planejado" && e.readiness_backup))}
   ${missed.length ? `<div class="rec alerta"><b>Treino perdido:</b> ${missed.map((e) => `${e.weekday} ${ddmm(e.date)} – ${esc(e.day_name)}`).join(", ")}.
      <div class="row gap wrap" style="margin-top:6px">${missed.map((e) => `<button class="btn sm" data-skip="${e.id}">Ajustar a semana (${e.weekday})</button>`).join("")}</div></div>` : ""}
   <div class="card">
@@ -594,8 +599,8 @@ function renderSession() {
   const compactCard = (ph, title) => compact(ph).length ? `<div class="card"><h3>${title}</h3><ul class="list">${compact(ph).map(([it, i]) => `<li class="row gap">
       <button class="check ${it.done ? "on" : ""}" data-pdone="${i}">✓</button>
       <span class="grow"><b data-ex="${esc(it.exercise_id)}" style="cursor:pointer">${esc(it.name)}</b><br><span class="small muted">${it.kind === "cardio" ? `${it.duration_min} min Z${it.zone}` : `${(it.plan && it.plan.duration_s) || 30}s${(it.plan && it.plan.sets) > 1 ? ` × ${it.plan.sets}` : ""}`}${it.plan && it.plan.notes ? " · " + esc(it.plan.notes) : ""}</span></span></li>`).join("")}</ul></div>` : "";
-  view.innerHTML = `<div class="card"><div class="row between gap"><h2 class="grow">${esc(s.day_name || "Treino")}</h2>
-      <input type="datetime-local" id="s-date" value="${esc((s.date || "").slice(0, 16))}" style="width:auto"></div>
+  view.innerHTML = `<div class="card"><h2>${esc(s.day_name || "Treino")}</h2>
+      <div class="field" style="margin:0"><label for="s-date">Data e hora</label><input type="datetime-local" id="s-date" value="${esc((s.date || "").slice(0, 16))}"></div>
       ${s.deload ? `<p class="small rec">Semana de deload: menos séries, carga −10%, RPE ~6.</p>` : ""}</div>
     ${compactCard("preparo", "Preparação — aquecimento e mobilidade")}
     ${idxs.filter(([it]) => phaseOf(it) === "principal").map(([it, i]) => sessionItemHtml(it, i)).join("")}
@@ -664,7 +669,7 @@ function bindSession() {
     if (t.dataset.done) {
       const [i, j] = t.dataset.done.split(":").map(Number); const set = s.items[i].sets[j]; set.done = !set.done; save();
       t.classList.toggle("on", set.done); t.closest("tr").classList.toggle("done", set.done);
-      if (set.done) startTimer((s.items[i].plan || {}).rest_s || 90);
+      if (set.done) startTimer((s.items[i].plan || {}).rest_s || 90, t);
     }
     if (t.dataset.cdone) { const it = s.items[+t.dataset.cdone]; it.done = !it.done; t.classList.toggle("on", it.done); save(); }
     if (t.dataset.pdone) { const it = s.items[+t.dataset.pdone]; it.done = !it.done; t.classList.toggle("on", it.done); save(); }
@@ -693,7 +698,19 @@ function bindSession() {
         : { exercise_id: it.exercise_id, sets: it.sets.filter((x) => x.done).map(({ reps, load_kg, rpe, duration_s }) => ({ reps, load_kg, rpe, duration_s })) })
         .filter((it) => it && (it.duration_min || (it.sets && it.sets.length))),
     };
-    const saved = await api("/api/sessions", { method: "POST", body: payload });
+    payload.client_id = s.client_id || (s.client_id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
+    save();
+    const btn = $("#s-finish"); btn.disabled = true;
+    let saved;
+    try { saved = await api("/api/sessions", { method: "POST", body: payload }); } catch (err) {
+      btn.disabled = false;
+      if (!err.offline) return toast(err.message, 5000);
+      // academia sem sinal: guarda no celular e envia sozinho quando a conexão voltar
+      const box = store("gg_outbox") || []; if (!box.some((x) => x.client_id === payload.client_id)) box.push(payload); store("gg_outbox", box);
+      store("gg_session", null); state.session = null; stopTimer();
+      toast("Sem internet: o treino ficou guardado no celular e será enviado sozinho quando a conexão voltar.", 7000);
+      location.hash = "#hoje"; return;
+    }
     store("gg_session", null); state.session = null; stopTimer();
     const prs = (saved && saved.prs) || [];
     toast(prs.length ? `Treino salvo! 🏆 Recorde em ${prs.map((p) => `${p.name} (${prText(p)})`).join(", ")}` : "Treino salvo! 🎉", prs.length ? 6000 : 2600);
@@ -703,11 +720,19 @@ function bindSession() {
 
 /* ---- timer de descanso ---- */
 let timerEnd = 0, timerInt;
-function startTimer(sec) {
-  timerEnd = Date.now() + sec * 1000; $("#timer").hidden = false; tick();
+function startTimer(sec, from) {
+  timerEnd = Date.now() + sec * 1000; $("#timer").hidden = false; document.body.classList.add("timer-on"); tick();
   clearInterval(timerInt); timerInt = setInterval(tick, 250);
+  // deixa a próxima série (ou o próximo exercício) visível acima do cronômetro
+  requestAnimationFrame(() => {
+    const all = $$("#view [data-done]"); const k = from ? all.indexOf(from) : -1;
+    const next = all.slice(k + 1).find((b) => !b.classList.contains("on"));
+    if (!next) return;
+    const row = next.closest("tr") || next; const rb = row.getBoundingClientRect(); const top = $("#timer").getBoundingClientRect().top;
+    if (rb.bottom > top - 12 || rb.top < 60) window.scrollBy({ top: rb.bottom - (top - 12), behavior: "smooth" });
+  });
 }
-function stopTimer() { clearInterval(timerInt); $("#timer").hidden = true; }
+function stopTimer() { clearInterval(timerInt); $("#timer").hidden = true; document.body.classList.remove("timer-on"); }
 function tick() {
   const left = Math.max(0, Math.round((timerEnd - Date.now()) / 1000));
   $("#timer-value").textContent = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")}`;
@@ -872,7 +897,7 @@ function endPayload(it) {
   if (it.avg_power) out.avg_power = it.avg_power;
   return out;
 }
-function readinessCard(rd, hasToday = true) {
+function readinessCard(rd, hasToday = true, adjusted = false) {
   if (!rd) return "";
   if (rd.score === null || rd.score === undefined) {
     return state.garmin && state.garmin.connected ? `<div class="card flat small row between gap"><span>Prontidão de hoje: sem dados do relógio ainda.</span><button class="btn sm ghost" id="rd-refresh">Buscar no Garmin</button></div>` : "";
@@ -881,7 +906,7 @@ function readinessCard(rd, hasToday = true) {
   return `<div class="card readiness ${cls}"><div class="row between gap"><h2 style="margin:0">Prontidão de hoje</h2><span class="kpi">${rd.score}</span></div>
     <p><span class="pill ${cls}">${esc({ alta: "Alta", moderada: "Moderada", baixa: "Baixa", muito_baixa: "Muito baixa" }[rd.level] || rd.level)}</span> ${esc(rd.text)}</p>
     <p class="small muted">${esc((rd.reasons || []).join(" · "))}${rd.sleep_h ? ` · ${rd.sleep_h} h de sono` : ""}${rd.rhr ? ` · FC repouso ${rd.rhr}` : ""}</p>
-    <div class="row gap wrap">${rd.action !== "seguir" && hasToday ? `<button class="btn sm" id="rd-apply">Ajustar o treino de hoje</button>` : ""}<button class="btn sm ghost" id="rd-refresh">Atualizar</button></div></div>`;
+    <div class="row gap wrap">${rd.action !== "seguir" && hasToday && !adjusted ? `<button class="btn sm" id="rd-apply">Ajustar o treino de hoje</button>` : ""}${adjusted ? `<span class="pill ok">Treino de hoje já ajustado</span>` : ""}<button class="btn sm ghost" id="rd-refresh">Atualizar</button></div></div>`;
 }
 function loadChart(series) {
   if (!series || series.length < 7) return "";
@@ -906,7 +931,7 @@ function loadCard(ld) {
     <div class="grid2 kpis"><div><div class="kpi">${Math.round(ld.ctl)}</div><div class="small muted">condicionamento (42 dias)</div></div>
       <div><div class="kpi">${Math.round(ld.atl)}</div><div class="small muted">fadiga (7 dias)</div></div>
       <div><div class="kpi">${ld.form > 0 ? "+" : ""}${Math.round(ld.form)}</div><div class="small muted">forma</div></div>
-      <div><div class="kpi">${ld.ramp_week > 0 ? "+" : ""}${ld.ramp_week}</div><div class="small muted">variação em 7 dias</div></div></div>
+      <div><div class="kpi">${ld.ramp_week > 0 ? "+" : ""}${(+ld.ramp_week).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}</div><div class="small muted">variação em 7 dias</div></div></div>
     <p><span class="pill ${st}">${esc({ risco: "Risco", subida_rapida: "Subida rápida", produtivo: "Produtivo", equilibrado: "Equilibrado", descansado: "Descansado", inicio: "Começando" }[ld.status] || ld.status)}</span> <span class="small">${esc(ld.message)}</span></p>
     ${loadChart(ld.series)}
     ${by.length ? `<p class="small">Últimos 7 dias: ${by.map(([k, v]) => `${SPORT_ICON[k] || (k === "musculacao" ? "🏋️" : "❤️")} ${Math.round(v.tss)}${v.km ? ` (${v.km.toLocaleString("pt-BR")} km)` : ""}`).join(" · ")}</p>` : ""}
@@ -924,7 +949,7 @@ async function viewEsportes() {
       <div class="grid2">
         <div class="field"><label>Onde</label><select data-sp="${sp.id}" data-k="env">${sp.envs.map((e) => `<option value="${e.id}" ${c.env === e.id ? "selected" : ""}>${esc(e.name)}</option>`).join("")}</select></div>
         <div class="field"><label>Sessões por semana</label><input type="number" min="1" max="7" data-sp="${sp.id}" data-k="sessions" value="${c.sessions || sp.sessions}"></div>
-        <div class="field"><label>Volume atual (${unit}/semana)</label><input type="number" step="any" min="0" data-sp="${sp.id}" data-k="current_weekly" value="${c.current_weekly ?? ""}" placeholder="${recent ? `Garmin: ${recent}` : "pelo nível"}"></div>
+        <div class="field"><label>Volume atual (${unit}/semana)</label><input type="number" step="any" min="0" data-sp="${sp.id}" data-k="current_weekly" value="${c.current_weekly ?? ""}" placeholder="${recent ? `Garmin: ${(+recent).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}` : "pelo nível"}"></div>
         <div class="field"><label>Dia do longo</label><select data-sp="${sp.id}" data-k="long_day"><option value="">automático</option>${wd.map((w, i) => `<option value="${i}" ${String(c.long_day) === String(i) ? "selected" : ""}>${w}</option>`).join("")}</select></div>
         ${sp.id === "natacao" ? `<div class="field"><label>Piscina (m)</label><select data-sp="${sp.id}" data-k="pool_m">${[25, 50, 20, 33].map((x) => `<option ${+(c.pool_m || 25) === x ? "selected" : ""}>${x}</option>`).join("")}</select></div>` : ""}
         <div class="field"><label>Meta</label><select data-sp="${sp.id}" data-k="goal_type">
@@ -1042,7 +1067,8 @@ async function viewExercicios() {
     const qs = new URLSearchParams({ q: $("#ex-q").value, limit: 80, hide_avoid: $("#ex-hide").checked });
     [["muscle", "#ex-m"], ["equipment", "#ex-e"], ["kind", "#ex-k"]].forEach(([k, s]) => { if ($(s).value) qs.set(k, $(s).value); });
     const res = await api(`/api/exercises?${qs}`);
-    $("#ex-list").innerHTML = res.map((ex) => `<li class="ex-item" data-ex="${esc(ex.id)}">
+    const list = $("#ex-list"); if (!list) return;  // saiu da tela antes da resposta chegar (4G lento)
+    list.innerHTML = res.map((ex) => `<li class="ex-item" data-ex="${esc(ex.id)}">
       ${ex.images[0] ? `<img class="thumb" loading="lazy" src="${esc(ex.images[0])}" alt="">` : `<span class="thumb"></span>`}
       <span class="grow" data-ex="${esc(ex.id)}"><b data-ex="${esc(ex.id)}">${esc(ex.name)}</b> ${limBadge(ex.limitation)}<br><span class="small muted" data-ex="${esc(ex.id)}">${esc(ex.primary_pt.join(", "))} · ${esc(ex.equipment_pt || "")} · ${esc(ex.category_pt)}</span></span></li>`).join("") || `<li class="empty">Nada encontrado.</li>`;
   };
@@ -1227,10 +1253,30 @@ async function route() {
     const routes = { hoje: () => viewHoje(a), planilhas: viewPlanilhas, plano: () => viewPlano(a), treinar: () => viewTreinar(a, b), analise: viewAnalise, evolucao: () => viewEvolucao(decodeURIComponent(a || "")), esportes: viewEsportes, exercicios: viewExercicios, perfil: viewPerfil };
     await (routes[name] || viewHoje)();
     if (!view.onclick) view.onclick = (e) => { const id = e.target.dataset && e.target.dataset.ex; if (id) showExercise(id); };
-  } catch (e) { view.innerHTML = `<div class="card"><p class="pill bad">Erro: ${esc(e.message)}</p></div>`; }
+  } catch (e) {
+    view.innerHTML = e.offline
+      ? `<div class="card"><h2>Sem internet</h2><p>${esc(e.message)}</p><p class="small muted">Um treino em andamento continua salvo no celular (aba Treinar).</p><button class="btn" id="retry">Tentar de novo</button></div>`
+      : `<div class="card"><p class="pill bad">Erro: ${esc(e.message)}</p><p><button class="btn ghost" id="retry">Tentar de novo</button></p></div>`;
+    const rb = $("#retry"); if (rb) rb.onclick = route;
+  }
   window.scrollTo(0, 0);
 }
 window.addEventListener("hashchange", route);
+async function flushOutbox() {
+  if (flushOutbox.busy) return;  // "online" pode disparar mais de uma vez: um envio por vez
+  const box = store("gg_outbox") || []; if (!box.length) return;
+  flushOutbox.busy = true;
+  try { await sendOutbox(box); } finally { flushOutbox.busy = false; }
+}
+async function sendOutbox(box) {
+  const left = [];
+  for (const p of box) { try { await api("/api/sessions", { method: "POST", body: p }); } catch (e) { if (e.offline) left.push(p); } }
+  store("gg_outbox", left.length ? left : null);
+  const sent = box.length - left.length;
+  if (sent) { toast(`${sent} treino${sent > 1 ? "s" : ""} guardado${sent > 1 ? "s" : ""} sem internet enviado${sent > 1 ? "s" : ""} ✔`); if (!location.hash || location.hash.startsWith("#hoje")) route(); }
+}
+window.addEventListener("online", flushOutbox);
+flushOutbox();
 route();
 updateGarminPill().then((g) => { if (g && g.connected) autoSync(); });
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});

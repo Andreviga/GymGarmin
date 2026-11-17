@@ -383,12 +383,22 @@ def get_session(session_id: int, user_id: int = 1) -> dict | None:
 
 def _session_data(s: dict) -> str:
     keep = {k: s.get(k) for k in ("items", "notes", "source", "garmin_activity_id", "feeling", "duration_min",
-                                  "schedule_id", "garmin_summary", "merged") if k in s}
+                                  "schedule_id", "garmin_summary", "merged", "client_id") if k in s}
     keep.setdefault("items", [])
     return json.dumps(keep, ensure_ascii=False)
 
 
+_save_lock = threading.Lock()
+
+
 def save_session(s: dict, user_id: int = 1, session_id: int | None = None) -> dict:
+    if s.get("client_id") and not session_id:
+        with _save_lock:  # dois reenvios simultâneos do mesmo treino não viram duas sessões
+            return _save_session(s, user_id, session_id)
+    return _save_session(s, user_id, session_id)
+
+
+def _save_session(s: dict, user_id: int = 1, session_id: int | None = None) -> dict:
     date = s.get("date") or now()
     with conn() as c:
         if session_id:
@@ -396,10 +406,13 @@ def save_session(s: dict, user_id: int = 1, session_id: int | None = None) -> di
                       (date, s.get("plan_id"), s.get("day_name"), _session_data(s), session_id, user_id))
             sid = session_id
         else:
-            if s.get("garmin_activity_id"):
+            if s.get("garmin_activity_id") or s.get("client_id"):
                 for r in c.execute("SELECT id, data FROM sessions WHERE user_id = ?", (user_id,)).fetchall():
-                    if json.loads(r["data"]).get("garmin_activity_id") == s["garmin_activity_id"]:
+                    d = json.loads(r["data"])
+                    if s.get("garmin_activity_id") and d.get("garmin_activity_id") == s["garmin_activity_id"]:
                         raise ValueError("Esta atividade do Garmin já foi importada")
+                    if s.get("client_id") and d.get("client_id") == s["client_id"]:
+                        return get_session(r["id"], user_id)  # reenvio do mesmo treino (sinal caiu na resposta)
             cur = c.execute("INSERT INTO sessions (user_id, date, plan_id, day_name, data, created_at) VALUES (?,?,?,?,?,?)",
                             (user_id, date, s.get("plan_id"), s.get("day_name"), _session_data(s), now()))
             sid = cur.lastrowid

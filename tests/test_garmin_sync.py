@@ -331,3 +331,18 @@ def test_workout_logged_in_app_and_on_watch_counts_once(client):
         {"exercise_id": "corrida_rua", "sport": "corrida", "duration_min": 30, "feeling": 3}]})
     runs = [s for s in db.list_sessions() if any(i.get("sport") == "corrida" for i in s["items"])]
     assert len(runs) == 1 and runs[0]["items"][0]["distance_km"] == 6.0
+
+
+def test_session_resent_after_lost_signal_is_saved_once(client):
+    body = {"date": "2026-11-16T19:00", "client_id": "abc-123", "items": [
+        {"exercise_id": "Barbell_Squat", "sets": [{"reps": 5, "load_kg": 100}]}]}
+    a = client.post("/api/sessions", json=body).json()
+    b = client.post("/api/sessions", json=body).json()
+    assert a["id"] == b["id"] and len(db.list_sessions()) == 1
+
+
+def test_plan_comes_with_exercise_names(client):
+    client.put("/api/profile", json={"training_months": 12, "available_days": [0, 2, 4], "session_minutes": 60})
+    plan = client.post("/api/generator/apply", json={}).json()
+    p = client.get(f"/api/plans/{plan['id']}").json()
+    assert all(it.get("_ex", {}).get("name") for d in p["days"] for it in d["items"])

@@ -148,7 +148,18 @@ def _plan_or_404(plan_id: int) -> dict:
 
 @app.get("/api/plans/{plan_id}")
 def get_plan(plan_id: int):
-    return _plan_or_404(plan_id)
+    """Planilha com os dados de cada exercício (nome, tipo, limitação) — evita uma requisição por exercício no celular."""
+    p = _plan_or_404(plan_id)
+    lims, ovr, cache = _profile().get("limitations") or [], db.garmin_overrides(), {}
+    for d in p.get("days", []):
+        for it in d.get("items", []):
+            eid = it.get("exercise_id")
+            if eid not in cache:
+                ex = catalog.get(eid)
+                cache[eid] = _with_status(ex, lims, ovr) if ex else None
+            if cache[eid]:
+                it["_ex"] = cache[eid]
+    return p
 
 
 @app.put("/api/plans/{plan_id}")
