@@ -113,7 +113,7 @@ PATTERNS = {
 DAY_TEMPLATES = {
     "FB_A": ("Full body A", [("squat", "main"), ("h_push", "main"), ("h_pull", "main"), ("hinge", "sec"), ("lateral", "acc"), ("biceps", "acc"), ("core", "acc")]),
     "FB_B": ("Full body B", [("hinge", "main"), ("v_pull", "main"), ("incline_push", "main"), ("single_leg", "sec"), ("rear_delt", "acc"), ("triceps", "acc"), ("calf", "acc")]),
-    "FB_C": ("Full body C", [("squat", "main"), ("v_push", "main"), ("h_pull", "main"), ("leg_curl", "sec"), ("chest_fly", "acc"), ("glute", "acc"), ("core", "acc")]),
+    "FB_C": ("Full body C", [("squat", "main"), ("v_push", "main"), ("v_pull", "main"), ("leg_curl", "sec"), ("chest_fly", "acc"), ("glute", "acc"), ("core", "acc")]),
     "UP_A": ("Superior A", [("h_push", "main"), ("v_pull", "main"), ("v_push", "sec"), ("h_pull", "sec"), ("lateral", "acc"), ("biceps", "acc"), ("triceps", "acc")]),
     "UP_B": ("Superior B", [("incline_push", "main"), ("h_pull", "main"), ("v_pull", "sec"), ("chest_fly", "acc"), ("rear_delt", "acc"), ("triceps", "acc"), ("biceps", "acc"), ("core", "acc")]),
     "LO_A": ("Inferior A", [("squat", "main"), ("hinge", "sec"), ("single_leg", "sec"), ("leg_curl", "acc"), ("calf", "acc"), ("adductor", "acc"), ("core", "acc")]),
@@ -154,6 +154,11 @@ CARDIO_DEFAULT = ["cardio_bike_vertical", "cardio_eliptico", "cardio_esteira_cam
 HIIT_PREF = ["cardio_air_bike", "cardio_bike_vertical", "cardio_remo", "cardio_eliptico", "cardio_spinning"]
 
 SEC_PER_REP = 3.5        # tempo médio por repetição (excêntrica + concêntrica)
+SUPERSET_SWITCH_S = 15   # troca entre os dois exercícios do bi-set
+# bi-sets de antagonistas/regiões diferentes nos acessórios: economiza o descanso de um deles
+SUPERSET_PAIRS = [("biceps", "triceps"), ("leg_curl", "leg_ext"), ("lateral", "rear_delt"), ("chest_fly", "rear_delt"),
+                  ("calf", "core"), ("glute", "core"), ("adductor", "calf"), ("traps", "core"), ("biceps", "lateral"),
+                  ("triceps", "rear_delt"), ("calf", "glute")]
 TRANSITION_S = 45        # troca de aparelho/ajuste de carga entre exercícios
 APPROACH_S = 120         # séries de aproximação do 1º exercício principal
 
@@ -198,6 +203,8 @@ def item_time(it: dict) -> dict:
     rest = int(it.get("rest_s") if it.get("rest_s") is not None else 60)
     work = sets * per
     rest_total = max(0, sets - 1) * rest + (TRANSITION_S if phase == "principal" else 5)
+    if it.get("superset") == "A":  # 1º do bi-set: só a troca para o exercício B (o descanso vem depois do B)
+        rest_total = sets * SUPERSET_SWITCH_S
     if it.get("approach_sets"):
         work += APPROACH_S
     return {"phase": phase, "kind": "forca", "work": work, "rest": rest_total, "total": work + rest_total}
@@ -308,6 +315,8 @@ def _choose_split(days: list[int], tier_key: str, goal: dict) -> list[str]:
     candidates = [preferred]
     alts = {2: [["UP_A", "LO_A"]], 3: [["PUSH", "PULL", "LEGS"], ["UP_A", "LO_A", "FB_C"]],
             4: [["PUSH", "PULL", "LEGS", "UP_A"]], 5: [["PUSH", "PULL", "LEGS", "UP_A", "LO_A"]]}
+    if n == 3:
+        alts[3] = [["UP_A", "LO_A", "FB_C"], ["FB_A", "FB_B", "FB_C"], ["PUSH", "PULL", "LEGS"]]  # PPL só se nada mais evita colar
     candidates += [c for c in alts.get(n, []) if c != preferred]
     best, best_key = preferred, None
     for ci, cand in enumerate(candidates):
@@ -330,7 +339,8 @@ def _split(n: int, tier_key: str, goal: dict) -> list[str]:
     if n == 2:
         return ["FB_A", "FB_B"]
     if n == 3:
-        return ["PUSH", "PULL", "LEGS"] if tier_key in ("avancado", "elite") and not goal.get("hybrid") else ["FB_A", "FB_B", "FB_C"]
+        # 2× por semana rende mais que 1× (PPL fica como alternativa para 3 dias seguidos)
+        return ["UP_A", "LO_A", "FB_C"] if tier_key in ("avancado", "elite") and not goal.get("hybrid") else ["FB_A", "FB_B", "FB_C"]
     if n == 4:
         return ["UP_A", "LO_A", "UP_B", "LO_B"]
     if n == 5:
@@ -373,7 +383,7 @@ def _prep_items(regions: set[str], lims, rotation: int, warm_machine: str, warm_
                 cand = pool[(rotation + i) % len(pool)]
                 if cand not in chosen:
                     chosen.append(cand)
-    for eid in chosen[:4]:
+    for eid in chosen[:3 if warm_min and warm_min <= 4 else 4]:  # sessão curta: preparo mais enxuto
         items.append({"exercise_id": eid, "sets": 1, "duration_s": 40, "rest_s": 10, "phase": "preparo",
                       "notes": "mobilidade/ativação dinâmica"})
     return items
@@ -430,6 +440,39 @@ def weekly_targets(tier_key: str, goal_key: str, volume_factor: float = 1.0) -> 
 
 
 # ================================================================== gerador ===
+
+def _pair_supersets(items: list[dict]) -> int:
+    """Junta acessórios em bi-sets (A → B → descanso) e os deixa lado a lado. Retorna o número de pares."""
+    acc = [i for i in items if i.get("role") == "acc" and not i.get("superset") and not i.get("duration_s")]
+    pairs = 0
+    for a_pat, b_pat in SUPERSET_PAIRS:
+        a = next((i for i in acc if i.get("pattern") == a_pat and not i.get("superset")), None)
+        b = next((i for i in acc if i.get("pattern") == b_pat and not i.get("superset") and i is not a), None)
+        if not a or not b:
+            continue
+        a["superset"], b["superset"] = "A", "B"
+        a["rest_s"] = SUPERSET_SWITCH_S
+        a["notes"] = ((a.get("notes") or "") + " · bi-set: emende com o próximo exercício").strip(" ·")
+        b["notes"] = ((b.get("notes") or "") + " · bi-set: descanse só depois deste").strip(" ·")
+        items.remove(b)
+        items.insert(items.index(a) + 1, b)
+        pairs += 1
+    return pairs
+
+
+def _fix_supersets(items: list[dict], acc_rest: int) -> None:
+    """Desfaz bi-set que perdeu o par (o ajuste de tempo pode ter tirado um dos dois)."""
+    for k, it in enumerate(items):
+        if it.get("superset") == "A" and not (k + 1 < len(items) and items[k + 1].get("superset") == "B"):
+            it.pop("superset")
+            it["rest_s"] = acc_rest
+            it["notes"] = (it.get("notes") or "").replace(" · bi-set: emende com o próximo exercício", "").replace(
+                "bi-set: emende com o próximo exercício", "") or None
+        if it.get("superset") == "B" and not (k > 0 and items[k - 1].get("superset") == "A"):
+            it.pop("superset")
+            it["notes"] = (it.get("notes") or "").replace(" · bi-set: descanse só depois deste", "").replace(
+                "bi-set: descanse só depois deste", "") or None
+
 
 def _leg_penalty(days: list[int], split: list[str], hard_leg_days: set[int]) -> int:
     """Perna pesada na véspera (ou no mesmo dia) de longão/qualidade de corrida, bike, remo ou trilha."""
@@ -559,7 +602,7 @@ def generate(profile: dict, seed: int = 0, recent: dict | None = None, today=Non
 
     days: list[dict] = []
     variant_count: dict[str, int] = defaultdict(int)
-    warm_min = 5 if budget < 75 else 8
+    warm_min = 4 if budget <= 45 else 5 if budget < 75 else 8
     for di, (wd, key) in enumerate(zip(strength_days, split)):
         title, slots = DAY_TEMPLATES[key]
         variant = variant_count[key]
@@ -589,6 +632,7 @@ def generate(profile: dict, seed: int = 0, recent: dict | None = None, today=Non
             if first["role"] == "main" and not first.get("duration_s"):
                 first["approach_sets"] = True
                 first["notes"] = ((first.get("notes") or "") + " · aproximação: 1×8 a 50% e 1×4 a 75% antes das séries válidas").strip(" ·")
+        _pair_supersets(main_items)
         regions = set()
         for it in main_items:
             ex = catalog.get(it["exercise_id"])
@@ -712,12 +756,17 @@ def generate(profile: dict, seed: int = 0, recent: dict | None = None, today=Non
     # ---- cardio: finalizadores até a meta
     _cardio_fill(days, cardio_target, budget, lims, cardio_prefs, mz, goal)
 
+    acc_rest = int(round(tier["rest"]["acc"] * rest_mult / 15) * 15)
     # ---- pós-treino (alongamento) com o que sobrar de tempo (mín. 3 min)
     for d in days:
         if d["kind"] != "forca":
             continue
         d["items"] += _post_items(_muscle_load(d["items"]), lims, 5)
-        _fit_time([d], budget, protect_post=True, all_days=days, targets=targets)
+        for _ in range(3):  # bi-set que perde o par recupera o descanso: reajusta até caber
+            _fit_time([d], budget, protect_post=True, all_days=days, targets=targets)
+            _fix_supersets(d["items"], acc_rest)
+            if _day_total(d) <= budget:
+                break
 
     days.sort(key=lambda d: d["weekday"])
     for d in days:
@@ -952,6 +1001,22 @@ def _balance(days: list[dict], targets: dict[str, float], budget: float) -> int:
                 changes += 1
                 continue
         # puxar ≥ empurrar (saúde do ombro e postura)
+        if _push_pull(vol) > 1.6 and vol.get("chest", 0) > 0:
+            # puxar muito acima de empurrar: tira de acessório de puxar ou soma em empurrar
+            pulls = [(d, i) for d in days for i in d["items"] if i.get("role") in ("acc", "sec")
+                     and set(prim(i)) & set(PULL_MUSCLES) and i["sets"] > 2]
+            if pulls:
+                pulls.sort(key=lambda di: -di[1]["sets"])
+                pulls[0][1]["sets"] -= 1
+                changes += 1
+                continue
+            pushes = [(d, i) for d in days for i in d["items"] if i.get("role") and set(prim(i)) & set(PUSH_MUSCLES)
+                      and i["sets"] < (5 if i["role"] == "main" else 4)]
+            added = next(((d, i) for d, i in sorted(pushes, key=lambda di: _day_total(di[0])) if can_add(d, i)), None)
+            if added:
+                added[1]["sets"] += 1
+                changes += 1
+                continue
         if _push_pull(vol) < 1.0 and vol.get("chest", 0) > 0:
             pulls = [(d, i) for d in days for i in d["items"] if i.get("role") and set(prim(i)) & set(PULL_MUSCLES)
                      and i["sets"] < (5 if i["role"] == "main" else 4)]

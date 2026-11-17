@@ -166,6 +166,12 @@ def build_week(plan: dict, profile: dict, ws: date, from_date: date | None = Non
     days = plan.get("days") or []
     wp = _endurance_week(plan, profile, ws)
     sessions_by_day = _assign_sessions(days, wp) if wp else {}
+    # séries extras do acúmulo só até o volume máximo recuperável de cada músculo na semana
+    from .generator import _weekly_volume
+    from .muscles import MUSCLES
+
+    vol = _weekly_volume(days)
+    allowance = {m: MUSCLES[m]["mrv"] - vol.get(m, 0) for m in MUSCLES}
     used: dict[int, list[dict]] = defaultdict(list)
     entries = []
     free = iter([d for d in avail])
@@ -181,7 +187,8 @@ def build_week(plan: dict, profile: dict, ws: date, from_date: date | None = Non
         dt = ws + timedelta(days=wd)
         if from_date and dt < from_date:
             continue
-        items = apply_cycle(day.get("items", []), pos, int(gen.get("ramp_sets") or 0))
+        items = apply_cycle(day.get("items", []), pos, int(gen.get("ramp_sets") or 0),
+                            budget_min=session_budget(profile, plan), allowance=allowance)
         name = _clean_name(day.get("name") or f"Treino {idx + 1}")
         extra = {}
         if day.get("endurance_slot") and wp:

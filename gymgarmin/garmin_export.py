@@ -201,6 +201,35 @@ def _cardio_steps_connect(order: _Order, it: dict, ex: dict, in_strength: bool, 
     return steps
 
 
+def _strength_work_connect(order: _Order, it: dict, ex: dict, overrides: dict | None) -> dict:
+    g = _garmin_override(ex, overrides)
+    reps, reps_note = parse_reps(it.get("reps"))
+    weight = {}
+    if it.get("load_kg"):
+        weight = {"weightValue": float(it["load_kg"]) * 1000.0, "weightUnit": WEIGHT_UNIT_KG}
+    desc = _notes(it, reps_note)
+    timed = bool(it.get("duration_s")) or (ex.get("timed") and not it.get("reps"))
+    kw = dict(category=g["category"], exerciseName=g["exercise"], description=desc, **weight)
+    if timed:
+        return _exec_step(order, "interval", COND_TIME, int(it.get("duration_s") or 30), **kw)
+    if reps > 0:
+        return _exec_step(order, "interval", COND_REPS, reps, **kw)
+    return _exec_step(order, "interval", COND_LAP, None, **kw)
+
+
+def _superset_block_connect(order: _Order, a: dict, b: dict, overrides: dict | None) -> dict:
+    """Bi-set: A → B → descanso, repetido pelo maior número de séries dos dois."""
+    sets = max(1, int(a.get("sets") or 3), int(b.get("sets") or 3))
+    group_order = order.next()
+    inner = [_strength_work_connect(order, a, a["_ex"], overrides), _strength_work_connect(order, b, b["_ex"], overrides)]
+    rest_s = int(b.get("rest_s") or 60)
+    if rest_s > 0:
+        inner.append(_exec_step(order, "rest", COND_TIME, rest_s))
+    return {"type": "RepeatGroupDTO", "stepOrder": group_order, "stepType": STEP_TYPES["repeat"],
+            "numberOfIterations": sets, "workoutSteps": inner, "endCondition": COND_ITER,
+            "endConditionValue": float(sets), "smartRepeat": False, "skipLastRestStep": False}
+
+
 def _strength_block_connect(order: _Order, it: dict, ex: dict, overrides: dict | None) -> dict:
     g = _garmin_override(ex, overrides)
     sets = max(1, int(it.get("sets") or 3))
@@ -345,8 +374,16 @@ def to_connect_json(day: dict, plan_name: str = "", overrides: dict | None = Non
                 steps.append(_phase_step_connect(order, it, it["_ex"], overrides, False))
     else:
         sport_key = "strength_training"
+        skip = set()
         for idx, it in enumerate(items):
+            if idx in skip:
+                continue
             ex = it["_ex"]
+            nxt = items[idx + 1] if idx + 1 < len(items) else None
+            if it.get("superset") == "A" and nxt and nxt.get("superset") == "B" and _phase(it) == "principal":
+                steps.append(_superset_block_connect(order, it, nxt, overrides))
+                skip.add(idx + 1)
+                continue
             if ex["kind"] == "cardio":
                 pos = "first" if idx == 0 else ("last" if idx == len(items) - 1 else "")
                 steps += _cardio_steps_connect(order, it, ex, True, pos, overrides)
@@ -522,8 +559,47 @@ def to_fit(day: dict, plan_name: str = "", overrides: dict | None = None,
     else:
         sport, sub_sport = "training", "strength_training"
 
+    skip_fit = set()
     for idx, it in enumerate(items):
+        if idx in skip_fit:
+            continue
         ex = it["_ex"]
+        nxt = items[idx + 1] if idx + 1 < len(items) else None
+        if not cardio_only and it.get("superset") == "A" and nxt and nxt.get("superset") == "B" and _phase(it) == "principal":
+            first = None
+            for member in (it, nxt):
+                mex = member["_ex"]
+                mcat, mexn = _fit_ids_for(mex, overrides)
+                mf = {}
+                if mcat is not None:
+                    mf["exercise_category"] = mcat
+                    if mexn is not None:
+                        mf["exercise_name"] = mexn
+                    titles.setdefault((mcat, mexn), _step_label(mex, member, 30))
+                reps_m, note_m = parse_reps(member.get("reps"))
+                st = {"wkt_step_name": _step_label(mex, member, 30), "intensity": "active", "target_type": "open", **mf}
+                if member.get("duration_s"):
+                    st.update(duration_type="time", duration_value=int(member["duration_s"]) * 1000)
+                elif reps_m > 0:
+                    st.update(duration_type="reps", duration_value=reps_m)
+                else:
+                    st.update(duration_type="open")
+                if member.get("load_kg"):
+                    st.update(exercise_weight=float(member["load_kg"]), weight_display_unit="kilogram")
+                n_ = _notes(member, note_m)
+                if n_:
+                    st["notes"] = n_
+                k = add(st)
+                first = k if first is None else first
+            rest_b = int(nxt.get("rest_s") or 60)
+            if rest_b > 0:
+                add({"wkt_step_name": "Descanso", "duration_type": "time", "duration_value": rest_b * 1000,
+                     "intensity": "rest", "target_type": "open"})
+            ss = max(int(it.get("sets") or 3), int(nxt.get("sets") or 3))
+            if ss > 1:
+                add({"duration_type": "repeat_until_steps_cmplt", "duration_value": first, "target_type": "open", "target_value": ss})
+            skip_fit.add(idx + 1)
+            continue
         cat, exn = (None, None) if cardio_only else _fit_ids_for(ex, overrides)
         ex_fields = {}
         if cat is not None:

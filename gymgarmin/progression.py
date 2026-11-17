@@ -1,7 +1,8 @@
 """Progressão de carga ("dupla progressão") e ciclo de treino (mesociclo + deload).
 
 Dupla progressão: trabalhe dentro de uma faixa de repetições (ex.: 8-12).
-- Fez o TOPO da faixa em todas as séries com RPE ≤ 8,5  → sobe a carga.
+- Fez o TOPO da faixa (todas as séries, ou faltou só 1 rep no total) com RPE ≤ 9 → sobe a carga
+  (RPE 9,5 → sobe meio incremento; RPE 10 em tudo → repete a carga).
 - Ficou ABAIXO do mínimo da faixa com RPE ≥ 9,5          → reduz ~5%.
 - Ficou abaixo do mínimo                                   → mantém e consolida.
 - Senão                                                    → mantém e busca +1 rep por série.
@@ -69,8 +70,18 @@ def suggest(plan_item: dict, last: dict | None, deload: bool = False) -> dict:
     inc = increment(ex)
     if deload:
         return {"load_kg": _round_load(work_load * 0.9), "note": "Deload: −10% de carga, menos séries, RPE ~6"}
-    if all(r >= hi for r in reps) and (avg_rpe is None or avg_rpe <= 8.5):
-        return {"load_kg": _round_load(work_load + inc), "note": f"Bateu {hi} reps em todas as séries → +{inc:g} kg"}
+    # topo da faixa: todas as séries no topo, ou faltou no máximo 1 rep no total (a última série cansa)
+    hit_top = all(r >= hi for r in reps) or (sum(reps) >= hi * len(reps) - 1 and min(reps) >= hi - 1)
+    if hit_top and (avg_rpe is None or avg_rpe <= 9.5):
+        step = inc if (avg_rpe is None or avg_rpe <= 9) else max(1.0, inc / 2)  # RPE 9,5: sobe menos
+        new = _round_load(work_load + step)
+        jump = (new - work_load) / work_load if work_load else 0
+        note = f"Bateu o topo ({hi} reps) → +{new - work_load:g} kg"
+        if jump > 0.12:
+            note += (f" (salto de {jump:.0%}: é normal as reps caírem para perto de {lo} — reconstrua até {hi})")
+        return {"load_kg": new, "note": note}
+    if hit_top:
+        return {"load_kg": work_load, "note": f"Topo da faixa, mas no limite (RPE 10): repita {work_load:g} kg com mais controle"}
     if any(r < lo for r in reps) and avg_rpe and avg_rpe >= 9.5:
         return {"load_kg": _round_load(work_load * 0.95), "note": "Muito pesado na última vez → −5%"}
     if any(r < lo for r in reps):
@@ -91,19 +102,43 @@ def cycle_position(cycle_start: str | date | None, week_start: date, cycle_weeks
     return {"week": w, "length": n, "cycle": weeks // n + 1, "deload": w == n}
 
 
-def apply_cycle(items: list[dict], pos: dict, ramp_sets: int) -> list[dict]:
-    """Aplica a semana do ciclo ao treino (cópia): acúmulo ou deload."""
+def apply_cycle(items: list[dict], pos: dict, ramp_sets: int, budget_min: float | None = None,
+                allowance: dict[str, float] | None = None) -> list[dict]:
+    """Aplica a semana do ciclo ao treino (cópia): acúmulo ou deload.
+
+    Deload: ~55% das séries (cada exercício), RPE 6.
+    Acúmulo: +1 série por vez nos principais (depois nos secundários) a partir da semana 3, só enquanto
+    couber no tempo da sessão (`budget_min`) e no volume máximo recuperável de cada músculo (`allowance`
+    = séries que ainda cabem por músculo na semana; é consumida aqui).
+    """
+    from .generator import time_breakdown
+
     out = copy.deepcopy(items)
-    for it in out:
-        if it.get("phase") not in (None, "principal") or not it.get("sets"):
-            continue
-        if pos["deload"]:
-            it["sets"] = max(1, math.ceil(it["sets"] * 0.6))
+    work = [it for it in out if it.get("phase") in (None, "principal") and it.get("sets")]
+    if pos["deload"]:
+        for it in work:
+            it["sets"] = max(1, round(it["sets"] * 0.55))
             it["rpe_target"] = 6
             it["deload"] = True
-        elif ramp_sets and it.get("role") in ("main", "sec") and pos["week"] >= 3:
-            extra = min(ramp_sets, (pos["week"] - 1) // 2)
-            if extra:
-                it["sets"] = it["sets"] + extra
-                it["ramp"] = extra
+        return out
+    extra_max = min(ramp_sets, (pos["week"] - 1) // 2) if ramp_sets and pos["week"] >= 3 else 0
+    if not extra_max:
+        return out
+    order = [it for it in work if it.get("role") == "main"] + [it for it in work if it.get("role") == "sec"]
+    for _ in range(extra_max):
+        for it in order:
+            ex = catalog.get(it.get("exercise_id")) or {}
+            prim, sec = ex.get("primaryMuscles", []), ex.get("secondaryMuscles", [])
+            if allowance is not None and (any(allowance.get(m, 0) < 1 for m in prim) or any(allowance.get(m, 0) < 0.5 for m in sec)):
+                continue
+            it["sets"] += 1
+            if budget_min is not None and time_breakdown(out)["total"] > budget_min:
+                it["sets"] -= 1
+                continue
+            it["ramp"] = it.get("ramp", 0) + 1
+            if allowance is not None:
+                for m in prim:
+                    allowance[m] = allowance.get(m, 0) - 1
+                for m in sec:
+                    allowance[m] = allowance.get(m, 0) - 0.5
     return out

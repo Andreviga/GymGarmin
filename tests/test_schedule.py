@@ -91,7 +91,7 @@ def test_cycle_deload():
     pos = progression.cycle_position("2026-11-16", MONDAY + timedelta(weeks=4), 5)
     assert pos["week"] == 5 and pos["deload"]
     items = [{"exercise_id": "Barbell_Squat", "sets": 4, "role": "main", "phase": "principal"}]
-    assert progression.apply_cycle(items, pos, 1)[0]["sets"] == 3
+    assert progression.apply_cycle(items, pos, 1)[0]["sets"] == 2  # deload ~55% das séries
     pos3 = progression.cycle_position("2026-11-16", MONDAY + timedelta(weeks=2), 5)
     assert progression.apply_cycle(items, pos3, 1)[0]["sets"] == 5
 
@@ -138,3 +138,72 @@ def test_missed_detection_and_done(fresh_db):
     later = schedule.ensure_week(prof, MONDAY, MONDAY + timedelta(days=3))
     st = {e["id"]: e["status"] for e in later}
     assert st[week[0]["id"]] == "perdido" and st[week[1]["id"]] == "feito"
+
+
+# ------------------------------------------------- regressões das simulações de musculação
+def test_double_progression_moves_at_rpe9_and_near_top():
+    item = {"exercise_id": "Barbell_Squat", "reps": "6-10"}
+    top9 = {"sets": [{"reps": 10, "load_kg": 100, "rpe": 9}] * 3}
+    assert progression.suggest(item, top9)["load_kg"] == 105
+    near = {"sets": [{"reps": 10, "load_kg": 100, "rpe": 8}, {"reps": 10, "load_kg": 100, "rpe": 9}, {"reps": 9, "load_kg": 100, "rpe": 9.5}]}
+    assert progression.suggest(item, near)["load_kg"] > 100  # faltou 1 rep no total: sobe
+    top95 = {"sets": [{"reps": 10, "load_kg": 100, "rpe": 9.5}] * 3}
+    assert 100 < progression.suggest(item, top95)["load_kg"] < 105  # meio incremento
+    top10 = {"sets": [{"reps": 10, "load_kg": 100, "rpe": 10}] * 3}
+    assert progression.suggest(item, top10)["load_kg"] == 100
+    light = {"exercise_id": "Side_Lateral_Raise", "reps": "10-15"}
+    note = progression.suggest(light, {"sets": [{"reps": 15, "load_kg": 6, "rpe": 8}] * 3})["note"]
+    assert "salto" in note
+
+
+def test_cycle_ramp_respects_time_and_mrv_and_deload_halves():
+    items = [{"exercise_id": "Barbell_Squat", "sets": 4, "reps": "6-10", "rest_s": 150, "role": "main", "phase": "principal"},
+             {"exercise_id": "Romanian_Deadlift", "sets": 3, "reps": "8-12", "rest_s": 120, "role": "sec", "phase": "principal"}]
+    w3 = {"week": 3, "length": 4, "cycle": 1, "deload": False}
+    budget = generator.time_breakdown(items)["total"] + 1
+    out = progression.apply_cycle(items, w3, 1, budget_min=budget)
+    assert generator.time_breakdown(out)["total"] <= budget
+    out2 = progression.apply_cycle(items, w3, 1, allowance={"quadriceps": 0.5})
+    assert out2[0]["sets"] == 4  # sem espaço no MRV do quadríceps
+    dl = progression.apply_cycle(items, {"week": 4, "length": 4, "cycle": 1, "deload": True}, 1)
+    assert sum(i["sets"] for i in dl) <= 0.6 * sum(i["sets"] for i in items)
+
+
+def test_supersets_paired_timed_and_exported():
+    from garmin_fit_sdk import Decoder, Stream
+
+    from gymgarmin import garmin_export as ge
+
+    p = generator.generate({"training_months": 18, "goal": "hipertrofia", "available_days": [0, 1, 3, 4], "session_minutes": 60})
+    pairs = [(d, k) for d in p["days"] for k, it in enumerate(d["items"]) if it.get("superset") == "A"]
+    assert pairs
+    d, k = pairs[0]
+    a, b = d["items"][k], d["items"][k + 1]
+    assert b.get("superset") == "B" and a["rest_s"] == generator.SUPERSET_SWITCH_S
+    sep = generator.item_time({**a, "superset": None, "rest_s": b["rest_s"]})["total"]
+    assert generator.item_time(a)["total"] < sep  # bi-set economiza o descanso do 1º
+    msgs, errs = Decoder(Stream.from_byte_array(bytearray(ge.to_fit(d, "T")))).read()
+    assert not errs
+    cj = ge.to_connect_json(d, "T")
+    assert any(s.get("type") == "RepeatGroupDTO" and len(s["workoutSteps"]) == 3 for s in cj["workoutSegments"][0]["workoutSteps"])
+    for day in p["days"]:  # nenhum bi-set órfão
+        for j, it in enumerate(day["items"]):
+            if it.get("superset") == "A":
+                assert day["items"][j + 1].get("superset") == "B"
+
+
+def test_three_day_split_trains_most_muscles_twice():
+    p = generator.generate({"training_months": 40, "goal": "hipertrofia", "available_days": [0, 2, 4], "session_minutes": 60})
+    assert [d["template"] for d in p["days"]] != ["PUSH", "PULL", "LEGS"]
+    p2 = generator.generate({"training_months": 40, "goal": "hipertrofia", "available_days": [0, 1, 2], "session_minutes": 60})
+    assert sorted(d["template"] for d in p2["days"]) == ["LEGS", "PULL", "PUSH"]  # dias seguidos: PPL evita colar
+
+
+def test_deadlift_counts_for_posterior_chain():
+    assert set(catalog.get("Barbell_Deadlift")["primaryMuscles"]) >= {"hamstrings", "glutes"}
+
+
+def test_pull_not_far_above_push():
+    for days in ([1, 4], [0, 1, 3, 4], [5, 6]):
+        p = generator.generate({"training_months": 9, "goal": "hipertrofia", "available_days": days, "session_minutes": 60})
+        assert generator._push_pull(generator._weekly_volume(p["days"])) <= 1.65

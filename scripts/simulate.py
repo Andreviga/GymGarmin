@@ -30,6 +30,7 @@ os.environ["GYMGARMIN_HOME"] = TMP
 os.environ["GYMGARMIN_DB"] = str(Path(TMP) / "sim.sqlite3")
 
 from gymgarmin import catalog, db, generator, schedule  # noqa: E402
+from gymgarmin.progression import apply_cycle  # noqa: E402
 from gymgarmin.analysis import balance  # noqa: E402
 from gymgarmin.limitations import check_exercise, max_zone  # noqa: E402
 from gymgarmin.muscles import MUSCLES  # noqa: E402
@@ -63,7 +64,9 @@ def evaluate(profile: dict) -> dict:
     if over:
         issues.append(f"tempo>orcamento ({max(over):.1f} min)")
     under = [budget - d["time"]["total"] for d in strength if d["time"]["total"] < budget * 0.7]
-    if under and plan["generator"]["tier"] != "iniciante":
+    vol_now = generator._weekly_volume(days)
+    saturated = all(vol_now.get(mm, 0) >= 0.95 * t for mm, t in plan["generator"]["targets"].items() if t >= 4)
+    if under and plan["generator"]["tier"] != "iniciante" and not saturated:
         issues.append(f"sessao_curta ({max(under):.0f} min sobrando)")
     targets = plan["generator"]["targets"]
     vol = generator._weekly_volume(days)
@@ -80,7 +83,7 @@ def evaluate(profile: dict) -> dict:
             issues.append("acima_mrv:" + ",".join(sorted(high)))
     bal = {b["id"]: b for b in balance({k: {"sets": v} for k, v in {**{x: 0 for x in MUSCLES}, **vol}.items()})}
     for k in ("push_pull", "ham_quad"):
-        if bal[k]["status"] in ("baixo", "alto") and strength and len(strength) >= 2:
+        if bal[k]["status"] in ("baixo", "alto") and strength and len(strength) >= 2 and budget >= 45:
             issues.append(f"desequilibrio:{k}={bal[k]['ratio']}")
     planned = plan["generator"]["cardio_planned_equiv"]
     target = plan["generator"]["cardio_target"]
@@ -88,7 +91,7 @@ def evaluate(profile: dict) -> dict:
     share = generator.CARDIO_SHARE[plan["generator"]["goal"]]
     feasible = min(target, sum(budget * (0.85 if d["kind"] == "cardio" else share) for d in days))
     m["cardio_feasible_pct"] = round(planned / feasible, 2) if feasible else 1
-    if planned < 0.6 * feasible:
+    if planned < 0.6 * feasible and feasible >= 20:
         issues.append(f"cardio<60%_do_possivel ({planned}/{int(feasible)})")
     equipment = set(profile.get("equipment") or [])
     mz = max_zone(lims) or 5
@@ -141,7 +144,93 @@ def evaluate(profile: dict) -> dict:
     legs = {d["weekday"] for d in days if d.get("template") in generator.HEAVY_LEGS}
     if any("HIIT" in d["name"] and (d["weekday"] + 1) % 7 in legs for d in days):
         issues.append("hiit_vespera_pernas")
+    # ---- ciclo: semanas de acúmulo (séries extras) e deload
+    cw = int(plan["generator"].get("cycle_weeks") or 4)
+    ramp = int(plan["generator"].get("ramp_sets") or 0)
+    base_sets = sum(int(i.get("sets") or 0) for d in strength for i in d["items"] if i.get("role"))
+    vol0 = generator._weekly_volume(days)
+    for w in range(1, cw + 1):
+        pos = {"week": w, "length": cw, "cycle": 1, "deload": w == cw}
+        allow = {mm: MUSCLES[mm]["mrv"] - vol0.get(mm, 0) for mm in MUSCLES}
+        wk = [{**d, "items": apply_cycle(d["items"], pos, ramp, budget_min=budget, allowance=allow)} for d in days]
+        for d in wk:
+            if d["kind"] == "forca":
+                t = generator.time_breakdown(d["items"])["total"]
+                if t > budget * 1.05:
+                    issues.append(f"ciclo_tempo (semana {w}: {t:.0f} de {budget} min)")
+                    break
+        if pos["deload"]:
+            dl = sum(int(i.get("sets") or 0) for d in wk if d["kind"] == "forca" for i in d["items"] if i.get("role"))
+            if base_sets and dl > 0.75 * base_sets:
+                issues.append("deload_fraco")
+        else:
+            v = generator._weekly_volume(wk)
+            hi = [mm for mm in v if mm in MUSCLES and v[mm] > MUSCLES[mm]["mrv"] * 1.05]
+            if hi:
+                issues.append("ciclo_acima_mrv:" + ",".join(sorted(hi)))
+    # ---- frequência: músculos grandes 1×/semana com 3+ dias de força (2× rende mais para hipertrofia)
+    if len(strength) >= 3 and plan["generator"]["goal"] in ("hipertrofia", "forca", "hibrido"):
+        freq = Counter()
+        for d in strength:
+            for mm, v in direct(d["items"]).items():
+                if v >= 2:
+                    freq[mm] += 1
+        once = [mm for mm in ("chest", "lats", "quadriceps", "hamstrings", "glutes") if targets.get(mm, 0) >= 8 and freq[mm] == 1]
+        if once:
+            issues.append("frequencia_1x:" + ",".join(once))
+    # ---- ordem: principal depois de isolado
+    for d in strength:
+        roles = [i.get("role") for i in d["items"] if (i.get("phase") or "principal") == "principal" and i.get("role")]
+        if "main" in roles and "acc" in roles and roles.index("acc") < max(k for k, r in enumerate(roles) if r == "main"):
+            issues.append("ordem_isolado_antes_do_principal")
+            break
     return {"plan": plan, "issues": sorted(set(issues)), "metrics": m}
+
+
+# ------------------------------------------------------------ progressão de carga
+def simulate_progression(n_sessions: int = 30) -> dict:
+    """Atleta virtual (força cresce ~0,4%/treino) seguindo as cargas sugeridas pela dupla progressão.
+
+    Reps possíveis por série = Epley invertido sobre o 1RM do dia, com fadiga entre séries.
+    Mede: saltos de carga que derrubam as reps abaixo da faixa, oscilação (sobe/desce), estagnação e
+    ganho de carga em relação ao ganho de força.
+    """
+    from gymgarmin import progression
+
+    cases = [("Barbell_Squat", "6-10", 100.0, 70.0), ("Barbell_Bench_Press_-_Medium_Grip", "6-10", 80.0, 55.0),
+             ("Dumbbell_Bicep_Curl", "10-15", 16.0, 8.0), ("Side_Lateral_Raise", "10-15", 12.0, 6.0),
+             ("Leg_Extensions", "10-15", 90.0, 45.0), ("Barbell_Deadlift", "3-5", 160.0, 130.0),
+             ("Cable_Rope_Overhead_Triceps_Extension", "10-15", 40.0, 20.0)]
+    out = {}
+    for eid, reps, one_rm, start in cases:
+        if not catalog.get(eid):
+            continue
+        lo, hi = progression._bounds(reps)
+        rm, load, last = one_rm, start, None
+        loads, below, flips, stuck = [], 0, 0, 0
+        for k in range(n_sessions):
+            sug = progression.suggest({"exercise_id": eid, "reps": reps, "load_kg": start}, last)
+            load = sug["load_kg"] or load
+            sets = []
+            fatigue = 0
+            for _ in range(3):
+                possible = max(0, int(30 * (rm * (1 - fatigue) / load - 1)))  # Epley invertido
+                done = min(hi, possible)
+                rpe = 10 if possible <= done else min(10, 10 - (possible - done) * 0.5)
+                sets.append({"reps": done, "load_kg": load, "rpe": round(rpe, 1)})
+                fatigue += 0.03
+            if any(x["reps"] < lo for x in sets):
+                below += 1
+            if loads and len(loads) >= 2 and (loads[-1] - loads[-2]) * (load - loads[-1]) < 0:
+                flips += 1
+            stuck = stuck + 1 if loads and load == loads[-1] else 0
+            loads.append(load)
+            last = {"sets": sets}
+            rm *= 1.004
+        out[eid] = {"start": start, "end": loads[-1], "gain_load_pct": round(100 * (loads[-1] / start - 1), 1),
+                    "gain_strength_pct": round(100 * (1.004 ** n_sessions - 1), 1), "below_range": below,
+                    "flips": flips, "max_stuck": stuck, "loads": loads}
+    return out
 
 
 def simulate_skips(profile: dict) -> list[dict]:
@@ -230,6 +319,10 @@ def main() -> None:
     print(f"dias acima do tempo após reajuste: {len(overs)}")
     for o in overs[:5]:
         print("     ", o)
+    print("\n=== progressão de carga (atleta virtual, 30 treinos, força +12,7%) ===")
+    for eid, r in simulate_progression().items():
+        print(f"  {eid:40s} carga {r['start']:g}→{r['end']:g} kg ({r['gain_load_pct']:+.1f}%) · abaixo da faixa {r['below_range']}×"
+              f" · sobe/desce {r['flips']}× · maior tempo parado {r['max_stuck']} treinos")
     if a.json:
         Path(a.json).write_text(json.dumps({"counts": counts, "skips": strat}, default=str, indent=1))
 

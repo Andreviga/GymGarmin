@@ -38,6 +38,8 @@ OUTDOOR_SPORT_IDS = {"corrida_rua", "corrida_trilha", "corrida_pista", "ciclismo
 # Correções de dados do free-exercise-db (músculos errados na fonte)
 MUSCLE_FIXES = {
     "Cable_Hip_Adduction": (["adductors"], ["glutes"]),
+    # levantamento terra: cadeia posterior inteira (a fonte lista só a lombar como principal)
+    "Barbell_Deadlift": (["hamstrings", "glutes", "lower back"], ["quadriceps", "traps", "forearms", "lats", "middle back"]),
 }
 
 # Nomes em português dos exercícios mais comuns de academia no Brasil
