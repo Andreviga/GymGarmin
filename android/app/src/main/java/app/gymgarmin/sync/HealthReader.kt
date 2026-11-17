@@ -1,0 +1,182 @@
+package app.gymgarmin.sync
+
+import android.content.Context
+import androidx.health.connect.client.HealthConnectClient
+import androidx.health.connect.client.permission.HealthPermission
+import androidx.health.connect.client.records.ActiveCaloriesBurnedRecord
+import androidx.health.connect.client.records.DistanceRecord
+import androidx.health.connect.client.records.ExerciseSessionRecord
+import androidx.health.connect.client.records.HeartRateRecord
+import androidx.health.connect.client.records.HeartRateVariabilityRmssdRecord
+import androidx.health.connect.client.records.Record
+import androidx.health.connect.client.records.RestingHeartRateRecord
+import androidx.health.connect.client.records.SleepSessionRecord
+import androidx.health.connect.client.records.StepsRecord
+import androidx.health.connect.client.records.TotalCaloriesBurnedRecord
+import androidx.health.connect.client.records.Vo2MaxRecord
+import androidx.health.connect.client.records.WeightRecord
+import androidx.health.connect.client.request.AggregateGroupByPeriodRequest
+import androidx.health.connect.client.request.AggregateRequest
+import androidx.health.connect.client.request.ReadRecordsRequest
+import androidx.health.connect.client.time.TimeRangeFilter
+import org.json.JSONArray
+import org.json.JSONObject
+import java.time.Duration
+import java.time.Instant
+import java.time.LocalDate
+import java.time.Period
+import java.time.ZoneId
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
+import kotlin.reflect.KClass
+
+/** Lê o Health Connect e monta o JSON que o GymGarmin recebe em /api/ingest. */
+class HealthReader(context: Context) {
+    private val client = HealthConnectClient.getOrCreate(context)
+    private val zone: ZoneId = ZoneId.systemDefault()
+
+    companion object {
+        val PERMISSIONS: Set<String> = setOf(
+            HealthPermission.getReadPermission(ExerciseSessionRecord::class),
+            HealthPermission.getReadPermission(SleepSessionRecord::class),
+            HealthPermission.getReadPermission(HeartRateRecord::class),
+            HealthPermission.getReadPermission(RestingHeartRateRecord::class),
+            HealthPermission.getReadPermission(HeartRateVariabilityRmssdRecord::class),
+            HealthPermission.getReadPermission(StepsRecord::class),
+            HealthPermission.getReadPermission(DistanceRecord::class),
+            HealthPermission.getReadPermission(TotalCaloriesBurnedRecord::class),
+            HealthPermission.getReadPermission(ActiveCaloriesBurnedRecord::class),
+            HealthPermission.getReadPermission(Vo2MaxRecord::class),
+            HealthPermission.getReadPermission(WeightRecord::class),
+            HealthPermission.PERMISSION_READ_HEALTH_DATA_IN_BACKGROUND,
+        )
+
+        fun typeName(t: Int): String? = when (t) {
+            ExerciseSessionRecord.EXERCISE_TYPE_RUNNING -> "RUNNING"
+            ExerciseSessionRecord.EXERCISE_TYPE_RUNNING_TREADMILL -> "RUNNING_TREADMILL"
+            ExerciseSessionRecord.EXERCISE_TYPE_BIKING -> "BIKING"
+            ExerciseSessionRecord.EXERCISE_TYPE_BIKING_STATIONARY -> "BIKING_STATIONARY"
+            ExerciseSessionRecord.EXERCISE_TYPE_WALKING -> "WALKING"
+            ExerciseSessionRecord.EXERCISE_TYPE_HIKING -> "HIKING"
+            ExerciseSessionRecord.EXERCISE_TYPE_SWIMMING_POOL -> "SWIMMING_POOL"
+            ExerciseSessionRecord.EXERCISE_TYPE_SWIMMING_OPEN_WATER -> "SWIMMING_OPEN_WATER"
+            ExerciseSessionRecord.EXERCISE_TYPE_ROWING_MACHINE -> "ROWING_MACHINE"
+            ExerciseSessionRecord.EXERCISE_TYPE_ROWING -> "ROWING"
+            ExerciseSessionRecord.EXERCISE_TYPE_ELLIPTICAL -> "ELLIPTICAL"
+            ExerciseSessionRecord.EXERCISE_TYPE_STAIR_CLIMBING,
+            ExerciseSessionRecord.EXERCISE_TYPE_STAIR_CLIMBING_MACHINE -> "STAIR_CLIMBING"
+            ExerciseSessionRecord.EXERCISE_TYPE_STRENGTH_TRAINING,
+            ExerciseSessionRecord.EXERCISE_TYPE_WEIGHTLIFTING,
+            ExerciseSessionRecord.EXERCISE_TYPE_CALISTHENICS,
+            ExerciseSessionRecord.EXERCISE_TYPE_HIGH_INTENSITY_INTERVAL_TRAINING -> "STRENGTH_TRAINING"
+            else -> null // ioga, tênis…: o GymGarmin não registra
+        }
+    }
+
+    suspend fun grantedAll(): Boolean =
+        client.permissionController.getGrantedPermissions().containsAll(PERMISSIONS - HealthPermission.PERMISSION_READ_HEALTH_DATA_IN_BACKGROUND)
+
+    private suspend fun <T : Record> readAll(type: KClass<T>, from: Instant, to: Instant): List<T> {
+        val out = mutableListOf<T>()
+        var token: String? = null
+        do {
+            val resp = client.readRecords(ReadRecordsRequest(type, TimeRangeFilter.between(from, to), pageToken = token))
+            out += resp.records
+            token = resp.pageToken
+        } while (token != null && out.size < 5000)
+        return out
+    }
+
+    private inline fun safe(block: () -> Unit) {
+        try { block() } catch (_: Exception) { /* sem permissão ou sem dado: segue com o resto */ }
+    }
+
+    suspend fun build(days: Long): JSONObject {
+        val now = Instant.now()
+        val from = LocalDate.now(zone).minusDays(days).atStartOfDay(zone).toInstant()
+        val byDay = sortedMapOf<String, JSONObject>()
+        fun day(d: LocalDate) = byDay.getOrPut(d.toString()) { JSONObject().put("date", d.toString()) }
+
+        safe {  // sono: a noite conta para o dia em que termina
+            for (s in readAll(SleepSessionRecord::class, from.minus(Duration.ofHours(14)), now)) {
+                val endDay = s.endTime.atZone(zone).toLocalDate()
+                val stages = mutableMapOf<Int, Long>()
+                for (st in s.stages) stages[st.stage] = (stages[st.stage] ?: 0L) + Duration.between(st.startTime, st.endTime).toMinutes()
+                val awake = (stages[SleepSessionRecord.STAGE_TYPE_AWAKE] ?: 0) + (stages[SleepSessionRecord.STAGE_TYPE_AWAKE_IN_BED] ?: 0) +
+                    (stages[SleepSessionRecord.STAGE_TYPE_OUT_OF_BED] ?: 0)
+                val total = Duration.between(s.startTime, s.endTime).toMinutes()
+                val asleep = if (stages.isNotEmpty()) total - awake else total
+                if (asleep < 120) continue // cochilo
+                val o = day(endDay)
+                o.put("sleep_h", Math.round(asleep / 60.0 * 100) / 100.0)
+                stages[SleepSessionRecord.STAGE_TYPE_DEEP]?.let { o.put("deep_min", it) }
+                stages[SleepSessionRecord.STAGE_TYPE_REM]?.let { o.put("rem_min", it) }
+                stages[SleepSessionRecord.STAGE_TYPE_LIGHT]?.let { o.put("light_min", it) }
+                if (stages.isNotEmpty()) o.put("awake_min", awake)
+                val hm = DateTimeFormatter.ofPattern("HH:mm")
+                o.put("sleep_start", s.startTime.atZone(zone).format(hm))
+                o.put("sleep_end", s.endTime.atZone(zone).format(hm))
+            }
+        }
+        safe {
+            val g = readAll(RestingHeartRateRecord::class, from, now).groupBy { it.time.atZone(zone).toLocalDate() }
+            for ((d, rs) in g) day(d).put("rhr", rs.map { it.beatsPerMinute }.average().toInt())
+        }
+        safe {  // VFC da noite (RMSSD)
+            val g = readAll(HeartRateVariabilityRmssdRecord::class, from.minus(Duration.ofHours(14)), now)
+                .groupBy { it.time.plus(Duration.ofHours(8)).atZone(zone).toLocalDate() }
+            for ((d, rs) in g) day(d).put("hrv", Math.round(rs.map { it.heartRateVariabilityMillis }.average() * 10) / 10.0).put("hrv_kind", "rmssd")
+        }
+        safe {
+            val res = client.aggregateGroupByPeriod(AggregateGroupByPeriodRequest(
+                setOf(StepsRecord.COUNT_TOTAL),
+                TimeRangeFilter.between(from.atZone(zone).toLocalDateTime(), now.atZone(zone).toLocalDateTime()),
+                Period.ofDays(1)))
+            for (r in res) r.result[StepsRecord.COUNT_TOTAL]?.let { day(r.startTime.toLocalDate()).put("steps", it) }
+        }
+        safe {
+            readAll(Vo2MaxRecord::class, from, now).maxByOrNull { it.time }?.let {
+                day(it.time.atZone(zone).toLocalDate()).put("vo2max", it.vo2MillilitersPerMinuteKilogram)
+            }
+        }
+        safe {
+            readAll(WeightRecord::class, from.minus(Duration.ofDays(30)), now).maxByOrNull { it.time }?.let {
+                day(it.time.atZone(zone).toLocalDate()).put("weight_kg", Math.round(it.weight.inKilograms * 10) / 10.0)
+            }
+        }
+
+        val workouts = JSONArray()
+        safe {
+            for (s in readAll(ExerciseSessionRecord::class, from, now)) {
+                val type = typeName(s.exerciseType) ?: continue
+                val w = JSONObject()
+                    .put("id", s.metadata.id)
+                    .put("type", type)
+                    .put("name", s.title ?: type)
+                    .put("start", s.startTime.atOffset(s.startZoneOffset ?: ZoneOffset.UTC).toString())
+                    .put("end", s.endTime.atOffset(s.endZoneOffset ?: ZoneOffset.UTC).toString())
+                    .put("duration_min", Duration.between(s.startTime, s.endTime).seconds / 60.0)
+                val range = TimeRangeFilter.between(s.startTime, s.endTime)
+                safe {
+                    val a = client.aggregate(AggregateRequest(setOf(HeartRateRecord.BPM_AVG, HeartRateRecord.BPM_MAX), range))
+                    a[HeartRateRecord.BPM_AVG]?.let { w.put("avg_hr", it) }
+                    a[HeartRateRecord.BPM_MAX]?.let { w.put("max_hr", it) }
+                }
+                safe {
+                    client.aggregate(AggregateRequest(setOf(DistanceRecord.DISTANCE_TOTAL), range))[DistanceRecord.DISTANCE_TOTAL]
+                        ?.let { if (it.inMeters > 0) w.put("distance_km", Math.round(it.inKilometers * 1000) / 1000.0) }
+                }
+                safe {
+                    val a = client.aggregate(AggregateRequest(setOf(TotalCaloriesBurnedRecord.ENERGY_TOTAL, ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL), range))
+                    (a[ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL] ?: a[TotalCaloriesBurnedRecord.ENERGY_TOTAL])
+                        ?.let { if (it.inKilocalories > 0) w.put("kcal", Math.round(it.inKilocalories)) }
+                }
+                workouts.put(w)
+            }
+        }
+        return JSONObject()
+            .put("source", "android")
+            .put("days", JSONArray(byDay.values.toList()))
+            .put("workouts", workouts)
+    }
+}

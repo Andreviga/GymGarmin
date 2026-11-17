@@ -22,6 +22,9 @@ from . import (analysis, calibration, catalog, clock, db, dedupe, health, endura
 from .muscles import EQUIPMENT_PT, HR_ZONES, MUSCLES, hr_max, zone_bpm
 
 STATIC = Path(__file__).resolve().parent / "static"
+import mimetypes  # noqa: E402
+
+mimetypes.add_type("application/vnd.android.package-archive", ".apk")
 GARMIN_CATALOG = json.loads((catalog.DATA / "garmin_catalog.json").read_text())
 
 @asynccontextmanager
