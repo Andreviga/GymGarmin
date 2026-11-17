@@ -425,12 +425,21 @@ def delete_session(session_id: int, user_id: int = 1) -> None:
 
 
 def last_performance(exercise_id: str, user_id: int = 1) -> dict | None:
-    """Última vez que o exercício foi feito (para sugerir carga/progressão)."""
+    """Base para sugerir carga: o último treino normal (deload não conta) + os anteriores e a data mais recente."""
+    from .progression import pick_last
+
+    perfs, cardio = [], None
     for s in list_sessions(user_id, limit=200):
         for it in s.get("items", []):
-            if it.get("exercise_id") == exercise_id and (it.get("sets") or it.get("duration_min")):
-                return {"date": s["date"], **{k: it.get(k) for k in ("sets", "duration_min", "zone")}}
-    return None
+            if it.get("exercise_id") != exercise_id:
+                continue
+            if it.get("sets"):
+                perfs.append({"date": s["date"], **{k: it.get(k) for k in ("sets", "duration_min", "zone", "deload")}})
+            elif it.get("duration_min") and cardio is None:
+                cardio = {"date": s["date"], **{k: it.get(k) for k in ("sets", "duration_min", "zone")}}
+        if len(perfs) >= 6:
+            break
+    return pick_last(perfs) or cardio
 
 
 # ---- mapeamento Garmin personalizado --------------------------------------
