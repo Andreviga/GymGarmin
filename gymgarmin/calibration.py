@@ -76,16 +76,18 @@ def suggestions(sessions: list[dict], anchors: dict, garmin_metrics: dict | None
                     best_vdot = v
                     best_src = f"{it['distance_km']:g} km em {sp.fmt_duration(it['duration_min'] * 60)} ({d.strftime('%d/%m')})"
     cur = anchors.get("run_vdot")
-    if best_vdot and (not cur or best_vdot >= cur + 1):
-        out.append({"key": "run_vdot", "value": best_vdot, "source": f"melhor corrida recente: {best_src}",
-                    "current": cur})
     gm = garmin_metrics or {}
     rp = gm.get("race_predictions") or {}
-    if rp.get("time5K"):
-        v = sp.vdot(5, float(rp["time5K"]))
-        if v and (not cur or abs(v - cur) >= 1.5) and not any(x["key"] == "run_vdot" for x in out):
-            out.append({"key": "run_vdot", "value": v, "source": f"previsão de 5 km do Garmin ({sp.fmt_duration(rp['time5K'])})",
+    # Um treino comum (rodagem leve, esteira) só subestima o condicionamento: a previsão de 5 km do
+    # Garmin vale mais, a não ser que um treino tenha mostrado mais que ela.
+    pred = sp.vdot(5, float(rp["time5K"])) if rp.get("time5K") else None
+    if pred and (not best_vdot or pred >= best_vdot):
+        if not cur or abs(pred - cur) >= 1.5:
+            out.append({"key": "run_vdot", "value": pred, "source": f"previsão de 5 km do Garmin ({sp.fmt_duration(rp['time5K'])})",
                         "current": cur})
+    elif best_vdot and (not cur or best_vdot >= cur + 1):
+        out.append({"key": "run_vdot", "value": best_vdot, "source": f"melhor corrida recente: {best_src}",
+                    "current": cur})
     if gm.get("ftp") and (not anchors.get("ftp_w") or abs(gm["ftp"] - anchors["ftp_w"]) >= 5):
         out.append({"key": "ftp_w", "value": float(gm["ftp"]), "source": "FTP estimado pelo Garmin", "current": anchors.get("ftp_w")})
     if gm.get("lthr") and (not anchors.get("lthr") or abs(gm["lthr"] - anchors["lthr"]) >= 3):

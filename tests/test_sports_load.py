@@ -109,3 +109,30 @@ def test_short_history_does_not_raise_false_overtraining_alarm():
     # com 6+ semanas de dados não precisa estimar
     S2 = S + [{**s, "date": (date.fromisoformat(s["date"][:10]) - timedelta(days=42)).isoformat() + "T07:00"} for s in S]
     assert not load.pmc(S2, {"level": "intermediario"}, today=today, days=21)["seeded"]
+
+
+def test_seed_does_not_depend_on_window_size():
+    from datetime import date, timedelta
+
+    from gymgarmin import load
+
+    today = date(2026, 11, 17)
+    S = [{"date": (today - timedelta(days=i)).isoformat() + "T07:00", "items": [
+        {"exercise_id": "corrida_rua", "sport": "corrida", "duration_min": 45, "zone": 2}]} for i in range(14) if i % 3]
+    a, b = load.pmc(S, {}, today=today, days=21), load.pmc(S, {}, today=today, days=90)
+    assert a["ctl"] == b["ctl"] and a["status"] == b["status"]
+
+
+def test_easy_run_does_not_beat_garmin_race_prediction_for_vdot():
+    from datetime import date
+
+    from gymgarmin import calibration
+
+    S = [{"date": "2026-11-15T12:00", "items": [{"sport": "corrida", "exercise_id": "cardio_esteira_corrida",
+                                                 "distance_km": 5.8, "duration_min": 40}]}]
+    sug = calibration.suggestions(S, {}, {"race_predictions": {"time5K": 1703}}, today=date(2026, 11, 17))
+    v = next(x for x in sug if x["key"] == "run_vdot")
+    assert v["value"] > 32 and "previsão" in v["source"]
+    # sem previsão do Garmin, usa o melhor treino
+    v2 = next(x for x in calibration.suggestions(S, {}, {}, today=date(2026, 11, 17)) if x["key"] == "run_vdot")
+    assert "melhor corrida" in v2["source"]

@@ -158,6 +158,7 @@ def pmc(sessions: list[dict], profile: dict, today: date | None = None, days: in
         start = today - timedelta(days=days)
     ctl = atl = 0.0
     seeded = False
+    seed = None
     first = min(daily) if daily else None
     hist_days = (today - first).days + 1 if first else 0
     # O app só conhece o treino a partir do primeiro registro. Começar o condicionamento do zero
@@ -167,11 +168,13 @@ def pmc(sessions: list[dict], profile: dict, today: date | None = None, days: in
     if first and hist_days < CTL_DAYS and not _beginner(profile):
         span = [daily.get(first + timedelta(days=i), {}).get("tss", 0.0) for i in range(min(14, hist_days))]
         if len(span) >= 7:
-            ctl = atl = sum(span) / len(span)
+            seed = sum(span) / len(span)  # aplicado no dia do primeiro registro (antes dele, o app não sabe nada)
             seeded = True
     series = []
     d = start
     while d <= today:
+        if seed is not None and d == first:
+            ctl = atl = seed
         tss = daily.get(d, {}).get("tss", 0.0)
         tsb = ctl - atl  # forma do dia = antes do treino do dia
         ctl += (tss - ctl) / CTL_DAYS
