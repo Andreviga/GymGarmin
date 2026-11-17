@@ -617,7 +617,7 @@ def import_activity(activity_id: int, preferred_ids: set[str] | None = None, hr_
 
 AUTO_MIN_HOURS = 6     # ao abrir o app, só sincroniza se a última tiver mais que isso
 MAX_PER_RUN = 15       # limite de importações por execução (gentil com a API)
-FIRST_SYNC_DAYS = 14
+FIRST_SYNC_DAYS = 42   # 6 semanas: o condicionamento (CTL) precisa do passado para não começar do zero
 LOOKBACK_DAYS = 14     # o relógio pode passar dias sem sincronizar: sempre olha 2 semanas para trás
 MAX_ATTEMPTS = 3       # atividade que falha 3 vezes é deixada de lado
 SKIP_KEY = "garmin_skipped"
@@ -688,7 +688,9 @@ def sync(save_session, imported_ids: set, preferred_ids: set[str] | None = None,
         return {"ok": False, "needs_login": True, "error": str(e), "imported": []}
 
     days = LOOKBACK_DAYS if st.get("last_ok_at") else FIRST_SYNC_DAYS
-    if st.get("last_ok_at"):
+    if st.get("last_ok_at") and not st.get("backfill_done"):
+        days = FIRST_SYNC_DAYS  # quem conectou antes da busca de 6 semanas: busca o passado uma vez
+    elif st.get("last_ok_at"):
         try:
             days = min(30, max(LOOKBACK_DAYS, (now - datetime.fromisoformat(st["last_ok_at"])).days + 2))
         except ValueError:
@@ -750,6 +752,6 @@ def sync(save_session, imported_ids: set, preferred_ids: set[str] | None = None,
 
     _set_sync_state(last_run=started, last_ok=True, last_ok_at=started, last_error="; ".join(errors) or None,
                     trigger=trigger, last_imported=imported[-10:] if imported else [], needs_reconnect=False,
-                    pending=max(0, len(new) - done))
+                    pending=max(0, len(new) - done), backfill_done=st.get("backfill_done") or (days >= FIRST_SYNC_DAYS and len(new) <= done))
     return {"ok": True, "imported": imported, "skipped": skipped, "errors": errors, "window_days": days,
             "pending": max(0, len(new) - done)}

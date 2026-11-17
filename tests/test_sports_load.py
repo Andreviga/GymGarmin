@@ -90,3 +90,22 @@ def test_session_stress_combines_sports():
                    {"exercise_id": "natacao_piscina", "duration_min": 30, "distance_km": 1.5, "avg_hr": 140}]}
     st = load.session_stress(s, a)
     assert set(st["by_sport"]) == {"musculacao", "natacao"} and st["km"]["natacao"] == 1.5
+
+
+def test_short_history_does_not_raise_false_overtraining_alarm():
+    """Conectou o relógio há 2 semanas e já treinava: o condicionamento não começa do zero."""
+    from datetime import date, timedelta
+
+    from gymgarmin import load
+
+    today = date(2026, 11, 17)
+    S = [{"date": (today - timedelta(days=i)).isoformat() + "T07:00", "items": [
+        {"exercise_id": "corrida_rua", "sport": "corrida", "duration_min": 45, "zone": 2}]}
+        for i in range(14) if i % 7 not in (2, 5)]
+    r = load.pmc(S, {"level": "intermediario"}, today=today, days=21)
+    assert r["seeded"] and r["status"] != "risco" and "estimado" in r["message"]
+    # iniciante de verdade começando agora: sem estimativa (a fadiga alta é real)
+    assert not load.pmc(S, {"level": "iniciante"}, today=today, days=21)["seeded"]
+    # com 6+ semanas de dados não precisa estimar
+    S2 = S + [{**s, "date": (date.fromisoformat(s["date"][:10]) - timedelta(days=42)).isoformat() + "T07:00"} for s in S]
+    assert not load.pmc(S2, {"level": "intermediario"}, today=today, days=21)["seeded"]

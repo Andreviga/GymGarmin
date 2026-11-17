@@ -157,6 +157,18 @@ def pmc(sessions: list[dict], profile: dict, today: date | None = None, days: in
     else:
         start = today - timedelta(days=days)
     ctl = atl = 0.0
+    seeded = False
+    first = min(daily) if daily else None
+    hist_days = (today - first).days + 1 if first else 0
+    # O app só conhece o treino a partir do primeiro registro. Começar o condicionamento do zero
+    # faz quem já treinava parecer em "risco de overtraining" nas primeiras semanas (a fadiga sobe em
+    # 7 dias, o condicionamento leva 42). Quem não é iniciante já vinha treinando: parte da média
+    # das 2 primeiras semanas registradas.
+    if first and hist_days < CTL_DAYS and not _beginner(profile):
+        span = [daily.get(first + timedelta(days=i), {}).get("tss", 0.0) for i in range(min(14, hist_days))]
+        if len(span) >= 7:
+            ctl = atl = sum(span) / len(span)
+            seeded = True
     series = []
     d = start
     while d <= today:
@@ -173,6 +185,9 @@ def pmc(sessions: list[dict], profile: dict, today: date | None = None, days: in
     ramp = round(cur["ctl"] - week_ago["ctl"], 1)
     form = round(cur["ctl"] - cur["atl"], 1)
     status, msg = form_status(form, ramp, cur["ctl"])
+    if seeded:
+        msg += (f" (Só {hist_days} dias de treinos no app: o condicionamento foi estimado pela média do início; "
+                "fica mais preciso com o tempo.)")
     week = [v for k, v in daily.items() if k > today - timedelta(days=7)]
     by_sport_week: dict[str, dict] = defaultdict(lambda: {"tss": 0.0, "km": 0.0, "minutes": 0.0})
     for v in week:
@@ -184,10 +199,20 @@ def pmc(sessions: list[dict], profile: dict, today: date | None = None, days: in
             by_sport_week[sp]["minutes"] += m
     return {
         "ctl": cur["ctl"], "atl": cur["atl"], "form": form, "ramp_week": ramp,
-        "status": status, "message": msg, "series": series,
+        "status": status, "message": msg, "series": series, "history_days": hist_days, "seeded": seeded,
         "week": {"tss": round(sum(v["tss"] for v in week), 1),
                  "by_sport": {k: {kk: round(vv, 1) for kk, vv in v.items()} for k, v in by_sport_week.items()}},
     }
+
+
+def _beginner(profile: dict) -> bool:
+    tm = (profile or {}).get("training_months")
+    if tm not in (None, ""):
+        try:
+            return float(tm) < 3
+        except (TypeError, ValueError):
+            pass
+    return (profile or {}).get("level") == "iniciante"
 
 
 def form_status(form: float, ramp: float, ctl: float) -> tuple[str, str]:
