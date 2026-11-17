@@ -27,7 +27,7 @@ from __future__ import annotations
 import math
 from collections import defaultdict
 
-from . import catalog, endurance
+from . import catalog, clock, endurance
 from .limitations import check_exercise, max_zone
 from .muscles import HR_ZONES, MUSCLES, PRIMARY_WEIGHT, SECONDARY_WEIGHT
 
@@ -517,7 +517,7 @@ def generate(profile: dict, seed: int = 0, recent: dict | None = None, today=Non
 
     end_on = endurance.active(p)
     wp, alloc = None, None
-    today = today or _date.today()
+    today = today or clock.today()
     week0 = today - _td(days=today.weekday())
     n_avail = len(avail)
     sess_override = None

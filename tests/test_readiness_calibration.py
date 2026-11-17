@@ -118,3 +118,40 @@ def test_endurance_api_flow(client, monkeypatch):
     res = client.post("/api/readiness/apply", json={}).json()
     assert res["action"] == "trocar"
     assert client.get("/api/load").json()["series"]
+
+
+# ------------------------------------------------- regressões das simulações ---
+def test_readiness_escalates_and_respects_undo():
+    a = {"run_vdot": 45}
+    hard = en.build_session("corrida", "intervalado", 9, {}, a, "intermediario")
+    entry = {"id": 1, "status": "planejado", "day_name": "Corrida: Intervalado", "items": [hard]}
+    mod = readiness.adjust_entry(entry, "moderar", a)
+    assert mod["readiness_action"] == "moderar"
+    assert readiness.adjust_entry(mod, "moderar", a) is None  # mesma intensidade: não refaz
+    worse = readiness.adjust_entry(mod, "trocar", a)  # piorou à tarde: refaz a partir do original
+    assert worse["readiness_action"] == "trocar" and not worse["items"][0]["endurance"]["hard"]
+    assert worse["readiness_backup"]["items"][0]["endurance"]["hard"]
+    undone = readiness.undo_entry(worse)
+    assert undone["items"][0]["endurance"]["hard"] and undone["readiness_declined"]
+    assert readiness.adjust_entry(undone, "trocar", a) is None  # automático não reaplica
+    assert readiness.adjust_entry(undone, "trocar", a, force=True)  # botão "aplicar" sim
+
+
+def test_readiness_stale_until_watch_data_arrives():
+    from datetime import datetime
+
+    now = datetime(2026, 11, 17, 7, 0)
+    assert readiness.stale(None, now)
+    empty = {"date": "2026-11-17", "fetched_at": "2026-11-17T05:40"}
+    assert readiness.stale(empty, now)  # buscou antes de o relógio ter os dados da noite
+    assert not readiness.stale({**empty, "fetched_at": "2026-11-17T06:50"}, now)
+    assert not readiness.stale({**empty, "sleep_score": 70}, now)
+
+
+def test_app_clock_uses_brazil_time():
+    from datetime import datetime, timezone
+
+    from gymgarmin import clock
+
+    late_utc = datetime(2026, 11, 18, 1, 30, tzinfo=timezone.utc)  # 22h30 de 17/11 em Brasília
+    assert late_utc.astimezone(clock.TZ).date() == date(2026, 11, 17)

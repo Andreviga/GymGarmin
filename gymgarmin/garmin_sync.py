@@ -30,7 +30,7 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-from . import catalog
+from . import catalog, clock
 
 _lock = threading.Lock()
 _client = None
@@ -54,6 +54,22 @@ class GarminUnavailable(RuntimeError):
 
 class GarminNeedsLogin(RuntimeError):
     """Sem tokens válidos: é preciso entrar de novo (e-mail/senha e, se houver, MFA)."""
+
+
+class GarminTemporary(RuntimeError):
+    """O Garmin não respondeu agora (fora do ar, limite, rede). Os tokens continuam guardados."""
+
+
+# O garminconnect transforma qualquer falha ao renovar o token (inclusive rede/Garmin fora do ar)
+# em "Username and password are required". Por isso só pedimos para entrar de novo quando a
+# recusa se repete em execuções separadas por algumas horas.
+AUTH_FAIL_CONFIRM = 2
+AUTH_FAIL_MIN_HOURS = 6
+
+
+def _is_auth_error(e: Exception) -> bool:
+    txt = f"{type(e).__name__} {e}".lower()
+    return "authentication" in txt or "401" in txt or "403" in txt or "unauthorized" in txt or "password" in txt
 
 
 def _lib():
@@ -167,7 +183,7 @@ def _mfa_pending() -> bool:
         started = datetime.fromisoformat(json.loads(raw).get("started"))
     except (ValueError, TypeError):
         return False
-    return datetime.now() - started < timedelta(minutes=MFA_TTL_MIN)
+    return clock.now() - started < timedelta(minutes=MFA_TTL_MIN)
 
 
 def status() -> dict:
@@ -221,13 +237,26 @@ def connect_with_tokens() -> bool:
         api = Garmin()
         try:
             api.login(tokens)  # JSON inline: carrega e renova o token se estiver vencendo
-        except Exception as e:  # noqa: BLE001 - refresh recusado → precisa entrar de novo
-            _del(TOKENS_KEY)
-            _set_sync_state(needs_reconnect=True, last_error=f"Login do Garmin expirou: entre de novo ({type(e).__name__}).")
-            return False
+        except Exception as e:  # noqa: BLE001
+            st = sync_state()
+            if _is_auth_error(e):
+                n = int(st.get("auth_failures") or 0) + 1
+                since = st.get("auth_failed_since") or clock.now().isoformat(timespec="seconds")
+                try:
+                    waited = clock.now() - datetime.fromisoformat(since) >= timedelta(hours=AUTH_FAIL_MIN_HOURS)
+                except ValueError:
+                    waited = True
+                if n >= AUTH_FAIL_CONFIRM and waited:  # recusa confirmada → precisa entrar de novo
+                    _del(TOKENS_KEY)
+                    _set_sync_state(needs_reconnect=True, auth_failures=0, auth_failed_since=None,
+                                    last_error=f"Login do Garmin expirou: entre de novo ({type(e).__name__}).")
+                    return False
+                _set_sync_state(auth_failures=n, auth_failed_since=since)
+            raise GarminTemporary(f"O Garmin não respondeu agora ({type(e).__name__}); tento de novo mais tarde.") from e
         _save_tokens(api)
         _client = api
-        _set_sync_state(needs_reconnect=False, display_name=getattr(api, "display_name", None))
+        _set_sync_state(needs_reconnect=False, auth_failures=0, auth_failed_since=None,
+                        display_name=getattr(api, "display_name", None))
         return True
 
 
@@ -242,7 +271,7 @@ def login(email: str, password: str) -> dict:
             _pending_mfa.clear()
             _pending_mfa.update({"api": api, "state": state})
             # Outra instância do servidor pode receber o código: guarda o estado (cifrado, 10 min)
-            _put_secret(MFA_KEY, {"state": state, "started": datetime.now().isoformat()})
+            _put_secret(MFA_KEY, {"state": state, "started": clock.now().isoformat()})
             return {"mfa_required": True}
         return _finish_login(api)
 
@@ -253,7 +282,8 @@ def _finish_login(api) -> dict:
     _del(MFA_KEY)
     _save_tokens(api)
     _client = api
-    _set_sync_state(needs_reconnect=False, last_error=None, display_name=getattr(api, "display_name", None))
+    _set_sync_state(needs_reconnect=False, last_error=None, auth_failures=0, auth_failed_since=None,
+                    display_name=getattr(api, "display_name", None))
     return {"connected": True, "display_name": getattr(api, "display_name", None)}
 
 
@@ -285,6 +315,15 @@ def logout() -> None:
         _set_sync_state(needs_reconnect=False, display_name=None)
 
 
+def persist() -> None:
+    """Grava o token se ele se renovou durante chamadas fora da sincronização (prontidão, métricas, envio)."""
+    if _client is not None:
+        try:
+            _save_tokens(_client)
+        except Exception:  # noqa: BLE001
+            pass
+
+
 def client():
     if _client is None and not connect_with_tokens():
         raise GarminNeedsLogin("Não conectado ao Garmin Connect. Entre em Perfil → Garmin.")
@@ -294,7 +333,10 @@ def client():
 def push_workout(workout_json: dict, schedule_date: str | None = None) -> dict:
     """Envia o treino ao Garmin Connect e (opcional) agenda no calendário."""
     api = client()
-    created = api.upload_workout(workout_json)
+    try:
+        created = api.upload_workout(workout_json)
+    finally:
+        persist()
     workout_id = created.get("workoutId") if isinstance(created, dict) else None
     out = {"workout_id": workout_id, "name": workout_json.get("workoutName")}
     if schedule_date and workout_id:
@@ -331,7 +373,7 @@ def _reverse_map(preferred: set[str] | None = None) -> dict[tuple[str, str], str
 def activity_to_session(activity: dict, exercise_sets: dict | None, preferred_ids: set[str] | None = None,
                         hr_max: int | None = None) -> dict:
     """Converte uma atividade do Garmin (com séries) em sessão do GymGarmin."""
-    start = activity.get("startTimeLocal") or activity.get("startTimeGMT") or datetime.now().isoformat()
+    start = activity.get("startTimeLocal") or activity.get("startTimeGMT") or clock.now().isoformat()
     session = {
         "date": str(start).replace(" ", "T"),
         "source": "garmin",
@@ -363,7 +405,40 @@ def activity_to_session(activity: dict, exercise_sets: dict | None, preferred_id
         item = endurance_item(activity, hr_max)
         if item:
             session["items"].append(item)
+        elif _is_strength(activity):
+            # o relógio gravou musculação sem detectar as séries: conta tempo e FC (carga por sRPE)
+            mins = round((activity.get("duration") or 0) / 60, 1)
+            if mins >= 5:
+                it = {"exercise_id": STRENGTH_GENERIC, "_name": "Musculação (relógio, sem séries detectadas)",
+                      "strength_min": mins, "duration_min": mins,
+                      "zone": _zone_from_hr(activity.get("averageHR"), hr_max)}
+                for k_src, k in (("averageHR", "avg_hr"), ("maxHR", "max_hr"), ("calories", "kcal")):
+                    if activity.get(k_src):
+                        it[k] = activity[k_src]
+                session["items"].append(it)
+    if session["items"]:
+        summ = {k: activity.get(src) for src, k in (("averageHR", "avg_hr"), ("maxHR", "max_hr"), ("calories", "kcal"))
+                if activity.get(src)}
+        if activity.get("duration"):
+            summ["duration_min"] = round(activity["duration"] / 60, 1)
+            session["duration_min"] = summ["duration_min"]
+        session["garmin_summary"] = summ
     return session
+
+
+STRENGTH_GENERIC = "Garmin_musculacao"
+
+
+def _is_strength(activity: dict) -> bool:
+    return "strength" in ((activity.get("activityType") or {}).get("typeKey") or "").lower()
+
+
+def importable_type(type_key: str | None) -> bool:
+    """Tipos que o app registra (o resto — yoga, tênis… — nem é baixado)."""
+    from . import sports as sp
+
+    t = (type_key or "").lower()
+    return t in sp.GARMIN_TYPE_TO_SPORT or t in GYM_MACHINES or "strength" in t
 
 
 # ambiente de cada tipo de atividade do Garmin (para escolher o item do catálogo)
@@ -424,8 +499,8 @@ def endurance_item(activity: dict, hr_max: int | None = None) -> dict | None:
 
 def recent_activities(days: int = 14) -> list[dict]:
     api = client()
-    start = (date.today() - timedelta(days=days)).isoformat()
-    acts = api.get_activities_by_date(start, date.today().isoformat())
+    start = (clock.today() - timedelta(days=days)).isoformat()
+    acts = api.get_activities_by_date(start, clock.today().isoformat())
     return [{
         "activity_id": a.get("activityId"), "name": a.get("activityName"),
         "type": (a.get("activityType") or {}).get("typeKey"), "start": a.get("startTimeLocal"),
@@ -463,6 +538,9 @@ def import_activity(activity_id: int, preferred_ids: set[str] | None = None, hr_
 AUTO_MIN_HOURS = 6     # ao abrir o app, só sincroniza se a última tiver mais que isso
 MAX_PER_RUN = 15       # limite de importações por execução (gentil com a API)
 FIRST_SYNC_DAYS = 14
+LOOKBACK_DAYS = 14     # o relógio pode passar dias sem sincronizar: sempre olha 2 semanas para trás
+MAX_ATTEMPTS = 3       # atividade que falha 3 vezes é deixada de lado
+SKIP_KEY = "garmin_skipped"
 
 
 def _is_rate_limit(e: Exception) -> bool:
@@ -478,64 +556,108 @@ def due(min_hours: float = AUTO_MIN_HOURS, now: datetime | None = None) -> bool:
     if not last:
         return True
     try:
-        return (now or datetime.now()) - datetime.fromisoformat(last) >= timedelta(hours=min_hours)
+        return (now or clock.now()) - datetime.fromisoformat(last) >= timedelta(hours=min_hours)
     except ValueError:
         return True
 
 
+def _skipped() -> dict:
+    from . import db
+
+    try:
+        return json.loads(db.kv_get(SKIP_KEY) or "{}")
+    except ValueError:
+        return {}
+
+
+def _save_skipped(d: dict) -> None:
+    from . import db
+
+    if len(d) > 600:  # guarda só os mais recentes
+        d = dict(list(d.items())[-500:])
+    db.kv_set(SKIP_KEY, json.dumps(d))
+
+
 def sync(save_session, imported_ids: set, preferred_ids: set[str] | None = None, hr_max: int | None = None,
-         trigger: str = "manual", now: datetime | None = None) -> dict:
+         trigger: str = "manual", now: datetime | None = None, merge=None) -> dict:
     """Importa as atividades novas do Garmin como sessões.
 
     `save_session` grava a sessão (db.save_session); `imported_ids` são os IDs já
-    importados. Só lê dados com os tokens guardados: se não houver login válido,
-    marca "reconectar" e não tenta entrar por senha.
+    importados; `merge(session)` (opcional) junta a atividade a um treino já registrado
+    no app no mesmo dia e devolve a sessão gravada (ou None se não há par).
+    Só lê dados com os tokens guardados: se não houver login válido, marca
+    "reconectar" e não tenta entrar por senha.
     """
-    now = now or datetime.now()
+    global _client
+    now = now or clock.now()
     st = sync_state()
     started = now.isoformat(timespec="seconds")
     try:
         api = client()
+    except GarminTemporary as e:
+        _set_sync_state(last_run=started, last_ok=False, last_error=str(e), trigger=trigger)
+        return {"ok": False, "temporary": True, "error": str(e), "imported": []}
     except GarminNeedsLogin as e:
         _set_sync_state(last_run=started, last_ok=False, last_error=str(e), trigger=trigger,
                         needs_reconnect=bool(st.get("display_name")) or bool(st.get("needs_reconnect")))
         return {"ok": False, "needs_login": True, "error": str(e), "imported": []}
 
-    # Janela: desde a última sincronização boa (com 2 dias de folga), no máximo 30 dias
-    days = FIRST_SYNC_DAYS
+    days = LOOKBACK_DAYS if st.get("last_ok_at") else FIRST_SYNC_DAYS
     if st.get("last_ok_at"):
         try:
-            days = min(30, max(2, (now - datetime.fromisoformat(st["last_ok_at"])).days + 2))
+            days = min(30, max(LOOKBACK_DAYS, (now - datetime.fromisoformat(st["last_ok_at"])).days + 2))
         except ValueError:
             pass
-    imported, skipped, errors = [], 0, []
+    imported, skipped, errors, new = [], 0, [], []
+    skip = _skipped()
+    skip_changed = False
     try:
         acts = recent_activities(days)
-        new = [a for a in acts if a.get("activity_id") and str(a["activity_id"]) not in imported_ids]
+        for a in acts:
+            aid = str(a.get("activity_id") or "")
+            if not aid or aid in imported_ids or (skip.get(aid) or {}).get("final"):
+                continue
+            if not importable_type(a.get("type")):
+                skip[aid] = {"final": True, "why": a.get("type")}  # yoga, tênis…: nem baixa o detalhe
+                skip_changed = True
+                skipped += 1
+                continue
+            new.append(a)
         new.sort(key=lambda a: str(a.get("start") or ""))
         for a in new[:MAX_PER_RUN]:
+            aid = str(a["activity_id"])
             try:
                 session = import_activity(a["activity_id"], preferred_ids, hr_max)
             except Exception as e:  # noqa: BLE001
-                if _is_rate_limit(e):
+                if _is_rate_limit(e) or _is_auth_error(e) or "connection" in type(e).__name__.lower():
                     raise
-                errors.append(f"{a.get('name') or a['activity_id']}: {type(e).__name__}")
+                n = int((skip.get(aid) or {}).get("attempts") or 0) + 1
+                skip[aid] = {"attempts": n, "final": n >= MAX_ATTEMPTS, "why": type(e).__name__}
+                skip_changed = True
+                errors.append(f"{a.get('name') or aid}: {type(e).__name__}")
                 continue
             if not session.get("items"):
-                skipped += 1  # corrida na rua, pedal etc.: o app só registra academia
+                skip[aid] = {"final": True, "why": "sem dados"}
+                skip_changed = True
+                skipped += 1
                 continue
             try:
-                saved = save_session(session)
+                saved = (merge(session) if merge else None) or save_session(session)
             except ValueError:
                 continue  # já importada por outra execução
             imported.append({"session_id": saved.get("id"), "name": a.get("name"), "date": str(a.get("start"))[:10],
-                             "type": a.get("type")})
-        _save_tokens(api)
+                             "type": a.get("type"), "merged": bool(saved.get("merged"))})
     except Exception as e:  # noqa: BLE001
+        if _is_auth_error(e):
+            _client = None  # na próxima, reconecta com os tokens guardados (e confirma se a recusa persiste)
         msg = ("O Garmin limitou as requisições agora; tento de novo na próxima sincronização."
                if _is_rate_limit(e) else f"Falha ao sincronizar: {type(e).__name__}: {e}")
         _set_sync_state(last_run=started, last_ok=False, last_error=msg, trigger=trigger)
         return {"ok": False, "error": msg, "imported": imported}
+    finally:
+        _save_tokens(api)  # o token pode ter se renovado no meio: sem isso o próximo login falha
+        if skip_changed:
+            _save_skipped(skip)
 
     _set_sync_state(last_run=started, last_ok=True, last_ok_at=started, last_error="; ".join(errors) or None,
                     trigger=trigger, last_imported=imported[-10:] if imported else [], needs_reconnect=False)

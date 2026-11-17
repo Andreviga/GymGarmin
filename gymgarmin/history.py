@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from datetime import date, datetime, timedelta
 
-from . import catalog
+from . import catalog, clock
 
 # Acima disso a fórmula de Epley superestima bastante; o ponto continua no
 # gráfico, mas marcado como "estimativa fraca".
@@ -169,7 +169,7 @@ def _slope_per_week(points: list[dict]) -> float | None:
 
 
 def summary(points: list[dict], today: date | None = None) -> dict:
-    today = today or date.today()
+    today = today or clock.today()
     if not points:
         return {"sessions": 0}
     metric = points[-1]["metric"]
@@ -247,7 +247,7 @@ def exercise_history(sessions: list[dict], exercise_id: str, today: date | None 
 
 def overview(sessions: list[dict], today: date | None = None) -> dict:
     """Lista de exercícios com histórico, do mais recente para o mais antigo, e os recordes recentes."""
-    today = today or date.today()
+    today = today or clock.today()
     rows, recent_prs = [], []
     for eid, pts in _points_by_exercise(sessions).items():
         _mark_prs(pts)

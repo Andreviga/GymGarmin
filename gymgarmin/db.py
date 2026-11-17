@@ -21,6 +21,7 @@ from contextlib import contextmanager
 from urllib.parse import parse_qs, unquote, urlparse
 from datetime import datetime
 from pathlib import Path
+from . import clock
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS users (
@@ -133,7 +134,7 @@ ID_TABLES = ("users", "plans", "sessions", "schedule", "garmin_pushes")
 
 
 def now() -> str:
-    return datetime.now().isoformat(timespec="seconds")
+    return clock.now().isoformat(timespec="seconds")
 
 
 def database_url() -> str | None:
@@ -382,7 +383,7 @@ def get_session(session_id: int, user_id: int = 1) -> dict | None:
 
 def _session_data(s: dict) -> str:
     keep = {k: s.get(k) for k in ("items", "notes", "source", "garmin_activity_id", "feeling", "duration_min",
-                                  "schedule_id") if k in s}
+                                  "schedule_id", "garmin_summary", "merged") if k in s}
     keep.setdefault("items", [])
     return json.dumps(keep, ensure_ascii=False)
 

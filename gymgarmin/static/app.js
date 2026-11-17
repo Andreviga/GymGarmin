@@ -80,7 +80,9 @@ function balanceHtml(bal) {
 const STATUS_INFO = { planejado: ["Planejado", ""], feito: ["Feito ✔", "ok"], perdido: ["Perdido", "bad"], pulado: ["Não treinou", "warn"], substituido: ["Substituído", "muted"] };
 const PHASES = [["preparo", "Preparação (aquecimento + mobilidade)"], ["principal", "Treino"], ["pos", "Pós-treino (alongamento)"]];
 const ddmm = (iso) => { const [y, m, d] = iso.slice(0, 10).split("-"); return `${d}/${m}`; };
-const addDays = (iso, n) => { const d = new Date(iso + "T12:00:00"); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
+// data/hora local (toISOString é UTC: depois das 21h no Brasil já seria amanhã)
+const localISO = (d = new Date()) => { const p = (x) => String(x).padStart(2, "0"); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`; };
+const addDays = (iso, n) => { const d = new Date(iso + "T12:00:00"); d.setDate(d.getDate() + n); return localISO(d).slice(0, 10); };
 
 function timeBar(t) {
   if (!t) return "";
@@ -362,7 +364,7 @@ function renderPlano() {
     <p class="small muted">Salve antes de exportar. <b>.FIT</b>: copie via USB para <code>GARMIN/NewFiles</code> no relógio. <b>Garmin Connect</b>: envia direto para sua biblioteca de treinos (e agenda no calendário), sincronizando com o relógio.</p>
     <div class="row gap wrap">
       <a class="btn sm ghost" href="/api/plans/${p.id}/days/${state.planTab}/fit">Baixar .FIT</a>
-      <input type="date" id="push-date" style="width:auto" value="${new Date().toISOString().slice(0, 10)}">
+      <input type="date" id="push-date" style="width:auto" value="${localISO().slice(0, 10)}">
       <button class="btn sm" id="push">Enviar ao Garmin Connect</button>
       <button class="btn sm ghost" id="show-json">Ver JSON</button>
     </div>
@@ -574,7 +576,7 @@ async function viewTreinar(planId, idx) {
       <div class="hr"></div><button class="btn ghost" id="free">Treino livre</button></div>`;
     const r = $("#resume"); if (r) r.onclick = () => { state.session = draft; renderSession(); };
     const d = $("#discard"); if (d) d.onclick = () => { store("gg_session", null); viewTreinar(); };
-    $("#free").onclick = () => { state.session = { date: new Date().toISOString().slice(0, 16), day_name: "Treino livre", items: [] }; renderSession(); };
+    $("#free").onclick = () => { state.session = { date: localISO(), day_name: "Treino livre", items: [] }; renderSession(); };
     return;
   }
   const draft = store("gg_session");
@@ -1189,7 +1191,7 @@ function syncInfo(sy) {
 }
 function syncToast(r) {
   if (!r || !r.imported || !r.imported.length) return "";
-  return `Garmin: ${r.imported.length} treino${r.imported.length > 1 ? "s" : ""} importado${r.imported.length > 1 ? "s" : ""} (${r.imported.map((i) => i.name || "atividade").join(", ")})`;
+  return `Garmin: ${r.imported.length} treino${r.imported.length > 1 ? "s" : ""} importado${r.imported.length > 1 ? "s" : ""} (${r.imported.map((i) => (i.name || "atividade") + (i.merged ? " — juntado ao treino que você registrou" : "")).join(", ")})`;
 }
 async function updateGarminPill() {
   try {

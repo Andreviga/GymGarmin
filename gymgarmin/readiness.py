@@ -15,9 +15,26 @@ O ajuste guarda o original para desfazer.
 from __future__ import annotations
 
 import copy
-from datetime import date
+from datetime import date, datetime, timedelta
+
+from . import clock
 
 HRV_SCORE = {"BALANCED": 80, "UNBALANCED": 50, "LOW": 30, "POOR": 20}
+SEVERITY = {"seguir": 0, "moderar": 1, "trocar": 2, "descanso": 3}
+DATA_KEYS = ("garmin_readiness", "sleep_score", "hrv_status", "body_battery_max")
+
+
+def stale(data: dict | None, now: datetime | None = None, every_min: int = 45) -> bool:
+    """Precisa buscar de novo? Sem registro, ou sem nenhum dado (o relógio ainda não tinha
+    sincronizado a noite) e a última busca tem mais de `every_min` minutos."""
+    if not data:
+        return True
+    if any(data.get(k) is not None for k in DATA_KEYS):
+        return False
+    try:
+        return (now or clock.now()) - datetime.fromisoformat(data["fetched_at"]) >= timedelta(minutes=every_min)
+    except (KeyError, ValueError, TypeError):
+        return True
 
 
 def _num(v):
@@ -30,7 +47,7 @@ def _num(v):
 def fetch(api, day: date) -> dict:
     """Lê os dados do dia no Garmin; cada fonte é opcional."""
     d = day.isoformat()
-    out: dict = {"date": d}
+    out: dict = {"date": d, "fetched_at": clock.now().isoformat(timespec="minutes")}
     try:
         tr = api.get_training_readiness(d)
         first = tr[0] if isinstance(tr, list) and tr else (tr if isinstance(tr, dict) else None)
@@ -120,7 +137,8 @@ ACTION_TEXT = {
     "seguir": "Pronto para treinar: siga o plano.",
     "moderar": "Recuperação parcial: mantenha o treino, mas com menos tiros/séries (−25%) e sem buscar recorde.",
     "trocar": "Recuperação baixa: hoje a sessão forte vira leve e a musculação fica mais curta e leve.",
-    "descanso": "Corpo pedindo descanso: folga ou só mobilidade/caminhada leve. O treino de hoje fica para depois.",
+    "descanso": "Corpo pedindo descanso: se puder, folgue hoje (marque \"Pulei\" e o app reorganiza a semana). "
+                "Se for treinar, a sessão já ficou regenerativa e curta.",
 }
 
 
@@ -130,14 +148,24 @@ def _scale_repeats(steps: list[dict], frac: float) -> None:
             st["n"] = max(2, int(round(st["n"] * frac)))
 
 
-def adjust_entry(entry: dict, action: str, anchors: dict | None = None) -> dict | None:
+def adjust_entry(entry: dict, action: str, anchors: dict | None = None, force: bool = False) -> dict | None:
     """Ajusta um treino da agenda conforme a prontidão. Retorna o treino alterado (ou None se nada muda)."""
     from . import endurance as en
 
-    if action == "seguir" or entry.get("status") not in ("planejado", None) or entry.get("readiness_backup"):
+    if action == "seguir" or entry.get("status") not in ("planejado", None):
         return None
+    if entry.get("readiness_declined") and not force:
+        return None  # o atleta desfez o ajuste de hoje: não reaplica sozinho
+    backup = entry.get("readiness_backup")
+    if backup:
+        if SEVERITY.get(action, 0) <= SEVERITY.get(entry.get("readiness_action") or "moderar", 1):
+            return None  # já ajustado com a mesma intensidade (ou mais)
+        # a prontidão piorou ao longo do dia: refaz o ajuste a partir do treino original
+        entry = {**entry, "items": copy.deepcopy(backup["items"]), "day_name": backup.get("day_name") or entry.get("day_name")}
     e = copy.deepcopy(entry)
-    e["readiness_backup"] = {"items": copy.deepcopy(entry["items"]), "day_name": entry.get("day_name")}
+    e["readiness_backup"] = backup or {"items": copy.deepcopy(entry["items"]), "day_name": entry.get("day_name")}
+    e["readiness_action"] = action
+    e.pop("readiness_declined", None)
     notes = []
     changed = False
     new_items = []
@@ -174,7 +202,7 @@ def adjust_entry(entry: dict, action: str, anchors: dict | None = None) -> dict 
                     it["rpe_target"] = min(7, it.get("rpe_target") or 7)
                 changed = True
         new_items.append(it)
-    if any(i.get("sets") for i in e["items"] if not i.get("endurance")) and action != "seguir":
+    if any(i.get("sets") and (i.get("phase") or "principal") == "principal" for i in e["items"] if not i.get("endurance")):
         notes.append("musculação: " + ("−1 série nos principais" if action == "moderar" else "−40% das séries, RPE até 7"))
     if not changed:
         return None
@@ -193,5 +221,7 @@ def undo_entry(entry: dict) -> dict:
     e["items"] = b["items"]
     e["day_name"] = b.get("day_name") or e.get("day_name")
     e.pop("readiness_backup", None)
+    e.pop("readiness_action", None)
+    e["readiness_declined"] = True
     e.setdefault("changes", []).append("Ajuste de prontidão desfeito")
     return e

@@ -14,7 +14,7 @@ from fastapi.staticfiles import StaticFiles
 
 from datetime import date, timedelta
 
-from . import (analysis, calibration, catalog, db, endurance, garmin_export, garmin_sync, generator, history, limitations,
+from . import (analysis, calibration, catalog, clock, db, dedupe, endurance, garmin_export, garmin_sync, generator, history, limitations,
                load, plans_io, progression, readiness, schedule, sports, templates)
 from .muscles import EQUIPMENT_PT, HR_ZONES, MUSCLES, hr_max, zone_bpm
 
@@ -259,7 +259,12 @@ def sessions(since: str | None = None, limit: int = 100):
 @app.post("/api/sessions")
 def create_session(body: dict = Body(...)):
     try:
-        saved = db.save_session(body)
+        twin = None if body.get("garmin_activity_id") else \
+            dedupe.find_twin(body, db.list_sessions(since=str(body.get("date") or "")[:10] or None, limit=200))
+        if twin:  # o relógio já trouxe este treino: junta (séries do app + medidas do relógio)
+            saved = db.save_session(dedupe.merge(body, twin), session_id=twin["id"])
+        else:
+            saved = db.save_session(body)
         if body.get("schedule_id"):
             e = db.get_entry(int(body["schedule_id"]))
             if e:
@@ -326,7 +331,7 @@ def session_prefill(plan_id: int, idx: int):
     """Monta a sessão do dia a partir da planilha + progressão de carga do histórico."""
     plan = _plan_or_404(plan_id)
     day = _day(plan, idx)
-    return {"plan_id": plan_id, "day_name": day.get("name"), "date": datetime.now().isoformat(timespec="minutes"),
+    return {"plan_id": plan_id, "day_name": day.get("name"), "date": clock.now().isoformat(timespec="minutes"),
             "items": _prefill_items(day.get("items", []))}
 
 
@@ -347,7 +352,7 @@ def history_exercise(exercise_id: str):
 
 @app.get("/api/report/weekly")
 def weekly(date: str | None = None):
-    now = datetime.fromisoformat(date) if date else datetime.now()
+    now = datetime.fromisoformat(date) if date else clock.now()
     return analysis.weekly_report(db.list_sessions(limit=1000), _profile(), now)
 
 
@@ -392,16 +397,25 @@ def g_activities(days: int = 14):
         raise HTTPException(502, str(e)) from e
 
 
+def _merge_garmin(session: dict) -> dict | None:
+    """Atividade do relógio que já foi registrada no app no mesmo dia: vira uma sessão só."""
+    day = str(session.get("date") or "")[:10]
+    twin = dedupe.find_twin(session, db.list_sessions(since=day, limit=200)) if day else None
+    if not twin:
+        return None
+    return {**db.save_session(dedupe.merge(twin, session), session_id=twin["id"]), "merged": True}
+
+
 def _run_sync(trigger: str) -> dict:
     plan_ids = {it.get("exercise_id") for p in db.list_plans() for d in p.get("days", []) for it in d.get("items", [])}
     p = _profile()
     try:
         r = garmin_sync.sync(db.save_session, db.garmin_imported_ids(), plan_ids,
-                             hr_max(p.get("age"), p.get("hr_max")), trigger=trigger)
+                             hr_max(p.get("age"), p.get("hr_max")), trigger=trigger, merge=_merge_garmin)
     except garmin_sync.GarminUnavailable as e:
         raise HTTPException(501, str(e)) from e
-    if r.get("ok") and garmin_sync._client is not None:
-        today = date.today()
+    if garmin_sync._client is not None:  # mesmo se a importação parou num 429, a prontidão é outra chamada
+        today = clock.today()
         if trigger != "cron":  # à noite a prontidão do dia já não importa
             try:
                 _refresh_readiness(today, auto_apply=True)
@@ -413,6 +427,7 @@ def _run_sync(trigger: str) -> dict:
                 db.kv_set("garmin_metrics", json.dumps(calibration.garmin_metrics(garmin_sync._client, today)))
         except Exception:  # noqa: BLE001
             pass
+        garmin_sync.persist()
     return r
 
 
@@ -421,7 +436,16 @@ def g_sync(auto: bool = False):
     """Sincroniza agora. Com auto=1 (ao abrir o app) só roda se a última tiver mais de 6 h."""
     if auto:
         st = garmin_sync.status()
-        if not st["has_tokens"] or not garmin_sync.due():
+        if not st["has_tokens"]:
+            return {"ok": True, "ran": False, "imported": []}
+        if not garmin_sync.due():
+            # sem sincronizar atividades, mas a prontidão de hoje pode ter chegado (o relógio sincroniza a noite ao acordar)
+            today = clock.today()
+            try:
+                if readiness.stale(json.loads(db.kv_get(f"readiness:{today.isoformat()}") or "null")):
+                    _refresh_readiness(today, auto_apply=True)
+            except Exception:  # noqa: BLE001 - prontidão é opcional
+                pass
             return {"ok": True, "ran": False, "imported": []}
     return {"ran": True, **_run_sync("auto" if auto else "manual")}
 
@@ -432,7 +456,7 @@ def cron_garmin_sync(authorization: str | None = Header(None)):
     secret = os.environ.get("CRON_SECRET")
     if (secret or os.environ.get("VERCEL")) and authorization != f"Bearer {secret}":
         raise HTTPException(401, "Não autorizado")
-    garmin_sync._set_sync_state(last_cron=datetime.now().isoformat(timespec="seconds"))  # prova de que o cron chega
+    garmin_sync._set_sync_state(last_cron=clock.now().isoformat(timespec="seconds"))  # prova de que o cron chega
     if not garmin_sync.status()["has_tokens"]:
         return {"ok": True, "ran": False, "reason": "Garmin não conectado"}
     return {"ran": True, **_run_sync("cron")}
@@ -490,7 +514,7 @@ def endurance_overview():
         "garmin_metrics": gm,
         "recent": endurance.recent_volumes(sessions, prof),
         "load": {k: v for k, v in load.pmc(sessions, prof).items() if k != "series"},
-        "readiness": _readiness_view(date.today()),
+        "readiness": _readiness_view(clock.today()),
     }
 
 
@@ -514,7 +538,7 @@ def _set_anchor(key: str, value: float, source: str) -> dict:
     anchors = dict(cur.get("anchors") or {})
     meta = dict(cur.get("anchors_meta") or {})
     anchors[key] = round(float(value), 1)
-    meta[key] = {"date": date.today().isoformat(), "source": source}
+    meta[key] = {"date": clock.today().isoformat(), "source": source}
     cur.update(anchors=anchors, anchors_meta=meta)
     db.save_profile({"endurance": cur})
     return {"key": key, "value": anchors[key], "text": calibration.fmt_anchor(key, anchors[key]), "source": source}
@@ -531,7 +555,7 @@ def anchors_test(body: dict = Body(...)):
         key, value = calibration.from_test(body.get("sport"), body.get("data") or {})
     except (ValueError, TypeError) as e:
         raise HTTPException(400, str(e)) from e
-    return _set_anchor(key, value, f"teste ({date.today().strftime('%d/%m')})")
+    return _set_anchor(key, value, f"teste ({clock.today().strftime('%d/%m')})")
 
 
 @app.get("/api/load")
@@ -551,7 +575,10 @@ def _readiness_view(day: date) -> dict | None:
 
 
 def _refresh_readiness(day: date, auto_apply: bool = False) -> dict | None:
-    data = readiness.fetch(garmin_sync.client(), day)
+    try:
+        data = readiness.fetch(garmin_sync.client(), day)
+    finally:
+        garmin_sync.persist()
     db.kv_set(f"readiness:{day.isoformat()}", json.dumps(data))
     view = _readiness_view(day)
     if auto_apply and view and _endurance_cfg(_profile()).get("readiness_auto"):
@@ -559,11 +586,11 @@ def _refresh_readiness(day: date, auto_apply: bool = False) -> dict | None:
     return view
 
 
-def _apply_readiness(day: date, action: str) -> list[dict]:
+def _apply_readiness(day: date, action: str, force: bool = False) -> list[dict]:
     anchors = sports.anchors_of(_profile())
     out = []
     for e in db.list_schedule(day.isoformat(), day.isoformat()):
-        new = readiness.adjust_entry(e, action, anchors)
+        new = readiness.adjust_entry(e, action, anchors, force=force)
         if new:
             out.append(db.save_entry(new))
     return out
@@ -571,24 +598,24 @@ def _apply_readiness(day: date, action: str) -> list[dict]:
 
 @app.get("/api/readiness")
 def readiness_get():
-    return _readiness_view(date.today()) or {"score": None, "level": "sem_dados", "action": "seguir"}
+    return _readiness_view(clock.today()) or {"score": None, "level": "sem_dados", "action": "seguir"}
 
 
 @app.post("/api/readiness/refresh")
 def readiness_refresh():
     try:
-        return _refresh_readiness(date.today())
+        return _refresh_readiness(clock.today())
     except RuntimeError as e:
         raise HTTPException(401, str(e)) from e
 
 
 @app.post("/api/readiness/apply")
 def readiness_apply(body: dict = Body(default={})):
-    view = _readiness_view(date.today())
+    view = _readiness_view(clock.today())
     action = body.get("action") or (view or {}).get("action") or "seguir"
     if action not in readiness.ACTION_TEXT:
         raise HTTPException(400, "Ação inválida")
-    return {"action": action, "changed": [e["day_name"] for e in _apply_readiness(date.today(), action)]}
+    return {"action": action, "changed": [e["day_name"] for e in _apply_readiness(clock.today(), action, force=True)]}
 
 
 @app.post("/api/readiness/undo/{entry_id}")
@@ -631,7 +658,7 @@ def generator_apply(body: dict = Body(default={})):
     prof = _profile()
     seed = int(body.get("seed") or 0)
     plan = generator.generate(prof, seed, recent=_recent(prof))
-    plan["generator"]["cycle_start"] = schedule.week_start(date.today()).isoformat()
+    plan["generator"]["cycle_start"] = schedule.week_start(clock.today()).isoformat()
     for p in db.list_plans():
         if p.get("generator") and p.get("active"):
             p["active"] = False
@@ -658,14 +685,14 @@ def _entry_view(e: dict, budget: float) -> dict:
 @app.get("/api/schedule")
 def get_schedule(date_: str | None = Query(None, alias="date")):
     prof = _profile()
-    day = date.fromisoformat(date_) if date_ else date.today()
+    day = date.fromisoformat(date_) if date_ else clock.today()
     entries = schedule.ensure_week(prof, day)
     ws = schedule.week_start(day)
     plan = schedule.schedule_plan(prof)
     budget = schedule.session_budget(prof, plan)
     cycle = next((e.get("cycle") for e in entries if e.get("cycle")), None)
     return {
-        "week_start": ws.isoformat(), "today": date.today().isoformat(),
+        "week_start": ws.isoformat(), "today": clock.today().isoformat(),
         "plan": {"id": plan["id"], "name": plan["name"], "generator": plan.get("generator")} if plan else None,
         "cycle": cycle, "budget": budget,
         "entries": [_entry_view(e, budget) for e in entries],
@@ -716,7 +743,7 @@ def schedule_prefill(entry_id: int):
     e = _entry_or_404(entry_id)
     deload = bool((e.get("cycle") or {}).get("deload"))
     return {"schedule_id": e["id"], "plan_id": e.get("plan_id"), "day_name": e.get("day_name"),
-            "date": e["date"] + datetime.now().strftime("T%H:%M"), "deload": deload,
+            "date": e["date"] + clock.now().strftime("T%H:%M"), "deload": deload,
             "items": _prefill_items(e.get("items", []), deload)}
 
 
@@ -770,7 +797,7 @@ def schedule_push(entry_id: int):
 @app.post("/api/schedule/push-week")
 def schedule_push_week(body: dict = Body(default={})):
     only_outdated = bool(body.get("only_outdated"))
-    today = date.today()
+    today = clock.today()
     ws = schedule.week_start(today)
     entries = [e for e in db.list_schedule(today.isoformat(), (ws + timedelta(days=6)).isoformat())
                if e["status"] == "planejado" and (not only_outdated or e.get("garmin_outdated") or not e.get("garmin_workout_id"))]
@@ -781,7 +808,7 @@ def schedule_push_week(body: dict = Body(default={})):
 
 @app.get("/api/backup")
 def backup():
-    fname = f"gymgarmin-backup-{date.today().isoformat()}.json"
+    fname = f"gymgarmin-backup-{clock.today().isoformat()}.json"
     return JSONResponse(db.export_all(), headers={"Content-Disposition": f'attachment; filename="{fname}"'})
 
 

@@ -247,3 +247,27 @@ def test_manual_move_warns_when_day_gets_crowded(fresh_db):
     src = next(e for e in week if e["date"] != full and e["status"] == "planejado")
     res = schedule.move(src["id"], full)
     assert res["warning"] and "3 treinos" in res["warning"]
+
+
+def test_watch_walk_does_not_mark_strength_done_and_one_activity_counts_once(fresh_db, monkeypatch):
+    prof, _ = _setup({"training_months": 14, "goal": "hipertrofia", "available_days": [0, 2, 4], "session_minutes": 60})
+    week = schedule.ensure_week(prof, MONDAY, MONDAY)
+    first = week[0]
+    db.save_session({"date": first["date"] + "T08:00", "source": "garmin", "garmin_activity_id": 1,
+                     "items": [{"exercise_id": "caminhada_rua", "sport": "caminhada", "duration_min": 18}]})
+    after = schedule.ensure_week(prof, MONDAY, MONDAY + timedelta(days=3))
+    assert next(e for e in after if e["id"] == first["id"])["status"] == "perdido"
+    # musculação do relógio sem séries detectadas conta
+    db.save_session({"date": first["date"] + "T19:00", "source": "garmin", "garmin_activity_id": 2,
+                     "items": [{"exercise_id": "Garmin_musculacao", "strength_min": 50, "duration_min": 50}]})
+    after = schedule.ensure_week(prof, MONDAY, MONDAY + timedelta(days=3))
+    assert next(e for e in after if e["id"] == first["id"])["status"] == "feito"
+    # dia com corrida e bike planejadas, só correu: a corrida não vale pelas duas
+    run = {"id": 900, "date": "2026-11-18", "kind": "resistencia", "sport": "corrida", "status": "planejado",
+           "items": [{"sport": "corrida", "endurance": {"dur_s": 2400}}]}
+    bike = {"id": 901, "date": "2026-11-18", "kind": "resistencia", "sport": "ciclismo", "status": "planejado",
+            "items": [{"sport": "ciclismo", "endurance": {"dur_s": 2400}}]}
+    sess = [{"id": 5, "date": "2026-11-18T07:00", "items": [{"sport": "corrida", "duration_min": 42}]}]
+    monkeypatch.setattr(db, "save_entry", lambda e: e)  # só a lógica de casamento
+    out = {e["id"]: e["status"] for e in schedule.sync_status([bike, run], sess, date(2026, 11, 20))}
+    assert out == {900: "feito", 901: "perdido"}

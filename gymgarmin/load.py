@@ -15,7 +15,7 @@ from __future__ import annotations
 from collections import defaultdict
 from datetime import date, datetime, timedelta
 
-from . import catalog
+from . import catalog, clock
 from .sports import (SPORTS, anchors_of, pace_at, row_split, speed_mps)
 
 ZONE_IF = {1: 0.55, 2: 0.68, 3: 0.80, 4: 0.92, 5: 1.03, 6: 1.12}
@@ -117,6 +117,10 @@ def session_stress(session: dict, anchors: dict) -> dict:
             total += st["tss"]
         elif it.get("sets"):
             strength_items.append(it)
+        elif it.get("strength_min"):  # musculação do relógio sem séries detectadas: sRPE pelo tempo (RPE ~7,5)
+            s = _tss(float(it["strength_min"]) / 60, 0.55 + 0.03 * 2.5)
+            by_sport["musculacao"] += s
+            total += s
     if strength_items:
         s = strength_stress(strength_items, session.get("duration_min"))
         by_sport["musculacao"] += s
@@ -145,7 +149,7 @@ def daily_stress(sessions: list[dict], anchors: dict) -> dict[date, dict]:
 
 def pmc(sessions: list[dict], profile: dict, today: date | None = None, days: int = 90) -> dict:
     """Condicionamento (CTL), fadiga (ATL) e forma (TSB) com a série dos últimos `days` dias."""
-    today = today or date.today()
+    today = today or clock.today()
     anchors = anchors_of(profile)
     daily = daily_stress(sessions, anchors)
     if daily:

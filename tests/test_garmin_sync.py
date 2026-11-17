@@ -5,13 +5,16 @@ from datetime import datetime, timedelta
 import pytest
 from fastapi.testclient import TestClient
 
-from gymgarmin import db, garmin_sync
+from gymgarmin import clock, db, garmin_sync
 
 STRENGTH_ID, RUN_ID, BIKE_ID = 9001, 9002, 9003
 
 
+EXTRA: list = []
+
+
 def _acts():
-    return [
+    return EXTRA + [
         {"activityId": STRENGTH_ID, "activityName": "Treino A", "activityType": {"typeKey": "strength_training"},
          "startTimeLocal": "2026-11-16 19:00:00", "duration": 3000},
         {"activityId": RUN_ID, "activityName": "Corrida na rua", "activityType": {"typeKey": "running"},
@@ -62,9 +65,10 @@ class FakeGarmin:
         return None, None
 
     def get_activities_by_date(self, start, end):
-        return _acts()
+        return [a for a in _acts() if start <= a["startTimeLocal"][:10] <= end]
 
     def get_activity(self, aid):
+        FakeGarmin.calls.append(("detail", aid, None))
         if FakeGarmin.rate_limit_on == int(aid):
             raise RuntimeError("429 Too Many Requests")
         a = next(x for x in _acts() if x["activityId"] == int(aid))
@@ -74,6 +78,8 @@ class FakeGarmin:
                                "trainingStressScore": a.get("trainingStressScore")}}
 
     def get_activity_exercise_sets(self, aid):
+        if int(aid) != STRENGTH_ID:
+            return {"exerciseSets": []}
         return {"exerciseSets": [
             {"setType": "ACTIVE", "repetitionCount": 8, "weight": 70000, "duration": 40,
              "exercises": [{"category": "BENCH_PRESS", "name": "BARBELL_BENCH_PRESS", "probability": 99}]},
@@ -94,7 +100,9 @@ def fake_garmin(tmp_path, monkeypatch):
     monkeypatch.setattr(garmin_sync, "_client", None)
     garmin_sync._pending_mfa.clear()
     FakeGarmin.mfa, FakeGarmin.rate_limit_on, FakeGarmin.calls = False, None, []
+    EXTRA.clear()
     yield
+    clock.freeze(None)
     garmin_sync._pending_mfa.clear()
 
 
@@ -144,7 +152,7 @@ def test_expired_mfa_state_is_rejected(monkeypatch):
     FakeGarmin.mfa = True
     garmin_sync.login("eu@x.com", "senha")
     garmin_sync._put_secret(garmin_sync.MFA_KEY, {"state": {"cookies": "sso"},
-                                                  "started": (datetime.now() - timedelta(minutes=30)).isoformat()})
+                                                  "started": (clock.now() - timedelta(minutes=30)).isoformat()})
     _forget_memory(monkeypatch)
     with pytest.raises(RuntimeError, match="expirou"):
         garmin_sync.submit_mfa("123456")
@@ -153,7 +161,16 @@ def test_expired_mfa_state_is_rejected(monkeypatch):
 def test_revoked_token_marks_reconnect_without_password_login(monkeypatch):
     garmin_sync._put_secret(garmin_sync.TOKENS_KEY, {"di_token": "t", "di_refresh_token": "revogado"})
     garmin_sync._set_sync_state(display_name="andre")
+    # 1ª recusa: pode ser o Garmin fora do ar (o garminconnect não distingue) → mantém os tokens
     r = garmin_sync.sync(db.save_session, set(), trigger="cron")
+    assert r["ok"] is False and r.get("temporary")
+    assert garmin_sync.status()["has_tokens"] and not garmin_sync.status()["needs_reconnect"]
+    # recusa de novo horas depois → aí sim pede para entrar de novo
+    clock.freeze(clock.now() + timedelta(hours=7))
+    try:
+        r = garmin_sync.sync(db.save_session, set(), trigger="cron")
+    finally:
+        clock.freeze(None)
     assert r["ok"] is False and r["needs_login"]
     st = garmin_sync.status()
     assert st["needs_reconnect"] and not st["has_tokens"]
@@ -194,11 +211,11 @@ def test_rate_limit_is_reported_and_retried_next_time():
 
 def test_due_logic():
     assert garmin_sync.due()
-    garmin_sync._set_sync_state(last_run=datetime.now().isoformat())
+    garmin_sync._set_sync_state(last_run=clock.now().isoformat())
     assert not garmin_sync.due()
-    assert garmin_sync.due(now=datetime.now() + timedelta(hours=7))
+    assert garmin_sync.due(now=clock.now() + timedelta(hours=7))
     garmin_sync._set_sync_state(needs_reconnect=True)
-    assert not garmin_sync.due(now=datetime.now() + timedelta(days=2))
+    assert not garmin_sync.due(now=clock.now() + timedelta(days=2))
 
 
 @pytest.fixture()
@@ -231,3 +248,86 @@ def test_api_sync_auto_and_cron(client, monkeypatch):
     assert any(e["summary"]["best"]["top_load"] == 72.5 for e in hist["exercises"])
     # backup não leva os tokens
     assert "kv" not in client.get("/api/backup").json()
+
+
+# ------------------------------------------------- regressões das simulações ---
+def test_garmin_down_does_not_drop_login(monkeypatch):
+    """Falha passageira (Garmin fora do ar) não apaga os tokens nem pede para reconectar."""
+    garmin_sync.login("eu@x.com", "senha")
+    garmin_sync._set_sync_state(display_name="andre")
+    _forget_memory(monkeypatch)
+
+    def down(self, tokenstore=None):
+        raise ConnectionError("503 Service Unavailable")
+
+    monkeypatch.setattr(FakeGarmin, "login", down)
+    r = garmin_sync.sync(db.save_session, set(), trigger="cron")
+    assert r["ok"] is False and r["temporary"]
+    st = garmin_sync.status()
+    assert st["has_tokens"] and not st["needs_reconnect"]
+
+
+def test_token_renewed_mid_run_is_saved_even_if_sync_fails(monkeypatch):
+    garmin_sync.login("eu@x.com", "senha")
+    orig = FakeGarmin.get_activity
+
+    def renew_then_429(self, aid):
+        self.client.tokens = {**self.client.tokens, "di_refresh_token": "novo"}
+        raise RuntimeError("429 Too Many Requests")
+
+    monkeypatch.setattr(FakeGarmin, "get_activity", renew_then_429)
+    assert garmin_sync.sync(db.save_session, set())["ok"] is False
+    assert json.loads(garmin_sync._get_secret(garmin_sync.TOKENS_KEY))["di_refresh_token"] == "novo"
+    monkeypatch.setattr(FakeGarmin, "get_activity", orig)
+
+
+def test_late_watch_sync_still_imported_and_unsupported_not_fetched():
+    """Relógio que passou dias sem sincronizar: a atividade antiga aparece depois e ainda entra.
+    Yoga/tênis nem têm o detalhe baixado, e não são buscados de novo a cada execução."""
+    clock.freeze(datetime(2026, 11, 20, 9, 0))
+    garmin_sync.login("eu@x.com", "senha")
+    assert garmin_sync.sync(db.save_session, db.garmin_imported_ids())["ok"]
+    clock.freeze(datetime(2026, 11, 21, 9, 0))
+    EXTRA.append({"activityId": 9100, "activityName": "Pedal de domingo", "activityType": {"typeKey": "road_biking"},
+                  "startTimeLocal": "2026-11-15 08:00:00", "duration": 5400, "distance": 50000})
+    EXTRA.append({"activityId": 9101, "activityName": "Yoga", "activityType": {"typeKey": "yoga"},
+                  "startTimeLocal": "2026-11-20 07:00:00", "duration": 3600})
+    FakeGarmin.calls = []
+    r = garmin_sync.sync(db.save_session, db.garmin_imported_ids())
+    assert [i["name"] for i in r["imported"]] == ["Pedal de domingo"] and r["skipped"] == 1
+    assert not any(c[0] == "detail" and str(c[1]) == "9101" for c in FakeGarmin.calls)
+    FakeGarmin.calls = []
+    garmin_sync.sync(db.save_session, db.garmin_imported_ids())
+    assert not any(c[0] == "detail" for c in FakeGarmin.calls)
+
+
+def test_strength_without_detected_sets_counts():
+    EXTRA.append({"activityId": 9200, "activityName": "Academia", "activityType": {"typeKey": "strength_training"},
+                  "startTimeLocal": "2026-11-16 18:00:00", "duration": 3300, "averageHR": 118})
+    garmin_sync.login("eu@x.com", "senha")
+    garmin_sync.sync(db.save_session, db.garmin_imported_ids())
+    s = next(x for x in db.list_sessions() if x.get("garmin_activity_id") == 9200)
+    assert s["items"][0]["strength_min"] == 55.0
+    from gymgarmin import load
+
+    assert load.session_stress(s, {})["by_sport"]["musculacao"] > 20
+
+
+def test_workout_logged_in_app_and_on_watch_counts_once(client):
+    """Registrou no app e o relógio também gravou: vira uma sessão só, com as medidas do relógio."""
+    app_s = client.post("/api/sessions", json={"date": "2026-11-16T20:05", "day_name": "Superior A", "items": [
+        {"exercise_id": "Barbell_Bench_Press_-_Medium_Grip", "sets": [{"reps": 8, "load_kg": 70, "rpe": 8}] * 3}]}).json()
+    garmin_sync.login("eu@x.com", "senha")
+    from gymgarmin.app import _run_sync
+
+    r = _run_sync("manual")
+    assert any(i["merged"] for i in r["imported"] if i["name"] == "Treino A")
+    strength = [s for s in db.list_sessions() if any(i.get("sets") for i in s["items"])]
+    assert len(strength) == 1 and strength[0]["id"] == app_s["id"]
+    assert strength[0]["garmin_activity_id"] == STRENGTH_ID and strength[0]["garmin_summary"]["duration_min"] == 50.0
+    assert [x["load_kg"] for x in strength[0]["items"][0]["sets"]] == [70, 70, 70]  # vale o que foi digitado
+    # ordem inversa: corrida já veio do relógio e o atleta registra depois no app
+    client.post("/api/sessions", json={"date": "2026-11-15T09:00", "items": [
+        {"exercise_id": "corrida_rua", "sport": "corrida", "duration_min": 30, "feeling": 3}]})
+    runs = [s for s in db.list_sessions() if any(i.get("sport") == "corrida" for i in s["items"])]
+    assert len(runs) == 1 and runs[0]["items"][0]["distance_km"] == 6.0

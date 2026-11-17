@@ -23,7 +23,7 @@ from __future__ import annotations
 import math
 from datetime import date, datetime, timedelta
 
-from . import sports as sp
+from . import clock, sports as sp
 
 WEEKDAYS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"]
 
@@ -877,7 +877,7 @@ def _goal_check(pred: float, tgt: float | None, g: dict, vd: float, dist: float)
     if tgt:
         need = sp.vdot(dist, tgt) or vd
         race = _d(g.get("date"))
-        weeks = max(0, (race - date.today()).days // 7) if race else 12
+        weeks = max(0, (race - clock.today()).days // 7) if race else 12
         realistic_gain = weeks / 4 * 1.0  # ~1 ponto de VDOT a cada 4 semanas de treino consistente
         res.update(gap_s=round(pred - tgt), vdot_needed=need,
                    status="no_alvo" if pred <= tgt else ("possivel" if need - vd <= realistic_gain else "ambicioso"))
@@ -919,7 +919,7 @@ def recent_volumes(sessions: list[dict], profile: dict, today: date | None = Non
     """Volume semanal médio das últimas semanas por modalidade (na unidade de cada uma)."""
     from . import load
 
-    today = today or date.today()
+    today = today or clock.today()
     since = today - timedelta(weeks=weeks)
     anchors = sp.anchors_of(profile)
     tot: dict[str, float] = {}

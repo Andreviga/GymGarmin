@@ -14,7 +14,7 @@ from __future__ import annotations
 from collections import defaultdict
 from datetime import date, datetime, timedelta
 
-from . import catalog
+from . import catalog, clock
 from .limitations import check_exercise, max_zone
 from .muscles import HR_ZONES, LEVEL_VOLUME_FACTOR, MUSCLES, PRIMARY_WEIGHT, SECONDARY_WEIGHT, muscle_pt
 
@@ -127,7 +127,7 @@ def last_trained(sessions: list[dict]) -> dict[str, dict]:
 
 
 def recovery(sessions: list[dict], now: datetime | None = None) -> dict[str, dict]:
-    now = now or datetime.now()
+    now = now or clock.now()
     lt = last_trained(sessions)
     out = {}
     for m, info in MUSCLES.items():
@@ -277,7 +277,7 @@ def suggest_for_muscle(muscle: str, user_limitations: list[dict], exclude: set[s
 
 
 def weekly_report(sessions: list[dict], profile: dict | None = None, now: datetime | None = None) -> dict:
-    now = now or datetime.now()
+    now = now or clock.now()
     end = now
     start7 = now - timedelta(days=7)
     start28 = now - timedelta(days=28)

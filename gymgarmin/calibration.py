@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from datetime import date, datetime, timedelta
 
-from . import sports as sp
+from . import clock, sports as sp
 
 ANCHOR_LABEL = {"run_vdot": "VDOT (corrida)", "ftp_w": "FTP (ciclismo)", "css_s100": "CSS (natação)",
                 "row_2k_s": "2 km (remo)", "lthr": "FC de limiar", "hrmax": "FC máxima"}
@@ -57,7 +57,7 @@ def from_test(kind: str, data: dict) -> tuple[str, float]:
 def suggestions(sessions: list[dict], anchors: dict, garmin_metrics: dict | None = None,
                 today: date | None = None) -> list[dict]:
     """Sugestões de atualização: melhores esforços recentes e métricas do Garmin."""
-    today = today or date.today()
+    today = today or clock.today()
     out = []
     since = today - timedelta(weeks=8)
     best_vdot, best_src = None, None
