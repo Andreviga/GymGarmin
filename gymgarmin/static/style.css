@@ -251,3 +251,25 @@ details > summary { cursor: pointer; padding: 10px 0; }
 .day-group { border-left: 3px solid var(--line); padding-left: 10px; margin: 8px 0; }
 .auth-mode .tabbar, .auth-mode #garmin-pill { display: none; }
 .auth-card { max-width: 420px; margin: 24px auto; }
+
+/* coach */
+.coach-card { border-left: 4px solid var(--line); }
+.coach-card.bad { border-left-color: var(--bad); }
+.coach-card.warn { border-left-color: var(--warn); }
+.coach-card.ok { border-left-color: var(--ok); }
+.dot-lg { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 8px; vertical-align: middle; background: var(--line); }
+.dot-lg.bad { background: var(--bad); } .dot-lg.warn { background: var(--warn); } .dot-lg.ok { background: var(--ok); }
+.flags { list-style: none; padding: 0; margin: 8px 0; }
+.flags li { display: flex; align-items: center; gap: 6px; font-size: 14px; padding: 3px 0; }
+.flags .mute { margin-left: auto; min-width: 40px; min-height: 40px; font-size: 16px; color: var(--ink-2); }
+.cstats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 8px 0; }
+.cstat { background: var(--bg); border-radius: 10px; padding: 6px 4px; text-align: center; }
+.cstat b { display: block; font-size: 16px; } .cstat span { font-size: 11px; color: var(--ink-2); }
+.cstat.warn b { color: var(--warn); }
+.tchip.cuidado { background: var(--warn-bg); border-color: var(--warn); }
+.tchip.evitar { background: var(--bad-bg); border-color: var(--bad); }
+.tension summary { margin-top: 8px; cursor: pointer; }
+.wrow { padding: 2px 0; }
+.wbtn { background: none; border: 1px solid transparent; border-radius: 10px; font-size: 22px; min-width: 40px; min-height: 40px; padding: 0; }
+.wbtn.on { border-color: var(--accent, #0f766e); background: var(--ok-bg); }
+.pchip.on { background: var(--warn-bg); border-color: var(--warn); }

@@ -38,6 +38,18 @@ def current_account() -> dict | None:
     return _account.get()
 
 
+_acting: ContextVar[int | None] = ContextVar("gymgarmin_acting_coach", default=None)
+
+
+def set_acting(coach_id: int | None) -> None:
+    _acting.set(coach_id)
+
+
+def acting_coach() -> int | None:
+    """Id do coach quando a requisição é dele agindo como o atleta."""
+    return _acting.get()
+
+
 COOKIE = "gg_session"
 SESSION_DAYS = 90
 MIN_PASSWORD = 8

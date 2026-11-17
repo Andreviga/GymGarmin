@@ -116,6 +116,12 @@ CREATE TABLE IF NOT EXISTS invites (
     used_by INTEGER,
     used_at TEXT
 );
+CREATE TABLE IF NOT EXISTS coach_links (
+    coach_id INTEGER NOT NULL,
+    athlete_id INTEGER NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (coach_id, athlete_id)
+);
 CREATE TABLE IF NOT EXISTS kv (
     user_id INTEGER NOT NULL,
     key TEXT NOT NULL,
@@ -657,7 +663,10 @@ def list_accounts() -> list[dict]:
     with conn() as c:
         rows = c.execute("SELECT a.user_id, a.email, a.is_admin, a.created_at, u.name FROM accounts a "
                          "JOIN users u ON u.id = a.user_id ORDER BY a.user_id").fetchall()
-    return [dict(r) for r in rows]
+    out = [dict(r) for r in rows]
+    for a in out:
+        a["is_coach"] = bool(a.get("is_admin")) or kv_get("is_coach", user_id=a["user_id"]) == "1"
+    return out
 
 
 def create_account(email: str, pw_hash: str, name: str, is_admin: bool = False, user_id: int | None = None) -> dict:
@@ -721,3 +730,49 @@ def users_with_key(key: str) -> list[int]:
     """Usuários que têm um registro no kv (ex.: tokens do Garmin) — para o cron."""
     with conn() as c:
         return [int(r["user_id"]) for r in c.execute("SELECT user_id FROM kv WHERE key = ? ORDER BY user_id", (key,)).fetchall()]
+
+
+# ---- coach ------------------------------------------------------------------
+
+def is_coach(user_id: int) -> bool:
+    acc = get_account(user_id)
+    return bool(acc and (acc.get("is_admin") or kv_get("is_coach", user_id=user_id) == "1"))
+
+
+def set_coach(user_id: int, on: bool) -> None:
+    if on:
+        kv_set("is_coach", "1", user_id=user_id)
+    else:
+        kv_delete("is_coach", user_id=user_id)
+
+
+def coaches() -> list[dict]:
+    return [a for a in list_accounts() if a["is_coach"]]
+
+
+def link_coach(coach_id: int, athlete_id: int) -> None:
+    with conn() as c:
+        if not c.execute("SELECT 1 FROM coach_links WHERE coach_id = ? AND athlete_id = ?", (coach_id, athlete_id)).fetchone():
+            c.execute("INSERT INTO coach_links (coach_id, athlete_id, created_at) VALUES (?,?,?)", (coach_id, athlete_id, now()))
+
+
+def unlink_coach(coach_id: int, athlete_id: int) -> None:
+    with conn() as c:
+        c.execute("DELETE FROM coach_links WHERE coach_id = ? AND athlete_id = ?", (coach_id, athlete_id))
+
+
+def is_linked(coach_id: int, athlete_id: int) -> bool:
+    with conn() as c:
+        return bool(c.execute("SELECT 1 FROM coach_links WHERE coach_id = ? AND athlete_id = ?",
+                              (coach_id, athlete_id)).fetchone())
+
+
+def athletes_of(coach_id: int) -> list[int]:
+    with conn() as c:
+        return [int(r["athlete_id"]) for r in c.execute("SELECT athlete_id FROM coach_links WHERE coach_id = ? ORDER BY athlete_id",
+                                                        (coach_id,)).fetchall()]
+
+
+def coaches_of(athlete_id: int) -> list[int]:
+    with conn() as c:
+        return [int(r["coach_id"]) for r in c.execute("SELECT coach_id FROM coach_links WHERE athlete_id = ?", (athlete_id,)).fetchall()]

@@ -7,8 +7,10 @@ const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "
 const view = $("#view");
 const state = { meta: null, profile: null, draftPlan: null, planTab: 0, session: null };
 
+function actAs() { try { return JSON.parse(sessionStorage.getItem("gg_act") || "null"); } catch (_) { return null; } }
 async function api(path, opts = {}) {
-  const o = { ...opts, headers: { "Content-Type": "application/json", ...(opts.headers || {}) } };
+  const act = actAs();
+  const o = { ...opts, headers: { "Content-Type": "application/json", ...(act ? { "X-GG-Athlete": String(act.id) } : {}), ...(opts.headers || {}) } };
   if (o.body && typeof o.body !== "string") o.body = JSON.stringify(o.body);
   let r;
   try { r = await fetch(path, o); } catch (_) {
@@ -140,7 +142,8 @@ async function viewHoje(weekDate) {
   const missed = sch.entries.filter((e) => e.status === "perdido");
   const outdated = sch.entries.some((e) => e.garmin_outdated && e.status === "planejado");
   const cyc = sch.cycle;
-  view.innerHTML = `
+  const athleteHtml = weekDate ? "" : await athleteCards();
+  view.innerHTML = `${athleteHtml}
   ${readinessCard(rd, sch.entries.some((e) => e.date === sch.today && e.status === "planejado"),
     sch.entries.some((e) => e.date === sch.today && e.status === "planejado" && e.readiness_backup))}
   ${missed.length ? `<div class="rec alerta"><b>Treino perdido:</b> ${missed.map((e) => `${e.weekday} ${ddmm(e.date)} – ${esc(e.day_name)}`).join(", ")}.
@@ -198,6 +201,7 @@ function dayCard(e, today) {
 }
 
 function bindAgenda(sch) {
+  bindAthleteCards();
   view.onclick = async (ev) => {
     const t = ev.target.closest("button, [data-ex]"); if (!t) return;
     const d = t.dataset;
@@ -332,6 +336,168 @@ function previewDays(plan) {
   }).join("");
 }
 
+/* ---------------------------------------------------------------- COACH -- */
+const LVL = { agir: ["bad", "Agir"], atencao: ["warn", "Atenção"] };
+const WELL_ICON = ["", "😀", "🙂", "😐", "😕", "😣"];
+function coachChrome() {
+  const me = state.me; const isCoach = me && me.logged_in && me.user.is_coach; const act = actAs();
+  let pill = $("#coach-pill");
+  if (isCoach && !pill) { $(".topbar").insertAdjacentHTML("beforeend", `<a id="coach-pill" class="pill ok" href="#coach" style="text-decoration:none;margin-left:6px">Coach</a>`); }
+  if (!isCoach && pill) pill.remove();
+  let bar = $("#act-bar");
+  if (act && !bar) {
+    $(".topbar").insertAdjacentHTML("afterend", `<div id="act-bar" class="rec atencao small row between gap" style="margin:8px 16px 0">
+      <span>👤 Você está vendo <b>${esc(act.name)}</b> como coach: tudo que mudar vale para essa conta.</span>
+      <button class="btn sm" id="act-exit">Voltar ao painel</button></div>`);
+    $("#act-exit").onclick = () => { sessionStorage.removeItem("gg_act"); $("#act-bar").remove(); state.profile = null; location.hash = "#coach"; route(); };
+  }
+  if (!act && bar) bar.remove();
+}
+async function viewCoach() {
+  if (actAs()) { sessionStorage.removeItem("gg_act"); coachChrome(); }
+  const d = await api("/api/coach/athletes");
+  const c = d.counts;
+  const regions = d.regions;
+  const stat = (label, val, cls = "") => `<div class="cstat ${cls}"><b>${val ?? "—"}</b><span>${label}</span></div>`;
+  const pct = (v) => v == null ? "—" : `${v}%`;
+  const fmt1 = (v) => v == null ? "—" : (+v).toLocaleString("pt-BR", { maximumFractionDigits: 1 });
+  const card = (a) => {
+    const worst = a.flags.some((f) => f.level === "agir") ? "bad" : a.flags.length ? "warn" : "ok";
+    const lims = Object.fromEntries((a.limitations || []).map((l) => [l.key, l.severity]));
+    const w = a.wellness || {};
+    return `<div class="card coach-card ${worst}" data-aid="${a.id}">
+      <div class="row between gap"><h3 style="margin:0"><span class="dot-lg ${worst}"></span>${esc(a.name)}</h3>
+        <span class="small muted">${a.last_training ? `último treino ${ddmm(a.last_training)}` : "sem treinos"}</span></div>
+      ${a.flags.length ? `<ul class="flags">${a.flags.map((f) => `<li><span class="pill ${LVL[f.level][0]}">${LVL[f.level][1]}</span> ${esc(f.text)}
+        <button class="icon-btn mute" title="Silenciar este alerta para este atleta" data-mute="${esc(f.code)}">×</button></li>`).join("")}</ul>`
+        : `<p class="small" style="margin:6px 0">✅ Tudo dentro do normal.</p>`}
+      <div class="cstats">${stat("adesão 7 dias", pct(a.compliance_7d), (a.compliance_7d ?? 100) < 70 ? "warn" : "")}
+        ${stat("prontidão", a.readiness ?? "—")}${stat("sono 7 dias", a.sleep_7d == null ? "—" : `${fmt1(a.sleep_7d)} h`)}
+        ${stat("carga semana", a.load_change == null ? "—" : `${a.load_change > 0 ? "+" : ""}${a.load_change}%`)}</div>
+      ${a.health_shared === false ? `<p class="small muted">Não compartilha saúde/sono/check-in com você.</p>` : a.checkin_date ? `<p class="small">Check-in ${ddmm(a.checkin_date)}: ${Object.entries(w).map(([k, v]) => `${WELL_ICON[v]} ${esc(({ sleep_q: "sono", fatigue: "cansaço", soreness: "dor muscular", stress: "estresse", mood: "humor" })[k])}`).join(" · ")}
+        ${a.checkin_note ? `<br><i>“${esc(a.checkin_note)}”</i>` : ""}</p>` : `<p class="small muted">Sem check-in recente.</p>`}
+      ${(a.suggestions || []).map((sg) => `<div class="rec ${sg.severity === "evitar" ? "alerta" : "atencao"} small">Dor ${sg.pain}/10 em <b>${esc(sg.label.toLowerCase())}</b>${sg.worse ? " (piorando)" : ""} →
+        sugestão: <b>${sg.severity}</b> e trocar os exercícios de risco${sg.refer ? ". Indique avaliação com fisioterapeuta/médico." : "."}
+        <button class="btn sm" data-tension="${sg.region}" data-sev="${sg.severity}">Aplicar</button></div>`).join("")}
+      <div class="row gap wrap" style="margin-top:8px">
+        <button class="btn sm" data-open="${a.id}" data-name="${esc(a.name)}">Abrir</button>
+        <button class="btn sm ghost" data-adjust="hoje">Hoje mais leve</button>
+        <button class="btn sm ghost" data-adjust="semana">Semana leve</button>
+        <button class="btn sm ghost" data-note>Recado</button></div>
+      <details class="tension"><summary class="small"><b>Áreas de tensão</b>${Object.keys(lims).length ? ` · ${Object.entries(lims).filter(([k]) => regions[k]).map(([k, v]) => `${esc(regions[k].toLowerCase())} (${v})`).join(", ")}` : ""}</summary>
+        <p class="small muted">Toque para alternar: livre → cuidado → evitar. O app troca na hora os exercícios de risco da planilha e da semana.</p>
+        <div class="chips">${Object.entries(regions).map(([k, lbl]) => { const sev = lims[k] || ""; const pain = (a.pain || {})[k];
+          return `<button class="chip tchip ${sev}" data-region="${k}" data-cur="${sev}">${esc(lbl)}${pain ? ` <b>${pain}/10</b>` : ""}${sev ? ` · ${sev}` : ""}</button>`; }).join("")}</div></details>
+    </div>`;
+  };
+  view.innerHTML = `<div class="card"><div class="row between gap wrap"><h2 style="margin:0">Coach</h2>
+      <button class="btn sm ghost" id="coach-cfg">Alertas ⚙</button></div>
+    <div class="row gap wrap" style="margin-top:8px"><span class="pill bad">Agir: ${c.agir}</span><span class="pill warn">Atenção: ${c.atencao}</span><span class="pill ok">Ok: ${c.ok}</span></div>
+    <p class="small muted">Quem precisa de você aparece primeiro. Os alertas comparam cada atleta com ele mesmo (últimas 4 semanas) e servem para puxar conversa, não para diagnosticar.</p></div>
+    ${d.athletes.length ? d.athletes.map(card).join("") : `<div class="card"><p>Nenhum atleta ainda.</p><p class="small">Cada pessoa autoriza você em <b>Perfil → Meu coach</b> (convide pelo Perfil → Pessoas). Ela escolhe se compartilha saúde e sono e pode remover o acesso quando quiser.</p></div>`}`;
+  view.onclick = async (e) => {
+    const t = e.target.closest("button"); if (!t) return;
+    const cardEl = t.closest("[data-aid]"); const aid = cardEl && cardEl.dataset.aid;
+    try {
+      if (t.id === "coach-cfg") return coachSettings();
+      if (t.dataset.open) { sessionStorage.setItem("gg_act", JSON.stringify({ id: +t.dataset.open, name: t.dataset.name })); state.profile = null; location.hash = "#hoje"; return; }
+      if (t.dataset.mute) { await api(`/api/coach/athletes/${aid}/mute`, { method: "POST", body: { code: t.dataset.mute } }); toast("Alerta silenciado para este atleta"); return viewCoach(); }
+      if (t.dataset.adjust) {
+        const r = await api(`/api/coach/athletes/${aid}/adjust`, { method: "POST", body: { scope: t.dataset.adjust, action: "moderar" } });
+        toast(r.changed.length ? `Mais leve: ${r.changed.join(", ")}` : "Nada planejado para ajustar", 4000); return;
+      }
+      if (t.dataset.note !== undefined) {
+        const text = prompt("Recado para o atleta (aparece no Hoje dele):"); if (!text) return;
+        await api(`/api/coach/athletes/${aid}/note`, { method: "POST", body: { text } }); toast("Recado enviado"); return;
+      }
+      if (t.dataset.region || t.dataset.tension) {
+        const region = t.dataset.region || t.dataset.tension;
+        const next = t.dataset.tension ? t.dataset.sev : ({ "": "cuidado", cuidado: "evitar", evitar: "nenhuma" })[t.dataset.cur];
+        t.disabled = true;
+        const r = await api(`/api/coach/athletes/${aid}/tension`, { method: "POST", body: { region, severity: next } });
+        toast(r.changes.length ? `Trocados: ${r.changes.slice(0, 3).join("; ")}${r.changes.length > 3 ? "…" : ""}` : `${regions[region]}: ${next === "nenhuma" ? "livre" : next}`, 6000);
+        return viewCoach();
+      }
+    } catch (err) { toast(err.message, 5000); }
+  };
+}
+async function coachSettings() {
+  const { settings: s, defaults } = await api("/api/coach/settings");
+  const rows = [["compliance_warn", "Adesão em 7 dias: atenção abaixo de (%)"], ["compliance_act", "Adesão: agir abaixo de (%)"],
+    ["inactive_warn", "Dias sem treinar: atenção a partir de"], ["inactive_act", "Dias sem treinar: agir a partir de"],
+    ["readiness_warn", "Prontidão: atenção abaixo de"], ["readiness_act", "Prontidão: agir abaixo de"],
+    ["sleep_warn", "Sono (média 7 noites): atenção abaixo de (h)"], ["sleep_act", "Sono: agir abaixo de (h)"],
+    ["rhr_warn", "FC de repouso acima do normal: atenção (+bpm)"], ["rhr_act", "FC de repouso: agir (+bpm)"],
+    ["load_jump_warn", "Pico de carga semanal: atenção (+%)"], ["load_jump_act", "Pico de carga: agir (+%)"],
+    ["wellness_warn", "Check-in: item ruim a partir de (1–5)"],
+    ["pain_warn", "Dor: atenção a partir de (0–10)"], ["pain_act", "Dor: trocar/reduzir a partir de"], ["pain_avoid", "Dor: evitar + profissional a partir de"]];
+  const body = openModal(`<h2>Alertas do coach</h2>
+    <p class="small muted">Valores iniciais baseados em evidência: sono &lt; 7 h (consenso BJSM 2021), pico de carga semana a semana em vez de ACWR (críticas de Impellizzeri/Lolli),
+      VFC e check-in comparados com o normal do próprio atleta (Plews, Buchheit, Saw 2016) e dor pelo modelo de Silbernagel (até 5/10, passando até a manhã seguinte e sem piorar).</p>
+    <div class="grid2">${rows.map(([k, l]) => `<div class="field"><label>${l} <span class="muted">(padrão ${defaults[k]})</span></label><input type="number" step="any" data-k="${k}" value="${s[k]}"></div>`).join("")}</div>
+    <button class="btn" id="cfg-save">Salvar</button>`);
+  $("#cfg-save", body).onclick = async () => {
+    const out = {}; $$("[data-k]", body).forEach((i) => { out[i.dataset.k] = i.value; });
+    await api("/api/coach/settings", { method: "PUT", body: out }); closeModal(); toast("Alertas salvos"); viewCoach();
+  };
+}
+// ---- lado do atleta: check-in e recados
+async function athleteCards() {
+  if (!(state.me && state.me.logged_in) || actAs()) return "";
+  const [ck, inbox] = await Promise.all([api("/api/checkin").catch(() => null), api("/api/coach/inbox").catch(() => null)]);
+  let html = "";
+  if (inbox && (inbox.notes.length || inbox.changes.length) && (inbox.unread || inbox.changes.length)) {
+    html += `<div class="card coach-inbox"><h3>Do seu coach</h3>
+      ${inbox.notes.slice(0, 2).map((n) => `<p class="small"><b>${esc(n.coach)}</b> · ${fmtDate(n.at)}<br>${esc(n.text)}</p>`).join("")}
+      ${inbox.changes.length ? `<ul class="plain small muted">${inbox.changes.map((x) => `<li>${fmtDate(x.at)}: ${esc(x.text)}</li>`).join("")}</ul>` : ""}
+      <button class="btn sm ghost" id="inbox-ok">Ok, vi</button></div>`;
+  }
+  if (ck && !ck.today) {
+    const opts = (k) => [1, 2, 3, 4, 5].map((v) => `<button type="button" class="wbtn" data-w="${k}" data-v="${v}" title="${v}">${WELL_ICON[v]}</button>`).join("");
+    html += `<div class="card" id="checkin"><h3>Check-in de hoje <span class="small muted">(10 segundos)</span></h3>
+      ${Object.entries(ck.wellness).map(([k, l]) => `<div class="row between gap wrow"><span class="small">${esc(l)}</span><span>${opts(k)}</span></div>`).join("")}
+      <p class="small" style="margin:10px 0 4px">Alguma dor ou tensão? Toque na região e dê uma nota de 0 a 10.</p>
+      <div class="chips">${Object.entries(ck.regions).map(([k, l]) => `<button type="button" class="chip pchip" data-p="${k}">${esc(l)}</button>`).join("")}</div>
+      <div class="row gap" style="margin-top:8px"><input id="ck-note" placeholder="Observação (opcional)" style="flex:1"><button class="btn" id="ck-send">Enviar</button></div></div>`;
+  }
+  return html;
+}
+function bindAthleteCards() {
+  const ok = $("#inbox-ok"); if (ok) ok.onclick = async () => { await api("/api/coach/inbox/read", { method: "POST" }); ok.closest(".card").remove(); };
+  const box = $("#checkin"); if (!box) return;
+  const val = {}; const pain = {};
+  box.onclick = async (e) => {
+    const b = e.target.closest("button"); if (!b) return;
+    if (b.dataset.w) { val[b.dataset.w] = +b.dataset.v; $$(`[data-w="${b.dataset.w}"]`, box).forEach((x) => x.classList.toggle("on", x === b)); return; }
+    if (b.dataset.p) {
+      const cur = pain[b.dataset.p] || 0; const v = prompt(`Dor em ${b.textContent.replace(/ \d+\/10$/, "")} (0 = nenhuma, 10 = máxima):`, cur || 3);
+      if (v === null) return; const n = Math.max(0, Math.min(10, parseInt(v, 10) || 0));
+      pain[b.dataset.p] = n; b.textContent = b.textContent.replace(/ \d+\/10$/, "") + (n ? ` ${n}/10` : ""); b.classList.toggle("on", n > 0); return;
+    }
+    if (b.id === "ck-send") {
+      if (!Object.keys(val).length && !Object.keys(pain).length) return toast("Toque nas carinhas ou numa região");
+      const r = await api("/api/checkin", { method: "POST", body: { ...val, pain, note: $("#ck-note").value } });
+      box.innerHTML = `<p class="small">Check-in enviado ✔${r.suggestions.length ? `<br>${r.suggestions.map((sg) => `Dor ${sg.pain}/10 em ${esc(sg.label.toLowerCase())}: ${sg.severity === "evitar" ? "evite os movimentos que doem e procure um profissional" : "reduza a carga dessa região e troque o que doer"}${sg.worse ? " (piorou)" : ""}.`).join("<br>")} Seu coach foi avisado.` : ""}</p>`;
+    }
+  };
+}
+async function coachMineCard() {
+  const me = state.me; if (!(me && me.logged_in) || actAs()) return "";
+  const m = await api("/api/coach/mine").catch(() => null);
+  if (!m || !m.coaches.length) return "";
+  return `<div class="card"><h2>Meu coach</h2><p class="small muted">O coach vê seus treinos, planilha e agenda e pode ajustá-los (você vê o que ele mudou no Hoje).
+    Saúde, sono e check-in só se você deixar. Ele nunca vê sua senha, seu login do Garmin ou seu código pessoal.</p>
+    <ul class="list">${m.coaches.map((c) => `<li class="row between gap wrap"><span><b>${esc(c.name)}</b>${c.linked ? ` <span class="pill ok">tem acesso</span>` : ""}</span>
+      <span class="row gap">${c.linked ? `<label class="small row gap" style="margin:0"><input type="checkbox" data-share="${c.id}" ${c.share_health ? "checked" : ""}> saúde e sono</label>
+        <button class="btn sm ghost" data-unlink="${c.id}">Remover acesso</button>` : `<button class="btn sm" data-link="${c.id}">Autorizar</button>`}</span></li>`).join("")}</ul></div>`;
+}
+function bindCoachMine() {
+  $$("[data-link]").forEach((b) => { b.onclick = async () => { await api(`/api/coach/mine/${b.dataset.link}`, { method: "POST" }); toast("Coach autorizado"); viewPerfil(); }; });
+  $$("[data-unlink]").forEach((b) => { b.onclick = async () => { if (!confirm("Remover o acesso deste coach?")) return; await api(`/api/coach/mine/${b.dataset.unlink}`, { method: "DELETE" }); viewPerfil(); }; });
+  $$("[data-share]").forEach((b) => { b.onchange = async () => { await api(`/api/coach/mine/${b.dataset.share}/share`, { method: "POST", body: { health: b.checked } }); toast(b.checked ? "Saúde e sono compartilhados" : "Saúde e sono não compartilhados"); }; });
+  $$("[data-coach]").forEach((b) => { b.onclick = async () => { await api(`/api/admin/users/${b.dataset.coach}/coach`, { method: "POST", body: { on: b.dataset.on === "1" } }); viewPerfil(); }; });
+}
+
 /* ---------------------------------------------------------------- CONTA -- */
 async function showAuth(mode, code) {
   document.body.classList.add("auth-mode");
@@ -383,8 +549,8 @@ async function accountCard() {
     const a = await api("/api/admin/users");
     const base = location.origin + location.pathname;
     admin = `<div class="card"><h2>Pessoas</h2>
-      <ul class="list">${a.users.map((x) => `<li class="row between gap"><span><b>${esc(x.name || x.email)}</b> <span class="small muted">${esc(x.email)}${x.is_admin ? " · admin" : ""}</span></span>
-        ${x.user_id !== u.id ? `<button class="btn sm ghost" data-reset="${x.user_id}">Senha provisória</button>` : ""}</li>`).join("")}</ul>
+      <ul class="list">${a.users.map((x) => `<li class="row between gap"><span><b>${esc(x.name || x.email)}</b> <span class="small muted">${esc(x.email)}${x.is_admin ? " · admin" : x.is_coach ? " · coach" : ""}</span></span>
+        ${x.user_id !== u.id ? `<span class="row gap"><button class="btn sm ghost" data-coach="${x.user_id}" data-on="${x.is_coach ? 0 : 1}">${x.is_coach ? "Tirar coach" : "Tornar coach"}</button><button class="btn sm ghost" data-reset="${x.user_id}">Senha provisória</button></span>` : ""}</li>`).join("")}</ul>
       <h3>Convites</h3>
       ${a.invites.length ? `<ul class="list">${a.invites.map((i) => `<li class="row between gap wrap"><span class="small"><b>${esc(i.note || "Convite")}</b><br><span class="muted" style="word-break:break-all">${esc(base)}#convite/${esc(i.code)}</span></span>
         <span class="row gap"><button class="btn sm" data-copy="${esc(base)}#convite/${esc(i.code)}">Copiar link</button><button class="btn sm ghost" data-delinv="${esc(i.code)}">Apagar</button></span></li>`).join("")}</ul>` : `<p class="small muted">Nenhum convite pendente.</p>`}
@@ -443,6 +609,7 @@ function bindDevices() {
 }
 function bindAccount() {
   bindDevices();
+  bindCoachMine();
   const st = $("#acc-setup");
   if (st) st.onsubmit = async (e) => {
     e.preventDefault();
@@ -1365,7 +1532,7 @@ async function viewPerfil() {
   const g = await api("/api/garmin/status");
   const num = (k, label, extra = "") => `<div class="field"><label>${label}</label><input type="number" data-p="${k}" value="${esc(p[k] ?? "")}" ${extra}></div>`;
   state.me = await api("/api/auth/me").catch(() => state.me);
-  const accHtml = (await accountCard()) + (await devicesCard());
+  const accHtml = (await accountCard()) + (await coachMineCard()) + (await devicesCard());
   const canBackup = !(state.me && state.me.logged_in && !state.me.user.is_admin);
   view.innerHTML = `${accHtml}
   <div class="card"><h2>Seus dados</h2>
@@ -1533,6 +1700,7 @@ async function autoSync() {
 async function route() {
   const [name, a, b] = (location.hash.slice(1) || "hoje").split("/");
   $$(".tabbar a").forEach((el) => el.classList.toggle("active", el.dataset.tab === ({ plano: "planilhas", evolucao: "analise", saude: "analise", esportes: "perfil" }[name] || name)));
+  coachChrome();
   view.oninput = view.onchange = view.onclick = null;
   view.innerHTML = `<p class="muted">Carregando…</p>`;
   try {
@@ -1542,7 +1710,7 @@ async function route() {
         document.querySelector(".topbar").insertAdjacentHTML("afterend", `<div id="eph" class="rec atencao small" style="margin:8px 16px 0">Versão de teste online: os dados podem ser apagados pelo servidor. Use <a href="#perfil">Perfil → Backup</a> para salvar e restaurar.</div>`);
       }
     }
-    const routes = { hoje: () => viewHoje(a), planilhas: viewPlanilhas, plano: () => viewPlano(a), treinar: () => viewTreinar(a, b), analise: viewAnalise, evolucao: () => viewEvolucao(decodeURIComponent(a || "")), esportes: viewEsportes, saude: viewSaude, exercicios: viewExercicios, perfil: viewPerfil };
+    const routes = { hoje: () => viewHoje(a), planilhas: viewPlanilhas, plano: () => viewPlano(a), treinar: () => viewTreinar(a, b), analise: viewAnalise, evolucao: () => viewEvolucao(decodeURIComponent(a || "")), esportes: viewEsportes, saude: viewSaude, exercicios: viewExercicios, perfil: viewPerfil, coach: viewCoach };
     await (routes[name] || viewHoje)();
     if (!view.onclick) view.onclick = (e) => { const id = e.target.dataset && e.target.dataset.ex; if (id) showExercise(id); };
   } catch (e) {

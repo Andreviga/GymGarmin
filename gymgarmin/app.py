@@ -16,7 +16,7 @@ from fastapi.staticfiles import StaticFiles
 
 from datetime import date, timedelta
 
-from . import auth, ingest
+from . import auth, coach, ingest
 from . import (analysis, calibration, catalog, clock, db, dedupe, health, endurance, garmin_export, garmin_sync, generator, history, limitations,
                load, plans_io, progression, readiness, schedule, sports, templates)
 from .muscles import EQUIPMENT_PT, HR_ZONES, MUSCLES, hr_max, zone_bpm
@@ -38,6 +38,19 @@ app = FastAPI(title="GymGarmin", version="0.1.0", lifespan=lifespan)
 # ------------------------------------------------------------------ login ----
 # Rotas abertas: login/cadastro, cron (tem segredo próprio) e envio de dados por token pessoal.
 OPEN_PREFIXES = ("/api/auth/", "/api/cron/", "/api/ingest")
+
+
+# O coach abre o app "como" o atleta (cabeçalho X-GG-Athlete). Isto ele não pode: login/senha,
+# Garmin (conta do atleta), código pessoal, administração, backup.
+ACT_BLOCKED = ("/api/auth/", "/api/account/", "/api/admin/", "/api/backup", "/api/ingest", "/api/coach/",
+               "/api/garmin/login", "/api/garmin/logout", "/api/garmin/mfa")
+
+
+def _header(scope, name: bytes) -> str | None:
+    for k, v in scope.get("headers") or []:
+        if k == name:
+            return v.decode("latin-1")
+    return None
 
 
 def _cookie(scope, name: str) -> str | None:
@@ -64,18 +77,62 @@ class AuthMiddleware:
         acc = auth.read_session(_cookie(scope, auth.COOKIE))
         tok = auth.set_account(acc)
         utok = db.set_current_user(acc["user_id"]) if acc else None
+        atok = None
         try:
             if not acc and not scope["path"].startswith(OPEN_PREFIXES) and auth.accounts_exist():
                 resp = JSONResponse({"detail": "Entre na sua conta para continuar.", "login": True}, status_code=401)
                 return await resp(scope, receive, send)
+            act = _header(scope, b"x-gg-athlete")
+            if acc and act and not scope["path"].startswith(ACT_BLOCKED):
+                try:
+                    aid = int(act)
+                except ValueError:
+                    aid = 0
+                if aid != acc["user_id"]:
+                    if not db.is_linked(acc["user_id"], aid):
+                        resp = JSONResponse({"detail": "Você não é coach deste atleta (ou ele removeu o acesso)."}, status_code=403)
+                        return await resp(scope, receive, send)
+                    atok = db.set_current_user(aid)
+                    auth.set_acting(acc["user_id"])
+                    if scope["path"].startswith(("/api/health", "/api/checkin")) and \
+                            db.kv_get(f"coach_share_health:{acc['user_id']}") == "0":
+                        resp = JSONResponse({"detail": "Este atleta não compartilha saúde e sono com o coach."}, status_code=403)
+                        return await resp(scope, receive, send)
+                    if scope["method"] in ("POST", "PUT", "DELETE"):
+                        _coach_log(aid, acc, scope["method"], scope["path"])
             return await self.inner(scope, receive, send)
         finally:
+            if atok is not None:
+                db._current_user.reset(atok)
+                auth.set_acting(None)
             auth.reset_account(tok)
             if utok is not None:
                 db._current_user.reset(utok)
 
 
 app.add_middleware(AuthMiddleware)
+
+COACH_ACTION_PT = [("/api/plans", "mudou a planilha"), ("/api/generator/apply", "gerou uma planilha nova"),
+                   ("/api/schedule", "ajustou a agenda"), ("/api/profile", "ajustou o perfil"),
+                   ("/api/endurance", "ajustou os esportes"), ("/api/readiness", "ajustou o treino do dia"),
+                   ("/api/sessions", "mexeu nos treinos registrados"), ("/api/anchors", "ajustou as zonas")]
+
+
+def _coach_name(acc: dict) -> str:
+    n = (db.get_profile(acc["user_id"]).get("name") or "").strip()
+    return n if n and n.lower() != "eu" else acc["email"].split("@")[0]
+
+
+def _coach_log(athlete_id: int, coach_acc: dict, method: str, path: str) -> None:
+    """Registro do que o coach mudou (o atleta vê em Hoje)."""
+    what = next((t for prefix, t in COACH_ACTION_PT if path.startswith(prefix)), "fez uma alteração")
+    name = _coach_name(coach_acc)
+    log = json.loads(db.kv_get("coach_log", user_id=athlete_id) or "[]")
+    if log and log[-1].get("text") == f"{name} {what}" and log[-1].get("at", "")[:13] == clock.now().isoformat()[:13]:
+        return  # mesma ação na mesma hora: uma linha só
+    log.append({"at": clock.now().isoformat(timespec="minutes"), "coach": coach_acc["user_id"], "text": f"{name} {what}",
+                "path": path, "method": method})
+    db.kv_set("coach_log", json.dumps(log[-40:], ensure_ascii=False), user_id=athlete_id)
 
 
 def _with_cookie(payload: dict, acc: dict) -> JSONResponse:
@@ -89,7 +146,8 @@ def _me_payload(acc: dict | None) -> dict:
     if not acc:
         return {"logged_in": False, "setup_needed": not auth.accounts_exist()}
     prof = db.get_profile(acc["user_id"])
-    return {"logged_in": True, "setup_needed": False, "user": auth.public(acc, prof.get("name"))}
+    return {"logged_in": True, "setup_needed": False,
+            "user": {**auth.public(acc, prof.get("name")), "is_coach": db.is_coach(acc["user_id"])}}
 
 
 def _require_admin() -> dict:
@@ -247,6 +305,267 @@ def _ingest_sync(body) -> dict:
         except Exception:  # noqa: BLE001 - prontidão é opcional
             pass
     return r
+
+
+# --------------------------------------------------------------------- coach ----
+
+def _coach() -> dict:
+    acc = auth.current_account()
+    if not acc or not db.is_coach(acc["user_id"]):
+        raise HTTPException(403, "Área do coach: peça ao administrador para ativar seu acesso de coach.")
+    return acc
+
+
+def _athlete_or_403(coach_acc: dict, athlete_id: int) -> None:
+    if not db.is_linked(coach_acc["user_id"], athlete_id):
+        raise HTTPException(403, "Este atleta não te deu acesso de coach.")
+
+
+def _athlete_snapshot(today: date, coach_id: int) -> dict:
+    """Retrato do atleta atual (db.current_user) para a triagem do coach."""
+    prof = _profile()
+    since = (today - timedelta(days=60)).isoformat()
+    sessions = db.list_sessions(since=since, limit=2000)
+    snap: dict = {"name": prof.get("name") or "Atleta", "has_plan": bool(prof.get("schedule_plan_id")),
+                  "limitations": prof.get("limitations") or []}
+    last = max((s["date"][:10] for s in sessions), default=None)
+    snap["last_training"] = last
+    snap["days_inactive"] = (today - date.fromisoformat(last)).days if last else None
+    ents = db.list_schedule((today - timedelta(days=7)).isoformat(), (today - timedelta(days=1)).isoformat())
+    if ents:
+        ents = schedule.sync_status(ents, [x for x in sessions if x["date"][:10] >= (today - timedelta(days=7)).isoformat()], today)
+        planned = [e for e in ents if not e.get("race")]
+        done = sum(1 for e in planned if e.get("status") == "feito")
+        snap["planned_7d"], snap["done_7d"] = len(planned), done
+        miss = 0
+        for e in sorted(planned, key=lambda x: x["date"], reverse=True):
+            if e.get("status") == "feito":
+                break
+            if e.get("status") in ("perdido", "planejado", "pulado"):
+                miss += 1
+        snap["missed_row"] = miss
+        snap["compliance_7d"] = round(100 * done / len(planned)) if planned else None
+    rv = _readiness_view(today) or _readiness_view(today - timedelta(days=1))
+    if rv and rv.get("score") is not None:
+        snap["readiness"] = rv["score"]
+        snap["readiness_level"] = rv.get("level")
+    share_health = db.kv_get(f"coach_share_health:{coach_id}") != "0"  # o atleta pode não compartilhar
+    hd = health.load_days(db.kv_get, today, 36) if share_health else {}
+    snap["health_shared"] = share_health
+    if hd:
+        rep = health.report(hd, None, {}, prof, today)
+        snap["health_alerts"] = rep.get("alerts") or []
+        snap["rhr_delta"] = (rep.get("rhr") or {}).get("delta")
+        s7 = [(hd.get((today - timedelta(days=i)).isoformat()) or {}).get("sleep") or {} for i in range(7)]
+        snap["sleep_7d"] = coach._mean([x.get("duration_h") for x in s7 if (x.get("duration_h") or 0) >= 1])
+        snap["short_nights"] = sum(1 for x in s7 if 1 <= (x.get("duration_h") or 0) < 6)
+        snap["hrv_low"] = coach.hrv_low(hd, today)
+        ln = rep.get("last_night") or {}
+        snap["last_night_h"] = ln.get("duration_h")
+    pmc = load.pmc(sessions, prof, today=today, days=35)
+    snap["form"] = pmc.get("form")
+    snap.update(coach.load_numbers(pmc.get("series") or []))
+    cks = coach.checkins(today, 29) if share_health else []
+    if cks and cks[0]["date"] >= (today - timedelta(days=2)).isoformat():
+        snap["wellness"] = {k: cks[0][k] for k in coach.WELLNESS if k in cks[0]}
+        snap["wellness_z"] = coach.wellness_z(cks)
+        snap["pain"] = cks[0].get("pain") or {}
+        snap["pain_prev"] = next((c.get("pain") or {} for c in cks[1:8] if c.get("pain") is not None), {})
+        snap["checkin_date"] = cks[0]["date"]
+        if cks[0].get("note"):
+            snap["checkin_note"] = cks[0]["note"]
+    snap["falling"] = sum(1 for r in history.overview(sessions, today, prof.get("weight_kg"))["exercises"]
+                          if r["summary"].get("status") == "caindo")
+    snap["muted"] = json.loads(db.kv_get(f"coach_muted:{db.current_user()}", user_id=coach_id) or "[]")
+    snap["suggestions"] = coach.pain_suggestions(cks, snap["limitations"], coach.settings(coach_id))
+    return snap
+
+
+@app.get("/api/coach/athletes")
+def coach_athletes():
+    acc = _coach()
+    s = coach.settings(acc["user_id"])
+    today = clock.today()
+    out = []
+    for aid in db.athletes_of(acc["user_id"]):
+        with db.as_user(aid):
+            try:
+                snap = _athlete_snapshot(today, acc["user_id"])
+            except Exception as e:  # noqa: BLE001 - um atleta com dado estranho não derruba o painel
+                snap = {"name": db.get_profile(aid).get("name"), "error": f"{type(e).__name__}"}
+        fl = coach.flags(snap, s) if "error" not in snap else []
+        out.append({"id": aid, **snap, "flags": fl, "priority": coach.priority(fl)})
+    out.sort(key=lambda a: (-a["priority"], a.get("name") or ""))
+    return {"athletes": out, "settings": s, "regions": coach.REGIONS,
+            "counts": {"agir": sum(1 for a in out if any(f["level"] == "agir" for f in a["flags"])),
+                       "atencao": sum(1 for a in out if a["flags"] and not any(f["level"] == "agir" for f in a["flags"])),
+                       "ok": sum(1 for a in out if not a["flags"])}}
+
+
+@app.get("/api/coach/settings")
+def coach_settings_get():
+    return {"settings": coach.settings(_coach()["user_id"]), "defaults": coach.DEFAULTS}
+
+
+@app.put("/api/coach/settings")
+def coach_settings_put(body: dict = Body(...)):
+    return {"settings": coach.save_settings(_coach()["user_id"], body)}
+
+
+@app.post("/api/coach/athletes/{athlete_id}/note")
+def coach_note(athlete_id: int, body: dict = Body(...)):
+    acc = _coach()
+    _athlete_or_403(acc, athlete_id)
+    text = (body.get("text") or "").strip()[:500]
+    if not text:
+        raise HTTPException(400, "Escreva o recado.")
+    name = _coach_name(acc)
+    notes = json.loads(db.kv_get("coach_notes", user_id=athlete_id) or "[]")
+    notes.append({"at": clock.now().isoformat(timespec="minutes"), "coach": name, "text": text, "read": False})
+    db.kv_set("coach_notes", json.dumps(notes[-30:], ensure_ascii=False), user_id=athlete_id)
+    return {"ok": True}
+
+
+@app.post("/api/coach/athletes/{athlete_id}/mute")
+def coach_mute(athlete_id: int, body: dict = Body(...)):
+    acc = _coach()
+    _athlete_or_403(acc, athlete_id)
+    key = f"coach_muted:{athlete_id}"
+    muted = set(json.loads(db.kv_get(key) or "[]"))
+    (muted.add if body.get("on", True) else muted.discard)(body.get("code"))
+    db.kv_set(key, json.dumps(sorted(m for m in muted if m)))
+    return {"muted": sorted(muted)}
+
+
+@app.post("/api/coach/athletes/{athlete_id}/tension")
+def coach_tension(athlete_id: int, body: dict = Body(...)):
+    """Área de tensão: marca a região (cuidado/evitar/nenhuma) e já troca os exercícios do plano."""
+    acc = _coach()
+    _athlete_or_403(acc, athlete_id)
+    region, sev = body.get("region"), body.get("severity")
+    if region not in coach.REGIONS or sev not in ("cuidado", "evitar", None, "", "nenhuma"):
+        raise HTTPException(400, "Região ou nível inválido")
+    with db.as_user(athlete_id):
+        prof = _profile()
+        lims = [l for l in prof.get("limitations") or [] if l.get("key") != region]
+        if sev in ("cuidado", "evitar"):
+            lims.append({"key": region, "severity": sev})
+        db.save_profile({"limitations": lims})
+        changes = []
+        if body.get("apply", True):
+            plan = schedule.schedule_plan(prof)
+            if plan:
+                plan, changes = coach.adapt_plan(plan, lims, _profile())
+                if changes:
+                    db.update_plan(plan["id"], plan)
+                    schedule.rebuild_week(_profile())
+        _coach_log(athlete_id, acc, "POST", "/api/profile")
+    return {"limitations": lims, "changes": changes}
+
+
+@app.post("/api/coach/athletes/{athlete_id}/adjust")
+def coach_adjust(athlete_id: int, body: dict = Body(...)):
+    """Ação rápida: hoje ou o resto da semana mais leve / descanso / trocar por regenerativo."""
+    acc = _coach()
+    _athlete_or_403(acc, athlete_id)
+    action = body.get("action") or "moderar"
+    if action not in readiness.ACTION_TEXT:
+        raise HTTPException(400, "Ação inválida")
+    today = clock.today()
+    days = [today] if body.get("scope", "hoje") == "hoje" else [today + timedelta(days=i) for i in range(7 - today.weekday())]
+    changed = []
+    with db.as_user(athlete_id):
+        schedule.ensure_week(_profile(), today)
+        for d in days:
+            changed += [e["day_name"] for e in _apply_readiness(d, action, force=True)]
+        _coach_log(athlete_id, acc, "POST", "/api/readiness")
+    return {"changed": changed}
+
+
+@app.get("/api/coach/mine")
+def coach_mine():
+    """Atleta: quem pode ser meu coach e quem já tem acesso."""
+    acc = auth.current_account()
+    if not acc:
+        return {"coaches": [], "linked": []}
+    linked = set(db.coaches_of(acc["user_id"]))
+    out = []
+    for a in db.coaches():
+        if a["user_id"] == acc["user_id"]:
+            continue
+        out.append({"id": a["user_id"], "name": _coach_name(a), "linked": a["user_id"] in linked,
+                    "share_health": db.kv_get(f"coach_share_health:{a['user_id']}") != "0"})
+    return {"coaches": out, "is_coach": db.is_coach(acc["user_id"])}
+
+
+@app.post("/api/coach/mine/{coach_id}")
+def coach_mine_add(coach_id: int):
+    acc = auth.current_account()
+    if not acc or not db.is_coach(coach_id) or coach_id == acc["user_id"]:
+        raise HTTPException(400, "Coach inválido")
+    db.link_coach(coach_id, acc["user_id"])
+    return coach_mine()
+
+
+@app.post("/api/coach/mine/{coach_id}/share")
+def coach_mine_share(coach_id: int, body: dict = Body(...)):
+    """O atleta escolhe se o coach vê saúde, sono, VFC e check-in (o treino ele sempre vê)."""
+    db.kv_set(f"coach_share_health:{coach_id}", "1" if body.get("health", True) else "0")
+    return coach_mine()
+
+
+@app.delete("/api/coach/mine/{coach_id}")
+def coach_mine_remove(coach_id: int):
+    acc = auth.current_account()
+    if acc:
+        db.unlink_coach(coach_id, acc["user_id"])
+    return coach_mine()
+
+
+@app.get("/api/coach/inbox")
+def coach_inbox():
+    """Atleta: recados do coach e o que ele mudou (para aparecer em Hoje)."""
+    notes = json.loads(db.kv_get("coach_notes") or "[]")
+    log = json.loads(db.kv_get("coach_log") or "[]")
+    seen = db.kv_get("coach_log_seen") or ""
+    return {"notes": notes[-5:][::-1], "unread": sum(1 for n in notes if not n.get("read")),
+            "changes": [x for x in log if x["at"] > seen][-5:][::-1]}
+
+
+@app.post("/api/coach/inbox/read")
+def coach_inbox_read():
+    notes = json.loads(db.kv_get("coach_notes") or "[]")
+    for n in notes:
+        n["read"] = True
+    db.kv_set("coach_notes", json.dumps(notes, ensure_ascii=False))
+    db.kv_set("coach_log_seen", clock.now().isoformat(timespec="minutes"))
+    return {"ok": True}
+
+
+@app.get("/api/checkin")
+def checkin_get():
+    today = clock.today()
+    cks = coach.checkins(today, 14)
+    return {"today": next((c for c in cks if c["date"] == today.isoformat()), None), "recent": cks[:7],
+            "regions": coach.REGIONS, "wellness": coach.WELLNESS}
+
+
+@app.post("/api/checkin")
+def checkin_post(body: dict = Body(...)):
+    rec = coach.save_checkin(clock.today(), body)
+    # dor alta: sugere a área de tensão ao próprio atleta (o coach também vê)
+    sugg = coach.pain_suggestions(coach.checkins(clock.today(), 7), _profile().get("limitations") or [],
+                                  coach.DEFAULTS)
+    return {"checkin": rec, "suggestions": sugg}
+
+
+@app.post("/api/admin/users/{user_id}/coach")
+def admin_set_coach(user_id: int, body: dict = Body(default={})):
+    _require_admin()
+    if not db.get_account(user_id):
+        raise HTTPException(404, "Usuário não encontrado")
+    db.set_coach(user_id, bool(body.get("on", True)))
+    return {"ok": True, "is_coach": db.is_coach(user_id)}
 
 
 @app.get("/api/admin/users")
