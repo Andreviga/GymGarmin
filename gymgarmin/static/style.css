@@ -249,3 +249,5 @@ details > summary { cursor: pointer; padding: 10px 0; }
 .gm-sport[hidden] { display: none; }
 #gm-same-wrap[hidden] { display: none; }
 .day-group { border-left: 3px solid var(--line); padding-left: 10px; margin: 8px 0; }
+.auth-mode .tabbar, .auth-mode #garmin-pill { display: none; }
+.auth-card { max-width: 420px; margin: 24px auto; }

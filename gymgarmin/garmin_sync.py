@@ -34,8 +34,20 @@ from typing import Any
 from . import catalog, clock
 
 _lock = threading.Lock()
-_client = None
-_pending_mfa: dict[str, Any] = {}
+# Cliente do Garmin e login aguardando MFA, por usuário do app (cada pessoa tem sua conta Garmin)
+_clients: dict[int, Any] = {}
+_pending_mfa: dict[int, dict] = {}
+
+
+def _uid() -> int:
+    from .db import current_user
+
+    return current_user()
+
+
+def current():
+    """Cliente do Garmin já conectado do usuário atual (ou None)."""
+    return _clients.get(_uid())
 
 
 def home_dir() -> Path:
@@ -148,6 +160,8 @@ def _del(key: str) -> None:
 def _migrate_file_tokens() -> None:
     """Tokens que ficaram na pasta antiga (versão local) passam para o banco uma vez."""
     f = token_dir() / "garmin_tokens.json"
+    if _uid() != 1:
+        return  # arquivo da versão local de um usuário só
     try:
         if f.exists() and not _get_secret(TOKENS_KEY):
             _put_secret(TOKENS_KEY, f.read_text())
@@ -175,7 +189,7 @@ def _set_sync_state(**kw) -> dict:
 
 
 def _mfa_pending() -> bool:
-    if _pending_mfa:
+    if _pending_mfa.get(_uid()):
         return True
     raw = _get_secret(MFA_KEY)
     if not raw:
@@ -204,9 +218,9 @@ def status() -> dict:
     return {
         "library_installed": lib_ok,
         "has_tokens": has_tokens,
-        "connected": _client is not None or has_tokens,
+        "connected": current() is not None or has_tokens,
         "mfa_pending": _mfa_pending() if key_ok else False,
-        "display_name": getattr(_client, "display_name", None) if _client else st.get("display_name"),
+        "display_name": getattr(current(), "display_name", None) if current() else st.get("display_name"),
         "storage_ok": key_ok,
         "storage_error": key_error,
         "needs_reconnect": bool(st.get("needs_reconnect")) and not has_tokens,
@@ -226,9 +240,8 @@ def _save_tokens(api) -> None:
 
 def connect_with_tokens() -> bool:
     """Reconecta com os tokens guardados, sem nunca tentar login por senha."""
-    global _client
     with _lock:
-        if _client is not None:
+        if current() is not None:
             return True
         _migrate_file_tokens()
         tokens = _get_secret(TOKENS_KEY)
@@ -255,7 +268,7 @@ def connect_with_tokens() -> bool:
                 _set_sync_state(auth_failures=n, auth_failed_since=since)
             raise GarminTemporary(f"O Garmin não respondeu agora ({type(e).__name__}); tento de novo mais tarde.") from e
         _save_tokens(api)
-        _client = api
+        _clients[_uid()] = api
         _set_sync_state(needs_reconnect=False, auth_failures=0, auth_failed_since=None,
                         display_name=getattr(api, "display_name", None))
         return True
@@ -263,14 +276,12 @@ def connect_with_tokens() -> bool:
 
 def login(email: str, password: str) -> dict:
     """Login com e-mail e senha. Se a conta tiver MFA, retorna {'mfa_required': True}."""
-    global _client
     Garmin = _lib()
     with _lock:
         api = Garmin(email=email, password=password, return_on_mfa=True)
         result, state = api.login()
         if result == "needs_mfa":
-            _pending_mfa.clear()
-            _pending_mfa.update({"api": api, "state": state})
+            _pending_mfa[_uid()] = {"api": api, "state": state}
             # Outra instância do servidor pode receber o código: guarda o estado (cifrado, 10 min)
             _put_secret(MFA_KEY, {"state": state, "started": clock.now().isoformat()})
             return {"mfa_required": True}
@@ -278,11 +289,10 @@ def login(email: str, password: str) -> dict:
 
 
 def _finish_login(api) -> dict:
-    global _client
-    _pending_mfa.clear()
+    _pending_mfa.pop(_uid(), None)
     _del(MFA_KEY)
     _save_tokens(api)
-    _client = api
+    _clients[_uid()] = api
     _set_sync_state(needs_reconnect=False, last_error=None, auth_failures=0, auth_failed_since=None,
                     display_name=getattr(api, "display_name", None))
     return {"connected": True, "display_name": getattr(api, "display_name", None)}
@@ -290,8 +300,9 @@ def _finish_login(api) -> dict:
 
 def submit_mfa(code: str) -> dict:
     with _lock:
-        if _pending_mfa:
-            api, state = _pending_mfa["api"], _pending_mfa["state"]
+        mine = _pending_mfa.get(_uid())
+        if mine:
+            api, state = mine["api"], mine["state"]
         else:
             raw = _get_secret(MFA_KEY) if _mfa_pending() else None
             if not raw:
@@ -303,14 +314,13 @@ def submit_mfa(code: str) -> dict:
 
 
 def logout() -> None:
-    global _client
     with _lock:
-        _client = None
-        _pending_mfa.clear()
+        _clients.pop(_uid(), None)
+        _pending_mfa.pop(_uid(), None)
         _del(TOKENS_KEY)
         _del(MFA_KEY)
         tdir = token_dir()
-        if tdir.exists():
+        if tdir.exists() and _uid() == 1:
             for f in tdir.iterdir():
                 f.unlink()
         _set_sync_state(needs_reconnect=False, display_name=None)
@@ -318,17 +328,18 @@ def logout() -> None:
 
 def persist() -> None:
     """Grava o token se ele se renovou durante chamadas fora da sincronização (prontidão, métricas, envio)."""
-    if _client is not None:
+    c = current()
+    if c is not None:
         try:
-            _save_tokens(_client)
+            _save_tokens(c)
         except Exception:  # noqa: BLE001
             pass
 
 
 def client():
-    if _client is None and not connect_with_tokens():
+    if current() is None and not connect_with_tokens():
         raise GarminNeedsLogin("Não conectado ao Garmin Connect. Entre em Perfil → Garmin.")
-    return _client
+    return current()
 
 
 def push_workout(workout_json: dict, schedule_date: str | None = None) -> dict:
@@ -673,7 +684,6 @@ def sync(save_session, imported_ids: set, preferred_ids: set[str] | None = None,
     Só lê dados com os tokens guardados: se não houver login válido, marca
     "reconectar" e não tenta entrar por senha.
     """
-    global _client
     now = now or clock.now()
     st = sync_state()
     started = now.isoformat(timespec="seconds")
@@ -740,7 +750,7 @@ def sync(save_session, imported_ids: set, preferred_ids: set[str] | None = None,
                              "type": a.get("type"), "merged": bool(saved.get("merged"))})
     except Exception as e:  # noqa: BLE001
         if _is_auth_error(e):
-            _client = None  # na próxima, reconecta com os tokens guardados (e confirma se a recusa persiste)
+            _clients.pop(_uid(), None)  # na próxima, reconecta com os tokens guardados (e confirma se a recusa persiste)
         msg = ("O Garmin limitou as requisições agora; tento de novo na próxima sincronização."
                if _is_rate_limit(e) else f"Falha ao sincronizar: {type(e).__name__}: {e}")
         _set_sync_state(last_run=started, last_ok=False, last_error=msg, trigger=trigger)

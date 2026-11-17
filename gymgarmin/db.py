@@ -18,10 +18,33 @@ import sqlite3
 import ssl
 import threading
 from contextlib import contextmanager
+from contextvars import ContextVar
 from urllib.parse import parse_qs, unquote, urlparse
 from datetime import datetime
 from pathlib import Path
 from . import clock
+
+# Usuário da requisição atual (definido pelo login). Sem login (testes, scripts) vale o usuário 1.
+_current_user: ContextVar[int] = ContextVar("gymgarmin_user", default=1)
+
+
+def current_user() -> int:
+    return _current_user.get()
+
+
+@contextmanager
+def as_user(user_id: int):
+    """Executa um bloco como outro usuário (cron, testes)."""
+    tok = _current_user.set(int(user_id))
+    try:
+        yield
+    finally:
+        _current_user.reset(tok)
+
+
+def set_current_user(user_id: int):
+    return _current_user.set(int(user_id))
+
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS users (
@@ -76,6 +99,22 @@ CREATE TABLE IF NOT EXISTS garmin_pushes (
     workout_id INTEGER,
     scheduled TEXT,
     created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS accounts (
+    user_id INTEGER NOT NULL PRIMARY KEY,
+    email TEXT NOT NULL UNIQUE,
+    pw_hash TEXT NOT NULL,
+    is_admin INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    ingest_token TEXT
+);
+CREATE TABLE IF NOT EXISTS invites (
+    code TEXT NOT NULL PRIMARY KEY,
+    created_by INTEGER NOT NULL,
+    note TEXT,
+    created_at TEXT NOT NULL,
+    used_by INTEGER,
+    used_at TEXT
 );
 CREATE TABLE IF NOT EXISTS kv (
     user_id INTEGER NOT NULL,
@@ -290,13 +329,15 @@ def init() -> None:
 
 # ---- perfil ---------------------------------------------------------------
 
-def get_profile(user_id: int = 1) -> dict:
+def get_profile(user_id: int | None = None) -> dict:
+    user_id = user_id or current_user()
     with conn() as c:
         row = c.execute("SELECT profile FROM users WHERE id = ?", (user_id,)).fetchone()
     return {**DEFAULT_PROFILE, **(json.loads(row["profile"]) if row else {})}
 
 
-def save_profile(profile: dict, user_id: int = 1) -> dict:
+def save_profile(profile: dict, user_id: int | None = None) -> dict:
+    user_id = user_id or current_user()
     merged = {**get_profile(user_id), **profile}
     with conn() as c:
         c.execute("UPDATE users SET profile = ?, name = ? WHERE id = ?",
@@ -312,14 +353,16 @@ def _plan_row(r) -> dict:
             "created_at": r["created_at"], "updated_at": r["updated_at"], **d}
 
 
-def list_plans(user_id: int = 1) -> list[dict]:
+def list_plans(user_id: int | None = None) -> list[dict]:
+    user_id = user_id or current_user()
     with conn() as c:
         rows = c.execute("SELECT * FROM plans WHERE user_id = ? ORDER BY active DESC, updated_at DESC",
                          (user_id,)).fetchall()
     return [_plan_row(r) for r in rows]
 
 
-def get_plan(plan_id: int, user_id: int = 1) -> dict | None:
+def get_plan(plan_id: int, user_id: int | None = None) -> dict | None:
+    user_id = user_id or current_user()
     with conn() as c:
         r = c.execute("SELECT * FROM plans WHERE id = ? AND user_id = ?", (plan_id, user_id)).fetchone()
     return _plan_row(r) if r else None
@@ -333,7 +376,8 @@ def _plan_data(plan: dict) -> str:
     return json.dumps(keep, ensure_ascii=False)
 
 
-def create_plan(plan: dict, user_id: int = 1) -> dict:
+def create_plan(plan: dict, user_id: int | None = None) -> dict:
+    user_id = user_id or current_user()
     with conn() as c:
         cur = c.execute("INSERT INTO plans (user_id, name, data, active, created_at, updated_at) VALUES (?,?,?,?,?,?)",
                         (user_id, plan.get("name") or "Minha planilha", _plan_data(plan),
@@ -342,7 +386,8 @@ def create_plan(plan: dict, user_id: int = 1) -> dict:
     return get_plan(pid, user_id)
 
 
-def update_plan(plan_id: int, plan: dict, user_id: int = 1) -> dict | None:
+def update_plan(plan_id: int, plan: dict, user_id: int | None = None) -> dict | None:
+    user_id = user_id or current_user()
     with conn() as c:
         c.execute("UPDATE plans SET name = ?, data = ?, active = ?, updated_at = ? WHERE id = ? AND user_id = ?",
                   (plan.get("name") or "Minha planilha", _plan_data(plan), 1 if plan.get("active", True) else 0,
@@ -350,7 +395,8 @@ def update_plan(plan_id: int, plan: dict, user_id: int = 1) -> dict | None:
     return get_plan(plan_id, user_id)
 
 
-def delete_plan(plan_id: int, user_id: int = 1) -> None:
+def delete_plan(plan_id: int, user_id: int | None = None) -> None:
+    user_id = user_id or current_user()
     with conn() as c:
         c.execute("DELETE FROM plans WHERE id = ? AND user_id = ?", (plan_id, user_id))
 
@@ -362,7 +408,8 @@ def _session_row(r) -> dict:
     return {"id": r["id"], "date": r["date"], "plan_id": r["plan_id"], "day_name": r["day_name"], **d}
 
 
-def list_sessions(user_id: int = 1, since: str | None = None, limit: int = 500) -> list[dict]:
+def list_sessions(user_id: int | None = None, since: str | None = None, limit: int = 500) -> list[dict]:
+    user_id = user_id or current_user()
     q = "SELECT * FROM sessions WHERE user_id = ?"
     args: list = [user_id]
     if since:
@@ -375,7 +422,8 @@ def list_sessions(user_id: int = 1, since: str | None = None, limit: int = 500) 
     return [_session_row(r) for r in rows]
 
 
-def get_session(session_id: int, user_id: int = 1) -> dict | None:
+def get_session(session_id: int, user_id: int | None = None) -> dict | None:
+    user_id = user_id or current_user()
     with conn() as c:
         r = c.execute("SELECT * FROM sessions WHERE id = ? AND user_id = ?", (session_id, user_id)).fetchone()
     return _session_row(r) if r else None
@@ -391,14 +439,16 @@ def _session_data(s: dict) -> str:
 _save_lock = threading.Lock()
 
 
-def save_session(s: dict, user_id: int = 1, session_id: int | None = None) -> dict:
+def save_session(s: dict, user_id: int | None = None, session_id: int | None = None) -> dict:
+    user_id = user_id or current_user()
     if s.get("client_id") and not session_id:
         with _save_lock:  # dois reenvios simultâneos do mesmo treino não viram duas sessões
             return _save_session(s, user_id, session_id)
     return _save_session(s, user_id, session_id)
 
 
-def _save_session(s: dict, user_id: int = 1, session_id: int | None = None) -> dict:
+def _save_session(s: dict, user_id: int | None = None, session_id: int | None = None) -> dict:
+    user_id = user_id or current_user()
     date = s.get("date") or now()
     with conn() as c:
         if session_id:
@@ -419,13 +469,15 @@ def _save_session(s: dict, user_id: int = 1, session_id: int | None = None) -> d
     return get_session(sid, user_id)
 
 
-def delete_session(session_id: int, user_id: int = 1) -> None:
+def delete_session(session_id: int, user_id: int | None = None) -> None:
+    user_id = user_id or current_user()
     with conn() as c:
         c.execute("DELETE FROM sessions WHERE id = ? AND user_id = ?", (session_id, user_id))
 
 
-def last_performance(exercise_id: str, user_id: int = 1) -> dict | None:
+def last_performance(exercise_id: str, user_id: int | None = None) -> dict | None:
     """Base para sugerir carga: o último treino normal (deload não conta) + os anteriores e a data mais recente."""
+    user_id = user_id or current_user()
     from .progression import pick_last
 
     perfs, cardio = [], None
@@ -444,13 +496,15 @@ def last_performance(exercise_id: str, user_id: int = 1) -> dict | None:
 
 # ---- mapeamento Garmin personalizado --------------------------------------
 
-def garmin_overrides(user_id: int = 1) -> dict[str, dict]:
+def garmin_overrides(user_id: int | None = None) -> dict[str, dict]:
+    user_id = user_id or current_user()
     with conn() as c:
         rows = c.execute("SELECT * FROM garmin_override WHERE user_id = ?", (user_id,)).fetchall()
     return {r["exercise_id"]: {"category": r["category"], "exercise": r["exercise"]} for r in rows}
 
 
-def set_garmin_override(exercise_id: str, category: str, exercise: str, user_id: int = 1) -> None:
+def set_garmin_override(exercise_id: str, category: str, exercise: str, user_id: int | None = None) -> None:
+    user_id = user_id or current_user()
     with conn() as c:
         c.execute("INSERT INTO garmin_override (user_id, exercise_id, category, exercise) VALUES (?,?,?,?) "
                   "ON CONFLICT (user_id, exercise_id) DO UPDATE SET category = excluded.category, "
@@ -458,7 +512,8 @@ def set_garmin_override(exercise_id: str, category: str, exercise: str, user_id:
                   (user_id, exercise_id, category, exercise))
 
 
-def log_push(plan_id: int | None, day_name: str, workout_id: int | None, scheduled: str | None, user_id: int = 1) -> None:
+def log_push(plan_id: int | None, day_name: str, workout_id: int | None, scheduled: str | None, user_id: int | None = None) -> None:
+    user_id = user_id or current_user()
     with conn() as c:
         c.execute("INSERT INTO garmin_pushes (user_id, plan_id, day_name, workout_id, scheduled, created_at) VALUES (?,?,?,?,?,?)",
                   (user_id, plan_id, day_name, workout_id, scheduled, now()))
@@ -474,20 +529,23 @@ def _entry_row(r) -> dict:
             "status": r["status"], **json.loads(r["data"])}
 
 
-def list_schedule(start: str, end: str, user_id: int = 1) -> list[dict]:
+def list_schedule(start: str, end: str, user_id: int | None = None) -> list[dict]:
+    user_id = user_id or current_user()
     with conn() as c:
         rows = c.execute("SELECT * FROM schedule WHERE user_id = ? AND date >= ? AND date <= ? ORDER BY date, id",
                          (user_id, start, end)).fetchall()
     return [_entry_row(r) for r in rows]
 
 
-def get_entry(entry_id: int, user_id: int = 1) -> dict | None:
+def get_entry(entry_id: int, user_id: int | None = None) -> dict | None:
+    user_id = user_id or current_user()
     with conn() as c:
         r = c.execute("SELECT * FROM schedule WHERE id = ? AND user_id = ?", (entry_id, user_id)).fetchone()
     return _entry_row(r) if r else None
 
 
-def save_entry(e: dict, user_id: int = 1) -> dict:
+def save_entry(e: dict, user_id: int | None = None) -> dict:
+    user_id = user_id or current_user()
     data = json.dumps({k: v for k, v in e.items() if k not in ENTRY_COLS}, ensure_ascii=False, default=str)
     with conn() as c:
         if e.get("id"):
@@ -505,7 +563,8 @@ def save_entry(e: dict, user_id: int = 1) -> dict:
     return get_entry(eid, user_id)
 
 
-def delete_entry(entry_id: int, user_id: int = 1) -> None:
+def delete_entry(entry_id: int, user_id: int | None = None) -> None:
+    user_id = user_id or current_user()
     with conn() as c:
         c.execute("DELETE FROM schedule WHERE id = ? AND user_id = ?", (entry_id, user_id))
 
@@ -514,26 +573,30 @@ def delete_entry(entry_id: int, user_id: int = 1) -> None:
 
 # ---- chave/valor (estado da integração Garmin; fora do backup de propósito) --
 
-def kv_get(key: str, user_id: int = 1) -> str | None:
+def kv_get(key: str, user_id: int | None = None) -> str | None:
+    user_id = user_id or current_user()
     with conn() as c:
         r = c.execute("SELECT value FROM kv WHERE user_id = ? AND key = ?", (user_id, key)).fetchone()
     return r["value"] if r else None
 
 
-def kv_set(key: str, value: str, user_id: int = 1) -> None:
+def kv_set(key: str, value: str, user_id: int | None = None) -> None:
+    user_id = user_id or current_user()
     with conn() as c:
         c.execute("INSERT INTO kv (user_id, key, value, updated_at) VALUES (?,?,?,?) "
                   "ON CONFLICT (user_id, key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at",
                   (user_id, key, value, now()))
 
 
-def kv_delete(key: str, user_id: int = 1) -> None:
+def kv_delete(key: str, user_id: int | None = None) -> None:
+    user_id = user_id or current_user()
     with conn() as c:
         c.execute("DELETE FROM kv WHERE user_id = ? AND key = ?", (user_id, key))
 
 
-def garmin_imported_ids(user_id: int = 1) -> set:
+def garmin_imported_ids(user_id: int | None = None) -> set:
     """IDs de atividades do Garmin já importadas (para a sincronização não duplicar)."""
+    user_id = user_id or current_user()
     out = set()
     with conn() as c:
         for r in c.execute("SELECT data FROM sessions WHERE user_id = ?", (user_id,)).fetchall():
@@ -568,3 +631,93 @@ def import_all(data: dict) -> dict:
             counts[t] = len(data[t])
         _fix_sequences(c)
     return counts
+
+
+# ---- contas (login por e-mail e senha) --------------------------------------
+
+def count_accounts() -> int:
+    with conn() as c:
+        r = c.execute("SELECT COUNT(*) AS n FROM accounts").fetchone()
+    return int(r["n"] if r else 0)
+
+
+def get_account_by_email(email: str) -> dict | None:
+    with conn() as c:
+        r = c.execute("SELECT * FROM accounts WHERE email = ?", (email.strip().lower(),)).fetchone()
+    return dict(r) if r else None
+
+
+def get_account(user_id: int) -> dict | None:
+    with conn() as c:
+        r = c.execute("SELECT * FROM accounts WHERE user_id = ?", (user_id,)).fetchone()
+    return dict(r) if r else None
+
+
+def list_accounts() -> list[dict]:
+    with conn() as c:
+        rows = c.execute("SELECT a.user_id, a.email, a.is_admin, a.created_at, u.name FROM accounts a "
+                         "JOIN users u ON u.id = a.user_id ORDER BY a.user_id").fetchall()
+    return [dict(r) for r in rows]
+
+
+def create_account(email: str, pw_hash: str, name: str, is_admin: bool = False, user_id: int | None = None) -> dict:
+    """Cria a conta. Com user_id existente (o primeiro login do dono), vincula aos dados que já existem."""
+    with conn() as c:
+        if user_id is None:
+            prof = {**DEFAULT_PROFILE, "name": name or "Eu"}
+            cur = c.execute("INSERT INTO users (name, profile, created_at) VALUES (?, ?, ?)",
+                            (name or "Eu", json.dumps(prof, ensure_ascii=False), now()))
+            user_id = cur.lastrowid
+        c.execute("INSERT INTO accounts (user_id, email, pw_hash, is_admin, created_at) VALUES (?,?,?,?,?)",
+                  (user_id, email.strip().lower(), pw_hash, 1 if is_admin else 0, now()))
+    return get_account(user_id)
+
+
+def set_password(user_id: int, pw_hash: str) -> None:
+    with conn() as c:
+        c.execute("UPDATE accounts SET pw_hash = ? WHERE user_id = ?", (pw_hash, user_id))
+
+
+def set_ingest_token(user_id: int, token_hash: str | None) -> None:
+    with conn() as c:
+        c.execute("UPDATE accounts SET ingest_token = ? WHERE user_id = ?", (token_hash, user_id))
+
+
+def account_by_ingest_token(token_hash: str) -> dict | None:
+    with conn() as c:
+        r = c.execute("SELECT * FROM accounts WHERE ingest_token = ?", (token_hash,)).fetchone()
+    return dict(r) if r else None
+
+
+def create_invite(code: str, created_by: int, note: str | None) -> dict:
+    with conn() as c:
+        c.execute("INSERT INTO invites (code, created_by, note, created_at) VALUES (?,?,?,?)",
+                  (code, created_by, note, now()))
+    return get_invite(code)
+
+
+def get_invite(code: str) -> dict | None:
+    with conn() as c:
+        r = c.execute("SELECT * FROM invites WHERE code = ?", (code,)).fetchone()
+    return dict(r) if r else None
+
+
+def list_invites() -> list[dict]:
+    with conn() as c:
+        return [dict(r) for r in c.execute("SELECT * FROM invites ORDER BY created_at DESC").fetchall()]
+
+
+def use_invite(code: str, user_id: int) -> None:
+    with conn() as c:
+        c.execute("UPDATE invites SET used_by = ?, used_at = ? WHERE code = ?", (user_id, now(), code))
+
+
+def delete_invite(code: str) -> None:
+    with conn() as c:
+        c.execute("DELETE FROM invites WHERE code = ? AND used_by IS NULL", (code,))
+
+
+def users_with_key(key: str) -> list[int]:
+    """Usuários que têm um registro no kv (ex.: tokens do Garmin) — para o cron."""
+    with conn() as c:
+        return [int(r["user_id"]) for r in c.execute("SELECT user_id FROM kv WHERE key = ? ORDER BY user_id", (key,)).fetchall()]

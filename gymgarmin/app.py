@@ -15,6 +15,7 @@ from fastapi.staticfiles import StaticFiles
 
 from datetime import date, timedelta
 
+from . import auth
 from . import (analysis, calibration, catalog, clock, db, dedupe, health, endurance, garmin_export, garmin_sync, generator, history, limitations,
                load, plans_io, progression, readiness, schedule, sports, templates)
 from .muscles import EQUIPMENT_PT, HR_ZONES, MUSCLES, hr_max, zone_bpm
@@ -29,6 +30,183 @@ async def lifespan(_app):
 
 
 app = FastAPI(title="GymGarmin", version="0.1.0", lifespan=lifespan)
+
+# ------------------------------------------------------------------ login ----
+# Rotas abertas: login/cadastro, cron (tem segredo próprio) e envio de dados por token pessoal.
+OPEN_PREFIXES = ("/api/auth/", "/api/cron/", "/api/ingest")
+
+
+def _cookie(scope, name: str) -> str | None:
+    for k, v in scope.get("headers") or []:
+        if k == b"cookie":
+            for part in v.decode("latin-1").split(";"):
+                if "=" in part:
+                    ck, cv = part.strip().split("=", 1)
+                    if ck == name:
+                        return cv
+    return None
+
+
+class AuthMiddleware:
+    """Define o usuário da requisição pelo cookie; sem login válido, /api/* responde 401
+    (enquanto não existe nenhuma conta, tudo funciona como usuário 1, como antes)."""
+
+    def __init__(self, inner):
+        self.inner = inner
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http" or not scope["path"].startswith("/api/"):
+            return await self.inner(scope, receive, send)
+        acc = auth.read_session(_cookie(scope, auth.COOKIE))
+        tok = auth.set_account(acc)
+        utok = db.set_current_user(acc["user_id"]) if acc else None
+        try:
+            if not acc and not scope["path"].startswith(OPEN_PREFIXES) and auth.accounts_exist():
+                resp = JSONResponse({"detail": "Entre na sua conta para continuar.", "login": True}, status_code=401)
+                return await resp(scope, receive, send)
+            return await self.inner(scope, receive, send)
+        finally:
+            auth.reset_account(tok)
+            if utok is not None:
+                db._current_user.reset(utok)
+
+
+app.add_middleware(AuthMiddleware)
+
+
+def _with_cookie(payload: dict, acc: dict) -> JSONResponse:
+    r = JSONResponse(payload)
+    r.set_cookie(auth.COOKIE, auth.make_session(acc), max_age=auth.SESSION_DAYS * 86400, httponly=True,
+                 secure=bool(os.environ.get("VERCEL")), samesite="lax", path="/")
+    return r
+
+
+def _me_payload(acc: dict | None) -> dict:
+    if not acc:
+        return {"logged_in": False, "setup_needed": not auth.accounts_exist()}
+    prof = db.get_profile(acc["user_id"])
+    return {"logged_in": True, "setup_needed": False, "user": auth.public(acc, prof.get("name"))}
+
+
+def _require_admin() -> dict:
+    acc = auth.current_account()
+    if not auth.accounts_exist():
+        return {"user_id": 1, "is_admin": 1}
+    if not acc or not acc.get("is_admin"):
+        raise HTTPException(403, "Só o administrador pode fazer isso.")
+    return acc
+
+
+@app.get("/api/auth/me")
+def auth_me():
+    return _me_payload(auth.current_account())
+
+
+@app.post("/api/auth/setup")
+def auth_setup(body: dict = Body(...)):
+    """Primeira conta (o dono): fica com os dados que já estão no app."""
+    if auth.accounts_exist():
+        raise HTTPException(409, "O app já tem dono. Entre com sua conta ou peça um convite.")
+    email, pw = (body.get("email") or "").strip().lower(), body.get("password") or ""
+    if "@" not in email:
+        raise HTTPException(400, "E-mail inválido.")
+    try:
+        auth.validate_password(pw)
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from e
+    name = (body.get("name") or "").strip() or db.get_profile(1).get("name") or "Eu"
+    acc = db.create_account(email, auth.hash_password(pw), name, is_admin=True, user_id=1)
+    if body.get("name"):
+        db.save_profile({"name": name}, user_id=1)
+    return _with_cookie(_me_payload(acc), acc)
+
+
+@app.post("/api/auth/login")
+def auth_login(body: dict = Body(...)):
+    acc = db.get_account_by_email(body.get("email") or "")
+    if not acc or not auth.check_password(body.get("password") or "", acc["pw_hash"]):
+        time.sleep(0.6)  # freia tentativa de senha por força bruta
+        raise HTTPException(401, "E-mail ou senha incorretos.")
+    return _with_cookie(_me_payload(acc), acc)
+
+
+@app.post("/api/auth/logout")
+def auth_logout():
+    r = JSONResponse({"ok": True})
+    r.delete_cookie(auth.COOKIE, path="/")
+    return r
+
+
+@app.get("/api/auth/invite/{code}")
+def auth_invite(code: str):
+    inv = db.get_invite(code)
+    return {"valid": bool(inv and not inv.get("used_by")), "note": (inv or {}).get("note")}
+
+
+@app.post("/api/auth/register")
+def auth_register(body: dict = Body(...)):
+    """Cadastro com convite: cada pessoa tem dados, planilhas e Garmin separados."""
+    code = body.get("code") or ""
+    inv = db.get_invite(code)
+    if not inv or inv.get("used_by"):
+        raise HTTPException(400, "Convite inválido ou já usado. Peça um novo a quem te convidou.")
+    email, pw = (body.get("email") or "").strip().lower(), body.get("password") or ""
+    if "@" not in email:
+        raise HTTPException(400, "E-mail inválido.")
+    if db.get_account_by_email(email):
+        raise HTTPException(409, "Já existe uma conta com esse e-mail. Entre com ela.")
+    try:
+        auth.validate_password(pw)
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from e
+    acc = db.create_account(email, auth.hash_password(pw), (body.get("name") or "").strip() or email.split("@")[0])
+    db.use_invite(code, acc["user_id"])
+    return _with_cookie(_me_payload(acc), acc)
+
+
+@app.post("/api/account/password")
+def account_password(body: dict = Body(...)):
+    acc = auth.current_account()
+    if not acc:
+        raise HTTPException(401, "Entre na sua conta.")
+    if not auth.check_password(body.get("current") or "", acc["pw_hash"]):
+        raise HTTPException(400, "Senha atual incorreta.")
+    try:
+        auth.validate_password(body.get("new") or "")
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from e
+    db.set_password(acc["user_id"], auth.hash_password(body["new"]))
+    return _with_cookie({"ok": True}, db.get_account(acc["user_id"]))
+
+
+@app.get("/api/admin/users")
+def admin_users():
+    _require_admin()
+    return {"users": db.list_accounts(), "invites": [i for i in db.list_invites() if not i.get("used_by")]}
+
+
+@app.post("/api/admin/invites")
+def admin_invite(body: dict = Body(default={})):
+    acc = _require_admin()
+    return db.create_invite(auth.new_invite_code(), acc["user_id"], (body.get("note") or "").strip() or None)
+
+
+@app.delete("/api/admin/invites/{code}")
+def admin_invite_delete(code: str):
+    _require_admin()
+    db.delete_invite(code)
+    return {"ok": True}
+
+
+@app.post("/api/admin/users/{user_id}/reset-password")
+def admin_reset_password(user_id: int):
+    """Senha provisória para quem esqueceu (o admin repassa; a pessoa troca no Perfil)."""
+    _require_admin()
+    if not db.get_account(user_id):
+        raise HTTPException(404, "Usuário não encontrado")
+    temp = auth.new_invite_code()
+    db.set_password(user_id, auth.hash_password(temp))
+    return {"temporary_password": temp}
 
 
 def _profile() -> dict:
@@ -473,11 +651,11 @@ def _run_sync(trigger: str) -> dict:
                              until=t0 + SYNC_BUDGET_S)
     except garmin_sync.GarminUnavailable as e:
         raise HTTPException(501, str(e)) from e
-    if garmin_sync._client is not None:  # mesmo se a importação parou num 429, a prontidão é outra chamada
+    if garmin_sync.current() is not None:  # mesmo se a importação parou num 429, a prontidão é outra chamada
         today = clock.today()
         until = t0 + EXTRAS_BUDGET_S
         try:  # saúde e sono (sono, HRV, FC de repouso, estresse, passos; VO2máx de tempos em tempos)
-            health.collect(garmin_sync._client, today, db.kv_get, db.kv_set, until=until)
+            health.collect(garmin_sync.current(), today, db.kv_get, db.kv_set, until=until)
         except Exception:  # noqa: BLE001 - opcional
             pass
         if trigger != "cron" and time.monotonic() < until:  # à noite a prontidão do dia já não importa
@@ -488,7 +666,7 @@ def _run_sync(trigger: str) -> dict:
         try:
             gm = json.loads(db.kv_get("garmin_metrics") or "{}")
             if time.monotonic() < until and (not gm or gm.get("date", "") < (today - timedelta(days=3)).isoformat()):
-                db.kv_set("garmin_metrics", json.dumps(calibration.garmin_metrics(garmin_sync._client, today)))
+                db.kv_set("garmin_metrics", json.dumps(calibration.garmin_metrics(garmin_sync.current(), today)))
         except Exception:  # noqa: BLE001
             pass
         garmin_sync.persist()
@@ -521,10 +699,24 @@ def cron_garmin_sync(authorization: str | None = Header(None)):
     secret = os.environ.get("CRON_SECRET")
     if (secret or os.environ.get("VERCEL")) and authorization != f"Bearer {secret}":
         raise HTTPException(401, "Não autorizado")
-    garmin_sync._set_sync_state(last_cron=clock.now().isoformat(timespec="seconds"))  # prova de que o cron chega
-    if not garmin_sync.status()["has_tokens"]:
-        return {"ok": True, "ran": False, "reason": "Garmin não conectado"}
-    return {"ran": True, **_run_sync("cron")}
+    users = db.users_with_key(garmin_sync.TOKENS_KEY) or [1]
+    # quem rodou por último vai para o fim da fila (no plano grátis a função tem 30 s)
+    last = int(db.kv_get("cron_last_user", user_id=1) or 0)
+    users = sorted(users, key=lambda u: (u <= last, u))
+    t0, results = time.monotonic(), {}
+    for uid in users:
+        if time.monotonic() - t0 > 6:
+            break  # o resto sincroniza quando abrir o app (ou no cron de amanhã)
+        with db.as_user(uid):
+            garmin_sync._set_sync_state(last_cron=clock.now().isoformat(timespec="seconds"))  # prova de que o cron chega
+            if not garmin_sync.status()["has_tokens"]:
+                results[uid] = {"ran": False, "reason": "Garmin não conectado"}
+                continue
+            results[uid] = {"ran": True, **_run_sync("cron")}
+        db.kv_set("cron_last_user", str(uid), user_id=1)
+    if list(results) == [1]:
+        return {**results[1], "ok": results[1].get("ok", True)}
+    return {"ok": True, "users": results}
 
 
 @app.post("/api/garmin/import/{activity_id}")
@@ -956,12 +1148,14 @@ def schedule_push_week(body: dict = Body(default={})):
 
 @app.get("/api/backup")
 def backup():
+    _require_admin()
     fname = f"gymgarmin-backup-{clock.today().isoformat()}.json"
     return JSONResponse(db.export_all(), headers={"Content-Disposition": f'attachment; filename="{fname}"'})
 
 
 @app.post("/api/backup")
 def restore(body: dict = Body(...)):
+    _require_admin()
     if body.get("version") != 1:
         raise HTTPException(400, "Arquivo de backup inválido")
     return db.import_all(body)

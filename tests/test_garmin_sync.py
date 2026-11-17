@@ -97,7 +97,7 @@ def fake_garmin(tmp_path, monkeypatch):
     monkeypatch.delenv("VERCEL", raising=False)
     monkeypatch.delenv("CRON_SECRET", raising=False)
     monkeypatch.setattr(garmin_sync, "_lib", lambda: FakeGarmin)
-    monkeypatch.setattr(garmin_sync, "_client", None)
+    garmin_sync._clients.clear()
     garmin_sync._pending_mfa.clear()
     FakeGarmin.mfa, FakeGarmin.rate_limit_on, FakeGarmin.calls = False, None, []
     EXTRA.clear()
@@ -108,7 +108,7 @@ def fake_garmin(tmp_path, monkeypatch):
 
 def _forget_memory(monkeypatch):
     """Simula outra instância do servidor (sem nada em memória)."""
-    monkeypatch.setattr(garmin_sync, "_client", None)
+    garmin_sync._clients.clear()
     garmin_sync._pending_mfa.clear()
 
 
@@ -406,3 +406,21 @@ def test_queue_left_by_limit_runs_again_on_open(monkeypatch):
     garmin_sync.sync(db.save_session, db.garmin_imported_ids())
     assert garmin_sync.sync_state()["pending"] == 0
     assert not garmin_sync.due(now=clock.now() + timedelta(minutes=2))
+
+
+def test_cron_syncs_each_user_with_own_garmin(client):
+    """Duas pessoas com Garmin: o cron sincroniza cada uma na própria conta, sem misturar."""
+    from gymgarmin import auth
+
+    auth.reset_cache()
+    garmin_sync.login("eu@x.com", "senha")                 # usuário 1
+    acc = db.create_account("maria@x.com", auth.hash_password("12345678"), "Maria")
+    with db.as_user(acc["user_id"]):
+        garmin_sync.login("maria@x.com", "senha")
+        assert db.list_sessions() == []
+    r = client.get("/api/cron/garmin-sync").json()
+    assert set(r["users"]) == {"1", str(acc["user_id"])}
+    assert len(db.list_sessions(user_id=1)) == 3
+    assert len(db.list_sessions(user_id=acc["user_id"])) == 3
+    assert garmin_sync._clients.keys() >= {1, acc["user_id"]}
+    auth.reset_cache()

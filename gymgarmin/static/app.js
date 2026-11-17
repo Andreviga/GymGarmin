@@ -16,8 +16,9 @@ async function api(path, opts = {}) {
     err.offline = true; throw err;
   }
   if (!r.ok) {
-    let msg = r.statusText;
-    try { const j = await r.json(); msg = j.detail || msg; } catch (_) { /* sem corpo */ }
+    let msg = r.statusText; let j = null;
+    try { j = await r.json(); msg = j.detail || msg; } catch (_) { /* sem corpo */ }
+    if (r.status === 401 && j && j.login) { showAuth("login"); const e = new Error(msg); e.auth = true; throw e; }
     throw new Error(msg);
   }
   const ct = r.headers.get("content-type") || "";
@@ -329,6 +330,104 @@ function previewDays(plan) {
     const head = `<b>${esc(g[0].name.split(" – ")[0])}</b> · ${same ? "mesmo treino" : "dois treinos"}: <b>${tot} min</b>${budget ? ` de ${budget}` : ""}${same ? " — musculação primeiro, corrida logo depois" : ""}`;
     return `<div class="day-group"><div class="small" style="margin:10px 0 4px">${head}</div>${g.map((d) => one(d, true)).join("")}</div>`;
   }).join("");
+}
+
+/* ---------------------------------------------------------------- CONTA -- */
+async function showAuth(mode, code) {
+  document.body.classList.add("auth-mode");
+  $("#modal").hidden = true;
+  let inv = null;
+  if (mode === "convite") { try { inv = await api(`/api/auth/invite/${encodeURIComponent(code)}`); } catch (_) { inv = { valid: false }; } }
+  const isReg = mode === "convite" && inv && inv.valid;
+  view.innerHTML = `<div class="card auth-card"><h2>${isReg ? "Criar sua conta" : "Entrar"}</h2>
+    ${mode === "convite" && !isReg ? `<p class="pill bad">Convite inválido ou já usado. Peça um novo a quem te convidou.</p>` : ""}
+    ${isReg ? `<p class="small muted">Você foi convidado${inv.note ? ` (${esc(inv.note)})` : ""} para o GymGarmin. Seus treinos, planilhas e Garmin ficam só na sua conta.</p>` : ""}
+    <form id="auth-form" class="stack">
+      ${isReg ? `<div class="field"><label>Seu nome</label><input name="name" autocomplete="name" required></div>` : ""}
+      <div class="field"><label>E-mail</label><input name="email" type="email" autocomplete="email" required></div>
+      <div class="field"><label>Senha${isReg ? " (mín. 8 caracteres)" : ""}</label><input name="password" type="password" minlength="${isReg ? 8 : 1}" autocomplete="${isReg ? "new-password" : "current-password"}" required></div>
+      <button class="btn" type="submit">${isReg ? "Criar conta" : "Entrar"}</button>
+    </form>
+    ${!isReg ? `<p class="small muted">Esqueceu a senha? Peça ao administrador uma senha provisória.</p>` : ""}</div>`;
+  $("#auth-form").onsubmit = async (e) => {
+    e.preventDefault();
+    const f = Object.fromEntries(new FormData(e.target));
+    const btn = e.target.querySelector("button"); btn.disabled = true;
+    try {
+      const me = isReg ? await api("/api/auth/register", { method: "POST", body: { ...f, code } })
+        : await api("/api/auth/login", { method: "POST", body: f });
+      state.me = me; state.profile = null; state.meta = null;
+      clearLocalDrafts();
+      if (location.hash.startsWith("#convite")) history.replaceState(null, "", isReg ? "#perfil" : "#hoje");
+      startApp();
+    } catch (err) { toast(err.message, 5000); btn.disabled = false; }
+  };
+}
+function clearLocalDrafts() {
+  // rascunhos de treino ficam no aparelho: não passam de uma conta para outra
+  try { Object.keys(localStorage).filter((k) => k.startsWith("gg_")).forEach((k) => localStorage.removeItem(k)); } catch (_) { /* */ }
+}
+async function accountCard() {
+  const me = state.me || await api("/api/auth/me").catch(() => null) || {};
+  if (me.setup_needed) {
+    return `<div class="card"><h2>Sua conta</h2><p class="small">Crie seu login para proteger o app e poder convidar família e amigos.
+      Os treinos e planilhas que já estão aqui ficam na sua conta.</p>
+      <form id="acc-setup" class="stack"><div class="grid2"><div class="field"><label>E-mail</label><input name="email" type="email" required></div>
+      <div class="field"><label>Senha (mín. 8)</label><input name="password" type="password" minlength="8" autocomplete="new-password" required></div></div>
+      <button class="btn" type="submit">Criar minha conta</button></form></div>`;
+  }
+  if (!me.logged_in) return "";
+  const u = me.user;
+  let admin = "";
+  if (u.is_admin) {
+    const a = await api("/api/admin/users");
+    const base = location.origin + location.pathname;
+    admin = `<div class="card"><h2>Pessoas</h2>
+      <ul class="list">${a.users.map((x) => `<li class="row between gap"><span><b>${esc(x.name || x.email)}</b> <span class="small muted">${esc(x.email)}${x.is_admin ? " · admin" : ""}</span></span>
+        ${x.user_id !== u.id ? `<button class="btn sm ghost" data-reset="${x.user_id}">Senha provisória</button>` : ""}</li>`).join("")}</ul>
+      <h3>Convites</h3>
+      ${a.invites.length ? `<ul class="list">${a.invites.map((i) => `<li class="row between gap wrap"><span class="small"><b>${esc(i.note || "Convite")}</b><br><span class="muted" style="word-break:break-all">${esc(base)}#convite/${esc(i.code)}</span></span>
+        <span class="row gap"><button class="btn sm" data-copy="${esc(base)}#convite/${esc(i.code)}">Copiar link</button><button class="btn sm ghost" data-delinv="${esc(i.code)}">Apagar</button></span></li>`).join("")}</ul>` : `<p class="small muted">Nenhum convite pendente.</p>`}
+      <form id="inv-form" class="row gap wrap"><input name="note" placeholder="Para quem? (ex.: Maria)" style="flex:1;min-width:160px"><button class="btn sm" type="submit">Criar convite</button></form>
+      <p class="small muted">Cada convite vale para uma pessoa. Mande o link por WhatsApp: ela cria e-mail e senha e começa com o app vazio, com seu próprio Garmin.</p></div>`;
+  }
+  return `<div class="card"><h2>Sua conta</h2><p><b>${esc(u.name || "")}</b> <span class="small muted">${esc(u.email)}${u.is_admin ? " · administrador" : ""}</span></p>
+    <details><summary class="small">Trocar senha</summary><form id="pw-form" class="stack"><div class="grid2">
+      <div class="field"><label>Senha atual</label><input name="current" type="password" autocomplete="current-password" required></div>
+      <div class="field"><label>Nova senha (mín. 8)</label><input name="new" type="password" minlength="8" autocomplete="new-password" required></div></div>
+      <button class="btn sm" type="submit">Salvar senha</button></form></details>
+    <p><button class="btn ghost sm" id="logout">Sair</button></p></div>${admin}`;
+}
+function bindAccount() {
+  const st = $("#acc-setup");
+  if (st) st.onsubmit = async (e) => {
+    e.preventDefault();
+    try { state.me = await api("/api/auth/setup", { method: "POST", body: Object.fromEntries(new FormData(e.target)) }); toast("Conta criada: o app agora pede login."); viewPerfil(); }
+    catch (err) { toast(err.message, 5000); }
+  };
+  const lo = $("#logout");
+  if (lo) lo.onclick = async () => { await api("/api/auth/logout", { method: "POST" }); state.me = null; clearLocalDrafts(); showAuth("login"); };
+  const pw = $("#pw-form");
+  if (pw) pw.onsubmit = async (e) => {
+    e.preventDefault();
+    try { await api("/api/account/password", { method: "POST", body: Object.fromEntries(new FormData(e.target)) }); toast("Senha trocada. Os outros aparelhos vão pedir login de novo."); e.target.reset(); }
+    catch (err) { toast(err.message, 5000); }
+  };
+  const inv = $("#inv-form");
+  if (inv) inv.onsubmit = async (e) => {
+    e.preventDefault();
+    const r = await api("/api/admin/invites", { method: "POST", body: Object.fromEntries(new FormData(e.target)) });
+    const link = `${location.origin}${location.pathname}#convite/${r.code}`;
+    try { await navigator.clipboard.writeText(link); toast("Convite criado e link copiado"); } catch (_) { toast("Convite criado"); }
+    viewPerfil();
+  };
+  $$("[data-copy]").forEach((b) => { b.onclick = async () => { try { await navigator.clipboard.writeText(b.dataset.copy); toast("Link copiado"); } catch (_) { prompt("Copie o link:", b.dataset.copy); } }; });
+  $$("[data-delinv]").forEach((b) => { b.onclick = async () => { await api(`/api/admin/invites/${b.dataset.delinv}`, { method: "DELETE" }); viewPerfil(); }; });
+  $$("[data-reset]").forEach((b) => { b.onclick = async () => {
+    if (!confirm("Gerar uma senha provisória para esta pessoa? A senha atual dela deixa de valer.")) return;
+    const r = await api(`/api/admin/users/${b.dataset.reset}/reset-password`, { method: "POST" });
+    prompt("Senha provisória (envie para a pessoa; ela troca no Perfil):", r.temporary_password);
+  }; });
 }
 
 /* ----------------------------------------------------------- PLANILHAS -- */
@@ -1221,7 +1320,10 @@ async function viewPerfil() {
   const custom = (p.limitations || []).find((l) => l.key === "personalizado") || {};
   const g = await api("/api/garmin/status");
   const num = (k, label, extra = "") => `<div class="field"><label>${label}</label><input type="number" data-p="${k}" value="${esc(p[k] ?? "")}" ${extra}></div>`;
-  view.innerHTML = `
+  state.me = await api("/api/auth/me").catch(() => state.me);
+  const accHtml = await accountCard();
+  const canBackup = !(state.me && state.me.logged_in && !state.me.user.is_admin);
+  view.innerHTML = `${accHtml}
   <div class="card"><h2>Seus dados</h2>
     <div class="grid2">
       <div class="field"><label>Nome</label><input data-p="name" value="${esc(p.name || "")}"></div>
@@ -1257,11 +1359,11 @@ async function viewPerfil() {
     <div class="field"><label>Outros exercícios a evitar (separe por vírgula, PT ou EN)</label><input id="custom-avoid" value="${esc(custom.custom_avoid || "")}" placeholder="ex.: leg press, burpee, levantamento terra"></div>
     <button class="btn" id="save-profile">Salvar perfil</button>
   </div>
-  <div class="card"><h2>Backup dos seus dados</h2>
+  ${canBackup ? `<div class="card"><h2>Backup${state.me && state.me.logged_in ? " (todas as contas)" : " dos seus dados"}</h2>
     <p class="small muted">Perfil, planilhas, treinos registrados e agenda em um arquivo .json.</p>
     <div class="row gap wrap"><a class="btn sm ghost" href="/api/backup">Baixar backup</a>
       <label class="btn sm ghost" style="margin:0">Restaurar backup<input type="file" id="restore" accept=".json,application/json" hidden></label></div>
-  </div>
+  </div>` : ""}
   <div class="card"><h2>Esportes de resistência</h2><p class="small">Corrida, ciclismo, natação, remo, caminhada e trilha — com meta de volume, prova com tempo alvo ou triathlon/duathlon; zonas por ritmo, potência ou FC; prontidão diária do relógio.</p>
     <a class="btn sm" href="#esportes">Configurar esportes</a></div>
   <div class="card"><h2>Garmin Connect</h2>
@@ -1300,13 +1402,14 @@ async function viewPerfil() {
     state.meta = await api("/api/meta");
     toast("Perfil salvo");
   };
-  $("#restore").onchange = async (e) => {
+  if ($("#restore")) $("#restore").onchange = async (e) => {
     const f = e.target.files[0]; if (!f) return;
     try {
       const r = await api("/api/backup", { method: "POST", body: JSON.parse(await f.text()) });
       state.meta = null; toast(`Restaurado: ${r.sessions || 0} treinos, ${r.plans || 0} planilhas`); route();
     } catch (err) { toast(err.message, 5000); }
   };
+  bindAccount();
   const gl = $("#g-login");
   if (gl) gl.onclick = async () => {
     gl.disabled = true;
@@ -1421,7 +1524,19 @@ async function sendOutbox(box) {
   if (sent) { toast(`${sent} treino${sent > 1 ? "s" : ""} guardado${sent > 1 ? "s" : ""} sem internet enviado${sent > 1 ? "s" : ""} ✔`); if (!location.hash || location.hash.startsWith("#hoje")) route(); }
 }
 window.addEventListener("online", flushOutbox);
-flushOutbox();
-route();
-updateGarminPill().then((g) => { if (g && g.connected) autoSync(); });
+(async () => {
+  const conv = location.hash.match(/^#convite\/([\w-]+)/);
+  let me = null;
+  try { me = await api("/api/auth/me"); } catch (_) { /* offline: segue com o que houver */ }
+  state.me = me;
+  if (conv && !(me && me.logged_in)) return showAuth("convite", conv[1]);
+  if (me && !me.logged_in && !me.setup_needed) return showAuth("login");
+  startApp();
+})();
+function startApp() {
+  document.body.classList.remove("auth-mode");
+  flushOutbox();
+  route();
+  updateGarminPill().then((g) => { if (g && g.connected) autoSync(); });
+}
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});

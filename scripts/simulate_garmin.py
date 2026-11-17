@@ -316,7 +316,7 @@ def run_athlete(pid: int, rng: random.Random, days: int):
     with db.conn() as c:
         for t in ("schedule", "plans", "sessions", "kv"):
             c.execute(f"DELETE FROM {t}")
-    garmin_sync._client = None
+    garmin_sync._clients.clear()
     garmin_sync._pending_mfa.clear()
     w = WORLD = World(rng, days)
     clock.freeze(at(MONDAY, 7))
@@ -328,7 +328,7 @@ def run_athlete(pid: int, rng: random.Random, days: int):
     db.save_profile({"schedule_plan_id": saved["id"]})
     prof = db.get_profile()
     garmin_sync.login("atleta@x", "senha")  # conectado no início
-    garmin_sync._client = None
+    garmin_sync._clients.clear()
     behavior = rng.choice(["assiduo", "assiduo", "falta_pouco", "falta_muito"])
     p_miss = {"assiduo": 0.07, "falta_pouco": 0.2, "falta_muito": 0.4}[behavior]
     logs_in_app = rng.random() < 0.5         # também registra o treino no app
@@ -411,7 +411,7 @@ def run_athlete(pid: int, rng: random.Random, days: int):
             r = call(A.cron_garmin_sync, None)
         else:
             if rng.random() < 0.6:
-                garmin_sync._client = None  # nova instância (cold start)
+                garmin_sync._clients.clear()  # nova instância (cold start)
             st = garmin_sync.status()
             if st["needs_reconnect"] and rng.random() < 0.7:
                 garmin_sync.login("atleta@x", "senha")
