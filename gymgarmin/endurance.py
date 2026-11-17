@@ -792,8 +792,12 @@ def _bricks(profile: dict, out: dict, week_idx: int) -> list[dict]:
 LEG_SPORTS = {s for s, d in sp.SPORTS.items() if d["legs"]}
 
 
-def allocate(slots: list[dict], avail: list[int], n_strength: int, long_day_pref: dict[str, int] | None = None) -> dict:
+def allocate(slots: list[dict], avail: list[int], n_strength: int, long_day_pref: dict[str, int] | None = None,
+             combine: bool = False) -> dict:
     """Escolhe o dia de cada sessão de resistência e os dias de força.
+
+    combine=True (musculação e esporte no mesmo treino): as sessões leves vão de preferência para
+    depois da musculação (dia de força sem perna pesada), deixando dias inteiros de descanso.
 
     slots: [{key, sport, role: longo|qualidade|leve, minutes}]
     Retorna {key: weekday, ..., "_strength": [weekdays], "_doubles": [keys em dia de força]}.
@@ -860,6 +864,16 @@ def allocate(slots: list[dict], avail: list[int], n_strength: int, long_day_pref
 
     for s in [x for x in slots if not is_long(x) and x["role"] != "qualidade"]:
         empty = [d for d in avail if not day_load[d] and d not in strength]
+        if combine:
+            pair = [d for d in strength if not day_load[d] and d not in hard_leg_days]
+            if pair:
+                empty = []
+                day = pair[0] if s["sport"] not in LEG_SPORTS else max(
+                    pair, key=lambda d: min((dist(d, l) for l in hard_leg_days), default=7))
+                day_load[day].append(s)
+                placed[s["key"]] = day
+                doubles.append(s["key"])
+                continue
         if empty:
             day = max(empty, key=lambda d: min((dist(d, l) for l in hard_leg_days), default=7))
         else:

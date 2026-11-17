@@ -253,7 +253,7 @@ async function openGenerator() {
     <div class="grid2">
       <div class="field"><label>Tempo de prática</label><select id="gm-months">${MONTH_OPTS.map(([v, t]) => `<option value="${v}" ${nearest(p.training_months) === v ? "selected" : ""}>${t}</option>`).join("")}</select></div>
       <div class="field"><label>Objetivo</label><select id="gm-goal">${opts.goals.map((g) => `<option value="${g.id}" ${p.goal === g.id ? "selected" : ""}>${esc(g.label)}</option>`).join("")}</select></div>
-      <div class="field"><label>Minutos por sessão</label><input id="gm-min" type="number" min="20" max="180" step="5" value="${p.session_minutes || 60}"></div>
+      <div class="field"><label>Minutos de treino por dia</label><input id="gm-min" type="number" min="20" max="180" step="5" value="${p.session_minutes || 60}"></div>
       <div class="field"><label>Meta de cardio (min/semana, vazio = pelo objetivo)</label><input id="gm-cardio" type="number" min="0" step="10" value="${p.cardio_target_min ?? ""}"></div>
     </div>
     <label>Dias que você pode treinar</label>
@@ -263,6 +263,8 @@ async function openGenerator() {
     <div class="stack" id="gm-sport-opts" style="margin-top:8px">${eopts.sports.map((sp) => { const c = ecfg.sports[sp.id] || {}; return `<div class="gm-sport" data-sp="${sp.id}" ${c.enabled ? "" : "hidden"}>
       <div class="grid2"><div class="field"><label>${SPORT_ICON[sp.id] || ""} ${esc(sp.name)}: onde</label><select data-k="env">${sp.envs.map((e) => `<option value="${e.id}" ${(c.env || sp.envs[0].id) === e.id ? "selected" : ""}>${esc(e.name)}</option>`).join("")}</select></div>
       <div class="field"><label>Vezes por semana</label><input type="number" min="1" max="7" data-k="sessions" value="${c.sessions || sp.sessions}"></div></div></div>`; }).join("")}</div>
+    <label class="row gap" id="gm-same-wrap" style="margin-top:8px" ${Object.values(ecfg.sports).some((c) => c.enabled) ? "" : "hidden"}><input type="checkbox" id="gm-same" ${p.same_session !== false ? "checked" : ""}>
+      Musculação e esporte no mesmo treino (os minutos acima valem para o dia todo: força primeiro, esporte logo depois)</label>
     <p class="small muted">Entra na mesma semana da musculação: longe dos dias de perna pesada, longo no fim de semana, ~80% leve.
       Metas de prova, triathlon e zonas ficam em <a href="#esportes" id="gm-esportes">Esportes</a>. Limitações e equipamentos vêm do Perfil.</p>
     <div class="row gap wrap"><button class="btn ghost" id="gm-prev">Pré-visualizar</button><button class="btn ghost" id="gm-var" hidden>Outra variação</button><button class="btn" id="gm-apply" hidden>Usar e montar minha semana</button></div>
@@ -273,6 +275,7 @@ async function openGenerator() {
     cardio_target_min: $("#gm-cardio", body).value === "" ? null : +$("#gm-cardio", body).value,
     available_days: $$("#gm-days input", body).filter((c) => c.checked).map((c) => +c.value),
     endurance: readSports(),
+    same_session: $("#gm-same", body).checked,
   });
   const readSports = () => {
     const out = JSON.parse(JSON.stringify(ecfg));
@@ -287,6 +290,7 @@ async function openGenerator() {
   $("#gm-sports", body).onchange = (e) => {
     const id = e.target.dataset.sp;
     if (id) $(`.gm-sport[data-sp="${id}"]`, body).hidden = !e.target.checked;
+    $("#gm-same-wrap", body).hidden = !$$("#gm-sports input", body).some((c) => c.checked);
   };
   const preview = async () => {
     const prof = read();

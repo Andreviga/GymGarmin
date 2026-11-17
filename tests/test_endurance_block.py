@@ -61,3 +61,26 @@ def test_goal_prediction_is_more_conservative_for_fast_runners():
                           "anchors": {"run_vdot": 56}}}
     g = en.predictions(fast)["sports"]["corrida"]["goal"]
     assert g["status"] == "ambicioso"  # +2,5 VDOT em 12 semanas para quem já tem 56 é muito (antes: "possível")
+
+
+def test_same_session_fits_strength_and_run_in_daily_minutes():
+    """90 min por dia, musculação + corrida no mesmo treino: cada dia cabe nos 90, mais dias de força,
+    corrida leve depois de treino de superior e nunca perna em dois dias seguidos."""
+    from gymgarmin import generator
+
+    base = {"age": 34, "weight_kg": 98, "training_months": 18, "goal": "hipertrofia", "session_minutes": 90,
+            "available_days": [0, 1, 2, 3, 4, 5],
+            "endurance": {"anchors": {"run_vdot": 33}, "sports": {"corrida": {"enabled": True, "env": "esteira", "sessions": 4}}}}
+    sep = generator.generate({**base, "same_session": False}, 0)
+    comb = generator.generate({**base, "same_session": True}, 0)
+    per_day = {}
+    for d in comb["days"]:
+        per_day[d["weekday"]] = per_day.get(d["weekday"], 0) + d["time"]["total"]
+    assert max(per_day.values()) <= 92
+    n_str = lambda p: sum(1 for d in p["days"] if d["kind"] == "forca")  # noqa: E731
+    assert n_str(comb) > n_str(sep)
+    runs_after = [d for d in comb["days"] if d.get("same_session")]
+    assert len(runs_after) >= 2 and all("mesmo treino" in d["items"][0]["notes"] for d in runs_after)
+    legs = sorted(d["weekday"] for d in comb["days"] if d["kind"] == "forca" and d["template"] in generator.HEAVY_LEGS)
+    assert not any(b - a == 1 for a, b in zip(legs, legs[1:]))
+    assert any("mesmo treino" in r for r in comb["rationale"])

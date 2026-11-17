@@ -515,7 +515,10 @@ def _choose_split_endurance(days: list[int], tier_key: str, goal: dict, hard_leg
     base = _choose_split(days, tier_key, goal)
     best, best_key = base, None
     for perm in set(itertools.permutations(base)):
-        key = (_leg_penalty(days, list(perm), hard_leg_days) * 2 + _adjacent_conflicts(days, list(perm)), list(perm) != base)
+        by = dict(zip(days, perm))
+        leg_leg = sum(1 for d, t in by.items() if t in HEAVY_LEGS and by.get((d + 1) % 7) in HEAVY_LEGS)  # perna 2 dias seguidos
+        key = (_leg_penalty(days, list(perm), hard_leg_days) * 2 + _adjacent_conflicts(days, list(perm)) + 2 * leg_leg,
+               list(perm) != base)
         if best_key is None or key < best_key:
             best, best_key = list(perm), key
     return best
@@ -530,6 +533,8 @@ def generate(profile: dict, seed: int = 0, recent: dict | None = None, today=Non
     goal_key = p.get("goal") if p.get("goal") in GOALS else "hipertrofia"
     goal = GOALS[goal_key]
     budget = float(p.get("session_minutes") or 60)
+    # musculação + corrida (ou outro esporte) no mesmo treino: os minutos valem para o dia todo
+    combine = bool(p.get("same_session"))
     avail = sorted(set(p.get("available_days") or _default_days(int(p.get("days_per_week") or 3))))
     equipment = set(p.get("equipment") or []) or None
     cardio_prefs = [c for c in (p.get("cardio_machines") or []) if catalog.get(c)]
@@ -590,9 +595,15 @@ def generate(profile: dict, seed: int = 0, recent: dict | None = None, today=Non
             # evento: 2 (manutenção)
             heavy = sum(1 for x in slots if x["role"] == "qualidade" or (x["role"] == "longo" and x["sport"] in endurance.LEG_SPORTS))
             n_strength = 2 if ev or n_avail < 4 or n_avail - heavy < 3 else 3
+            if combine and not ev:
+                # mesmo treino: o esporte vem depois da força, então cabem mais dias de força
+                # (o longão fica num dia só dele)
+                longs = sum(1 for x in slots if x["role"] == "longo" and x["sport"] in endurance.LEG_SPORTS)
+                n_strength = min(tier["max_strength_days"], max(2, n_avail - min(longs, 1)),
+                                 3 if goal.get("hybrid") else 9)
         n_strength = max(1, min(n_strength, tier["max_strength_days"], n_avail))
         long_pref = {k: int(c["long_day"]) for k, c in endurance.config(p).items() if c.get("long_day") not in (None, "")}
-        alloc = endurance.allocate(slots, avail, n_strength, long_pref)
+        alloc = endurance.allocate(slots, avail, n_strength, long_pref, combine=combine)
         strength_days = alloc["_strength"]
         cardio_days = []
         split = _choose_split_endurance(strength_days, tier_key, goal, set(alloc["_hard_leg_days"]))
@@ -751,6 +762,42 @@ def generate(profile: dict, seed: int = 0, recent: dict | None = None, today=Non
         rationale.append("Híbrido: intervalado longe da véspera de pernas, cardio sempre depois da força e em "
                          "aparelhos de baixo impacto para reduzir a interferência no ganho de força.")
 
+    if combine and wp:
+        # corrida leve depois de treino de superior (não de perna pesada): troca o dia se houver um livre
+        def _wd_name(d, wd):
+            d["weekday"] = wd
+            d["name"] = f"{WEEKDAYS[wd]} – " + d["name"].split(" – ", 1)[1]
+        for x in [d for d in days if d.get("kind") == "resistencia"]:
+            slot = x["endurance_slot"]
+            if slot["role"] != "leve" or slot["sport"] not in endurance.LEG_SPORTS:
+                continue
+            here = next((d for d in days if d["kind"] == "forca" and d["weekday"] == x["weekday"]), None)
+            if not here or here.get("template") not in HEAVY_LEGS:
+                continue
+            free = [d for d in days if d["kind"] == "forca" and d.get("template") not in HEAVY_LEGS
+                    and not any(e.get("kind") == "resistencia" and e["weekday"] == d["weekday"] for e in days)]
+            if free:
+                _wd_name(x, free[0]["weekday"])
+        n_comb = 0
+        for d in days:
+            if d["kind"] != "forca":
+                continue
+            ends = [x for x in days if x.get("kind") == "resistencia" and x["weekday"] == d["weekday"]]
+            if not ends:
+                continue
+            end_min = sum(float(x["items"][0].get("duration_min") or 0) for x in ends)
+            d["budget"] = max(STRENGTH_MIN_COMBINED, budget - end_min - 3)  # 3 min de transição
+            d["with_endurance"] = True
+            for x in ends:
+                x["same_session"] = True
+                x["items"][0]["notes"] = ("logo depois da musculação (mesmo treino)" + (" · " + x["items"][0]["notes"]
+                                          if x["items"][0].get("notes") else ""))
+            n_comb += 1
+        if n_comb:
+            rationale.append(f"Musculação + esporte no mesmo treino em {n_comb} dia(s): a força vem primeiro e encolhe para "
+                             f"o esporte caber nos {int(budget)} min (força antes protege o ganho muscular; o aquecimento "
+                             "da musculação já serve para a corrida).")
+
     # ---- ajuste ao tempo e balanceamento de volume
     targets = weekly_targets(tier_key, goal_key, p.get("volume_factor") or 1.0)
     if wp and leg_end >= 3:
@@ -791,12 +838,12 @@ def generate(profile: dict, seed: int = 0, recent: dict | None = None, today=Non
         for _ in range(3):  # bi-set que perde o par recupera o descanso: reajusta até caber
             _fit_time([d], budget, protect_post=True, all_days=days, targets=targets)
             _fix_supersets(d["items"], acc_rest)
-            if _day_total(d) <= budget:
+            if _day_total(d) <= _b(d, budget):
                 break
 
     days.sort(key=lambda d: d["weekday"])
     for d in days:
-        d["time"] = time_breakdown(d["items"], budget)
+        d["time"] = time_breakdown(d["items"], _b(d, budget))
     week_cardio = _cardio_equiv(days)
     if week_cardio < cardio_target * 0.9:
         falta = int(cardio_target - week_cardio)
@@ -860,12 +907,20 @@ def _surplus_ratio(it: dict, vol: dict[str, float], targets: dict[str, float] | 
     return min(ratios) if ratios else 9.0
 
 
+STRENGTH_MIN_COMBINED = 40  # abaixo disso a musculação do dia vira só manutenção
+
+
+def _b(d: dict, default: float) -> float:
+    """Tempo disponível para a parte de força do dia (menor quando o esporte vem logo depois)."""
+    return float(d["budget"]) if d.get("budget") else default
+
+
 def _fit_time(days: list[dict], budget: float, protect_post: bool = False,
               all_days: list[dict] | None = None, targets: dict[str, float] | None = None) -> None:
     """Corta até caber no tempo. Corta primeiro o que é de músculo que já está sobrando na semana."""
     for d in days:
         guard = 0
-        while _day_total(d) > budget + 0.05 and guard < 120:
+        while _day_total(d) > _b(d, budget) + 0.05 and guard < 120:
             guard += 1
             items = d["items"]
             vol = _weekly_volume(all_days or days)
@@ -982,7 +1037,7 @@ def _add_complements(days, targets, budget, picker, tier, reps, rest_mult, limit
                     item["duration_s"] = tier["timed_s"]
                 else:
                     item["reps"] = reps["acc"]
-                if _day_total({"items": d["items"] + [item]}) <= budget:
+                if _day_total({"items": d["items"] + [item]}) <= _b(d, budget):
                     posts = [i for i in d["items"] if i.get("phase") == "pos" or i.get("finisher")]
                     d["items"].insert(d["items"].index(posts[0]) if posts else len(d["items"]), item)
                     added.append(f"{ex['name']} ({_short(d['name'])})")
@@ -1008,7 +1063,7 @@ def _balance(days: list[dict], targets: dict[str, float], budget: float) -> int:
 
     def can_add(d, it):
         extra = item_time({**it, "sets": 1, "approach_sets": False})["work"] / 60 + (it.get("rest_s") or 60) / 60
-        return d["kind"] == "forca" and _day_total(d) + extra <= budget
+        return d["kind"] == "forca" and _day_total(d) + extra <= _b(d, budget)
 
     for _ in range(80):
         vol = _weekly_volume(days)
@@ -1137,7 +1192,7 @@ def _cardio_fill(days, target, budget, lims, prefs, mz, goal) -> None:
                 break
         if progressed:
             continue
-        for d in sorted([x for x in days if x["kind"] == "forca"], key=_day_total):
+        for d in sorted([x for x in days if x["kind"] == "forca" and not x.get("with_endurance")], key=_day_total):
             slack = budget - _day_total(d) - 4  # reserva para o alongamento
             if slack < 5:
                 continue

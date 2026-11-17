@@ -247,3 +247,4 @@ details > summary { cursor: pointer; padding: 10px 0; }
 .hist-table tr.suspect-row td { opacity: .55; text-decoration: line-through; }
 
 .gm-sport[hidden] { display: none; }
+#gm-same-wrap[hidden] { display: none; }
