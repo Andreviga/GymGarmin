@@ -239,3 +239,8 @@ details > summary { cursor: pointer; padding: 10px 0; }
 .plan-item > .row { flex-wrap: wrap; }
 .plan-item > .row > .grow { flex: 1 1 60%; }
 .plan-item > .row > .icon-btn { flex: none; }
+.over { margin: 4px 0; color: var(--warn); }
+/* saúde */
+.link-card { display: flex; text-decoration: none; color: var(--ink); min-height: 56px; }
+.link-card .chev { font-size: 26px; color: var(--ink-2); }
+.area + .area { border-top: 1px solid var(--line); padding-top: 8px; }

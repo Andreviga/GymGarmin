@@ -271,3 +271,22 @@ def test_watch_walk_does_not_mark_strength_done_and_one_activity_counts_once(fre
     monkeypatch.setattr(db, "save_entry", lambda e: e)  # só a lógica de casamento
     out = {e["id"]: e["status"] for e in schedule.sync_status([bike, run], sess, date(2026, 11, 20))}
     assert out == {900: "feito", 901: "perdido"}
+
+
+def test_long_sessions_may_exceed_session_time_with_warnings(fresh_db):
+    from fastapi.testclient import TestClient
+
+    from gymgarmin.app import app
+
+    with TestClient(app) as c:
+        c.put("/api/profile", json={"training_months": 18, "goal": "hibrido", "available_days": [0, 2, 4, 5, 6],
+                                    "session_minutes": 45, "age": 40})
+        c.put("/api/endurance", json={"sports": {"corrida": {"enabled": True, "sessions": 3, "current_weekly": 35,
+                                                             "goal": {"type": "prova", "distance": 21.1}}}})
+        plan = c.post("/api/generator/apply", json={}).json()
+        assert any("Passam do seu tempo" in r for r in plan["rationale"])
+        sch = c.get("/api/schedule").json()
+        over = [e for e in sch["entries"] if e.get("over_budget_min")]
+        assert over and sch["time_warnings"]
+        longo = [e for e in over if any((it.get("endurance") or {}).get("role") == "longo" for it in e["items"])]
+        assert longo and longo[0]["time"]["total"] > 45 + 5  # o longo não é cortado para caber nos 45 min

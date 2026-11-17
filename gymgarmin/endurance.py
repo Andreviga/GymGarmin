@@ -757,8 +757,8 @@ def allocate(slots: list[dict], avail: list[int], n_strength: int, long_day_pref
 
     weekend = [d for d in (5, 6) if d in avail] or avail[-1:]
 
-    def is_long(x):  # longo que pesa (pernas); nado contínuo entra como sessão leve
-        return x["role"] == "longo" and x["sport"] in LEG_SPORTS
+    def is_long(x):  # longo que pesa (pernas, inclusive caminhada longa e trilha); nado contínuo entra como sessão leve
+        return x["role"] == "longo" and (x["sport"] in LEG_SPORTS or x["sport"] in ("caminhada", "trilha"))
 
     # 1) longos: dia preferido → fim de semana → último dia; um longo por dia
     for s in sorted([x for x in slots if is_long(x)], key=lambda x: -x["minutes"]):

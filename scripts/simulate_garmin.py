@@ -188,7 +188,8 @@ class FakeGarmin:
 
     def get_sleep_data(self, d):
         r = self._ready(d)
-        return {"dailySleepDTO": {"sleepScores": {"overall": {"value": r["sleep"]}}, "sleepTimeSeconds": 25000}} if r else {}
+        return {"dailySleepDTO": {"sleepScores": {"overall": {"value": r["sleep"]}}, "sleepTimeSeconds": 18000 + r["sleep"] * 120,
+                                  "deepSleepSeconds": 4000, "lightSleepSeconds": 15000, "remSleepSeconds": 5000}} if r else {}
 
     def get_body_battery(self, a, b):
         r = self._ready(a)
@@ -196,6 +197,24 @@ class FakeGarmin:
 
     def get_rhr_day(self, d):
         raise RuntimeError("sem dado")
+
+    def get_stats(self, d):
+        self._api("health")
+        r = WORLD.readiness.get(d) or {}
+        return {"restingHeartRate": 50 + (100 - r.get("sleep", 70)) // 10, "averageStressLevel": WORLD.rng.choice([-1, 25, 35, 48]),
+                "totalSteps": WORLD.rng.randint(2000, 14000), "moderateIntensityMinutes": 20, "vigorousIntensityMinutes": 5}
+
+    def get_training_status(self, d):
+        self._api("health")
+        return {"mostRecentVO2Max": {"generic": {"vo2MaxPreciseValue": 48.0}}}
+
+    def get_fitnessage_data(self, d):
+        self._api("health")
+        return {}
+
+    def get_body_composition(self, a, b):
+        self._api("health")
+        return {"dateWeightList": []}
 
     def get_race_predictions(self):
         self._api("metrics")
@@ -421,6 +440,14 @@ def run_athlete(pid: int, rng: random.Random, days: int):
                             call(A.readiness_undo, e["id"])
                             applied.setdefault(day.isoformat(), {}).setdefault("undone_ids", set()).add(e["id"])
                 STATS["ação da prontidão"].append(rv["action"])
+            try:
+                hr = A.health_get()
+                if hr.get("has_data"):
+                    STATS["painel de saúde com dados"].append(1)
+                    if hr.get("last_night") and hr["last_night"]["date"] not in (day.isoformat(), (day - timedelta(days=1)).isoformat()):
+                        issue("saúde: última noite antiga", (pid, when.isoformat(), hr["last_night"]["date"]))
+            except Exception as ex:  # noqa: BLE001
+                issue("exceção no painel de saúde", (pid, repr(ex)[:160], traceback.format_exc(limit=3)[-300:]))
     # fim: uma sincronização final sem falhas para conferir que tudo chega
     final_check(pid, w, truth, prof, days)
 
@@ -528,6 +555,7 @@ def final_check(pid, w: World, truth: dict, prof: dict, days: int):
             if not did and e["status"] == "feito" and e.get("sport") != "caminhada":  # caminhou de verdade no dia
                 issue(f"treino marcado como feito sem ter sido feito ({e.get('kind')})", (pid, e["date"], e["day_name"]))
     STATS["chamadas login/lista/detalhe por atleta"].append((w.calls["login"], w.calls["list"], w.calls["detail"]))
+    STATS["chamadas de saúde por atleta-dia"].append(round((w.calls["health"] + w.calls["readiness"]) / days, 1))
 
 
 def main():

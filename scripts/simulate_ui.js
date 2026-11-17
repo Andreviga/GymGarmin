@@ -334,7 +334,7 @@ async function offline(context, page, base, tag) {
     try {
       const plans = await (await fetch(`${base}/api/plans`)).json();
       const hist = await (await fetch(`${base}/api/history`)).json().catch(() => ({ exercises: [] }));
-      const routes = ["#hoje", "#planilhas", "#treinar", "#analise", "#evolucao", "#esportes", "#exercicios", "#perfil"];
+      const routes = ["#hoje", "#planilhas", "#treinar", "#analise", "#evolucao", "#saude", "#esportes", "#exercicios", "#perfil"];
       if (plans.length) routes.push(`#plano/${plans[0].id}`, `#treinar/${plans[0].id}/0`);
       if ((hist.exercises || []).length) routes.push(`#evolucao/${encodeURIComponent(hist.exercises[0].exercise_id)}`);
       for (const [dname, dev] of DEVICES) {

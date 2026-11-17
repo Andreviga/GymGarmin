@@ -63,6 +63,33 @@ def history(c, weeks: int, endurance: bool, n_per_week: int = 4):
                                                    "distance_km": round(7 + w * 0.3, 2), "avg_hr": 148, "tss": 45}]})
 
 
+def health_days(days: int, short_recent: bool = False, alert: bool = False):
+    """Dados de saúde do relógio (sono, HRV, FC de repouso, estresse, passos) para N dias."""
+    r = random.Random(11)
+    for i in range(days, -1, -1):
+        d = today - timedelta(days=i)
+        heavy_prev = (d - timedelta(days=1)).weekday() in (1, 5)
+        dur = 7.3 + r.uniform(-0.6, 0.5) - (0.5 if heavy_prev else 0)
+        sc = 78 + r.uniform(-8, 8) - (9 if heavy_prev else 0)
+        if short_recent and i < 5:
+            dur, sc = 5.3 + r.uniform(0, 0.5), 50 + r.uniform(0, 8)
+        rhr = 52 + r.uniform(-1.5, 1.5) + (1.5 if heavy_prev else 0) + (7 if alert and i < 3 else 0)
+        hrv = 54 + r.uniform(-5, 5) - (6 if heavy_prev else 0) - (14 if alert and i < 5 else 0)
+        db.kv_set(f"health:{d.isoformat()}", json.dumps({
+            "date": d.isoformat(), "fetched_at": f"{d}T08:00", "final": i > 0,
+            "sleep": {"score": round(sc), "duration_h": round(dur, 2), "deep_pct": round(16 + r.uniform(-4, 4), 1),
+                      "rem_pct": round(21 + r.uniform(-4, 3), 1), "light_pct": 60.0, "awake_min": r.randint(5, 40),
+                      "start": f"23:{r.randint(0, 59):02d}" if r.random() < 0.7 else f"00:{r.randint(0, 50):02d}", "end": "06:40",
+                      "avg_hrv": round(hrv), "resp": 14.1},
+            "hrv": {"last_night": round(hrv), "status": "BALANCED", "low": 46, "high": 62},
+            "rhr": round(rhr), "stress_avg": r.randint(22, 42), "steps": r.randint(5000, 12000),
+            "int_mod": r.randint(5, 40), "int_vig": r.randint(0, 25), "bb_high": r.randint(55, 95)}))
+    db.kv_set("health_weekly", json.dumps({"date": today.isoformat(), "vo2max": 51.6, "fitness_age": 32.5, "chron_age": 38,
+                                           "training_status": "PRODUCTIVE", "weight_kg": 79.4,
+                                           "history": [{"date": (today - timedelta(days=42)).isoformat(), "vo2max": 50.2},
+                                                       {"date": today.isoformat(), "vo2max": 51.6}]}))
+
+
 with TestClient(app) as c:
     if persona == "novo":
         pass
@@ -97,6 +124,7 @@ with TestClient(app) as c:
         garmin_sync._set_sync_state(display_name="andre", last_run=f"{today}T07:10:00", last_ok=True,
                                     last_ok_at=f"{today}T07:10:00", trigger="auto",
                                     last_imported=[{"name": "Corrida matinal", "date": today.isoformat(), "type": "running"}])
+        health_days(56)
         c.get("/api/schedule")
         c.post("/api/readiness/apply", json={})
     elif persona == "extremo":
@@ -115,6 +143,7 @@ with TestClient(app) as c:
         p["name"] = "Planilha de recondicionamento pós-lesão com foco em membros inferiores e core — versão 3 (revisada)"
         c.put(f"/api/plans/{p['id']}", json=p)
         history(c, 20, True, 5)
+        health_days(20, short_recent=True, alert=True)
         garmin_sync._set_sync_state(display_name="maria", needs_reconnect=True, last_run=f"{today}T06:00:00", last_ok=False,
                                     last_error="Login do Garmin expirou: entre de novo (GarminConnectAuthenticationError).")
         sch = must(c.get("/api/schedule"))

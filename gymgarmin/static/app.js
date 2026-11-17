@@ -144,6 +144,7 @@ async function viewHoje(weekDate) {
     sch.entries.some((e) => e.date === sch.today && e.status === "planejado" && e.readiness_backup))}
   ${missed.length ? `<div class="rec alerta"><b>Treino perdido:</b> ${missed.map((e) => `${e.weekday} ${ddmm(e.date)} – ${esc(e.day_name)}`).join(", ")}.
      <div class="row gap wrap" style="margin-top:6px">${missed.map((e) => `<button class="btn sm" data-skip="${e.id}">Ajustar a semana (${e.weekday})</button>`).join("")}</div></div>` : ""}
+  ${(sch.time_warnings || []).length ? `<div class="rec atencao small"><b>Tempo acima do normal nesta semana</b><ul class="plain">${sch.time_warnings.map((w) => `<li>${esc(w)}</li>`).join("")}</ul></div>` : ""}
   <div class="card">
     <div class="row between gap"><button class="icon-btn" data-week="${addDays(sch.week_start, -7)}" title="Semana anterior">‹</button>
       <div class="grow" style="text-align:center"><h2 style="margin:0">Semana de ${ddmm(sch.week_start)}</h2>
@@ -180,6 +181,7 @@ function dayCard(e, today) {
     ${active ? timeBar(e.time) : ""}
     ${e.changes && e.changes.length ? `<ul class="small changes">${e.changes.map((c) => `<li>${esc(c)}</li>`).join("")}</ul>` : ""}
     ${e.skip_result ? `<ul class="small changes">${e.skip_result.changes.map((c) => `<li>${esc(c)}</li>`).join("")}</ul>` : ""}
+    ${e.over_budget_min ? `<div class="small over"><span class="pill warn">⏱ +${e.over_budget_min} min</span> passa do seu tempo de sessão — reserve ~${Math.round(e.time.total / 5) * 5} min</div>` : ""}
     ${e.garmin_outdated ? `<span class="pill warn">Garmin desatualizado</span>` : e.garmin_workout_id ? `<span class="pill ok">no Garmin</span>` : ""}
     <details><summary class="small">Ver treino</summary>${itemsByPhase(e.items)}</details>
     <div class="row gap wrap" style="margin-top:6px">
@@ -751,6 +753,7 @@ async function viewAnalise() {
   const [hist, ld] = await Promise.all([api("/api/history").catch(() => ({ exercises: [], recent_prs: [] })),
     api("/api/load?days=90").catch(() => null)]);
   view.innerHTML = `
+  <a class="card link-card row between gap" href="#saude"><span><b>😴 Saúde e sono</b><br><span class="small muted">Sono, recuperação, FC de repouso, HRV, VO2máx e o efeito dos treinos — pelo relógio</span></span><span class="chev">›</span></a>
   ${loadCard(ld)}
   ${historyCard(hist)}
   <div class="card"><h2>Volume por músculo — últimos 7 dias</h2>${muscleBars(rep.muscles, "sets_7d")}
@@ -906,6 +909,7 @@ function readinessCard(rd, hasToday = true, adjusted = false) {
   return `<div class="card readiness ${cls}"><div class="row between gap"><h2 style="margin:0">Prontidão de hoje</h2><span class="kpi">${rd.score}</span></div>
     <p><span class="pill ${cls}">${esc({ alta: "Alta", moderada: "Moderada", baixa: "Baixa", muito_baixa: "Muito baixa" }[rd.level] || rd.level)}</span> ${esc(rd.text)}</p>
     <p class="small muted">${esc((rd.reasons || []).join(" · "))}${rd.sleep_h ? ` · ${rd.sleep_h} h de sono` : ""}${rd.rhr ? ` · FC repouso ${rd.rhr}` : ""}</p>
+    <p class="small"><a href="#saude">😴 ${rd.night ? `Noite: ${esc(rd.night.text)} — ` : ""}ver saúde e sono ›</a></p>
     <div class="row gap wrap">${rd.action !== "seguir" && hasToday && !adjusted ? `<button class="btn sm" id="rd-apply">Ajustar o treino de hoje</button>` : ""}${adjusted ? `<span class="pill ok">Treino de hoje já ajustado</span>` : ""}<button class="btn sm ghost" id="rd-refresh">Atualizar</button></div></div>`;
 }
 function loadChart(series) {
@@ -1078,6 +1082,95 @@ async function viewExercicios() {
   load();
 }
 
+/* --------------------------------------------------------------- SAÚDE -- */
+const LEVEL_PILL = { ok: ["bom", "ok"], atencao: ["atenção", "warn"], alerta: ["alerta", "bad"] };
+const NIGHT_PILL = { bom: "ok", regular: "warn", ruim: "bad", sem_dados: "muted" };
+const fmtH = (h) => { if (h == null) return "—"; const t = Math.round(h * 60); return `${Math.floor(t / 60)}h${String(t % 60).padStart(2, "0")}`; };
+const nf = (v, d = 0) => (v == null ? "—" : (+v).toLocaleString("pt-BR", { maximumFractionDigits: d }));
+const STATUS_TXT = { PRODUCTIVE: "Produtivo", MAINTAINING: "Mantendo", RECOVERY: "Recuperação", PEAKING: "No pico", OVERREACHING: "Sobrecarga",
+  UNPRODUCTIVE: "Improdutivo", STRAINED: "Esgotado", DETRAINING: "Perdendo forma", NO: "Sem status" };
+
+function stagesBar(sl) {
+  const segs = [["deep_pct", "Profundo", "#3b5bdb"], ["light_pct", "Leve", "#74c0fc"], ["rem_pct", "REM", "#b197fc"]];
+  const on = segs.filter((x) => sl[x[0]] != null);
+  if (!on.length) return "";
+  return `<div class="tbar" style="height:14px">${on.map((x) => `<span style="width:${sl[x[0]]}%;background:${x[2]}" title="${x[1]} ${nf(sl[x[0]])}%"></span>`).join("")}</div>
+    <div class="small muted">${on.map((x) => `<span class="dot" style="background:${x[2]}"></span>${x[1]} ${nf(sl[x[0]])}%`).join(" ")}${sl.awake_min != null ? ` · acordado ${sl.awake_min} min` : ""}</div>`;
+}
+
+function healthChart(series, key, { label, unit = "", band = null, ref = null, bars = false, color = "var(--brand)" } = {}) {
+  const pts = series.map((p, i) => [i, p[key]]).filter((p) => p[1] != null);
+  if (pts.length < 3) return "";
+  const W = 340, H = 120, L = 34, R = 8, T = 10, B = 20;
+  const vals = pts.map((p) => p[1]).concat(band || []).concat(ref != null ? [ref] : []);
+  const lo = bars ? 0 : Math.min(...vals), hi = Math.max(...vals);
+  const pad = (hi - lo) * 0.12 || 1;
+  const mn = bars ? 0 : lo - pad, mx = hi + pad;
+  const X = (i) => L + (i / Math.max(1, series.length - 1)) * (W - L - R);
+  const Y = (v) => T + (1 - (v - mn) / (mx - mn)) * (H - T - B);
+  const bw = Math.max(3, (W - L - R) / series.length - 3);
+  return `<div class="small" style="margin-top:8px"><b>${esc(label)}</b></div>
+  <svg class="hist-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(label)} nos últimos ${series.length} dias">
+    ${band ? `<rect x="${L}" width="${W - L - R}" y="${Y(band[1])}" height="${Math.max(1, Y(band[0]) - Y(band[1]))}" fill="var(--ok-bg)"/>` : ""}
+    ${ref != null ? `<line x1="${L}" x2="${W - R}" y1="${Y(ref)}" y2="${Y(ref)}" class="grid" stroke-dasharray="4 3"/>` : ""}
+    ${bars ? pts.map(([i, v]) => `<rect x="${(X(i) - bw / 2).toFixed(1)}" y="${Y(v).toFixed(1)}" width="${bw.toFixed(1)}" height="${(Y(0) - Y(v)).toFixed(1)}" rx="2" fill="${ref != null && v < ref ? "var(--warn)" : color}"/>`).join("")
+    : `<path d="${pts.map(([i, v], k) => `${k ? "L" : "M"}${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join(" ")}" class="line1" style="stroke:${color}"/>`}
+    <text x="${L - 4}" y="${Y(hi) + 4}" text-anchor="end" class="axis">${nf(hi, 1)}</text>
+    <text x="${L - 4}" y="${Y(lo) + 4}" text-anchor="end" class="axis">${nf(lo, 1)}</text>
+    <text x="${L}" y="${H - 4}" class="axis">${ddmm(series[0].date)}</text><text x="${W - R}" y="${H - 4}" text-anchor="end" class="axis">${ddmm(series[series.length - 1].date)}</text>
+  </svg>${unit ? `<div class="small muted">${esc(unit)}</div>` : ""}`;
+}
+
+async function viewSaude() {
+  const h = await api("/api/health");
+  const head = `<div class="card"><div class="row between gap wrap"><h2 style="margin:0">Saúde e sono</h2>
+      ${h.garmin.connected ? `<button class="btn sm ghost" id="h-refresh">Atualizar do relógio</button>` : ""}</div>
+    <p class="small muted">Sono, recuperação e condicionamento lidos do seu relógio Garmin — e como o treino está mexendo com eles.
+      Não substitui avaliação médica: sintomas ou valores fora do normal por vários dias, procure um médico.</p></div>`;
+  if (!h.has_data) {
+    view.innerHTML = head + `<div class="card"><p>${h.garmin.connected
+      ? "Ainda sem dados de saúde do relógio. Toque em <b>Atualizar do relógio</b> — o app busca as últimas semanas aos poucos."
+      : "Conecte o Garmin em <a href=\"#perfil\">Perfil → Garmin</a>. Com o relógio no pulso também à noite, o app passa a mostrar sono, HRV, FC de repouso, estresse e VO2máx."}</p>
+      <p class="small muted">HRV, Training Readiness e idade física dependem do modelo do relógio.</p></div>`;
+  } else {
+    const n = h.last_night;
+    const wk = h.weekly || {};
+    const extra = n ? [n.hrv != null ? `HRV ${nf(n.hrv)} ms` : "", n.rhr != null ? `FC de repouso ${nf(n.rhr)} bpm` : "",
+      n.resp != null ? `respiração ${nf(n.resp, 1)}/min` : "", n.spo2 != null ? `SpO₂ ${nf(n.spo2)}%` : ""].filter(Boolean).join(" · ") : "";
+    view.innerHTML = head + `
+    ${(h.alerts || []).map((a) => `<div class="rec alerta">⚠ ${esc(a)}</div>`).join("")}
+    ${n ? `<div class="card"><div class="row between gap"><h2 style="margin:0">Noite de ${ddmm(n.date)}</h2>
+        <span class="kpi">${n.score != null ? nf(n.score) : fmtH(n.duration_h)}</span></div>
+      <p><span class="pill ${NIGHT_PILL[n.level] || "muted"}">${esc({ bom: "Sono bom", regular: "Sono regular", ruim: "Sono ruim", sem_dados: "Sem dados" }[n.level] || n.level)}</span>
+        ${fmtH(n.duration_h)} dormindo${n.start ? ` · ${esc(n.start)}${n.end ? `–${esc(n.end)}` : ""}` : ""} <span class="muted small">(ideal ${nf(h.need[0])}–${nf(h.need[1])} h)</span></p>
+      ${stagesBar(n)}
+      <ul class="small plain">${(n.reasons || []).map((r) => `<li>${esc(r)}</li>`).join("")}</ul>
+      ${extra ? `<p class="small muted">${extra}</p>` : ""}
+      ${(n.tips || []).map((t) => `<p class="small rec">${esc(t)}</p>`).join("")}</div>` : ""}
+    ${h.areas.length ? `<div class="card"><h2>Como você está</h2><div class="stack">
+      ${h.areas.map((a) => `<div class="area"><div class="row between gap"><b>${esc(a.title)}</b><span class="pill ${LEVEL_PILL[a.level][1]}">${LEVEL_PILL[a.level][0]}</span></div>
+        <div class="small">${esc(a.text)}</div>${a.tip ? `<div class="small muted">${esc(a.tip)}</div>` : ""}</div>`).join("")}
+    </div></div>` : ""}
+    <div class="card"><h2>Efeitos do seu treino</h2>${(h.effects || []).length ? `<ul class="small">${h.effects.map((e) => `<li>${esc(e)}</li>`).join("")}</ul>` : `<p class="small muted">Sem dados suficientes ainda.</p>`}
+      <p class="small muted">Compara as noites depois de dias de treino pesado com as noites depois de dias leves ou de folga (últimas 8 semanas).</p></div>
+    <div class="card"><h2>Últimas 4 semanas</h2>
+      ${healthChart(h.series, "sleep_h", { label: "Horas de sono", bars: true, ref: h.need[0], unit: `Tracejado: mínimo recomendado (${nf(h.need[0])} h). Laranja = noite curta.` })}
+      ${healthChart(h.series, "sleep_score", { label: "Nota do sono", ref: 80 })}
+      ${healthChart(h.series, "hrv", { label: "HRV noturna (ms)", band: h.hrv && h.hrv.low != null && h.hrv.high != null ? [h.hrv.low, h.hrv.high] : null, unit: h.hrv && h.hrv.low != null ? "Faixa verde: o seu normal. Abaixo dela vários dias seguidos = recuperação incompleta." : "" })}
+      ${healthChart(h.series, "rhr", { label: "FC de repouso (bpm)", ref: h.rhr ? h.rhr.base : null, color: "var(--bad)", unit: "Subir 5+ bpm acima da sua base (tracejado) costuma indicar fadiga, estresse ou início de doença." })}
+      ${healthChart(h.series, "stress", { label: "Estresse médio (0–100)", color: "var(--warn)" })}
+    </div>
+    ${Object.keys(wk).length ? `<div class="card"><h2>Indicadores do relógio</h2><div class="grid2">
+      ${wk.vo2max ? `<div><div class="kpi">${nf(wk.vo2max, 1)}</div><div class="small muted">VO2máx${wk.vo2max_bike ? ` (bike ${nf(wk.vo2max_bike, 1)})` : ""}</div></div>` : ""}
+      ${wk.fitness_age ? `<div><div class="kpi">${nf(wk.fitness_age, 1)}</div><div class="small muted">idade física${wk.chron_age ? ` (real ${nf(wk.chron_age)})` : ""}</div></div>` : ""}
+      ${wk.training_status ? `<div><div class="kpi" style="font-size:18px">${esc(STATUS_TXT[wk.training_status] || wk.training_status)}</div><div class="small muted">status de treino</div></div>` : ""}
+      ${wk.weight_kg ? `<div><div class="kpi">${nf(wk.weight_kg, 1)} kg</div><div class="small muted">peso${wk.body_fat ? ` · ${nf(wk.body_fat, 1)}% gordura` : ""}</div></div>` : ""}
+    </div></div>` : ""}`;
+  }
+  const rb = $("#h-refresh");
+  if (rb) rb.onclick = async () => { rb.disabled = true; try { await api("/api/health/refresh", { method: "POST" }); toast("Dados do relógio atualizados"); viewSaude(); } catch (e) { rb.disabled = false; toast(e.message, 5000); } };
+}
+
 /* -------------------------------------------------------------- PERFIL -- */
 async function viewPerfil() {
   const p = await api("/api/profile");
@@ -1240,7 +1333,7 @@ async function autoSync() {
 /* --------------------------------------------------------------- router -- */
 async function route() {
   const [name, a, b] = (location.hash.slice(1) || "hoje").split("/");
-  $$(".tabbar a").forEach((el) => el.classList.toggle("active", el.dataset.tab === ({ plano: "planilhas", evolucao: "analise", esportes: "perfil" }[name] || name)));
+  $$(".tabbar a").forEach((el) => el.classList.toggle("active", el.dataset.tab === ({ plano: "planilhas", evolucao: "analise", saude: "analise", esportes: "perfil" }[name] || name)));
   view.oninput = view.onchange = view.onclick = null;
   view.innerHTML = `<p class="muted">Carregando…</p>`;
   try {
@@ -1250,7 +1343,7 @@ async function route() {
         document.querySelector(".topbar").insertAdjacentHTML("afterend", `<div id="eph" class="rec atencao small" style="margin:8px 16px 0">Versão de teste online: os dados podem ser apagados pelo servidor. Use <a href="#perfil">Perfil → Backup</a> para salvar e restaurar.</div>`);
       }
     }
-    const routes = { hoje: () => viewHoje(a), planilhas: viewPlanilhas, plano: () => viewPlano(a), treinar: () => viewTreinar(a, b), analise: viewAnalise, evolucao: () => viewEvolucao(decodeURIComponent(a || "")), esportes: viewEsportes, exercicios: viewExercicios, perfil: viewPerfil };
+    const routes = { hoje: () => viewHoje(a), planilhas: viewPlanilhas, plano: () => viewPlano(a), treinar: () => viewTreinar(a, b), analise: viewAnalise, evolucao: () => viewEvolucao(decodeURIComponent(a || "")), esportes: viewEsportes, saude: viewSaude, exercicios: viewExercicios, perfil: viewPerfil };
     await (routes[name] || viewHoje)();
     if (!view.onclick) view.onclick = (e) => { const id = e.target.dataset && e.target.dataset.ex; if (id) showExercise(id); };
   } catch (e) {

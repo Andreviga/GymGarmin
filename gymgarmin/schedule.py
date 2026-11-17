@@ -131,7 +131,7 @@ def _race_entries(plan: dict, profile: dict, ws: date, wp: dict | None) -> list[
     cfg = endurance.config(profile)
     anchors = endurance.sp.anchors_of(profile)
     ev = ((profile or {}).get("endurance") or {}).get("event") or {}
-    ev_date = _d(ev.get("date")) if ev.get("type") in endurance.EVENTS else None
+    ev_date = endurance._d(ev.get("date")) if ev.get("type") in endurance.EVENTS else None  # sem data: sem dia de prova
     if ev_date and ws <= ev_date < ws + timedelta(days=7):
         e = endurance.EVENTS[ev["type"]]
         items = []
@@ -151,7 +151,7 @@ def _race_entries(plan: dict, profile: dict, ws: date, wp: dict | None) -> list[
         return out
     for s_key, c in cfg.items():
         g = c.get("goal") or {}
-        rd = _d(g.get("date")) if g.get("type") == "prova" else None
+        rd = endurance._d(g.get("date")) if g.get("type") == "prova" else None
         if rd and ws <= rd < ws + timedelta(days=7):
             it = endurance.build_session(s_key, "prova", float(g.get("distance") or 5), c, anchors, "intermediario")
             out.append({"date": rd.isoformat(), "plan_id": plan["id"], "day_idx": None, "status": "planejado",

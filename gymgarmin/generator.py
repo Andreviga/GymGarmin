@@ -1150,11 +1150,14 @@ def _end_rationale(rationale: list[str], wp: dict, alloc: dict, p: dict, budget:
     if alloc.get("_doubles"):
         rationale.append("Dias com dois treinos (força + resistência): faça a musculação primeiro ou separe por 6 h+; "
                          "natação e treinos leves são os que melhor combinam.")
-    longs = [x for d in wp["sports"].values() for x in d["sessions"] if x["endurance"]["role"] == "longo"]
-    big = [x for x in longs if x["duration_min"] > budget + 10]
-    if big:
-        rationale.append("Longões passam do tempo normal de sessão (" + ", ".join(f"{x['endurance']['title']} ~{x['duration_min']} min" for x in big)
-                         + ") — por isso ficam no fim de semana.")
+    over = [x for d in wp["sports"].values() for x in d["sessions"] if x["duration_min"] > budget + 5]
+    if over:
+        longs = [x for x in over if x["endurance"]["role"] == "longo"]
+        rationale.append("⚠ Passam do seu tempo de sessão (" + str(int(budget)) + " min): "
+                         + ", ".join(f"{x['endurance']['title']} ~{x['duration_min']} min" for x in over)
+                         + (". O longo é o treino que mais desenvolve a resistência: fica no fim de semana e o app não corta — "
+                            "reserve esse tempo (ou use 'Mover' para outro dia livre)." if longs else
+                            ". Mantidas inteiras para cumprir o volume da semana — reserve esse tempo."))
     a = anchors_of(p)
     missing = [SPORTS[s]["name"] for s in wp["sports"] if s in ("corrida", "ciclismo", "natacao", "remo")
                and not a.get({"corrida": "run_vdot", "ciclismo": "ftp_w", "natacao": "css_s100", "remo": "row_2k_s"}[s])]

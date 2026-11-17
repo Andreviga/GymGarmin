@@ -44,10 +44,24 @@ def _num(v):
         return None
 
 
-def fetch(api, day: date) -> dict:
-    """Lê os dados do dia no Garmin; cada fonte é opcional."""
+def fetch(api, day: date, known: dict | None = None) -> dict:
+    """Lê os dados do dia no Garmin; cada fonte é opcional.
+    `known` = dia já lido pela coleta de saúde (sono, HRV, FC de repouso, Body Battery): não busca de novo."""
     d = day.isoformat()
     out: dict = {"date": d, "fetched_at": clock.now().isoformat(timespec="minutes")}
+    k = known or {}
+    if (k.get("sleep") or {}).get("score") is not None:
+        out["sleep_score"] = int(k["sleep"]["score"])
+    if (k.get("sleep") or {}).get("duration_h"):
+        out["sleep_h"] = round(k["sleep"]["duration_h"], 1)
+    if (k.get("hrv") or {}).get("status"):
+        out["hrv_status"] = k["hrv"]["status"]
+        out["hrv_last_night"] = k["hrv"].get("last_night")
+        out["hrv_weekly"] = k["hrv"].get("weekly")
+    if k.get("rhr"):
+        out["rhr"] = int(k["rhr"])
+    if k.get("bb_high") is not None:
+        out["body_battery_max"] = int(k["bb_high"])
     try:
         tr = api.get_training_readiness(d)
         first = tr[0] if isinstance(tr, list) and tr else (tr if isinstance(tr, dict) else None)
@@ -58,6 +72,8 @@ def fetch(api, day: date) -> dict:
     except Exception:  # noqa: BLE001
         pass
     try:
+        if "hrv_status" in out:
+            raise LookupError  # já veio da saúde
         hrv = (api.get_hrv_data(d) or {}).get("hrvSummary") or {}
         if hrv.get("status"):
             out["hrv_status"] = hrv["status"]
@@ -66,6 +82,8 @@ def fetch(api, day: date) -> dict:
     except Exception:  # noqa: BLE001
         pass
     try:
+        if "sleep_score" in out:
+            raise LookupError
         sl = (api.get_sleep_data(d) or {}).get("dailySleepDTO") or {}
         val = ((sl.get("sleepScores") or {}).get("overall") or {}).get("value")
         if val is not None:
@@ -75,6 +93,8 @@ def fetch(api, day: date) -> dict:
     except Exception:  # noqa: BLE001
         pass
     try:
+        if "body_battery_max" in out:
+            raise LookupError
         bb = api.get_body_battery(d, d) or []
         arr = (bb[0] if bb else {}).get("bodyBatteryValuesArray") or []
         vals = [v[1] for v in arr if isinstance(v, (list, tuple)) and len(v) > 1 and v[1] is not None]
@@ -83,6 +103,8 @@ def fetch(api, day: date) -> dict:
     except Exception:  # noqa: BLE001
         pass
     try:
+        if "rhr" in out:
+            raise LookupError
         rhr = api.get_rhr_day(d) or {}
         vals = (((rhr.get("allMetrics") or {}).get("metricsMap") or {}).get("WELLNESS_RESTING_HEART_RATE") or [])
         if vals and vals[0].get("value"):
@@ -118,6 +140,10 @@ def score(data: dict, form: float | None = None) -> dict:
         return {"score": None, "level": "sem_dados", "action": "seguir",
                 "reasons": ["Sem dados do relógio hoje: siga o plano pela sensação."]}
     s = base if base is not None else 70.0
+    rd = data.get("rhr_delta")
+    if rd is not None and rd >= 5:  # FC de repouso acima da base da própria pessoa (dados de saúde do relógio)
+        s -= 15 if rd >= 8 else 8
+        reasons.append(f"FC de repouso +{rd:.0f} bpm acima do seu normal")
     if form is not None:
         if form < -30:
             s -= 15

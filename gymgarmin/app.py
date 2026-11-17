@@ -14,7 +14,7 @@ from fastapi.staticfiles import StaticFiles
 
 from datetime import date, timedelta
 
-from . import (analysis, calibration, catalog, clock, db, dedupe, endurance, garmin_export, garmin_sync, generator, history, limitations,
+from . import (analysis, calibration, catalog, clock, db, dedupe, health, endurance, garmin_export, garmin_sync, generator, history, limitations,
                load, plans_io, progression, readiness, schedule, sports, templates)
 from .muscles import EQUIPMENT_PT, HR_ZONES, MUSCLES, hr_max, zone_bpm
 
@@ -427,6 +427,10 @@ def _run_sync(trigger: str) -> dict:
         raise HTTPException(501, str(e)) from e
     if garmin_sync._client is not None:  # mesmo se a importação parou num 429, a prontidão é outra chamada
         today = clock.today()
+        try:  # saúde e sono (sono, HRV, FC de repouso, estresse, passos; VO2máx de tempos em tempos)
+            health.collect(garmin_sync._client, today, db.kv_get, db.kv_set)
+        except Exception:  # noqa: BLE001 - opcional
+            pass
         if trigger != "cron":  # à noite a prontidão do dia já não importa
             try:
                 _refresh_readiness(today, auto_apply=True)
@@ -581,13 +585,30 @@ def _readiness_view(day: date) -> dict | None:
     if not raw:
         return None
     data = json.loads(raw)
+    hd = health.load_days(db.kv_get, day, 36)
+    night = None
+    if hd:
+        hr = health.report(hd, None, {}, _profile(), day)
+        rhr = hr.get("rhr") or {}
+        if rhr.get("delta") is not None:
+            data["rhr_delta"] = rhr["delta"]
+        n = hr.get("last_night")
+        if n and n["date"] == day.isoformat() and n.get("level") != "sem_dados":
+            night = {"level": n["level"], "text": f"{health.fmt_h(n.get('duration_h'))} · sono {n['level']}"
+                                                  + (f" ({int(n['score'])})" if n.get("score") is not None else "")}
     sc = readiness.score(data, load.pmc(db.list_sessions(limit=2000), _profile(), days=14)["form"])
-    return {**data, **sc, "text": readiness.ACTION_TEXT[sc["action"]]}
+    return {**data, **sc, "text": readiness.ACTION_TEXT[sc["action"]], "night": night}
 
 
 def _refresh_readiness(day: date, auto_apply: bool = False) -> dict | None:
     try:
-        data = readiness.fetch(garmin_sync.client(), day)
+        api = garmin_sync.client()
+        try:  # sono/HRV/FC de repouso vêm da coleta de saúde (uma chamada só para os dois)
+            health.collect(api, day, db.kv_get, db.kv_set, backfill=0)
+        except Exception:  # noqa: BLE001
+            pass
+        known = json.loads(db.kv_get(f"health:{day.isoformat()}") or "{}")
+        data = readiness.fetch(api, day, known)
     finally:
         garmin_sync.persist()
     db.kv_set(f"readiness:{day.isoformat()}", json.dumps(data))
@@ -605,6 +626,46 @@ def _apply_readiness(day: date, action: str, force: bool = False) -> list[dict]:
         if new:
             out.append(db.save_entry(new))
     return out
+
+
+# ---- saúde e sono
+
+def _health_report(today: date) -> dict:
+    prof = _profile()
+    sessions = db.list_sessions(since=(today - timedelta(days=60)).isoformat(), limit=2000)
+    anchors = sports.anchors_of(prof)
+    daily = {d: v["tss"] for d, v in load.daily_stress(sessions, anchors).items()}
+    times: dict = {}
+    for s in sessions:
+        try:
+            t = datetime.fromisoformat(str(s["date"])[:19])
+        except ValueError:
+            continue
+        if len(str(s["date"])) > 10:
+            times.setdefault(t.date(), []).append(t.hour + t.minute / 60)
+    rep = health.report(health.load_days(db.kv_get, today, 56), json.loads(db.kv_get("health_weekly") or "{}"),
+                        daily, prof, today, times)
+    st = garmin_sync.status()
+    rep["garmin"] = {"connected": st["connected"], "needs_reconnect": st["needs_reconnect"]}
+    return rep
+
+
+@app.get("/api/health")
+def health_get():
+    return _health_report(clock.today())
+
+
+@app.post("/api/health/refresh")
+def health_refresh():
+    try:
+        api = garmin_sync.client()
+        try:
+            health.collect(api, clock.today(), db.kv_get, db.kv_set, backfill=7)
+        finally:
+            garmin_sync.persist()
+    except RuntimeError as e:
+        raise HTTPException(401, str(e)) from e
+    return _health_report(clock.today())
 
 
 @app.get("/api/readiness")
@@ -686,6 +747,9 @@ def _entry_view(e: dict, budget: float) -> dict:
     e = dict(e)
     e["can_undo"] = bool(e.pop("undo", None))
     e["time"] = generator.time_breakdown(e.get("items", []), budget)
+    over = round(e["time"]["total"] - budget)
+    if over > 5 and e.get("status") in ("planejado", "perdido"):
+        e["over_budget_min"] = over  # o treino pode passar do tempo (longo, pedal); o app só avisa
     e["weekday"] = generator.WEEKDAYS[date.fromisoformat(e["date"]).weekday()]
     for it in e.get("items", []):
         ex = catalog.get(it.get("exercise_id"))
@@ -706,9 +770,32 @@ def get_schedule(date_: str | None = Query(None, alias="date")):
         "week_start": ws.isoformat(), "today": clock.today().isoformat(),
         "plan": {"id": plan["id"], "name": plan["name"], "generator": plan.get("generator")} if plan else None,
         "cycle": cycle, "budget": budget,
-        "entries": [_entry_view(e, budget) for e in entries],
+        "entries": (views := [_entry_view(e, budget) for e in entries]),
         "goals": schedule.week_goals(entries, prof, ws),
+        "time_warnings": _time_warnings(views, budget),
     }
+
+
+def _time_warnings(views: list[dict], budget: float) -> list[str]:
+    """Avisos da semana: treinos acima do tempo de sessão e dias com dois treinos que somam demais."""
+    out = []
+    for e in views:
+        if e.get("over_budget_min"):
+            role = next((it["endurance"].get("role") for it in e.get("items", []) if it.get("endurance")), None)
+            out.append(f"{e['weekday']} {e['date'][8:10]}/{e['date'][5:7]} – {e['day_name']}: ~{round(e['time']['total'])} min, "
+                       f"{e['over_budget_min']} min além dos seus {int(budget)}"
+                       + (" (longo: reserve o tempo, não corte)" if role == "longo" else ""))
+    by_day: dict = {}
+    for e in views:
+        if e.get("status") in ("planejado", "perdido"):
+            by_day.setdefault(e["date"], []).append(e)
+    for d, es in sorted(by_day.items()):
+        if len(es) >= 2:
+            tot = round(sum(x["time"]["total"] for x in es))
+            if tot > budget + 10:
+                out.append(f"{es[0]['weekday']} {d[8:10]}/{d[5:7]}: dois treinos somam ~{tot} min — "
+                           "faça em dois horários (força primeiro, ou 6 h+ de intervalo).")
+    return out
 
 
 def _entry_or_404(entry_id: int) -> dict:
