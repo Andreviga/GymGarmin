@@ -15,7 +15,8 @@ def _acts():
         {"activityId": STRENGTH_ID, "activityName": "Treino A", "activityType": {"typeKey": "strength_training"},
          "startTimeLocal": "2026-11-16 19:00:00", "duration": 3000},
         {"activityId": RUN_ID, "activityName": "Corrida na rua", "activityType": {"typeKey": "running"},
-         "startTimeLocal": "2026-11-15 07:00:00", "duration": 1800},
+         "startTimeLocal": "2026-11-15 07:00:00", "duration": 1800, "distance": 6000, "averageHR": 150,
+         "trainingStressScore": 48.0},
         {"activityId": BIKE_ID, "activityName": "Bike indoor", "activityType": {"typeKey": "indoor_cycling"},
          "startTimeLocal": "2026-11-14 18:00:00", "duration": 1200, "averageHR": 130},
     ]
@@ -69,7 +70,8 @@ class FakeGarmin:
         a = next(x for x in _acts() if x["activityId"] == int(aid))
         return {"activityId": a["activityId"], "activityName": a["activityName"], "activityTypeDTO": a["activityType"],
                 "summaryDTO": {"startTimeLocal": a["startTimeLocal"], "duration": a["duration"],
-                               "averageHR": a.get("averageHR")}}
+                               "averageHR": a.get("averageHR"), "distance": a.get("distance"),
+                               "trainingStressScore": a.get("trainingStressScore")}}
 
     def get_activity_exercise_sets(self, aid):
         return {"exerciseSets": [
@@ -161,15 +163,21 @@ def test_revoked_token_marks_reconnect_without_password_login(monkeypatch):
 def test_sync_imports_gym_activities_once():
     garmin_sync.login("eu@x.com", "senha")
     r = garmin_sync.sync(db.save_session, db.garmin_imported_ids(), trigger="manual")
-    assert r["ok"] and r["skipped"] == 1  # corrida na rua fica de fora
-    assert sorted(i["name"] for i in r["imported"]) == ["Bike indoor", "Treino A"]
+    assert r["ok"] and r["skipped"] == 0
+    assert sorted(i["name"] for i in r["imported"]) == ["Bike indoor", "Corrida na rua", "Treino A"]
     sessions = db.list_sessions()
     strength = next(s for s in sessions if s.get("garmin_activity_id") == STRENGTH_ID)
     assert [x["load_kg"] for x in strength["items"][0]["sets"]] == [70.0, 72.5]
 
+    run = next(s for s in sessions if s.get("garmin_activity_id") == RUN_ID)["items"][0]
+    assert run["sport"] == "corrida" and run["exercise_id"] == "corrida_rua"
+    assert run["distance_km"] == 6.0 and run["pace_s_km"] == 300 and run["tss"] == 48.0
+    bike = next(s for s in sessions if s.get("garmin_activity_id") == BIKE_ID)["items"][0]
+    assert bike["sport"] == "ciclismo" and bike["exercise_id"] == "ciclismo_rolo"
+
     again = garmin_sync.sync(db.save_session, db.garmin_imported_ids(), trigger="cron")
     assert again["ok"] and again["imported"] == []
-    assert len(db.list_sessions()) == 2
+    assert len(db.list_sessions()) == 3
     st = garmin_sync.status()["sync"]
     assert st["last_ok"] and st["trigger"] == "cron"
 
@@ -212,7 +220,7 @@ def test_api_sync_auto_and_cron(client, monkeypatch):
 
     assert client.post("/api/garmin/login", json={"email": "eu@x.com", "password": "senha"}).json()["connected"]
     r = client.get("/api/cron/garmin-sync", headers={"Authorization": "Bearer s3"}).json()
-    assert r["ran"] and len(r["imported"]) == 2
+    assert r["ran"] and len(r["imported"]) == 3
     # logo depois, o automático ao abrir o app não roda de novo
     assert client.post("/api/garmin/sync?auto=true").json()["ran"] is False
     assert client.post("/api/garmin/sync").json()["ran"] is True

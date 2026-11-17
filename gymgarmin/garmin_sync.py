@@ -360,22 +360,66 @@ def activity_to_session(activity: dict, exercise_sets: dict | None, preferred_id
                 current = {"exercise_id": eid, "sets": [entry], "garmin": {"category": cat, "name": name}}
                 session["items"].append(current)
     else:
-        type_key = ((activity.get("activityType") or {}).get("typeKey") or "").lower()
-        machine = {
-            "treadmill_running": "cardio_esteira_corrida", "indoor_running": "cardio_esteira_corrida",
-            "indoor_cycling": "cardio_bike_vertical", "virtual_ride": "cardio_bike_vertical",
-            "elliptical": "cardio_eliptico", "indoor_rowing": "cardio_remo", "stair_climbing": "cardio_escada",
-            "walking": "cardio_esteira_caminhada", "treadmill_walking": "cardio_esteira_caminhada",
-        }.get(type_key)
-        if machine:
-            avg = activity.get("averageHR")
-            zone = 2
-            if avg and hr_max:
-                pct = avg / hr_max
-                zone = 1 if pct < 0.6 else 2 if pct < 0.7 else 3 if pct < 0.8 else 4 if pct < 0.9 else 5
-            session["items"].append({"exercise_id": machine, "duration_min": round((activity.get("duration") or 0) / 60, 1),
-                                     "zone": zone, "avg_hr": avg, "kcal": activity.get("calories")})
+        item = endurance_item(activity, hr_max)
+        if item:
+            session["items"].append(item)
     return session
+
+
+# ambiente de cada tipo de atividade do Garmin (para escolher o item do catálogo)
+TYPE_ENV = {"treadmill_running": "esteira", "indoor_running": "esteira", "trail_running": "trilha",
+            "track_running": "pista", "indoor_cycling": "rolo", "virtual_ride": "rolo", "mountain_biking": "mtb",
+            "open_water_swimming": "aguas_abertas", "lap_swimming": "piscina", "indoor_rowing": "indoor",
+            "rowing": "agua", "treadmill_walking": "esteira", "indoor_walking": "esteira"}
+GYM_MACHINES = {"elliptical": "cardio_eliptico", "stair_climbing": "cardio_escada", "stairs": "cardio_escada",
+                "indoor_cardio": "cardio_eliptico"}
+
+
+def _zone_from_hr(avg, hr_max):
+    if not avg or not hr_max:
+        return 2
+    pct = avg / hr_max
+    return 1 if pct < 0.6 else 2 if pct < 0.7 else 3 if pct < 0.8 else 4 if pct < 0.9 else 5
+
+
+def endurance_item(activity: dict, hr_max: int | None = None) -> dict | None:
+    """Atividade de resistência do Garmin → item de sessão (com distância, FC, potência, TSS)."""
+    from . import sports as sp
+
+    type_key = ((activity.get("activityType") or {}).get("typeKey") or "").lower()
+    avg = activity.get("averageHR")
+    base = {"duration_min": round((activity.get("duration") or 0) / 60, 1), "zone": _zone_from_hr(avg, hr_max)}
+    for k_src, k in (("averageHR", "avg_hr"), ("maxHR", "max_hr"), ("calories", "kcal")):
+        if activity.get(k_src):
+            base[k] = activity[k_src]
+    sport = sp.GARMIN_TYPE_TO_SPORT.get(type_key)
+    if sport:
+        env, ex_id = sp.sport_env(sport, TYPE_ENV.get(type_key))
+        item = {"exercise_id": ex_id, "sport": sport, **base}
+        if activity.get("distance"):
+            item["distance_km"] = round(float(activity["distance"]) / 1000, 3)
+        for k_src, k in (("avgPower", "avg_power"), ("averagePower", "avg_power"), ("normPower", "np"),
+                         ("normalizedPower", "np"), ("trainingStressScore", "tss"), ("elevationGain", "elev_m"),
+                         ("aerobicTrainingEffect", "te_aerobic"), ("anaerobicTrainingEffect", "te_anaerobic")):
+            if activity.get(k_src) and k not in item:
+                item[k] = round(float(activity[k_src]), 1)
+        if activity.get("poolLength"):
+            item["pool_m"] = activity["poolLength"]
+        if item.get("distance_km") and item["duration_min"]:
+            secs = item["duration_min"] * 60
+            if sport in ("corrida", "caminhada"):
+                item["pace_s_km"] = round(secs / item["distance_km"])
+            elif sport == "natacao":
+                item["pace_s_100"] = round(secs / (item["distance_km"] * 10), 1)
+            elif sport == "remo":
+                item["split_s_500"] = round(secs / (item["distance_km"] * 2), 1)
+            else:
+                item["speed_kmh"] = round(item["distance_km"] / (secs / 3600), 1)
+        return item
+    machine = GYM_MACHINES.get(type_key)
+    if machine:
+        return {"exercise_id": machine, **base}
+    return None
 
 
 def recent_activities(days: int = 14) -> list[dict]:
@@ -386,7 +430,7 @@ def recent_activities(days: int = 14) -> list[dict]:
         "activity_id": a.get("activityId"), "name": a.get("activityName"),
         "type": (a.get("activityType") or {}).get("typeKey"), "start": a.get("startTimeLocal"),
         "duration_min": round((a.get("duration") or 0) / 60), "avg_hr": a.get("averageHR"),
-        "calories": a.get("calories"),
+        "calories": a.get("calories"), "distance_km": round((a.get("distance") or 0) / 1000, 2) or None,
     } for a in acts or []]
 
 
@@ -399,10 +443,13 @@ def import_activity(activity_id: int, preferred_ids: set[str] | None = None, hr_
         "activityName": act.get("activityName"),
         "activityType": act.get("activityTypeDTO") or act.get("activityType") or {},
         "startTimeLocal": summary.get("startTimeLocal") or act.get("startTimeLocal"),
-        "duration": summary.get("duration") or act.get("duration"),
-        "averageHR": summary.get("averageHR") or act.get("averageHR"),
-        "calories": summary.get("calories") or act.get("calories"),
     }
+    for k in ("duration", "averageHR", "maxHR", "calories", "distance", "averagePower", "normalizedPower", "avgPower",
+              "normPower", "trainingStressScore", "elevationGain", "aerobicTrainingEffect", "anaerobicTrainingEffect",
+              "poolLength", "averageSpeed"):
+        v = summary.get(k) if summary.get(k) is not None else act.get(k)
+        if v is not None:
+            flat[k] = v
     sets = None
     if "strength" in str((flat["activityType"] or {}).get("typeKey", "")):
         sets = api.get_activity_exercise_sets(activity_id)

@@ -205,3 +205,34 @@ def test_missed_long_run_moves_or_compensates(fresh_db):
 def test_predict_and_anchor_math_consistency():
     vd = sports.vdot(10, 48 * 60)
     assert sports.predict_time(vd, 10) == pytest.approx(48 * 60, abs=5)
+
+
+def test_endurance_fit_and_connect_roundtrip():
+    from garmin_fit_sdk import Decoder, Stream
+
+    from gymgarmin import garmin_export as ge
+
+    a = {"run_vdot": 45, "ftp_w": 240, "css_s100": 105, "row_2k_s": 440, "hrmax": 188}
+    cases = [("corrida", "intervalado", 8, {}, "running", "speed"), ("ciclismo", "limiar", 1.25, {}, "cycling", "power"),
+             ("natacao", "css", 2500, {"env": "piscina", "pool_m": 25}, "swimming", "swim_stroke"),
+             ("remo", "intervalos_500", 8000, {}, "rowing", "speed"), ("trilha", "longo", 2, {}, "hiking", "heart_rate")]
+    for sport, kind, vol, c, fit_sport, tgt in cases:
+        it = en.build_session(sport, kind, vol, c, a, "intermediario")
+        day = {"name": f"{sport} {kind}", "items": [it]}
+        msgs, errs = Decoder(Stream.from_byte_array(bytearray(ge.to_fit(day, "T")))).read()
+        assert not errs
+        assert msgs["workout_mesgs"][0]["sport"] == fit_sport
+        steps = msgs["workout_step_mesgs"]
+        main = steps[1] if len(steps) > 1 else steps[0]
+        assert main["target_type"] == tgt, (sport, main)
+        if sport == "natacao":
+            assert msgs["workout_mesgs"][0]["pool_length"] == 25.0
+        if sport == "corrida":
+            assert main["duration_distance"] == 1000.0 and 3.7 < main["custom_target_speed_low"] < main["custom_target_speed_high"] < 4.2
+        if sport == "ciclismo":
+            assert main["custom_target_power_low"] == 1228  # 228 W (+1000)
+        cj = ge.to_connect_json(day, "T")
+        assert cj["workoutSegments"][0]["workoutSteps"]
+    brick = ge.to_connect_json({"name": "Brick", "items": [en.build_session("ciclismo", "longo", 2, {}, a, "intermediario"),
+                                                            en.build_session("corrida", "leve", 5, {}, a, "intermediario")]})
+    assert brick["sportType"]["sportTypeKey"] == "multi_sport" and len(brick["workoutSegments"]) == 2

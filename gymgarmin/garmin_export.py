@@ -20,7 +20,7 @@ from __future__ import annotations
 import re
 from datetime import datetime, timezone
 
-from . import catalog
+from . import catalog, sports
 
 # ---------------------------------------------------------------------------
 # Normalização dos itens da planilha
@@ -118,9 +118,20 @@ HR_ZONE_TARGET = {"workoutTargetTypeId": 4, "workoutTargetTypeKey": "heart.rate.
 SPORTS = {
     "running": {"sportTypeId": 1, "sportTypeKey": "running", "displayOrder": 1},
     "cycling": {"sportTypeId": 2, "sportTypeKey": "cycling", "displayOrder": 2},
+    "other": {"sportTypeId": 3, "sportTypeKey": "other", "displayOrder": 3},
+    "swimming": {"sportTypeId": 4, "sportTypeKey": "swimming", "displayOrder": 4},
     "strength_training": {"sportTypeId": 5, "sportTypeKey": "strength_training", "displayOrder": 5},
     "cardio_training": {"sportTypeId": 6, "sportTypeKey": "cardio_training", "displayOrder": 6},
+    "multi_sport": {"sportTypeId": 10, "sportTypeKey": "multi_sport", "displayOrder": 10},
 }
+COND_DISTANCE = {"conditionTypeId": 3, "conditionTypeKey": "distance", "displayOrder": 3, "displayable": True}
+COND_FIXED_REST = {"conditionTypeId": 8, "conditionTypeKey": "fixed.rest", "displayOrder": 8, "displayable": True}
+POWER_TARGET = {"workoutTargetTypeId": 2, "workoutTargetTypeKey": "power.zone", "displayOrder": 2}
+PACE_TARGET = {"workoutTargetTypeId": 6, "workoutTargetTypeKey": "pace.zone", "displayOrder": 6}
+UNIT_KM = {"unitId": 2, "unitKey": "kilometer", "factor": 100000.0}
+UNIT_M = {"unitId": 1, "unitKey": "meter", "factor": 100.0}
+END_STEP_TYPE = {"warmup": "warmup", "cooldown": "cooldown", "interval": "interval", "steady": "interval",
+                 "recovery": "recovery", "rest": "rest"}
 WEIGHT_UNIT_KG = {"unitId": 8, "unitKey": "kilogram", "factor": 1000.0}
 
 
@@ -229,7 +240,93 @@ def _phase_step_connect(order: _Order, it: dict, ex: dict, overrides: dict | Non
                       description=_notes(it, ex["name"]), **extra)
 
 
+# ---------------------------------------------------------------- resistência
+
+def endurance_items(day: dict) -> list[dict]:
+    return [i for i in day.get("items", []) if i.get("endurance")]
+
+
+def _connect_target(sport: str, tgt: dict | None) -> dict:
+    """Alvo no formato do workout-service. Ritmo em m/s (lento = valor 1)."""
+    t = tgt or {}
+    kind = t.get("type")
+    if kind == "pace" and sport == "corrida":
+        return {"targetType": PACE_TARGET, "targetValueOne": round(1000 / t["slow_s_km"], 4),
+                "targetValueTwo": round(1000 / t["fast_s_km"], 4)}
+    if kind == "swim_pace":
+        return {"targetType": PACE_TARGET, "targetValueOne": round(100 / t["slow_s_100"], 4),
+                "targetValueTwo": round(100 / t["fast_s_100"], 4)}
+    if kind == "power":
+        return {"targetType": POWER_TARGET, "targetValueOne": float(t["low_w"]), "targetValueTwo": float(t["high_w"])}
+    if kind == "hr":
+        return {"targetType": HR_ZONE_TARGET, "targetValueOne": float(t["low_bpm"]), "targetValueTwo": float(t["high_bpm"])}
+    if kind == "hr_zone":
+        return {"targetType": HR_ZONE_TARGET, "zoneNumber": int(t["zone"])}
+    return {}  # remo (split) e "máximo": vai na descrição do passo
+
+
+def _end_desc(st: dict) -> str | None:
+    parts = [p for p in ((st.get("target") or {}).get("label"), st.get("note")) if p]
+    return " · ".join(parts)[:120] or None
+
+
+def _end_steps_connect(order: _Order, it: dict) -> list[dict]:
+    end = it["endurance"]
+    sport = end["sport"]
+    swim = sport == "natacao"
+
+    def one(st: dict) -> dict:
+        if st["kind"] == "repeat":
+            group_order = order.next()
+            inner = [one(x) for x in st["steps"]]
+            return {"type": "RepeatGroupDTO", "stepOrder": group_order, "stepType": STEP_TYPES["repeat"],
+                    "numberOfIterations": int(st["n"]), "workoutSteps": inner, "endCondition": COND_ITER,
+                    "endConditionValue": float(st["n"]), "smartRepeat": False}
+        stype = END_STEP_TYPE.get(st["kind"], "interval")
+        if st["kind"] == "rest" or (swim and st["kind"] == "recovery"):
+            return _exec_step(order, "rest", COND_FIXED_REST if swim else COND_TIME, float(st["dur_s"]),
+                              description=st.get("note"))
+        use_dist = bool(st.get("dist_m")) and sport in ("corrida", "natacao", "remo", "caminhada") and st["kind"] != "recovery"
+        step = _exec_step(order, stype, COND_DISTANCE if use_dist else COND_TIME,
+                          float(st["dist_m"] if use_dist else st["dur_s"]), description=_end_desc(st))
+        if use_dist:
+            step["preferredEndConditionUnit"] = UNIT_M if sport in ("natacao", "remo") else UNIT_KM
+        step.update(_connect_target(sport, st.get("target")))
+        return step
+
+    return [one(st) for st in end["steps"]]
+
+
+def endurance_connect_json(day: dict, plan_name: str = "") -> dict:
+    items = endurance_items(day)
+    name = f"{plan_name} – {day.get('name', 'Treino')}".strip(" –") if plan_name else day.get("name", "Treino")
+    segments = []
+    for i, it in enumerate(items):
+        order = _Order()
+        sk = sports.connect_sport(it["endurance"]["sport"], it["endurance"].get("env"))
+        segments.append({"segmentOrder": i + 1, "sportType": SPORTS.get(sk, SPORTS["other"]),
+                         "workoutSteps": _end_steps_connect(order, it)})
+    sport = segments[0]["sportType"] if len(segments) == 1 else SPORTS["multi_sport"]
+    out = {
+        "workoutName": name[:80],
+        "description": (" · ".join(x for x in (items[0]["endurance"].get("note"), "Gerado pelo GymGarmin") if x))[:500],
+        "sportType": sport,
+        "estimatedDurationInSecs": int(sum(i["endurance"]["dur_s"] for i in items)),
+        "workoutSegments": segments,
+    }
+    dist = sum(i["endurance"].get("dist_m") or 0 for i in items)
+    if dist:
+        out["estimatedDistanceInMeters"] = float(dist)
+    pool = next((i["endurance"].get("pool_m") for i in items if i["endurance"].get("pool_m")), None)
+    if pool:
+        out["poolLength"] = float(pool)
+        out["poolLengthUnit"] = UNIT_M
+    return out
+
+
 def to_connect_json(day: dict, plan_name: str = "", overrides: dict | None = None) -> dict:
+    if endurance_items(day):
+        return endurance_connect_json(day, plan_name)
     items = normalize_day(day)
     if not items:
         raise ValueError("Treino sem exercícios reconhecidos")
@@ -302,10 +399,97 @@ def _fit_ids_for(ex: dict, overrides: dict | None) -> tuple[int | None, int | No
     return _fit_exercise_ids(g.get("category"), g.get("exercise"))
 
 
+def endurance_fit(day: dict, plan_name: str = "", now: datetime | None = None) -> bytes:
+    """FIT de resistência: passos por distância/tempo com alvo de ritmo, potência ou FC.
+
+    Valores brutos do FIT: distância em cm, tempo em ms, velocidade em mm/s,
+    potência personalizada = W + 1000, FC personalizada = bpm + 100.
+    O FIT de treino é de uma modalidade só: brick/evento usam a primeira (o Connect leva tudo).
+    """
+    from garmin_fit_sdk import Encoder, Profile
+
+    MN = Profile["mesg_num"]
+    it = endurance_items(day)[0]
+    end = it["endurance"]
+    sport = end["sport"]
+    fs, fss = sports.fit_sport(sport, end.get("env"))
+    name = (f"{plan_name} {day.get('name', '')}".strip() if plan_name else day.get("name", "Treino"))[:40]
+    now = now or datetime.now(timezone.utc)
+    steps: list[dict] = []
+
+    def add(step: dict) -> int:
+        step["mesg_num"] = MN["WORKOUT_STEP"]
+        step["message_index"] = len(steps)
+        steps.append(step)
+        return step["message_index"]
+
+    def target(st: dict) -> dict:
+        t = st.get("target") or {}
+        k = t.get("type")
+        if sport == "natacao" and st["kind"] in ("interval", "steady", "warmup", "cooldown"):
+            return {"target_type": "swim_stroke", "target_value": 0}  # livre; ritmo vai nas notas
+        if k == "pace":
+            return {"target_type": "speed", "target_value": 0, "custom_target_value_low": int(1_000_000 / t["slow_s_km"]),
+                    "custom_target_value_high": int(1_000_000 / t["fast_s_km"])}
+        if k == "split":
+            return {"target_type": "speed", "target_value": 0, "custom_target_value_low": int(500_000 / t["slow_s_500"]),
+                    "custom_target_value_high": int(500_000 / t["fast_s_500"])}
+        if k == "power":
+            return {"target_type": "power", "target_value": 0, "custom_target_value_low": int(t["low_w"]) + 1000,
+                    "custom_target_value_high": int(t["high_w"]) + 1000}
+        if k == "hr":
+            return {"target_type": "heart_rate", "target_value": 0, "custom_target_value_low": int(t["low_bpm"]) + 100,
+                    "custom_target_value_high": int(t["high_bpm"]) + 100}
+        if k == "hr_zone":
+            return {"target_type": "heart_rate", "target_value": int(t["zone"])}
+        return {"target_type": "open"}
+
+    intensity = {"warmup": "warmup", "cooldown": "cooldown", "interval": "active", "steady": "active",
+                 "recovery": "recovery", "rest": "rest"}
+    label = {"warmup": "Aquecimento", "cooldown": "Desaquecimento", "interval": "Tiro", "steady": "Contínuo",
+             "recovery": "Recuperação", "rest": "Descanso"}
+
+    def emit(st: dict) -> None:
+        if st["kind"] == "repeat":
+            first = len(steps)
+            for x in st["steps"]:
+                emit(x)
+            add({"duration_type": "repeat_until_steps_cmplt", "duration_value": first, "target_type": "open",
+                 "target_value": int(st["n"])})
+            return
+        use_dist = bool(st.get("dist_m")) and sport in ("corrida", "natacao", "remo", "caminhada") and st["kind"] not in ("recovery", "rest")
+        step = {"wkt_step_name": label.get(st["kind"], "Passo"), "intensity": intensity.get(st["kind"], "active")}
+        if use_dist:
+            step.update(duration_type="distance", duration_value=int(st["dist_m"] * 100))
+        else:
+            step.update(duration_type="time", duration_value=int(st["dur_s"] * 1000))
+        step.update(target(st) if st["kind"] != "rest" else {"target_type": "open"})
+        desc = _end_desc(st)
+        if desc:
+            step["notes"] = desc
+        add(step)
+
+    for st in end["steps"]:
+        emit(st)
+    enc = Encoder()
+    enc.write_mesg({"mesg_num": MN["FILE_ID"], "type": "workout", "manufacturer": "development", "product": 0,
+                    "serial_number": 0x47594D, "time_created": now})
+    wk = {"mesg_num": MN["WORKOUT"], "wkt_name": name, "sport": fs, "sub_sport": fss, "num_valid_steps": len(steps)}
+    if end.get("pool_m"):
+        wk.update(pool_length=float(end["pool_m"]), pool_length_unit="metric")  # o SDK aplica a escala deste campo
+    enc.write_mesg(wk)
+    for st in steps:
+        enc.write_mesg(st)
+    return enc.close()
+
+
 def to_fit(day: dict, plan_name: str = "", overrides: dict | None = None,
            now: datetime | None = None) -> bytes:
     """Gera os bytes de um arquivo FIT do tipo 'workout'."""
     from garmin_fit_sdk import Encoder, Profile
+
+    if endurance_items(day):
+        return endurance_fit(day, plan_name, now)
 
     items = normalize_day(day)
     if not items:
