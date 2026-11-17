@@ -398,7 +398,51 @@ async function accountCard() {
       <button class="btn sm" type="submit">Salvar senha</button></form></details>
     <p><button class="btn ghost sm" id="logout">Sair</button></p></div>${admin}`;
 }
+async function devicesCard() {
+  const me = state.me || {};
+  if (!me.logged_in) return "";
+  const st = await api("/api/account/ingest").catch(() => ({}));
+  const last = st.last;
+  const url = `${location.origin}/api/ingest`;
+  return `<div class="card" id="devices"><h2>Outros relógios (iPhone / Android)</h2>
+    <p class="small">Apple Watch, Xiaomi, Amazfit, Galaxy, Pixel…: o celular manda treinos, sono, FC de repouso e passos para a sua conta.
+      Primeiro gere seu <b>código pessoal</b> (é como uma senha só para isso).</p>
+    <div class="row gap wrap"><button class="btn sm" id="ing-new">${st.has_token ? "Gerar código novo" : "Gerar código pessoal"}</button>
+      ${st.has_token ? `<button class="btn sm ghost" id="ing-del">Desligar</button>` : ""}</div>
+    <div id="ing-token"></div>
+    <p class="small ${last ? "" : "muted"}">${last ? `Último envio: <b>${fmtDate(last.at)}</b> (${last.source === "android" ? "Android" : "iPhone"}) · ${last.days.length} dia(s) de saúde · ${last.workouts} treino(s) novo(s)${last.skipped ? ` · ${last.skipped} ignorado(s) (tipo não usado, ex.: ioga)` : ""}` : "Nenhum envio recebido ainda."}</p>
+    <details><summary><b>iPhone (Apple Saúde) — app Atalhos</b></summary><div class="small">
+      <ol>
+        <li>Abra o app <b>Atalhos</b> → <b>+</b> (novo atalho) → nome "GymGarmin".</li>
+        <li>Adicione <b>Encontrar Amostras de Saúde</b>: Tipo <b>Análise do Sono</b>, Data de Início <b>nas últimas 24 horas</b>. Depois <b>Obter Detalhes das Amostras de Saúde → Duração</b> e <b>Calcular Estatísticas → Soma</b> (resultado em horas).</li>
+        <li>Repita para <b>Frequência Cardíaca em Repouso</b> (estatística <b>Média</b>), <b>Variabilidade da Frequência Cardíaca</b> (Média) e <b>Passos</b> (Soma, hoje).</li>
+        <li>Adicione <b>Dicionário</b> com as chaves: <code>source</code> = apple · <code>date</code> = Data Atual formatada como <b>ISO 8601</b> (só a data) · <code>sleep_h</code> · <code>rhr</code> · <code>hrv</code> · <code>hrv_kind</code> = sdnn · <code>steps</code> (cada uma com o resultado do passo correspondente).</li>
+        <li>Opcional (treinos do Apple Watch ou de outro relógio que grava no Apple Saúde): <b>Encontrar Amostras de Saúde</b> do tipo <b>Treinos</b> nos últimos 2 dias → <b>Repetir com Cada</b> → um Dicionário por treino com <code>id</code>, <code>type</code>, <code>start</code> (ISO 8601), <code>duration_min</code>, <code>distance_km</code>, <code>kcal</code>, <code>avg_hr</code> → junte numa lista e ponha em <code>workouts</code>.</li>
+        <li>Adicione <b>Obter Conteúdo do URL</b>: URL <code style="word-break:break-all">${esc(url)}</code>, Método <b>POST</b>, Cabeçalho <code>Authorization</code> = <code>Bearer SEU-CÓDIGO</code>, Corpo da Solicitação <b>JSON</b> = o Dicionário.</li>
+        <li>Em <b>Automação</b> → <b>Hora do Dia</b> (ex.: 9h, todo dia) → executar o atalho, sem perguntar.</li>
+      </ol>
+      <p class="muted">Rode uma vez à mão e confira aqui em "Último envio". Os nomes dos menus mudam um pouco entre versões do iOS. Xiaomi (Mi Fitness) e Amazfit (Zepp) no iPhone: ligue a opção <b>Apple Saúde</b> no app do relógio, e o atalho leva os dados junto.</p></div></details>
+    <details><summary><b>Android (Health Connect)</b></summary><div class="small">
+      <p>Xiaomi (Mi Fitness), Samsung Health, Google Fit, Amazfit (Zepp), Fitbit…: no app do relógio, ligue o compartilhamento com o <b>Health Connect</b>.
+        Depois instale o app <b>GymGarmin Sync</b> (Android), cole o código pessoal e toque em Sincronizar. Ele envia sozinho a cada poucas horas.</p>
+      <p><a class="btn sm ghost" href="/static/gymgarmin-sync.apk" download>Baixar app Android (APK)</a></p>
+      <p class="muted">Como o app não está na Play Store, o Android pede para permitir "instalar apps desta fonte".</p></div></details>
+  </div>`;
+}
+function bindDevices() {
+  const n = $("#ing-new");
+  if (n) n.onclick = async () => {
+    if ($("#ing-del") && !confirm("Gerar um código novo? O antigo para de funcionar (atualize o atalho/app).")) return;
+    const r = await api("/api/account/ingest-token", { method: "POST" });
+    $("#ing-token").innerHTML = `<p class="rec atencao small">Seu código (aparece só agora — copie e guarde): <br><code style="word-break:break-all;font-size:15px">${esc(r.token)}</code>
+      <br><button class="btn sm" id="ing-copy">Copiar código</button></p>`;
+    $("#ing-copy").onclick = async () => { try { await navigator.clipboard.writeText(r.token); toast("Código copiado"); } catch (_) { prompt("Copie o código:", r.token); } };
+  };
+  const d = $("#ing-del");
+  if (d) d.onclick = async () => { if (!confirm("Desligar? O atalho/app para de enviar.")) return; await api("/api/account/ingest-token", { method: "DELETE" }); viewPerfil(); };
+}
 function bindAccount() {
+  bindDevices();
   const st = $("#acc-setup");
   if (st) st.onsubmit = async (e) => {
     e.preventDefault();
@@ -1321,7 +1365,7 @@ async function viewPerfil() {
   const g = await api("/api/garmin/status");
   const num = (k, label, extra = "") => `<div class="field"><label>${label}</label><input type="number" data-p="${k}" value="${esc(p[k] ?? "")}" ${extra}></div>`;
   state.me = await api("/api/auth/me").catch(() => state.me);
-  const accHtml = await accountCard();
+  const accHtml = (await accountCard()) + (await devicesCard());
   const canBackup = !(state.me && state.me.logged_in && !state.me.user.is_admin);
   view.innerHTML = `${accHtml}
   <div class="card"><h2>Seus dados</h2>

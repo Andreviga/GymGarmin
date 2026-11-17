@@ -431,7 +431,7 @@ def get_session(session_id: int, user_id: int | None = None) -> dict | None:
 
 def _session_data(s: dict) -> str:
     keep = {k: s.get(k) for k in ("items", "notes", "source", "garmin_activity_id", "feeling", "duration_min",
-                                  "schedule_id", "garmin_summary", "merged", "client_id") if k in s}
+                                  "schedule_id", "garmin_summary", "merged", "client_id", "ext_id") if k in s}
     keep.setdefault("items", [])
     return json.dumps(keep, ensure_ascii=False)
 

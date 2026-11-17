@@ -32,18 +32,23 @@ def _time(s: dict) -> datetime | None:
         return None
 
 
+def _watch(s: dict) -> bool:
+    """Veio de um relógio (Garmin, Apple Saúde, Health Connect)?"""
+    return bool(s.get("garmin_activity_id") or s.get("ext_id"))
+
+
 def find_twin(new: dict, sessions: list[dict]) -> dict | None:
     """Sessão do mesmo dia e do mesmo tipo vinda da outra fonte (app ↔ relógio)."""
     day = str(new.get("date") or "")[:10]
     k_new = kinds(new)
     if not day or not k_new:
         return None
-    from_garmin = bool(new.get("garmin_activity_id"))
+    from_garmin = _watch(new)
     best, best_gap = None, None
     for s in sessions:
         if str(s.get("date") or "")[:10] != day or s.get("id") == new.get("id"):
             continue
-        if bool(s.get("garmin_activity_id")) == from_garmin:
+        if _watch(s) == from_garmin:
             continue  # já está ligada a uma atividade (ou as duas são do app)
         if not (kinds(s) & k_new):
             continue
@@ -57,7 +62,10 @@ def find_twin(new: dict, sessions: list[dict]) -> dict | None:
 def merge(app_s: dict, garmin_s: dict) -> dict:
     """Une as duas: itens do app + medidas do relógio."""
     out = {k: v for k, v in app_s.items() if k not in ("id", "created_at")}
-    out["garmin_activity_id"] = garmin_s.get("garmin_activity_id")
+    if garmin_s.get("garmin_activity_id"):
+        out["garmin_activity_id"] = garmin_s.get("garmin_activity_id")
+    if garmin_s.get("ext_id"):
+        out["ext_id"] = garmin_s["ext_id"]
     out["garmin_summary"] = garmin_s.get("garmin_summary") or {}
     out["merged"] = True
     if garmin_s.get("duration_min") and not out.get("duration_min"):

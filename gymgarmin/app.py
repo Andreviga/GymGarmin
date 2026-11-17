@@ -9,13 +9,14 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
 
-from fastapi import Body, FastAPI, Header, HTTPException, Query
+from fastapi import Body, FastAPI, Header, HTTPException, Query, Request
+from starlette.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from datetime import date, timedelta
 
-from . import auth
+from . import auth, ingest
 from . import (analysis, calibration, catalog, clock, db, dedupe, health, endurance, garmin_export, garmin_sync, generator, history, limitations,
                load, plans_io, progression, readiness, schedule, sports, templates)
 from .muscles import EQUIPMENT_PT, HR_ZONES, MUSCLES, hr_max, zone_bpm
@@ -177,6 +178,72 @@ def account_password(body: dict = Body(...)):
         raise HTTPException(400, str(e)) from e
     db.set_password(acc["user_id"], auth.hash_password(body["new"]))
     return _with_cookie({"ok": True}, db.get_account(acc["user_id"]))
+
+
+# ------------------------------------------- outros relógios (Apple / Android)
+
+@app.post("/api/account/ingest-token")
+def ingest_token_new():
+    """Gera (ou troca) o código pessoal usado pelo Atalhos do iPhone e pelo app Android."""
+    acc = auth.current_account()
+    if not acc:
+        raise HTTPException(400, "Crie sua conta (Perfil → Sua conta) antes de ligar outro relógio.")
+    token, h = auth.new_ingest_token()
+    db.set_ingest_token(acc["user_id"], h)
+    return {"token": token}
+
+
+@app.delete("/api/account/ingest-token")
+def ingest_token_delete():
+    acc = auth.current_account()
+    if acc:
+        db.set_ingest_token(acc["user_id"], None)
+    return {"ok": True}
+
+
+@app.get("/api/account/ingest")
+def ingest_status():
+    acc = auth.current_account()
+    last = json.loads(db.kv_get("ingest_last") or "null")
+    return {"has_token": bool(acc and acc.get("ingest_token")), "last": last}
+
+
+@app.post("/api/ingest")
+async def ingest_data(request: Request, authorization: str | None = Header(None), token: str | None = Query(None),
+                      x_gymgarmin_token: str | None = Header(None)):
+    """Recebe treinos e saúde do Atalhos do iPhone (Apple Saúde) ou do app Android (Health Connect)."""
+    raw = (authorization or "").removeprefix("Bearer ").strip() or (x_gymgarmin_token or "").strip() or (token or "").strip()
+    acc = db.account_by_ingest_token(auth.hash_token(raw)) if raw else None
+    if not acc:
+        raise HTTPException(401, "Código pessoal inválido. Gere um novo em Perfil → Outros relógios.")
+    try:
+        body = await request.json()
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(400, "Envie os dados em JSON.") from e
+    tok = db.set_current_user(acc["user_id"])
+    try:
+        return await run_in_threadpool(_ingest_sync, body)
+    finally:
+        db._current_user.reset(tok)
+
+
+def _ingest_sync(body) -> dict:
+    p = _profile()
+    try:
+        r = ingest.ingest(body, hr_max(p.get("age"), p.get("hr_max")), merge=_merge_garmin)
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from e
+    today = clock.today()
+    if today.isoformat() in r["days"]:  # sono da noite chegou: prontidão do dia sem Garmin
+        try:
+            known = json.loads(db.kv_get(f"health:{today.isoformat()}") or "{}")
+            db.kv_set(f"readiness:{today.isoformat()}", json.dumps(readiness.fetch(None, today, known)))
+            view = _readiness_view(today)
+            if view and _endurance_cfg(_profile()).get("readiness_auto"):
+                _apply_readiness(today, view["action"])
+        except Exception:  # noqa: BLE001 - prontidão é opcional
+            pass
+    return r
 
 
 @app.get("/api/admin/users")
