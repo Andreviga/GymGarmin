@@ -76,6 +76,13 @@ CREATE TABLE IF NOT EXISTS garmin_pushes (
     scheduled TEXT,
     created_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS kv (
+    user_id INTEGER NOT NULL,
+    key TEXT NOT NULL,
+    value TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (user_id, key)
+);
 """
 
 DEFAULT_PROFILE = {
@@ -480,6 +487,37 @@ def delete_entry(entry_id: int, user_id: int = 1) -> None:
 
 
 # ---- backup ------------------------------------------------------------------
+
+# ---- chave/valor (estado da integração Garmin; fora do backup de propósito) --
+
+def kv_get(key: str, user_id: int = 1) -> str | None:
+    with conn() as c:
+        r = c.execute("SELECT value FROM kv WHERE user_id = ? AND key = ?", (user_id, key)).fetchone()
+    return r["value"] if r else None
+
+
+def kv_set(key: str, value: str, user_id: int = 1) -> None:
+    with conn() as c:
+        c.execute("INSERT INTO kv (user_id, key, value, updated_at) VALUES (?,?,?,?) "
+                  "ON CONFLICT (user_id, key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at",
+                  (user_id, key, value, now()))
+
+
+def kv_delete(key: str, user_id: int = 1) -> None:
+    with conn() as c:
+        c.execute("DELETE FROM kv WHERE user_id = ? AND key = ?", (user_id, key))
+
+
+def garmin_imported_ids(user_id: int = 1) -> set:
+    """IDs de atividades do Garmin já importadas (para a sincronização não duplicar)."""
+    out = set()
+    with conn() as c:
+        for r in c.execute("SELECT data FROM sessions WHERE user_id = ?", (user_id,)).fetchall():
+            aid = json.loads(r["data"]).get("garmin_activity_id")
+            if aid:
+                out.add(str(aid))
+    return out
+
 
 BACKUP_TABLES = ("users", "plans", "sessions", "schedule", "garmin_override")
 

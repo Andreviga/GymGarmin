@@ -9,15 +9,22 @@ Observações importantes (nov/2026):
 - `garth` foi descontinuado em 2026 porque a Garmin mudou o fluxo de autenticação;
   o `garminconnect` 0.3.x tem login próprio (com suporte a MFA). Tokens antigos do
   garth não funcionam: faça login de novo uma vez.
-- Os tokens ficam em ~/.gymgarmin/garmin_tokens (ou $GYMGARMIN_HOME). A senha NÃO é
-  salva — só os tokens, que se renovam sozinhos.
+- Os tokens ficam no banco (tabela kv), criptografados com GARMIN_TOKEN_KEY. A senha
+  NÃO é salva — só os tokens, que se renovam sozinhos.
+- Sincronização automática: uma vez por dia (cron da Vercel) e ao abrir o app se a
+  última tiver mais de 6 h. Nunca tenta login por senha sozinha: se o token expirar,
+  marca "reconectar" e espera o usuário entrar de novo.
 - Por ser uma API não documentada, a Garmin pode mudá-la sem aviso. Se o envio
   falhar, use o arquivo .FIT (cópia via USB), que não depende de API.
 """
 
 from __future__ import annotations
 
+import base64
+import hashlib
+import json
 import os
+import secrets
 import threading
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -37,11 +44,16 @@ def home_dir() -> Path:
 
 
 def token_dir() -> Path:
+    """Pasta antiga dos tokens (antes de irem para o banco). Só lida para migrar."""
     return home_dir() / "garmin_tokens"
 
 
 class GarminUnavailable(RuntimeError):
     pass
+
+
+class GarminNeedsLogin(RuntimeError):
+    """Sem tokens válidos: é preciso entrar de novo (e-mail/senha e, se houver, MFA)."""
 
 
 def _lib():
@@ -55,36 +67,167 @@ def _lib():
     return Garmin
 
 
+# ---------------------------------------------------------------------------
+# Tokens e estado do MFA guardados no banco, criptografados.
+# Na Vercel o disco é temporário: arquivo de token some a cada nova instância.
+# A senha do Garmin nunca é guardada — só os tokens, que se renovam sozinhos.
+# ---------------------------------------------------------------------------
+
+TOKENS_KEY = "garmin_tokens"
+MFA_KEY = "garmin_mfa"
+SYNC_KEY = "garmin_sync"
+MFA_TTL_MIN = 10
+
+
+def _secret() -> str:
+    secret = os.environ.get("GARMIN_TOKEN_KEY")
+    if secret:
+        return secret
+    if os.environ.get("VERCEL"):
+        raise GarminUnavailable("Falta a variável GARMIN_TOKEN_KEY no servidor para guardar o login do Garmin.")
+    # Uso local: chave aleatória num arquivo só do usuário
+    kf = home_dir() / "garmin.key"
+    if not kf.exists():
+        kf.parent.mkdir(parents=True, exist_ok=True)
+        fd = os.open(kf, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, "w") as f:
+            f.write(secrets.token_urlsafe(48))
+    return kf.read_text().strip()
+
+
+def _fernet():
+    from cryptography.fernet import Fernet
+
+    return Fernet(base64.urlsafe_b64encode(hashlib.sha256(_secret().encode()).digest()))
+
+
+def _put_secret(key: str, data: dict | str) -> None:
+    from . import db
+
+    raw = data if isinstance(data, str) else json.dumps(data)
+    db.kv_set(key, _fernet().encrypt(raw.encode()).decode())
+
+
+def _get_secret(key: str) -> str | None:
+    from cryptography.fernet import InvalidToken
+
+    from . import db
+
+    v = db.kv_get(key)
+    if not v:
+        return None
+    try:
+        return _fernet().decrypt(v.encode()).decode()
+    except InvalidToken:
+        return None  # chave trocada: trata como sem login
+
+
+def _del(key: str) -> None:
+    from . import db
+
+    db.kv_delete(key)
+
+
+def _migrate_file_tokens() -> None:
+    """Tokens que ficaram na pasta antiga (versão local) passam para o banco uma vez."""
+    f = token_dir() / "garmin_tokens.json"
+    try:
+        if f.exists() and not _get_secret(TOKENS_KEY):
+            _put_secret(TOKENS_KEY, f.read_text())
+            f.unlink()
+    except Exception:  # noqa: BLE001 - migração é melhor-esforço
+        pass
+
+
+def sync_state() -> dict:
+    from . import db
+
+    try:
+        return json.loads(db.kv_get(SYNC_KEY) or "{}")
+    except ValueError:
+        return {}
+
+
+def _set_sync_state(**kw) -> dict:
+    from . import db
+
+    st = sync_state()
+    st.update(kw)
+    db.kv_set(SYNC_KEY, json.dumps(st, ensure_ascii=False))
+    return st
+
+
+def _mfa_pending() -> bool:
+    if _pending_mfa:
+        return True
+    raw = _get_secret(MFA_KEY)
+    if not raw:
+        return False
+    try:
+        started = datetime.fromisoformat(json.loads(raw).get("started"))
+    except (ValueError, TypeError):
+        return False
+    return datetime.now() - started < timedelta(minutes=MFA_TTL_MIN)
+
+
 def status() -> dict:
-    tdir = token_dir()
-    has_tokens = tdir.exists() and any(tdir.iterdir()) if tdir.exists() else False
     try:
         _lib()
         lib_ok = True
     except GarminUnavailable:
         lib_ok = False
+    try:
+        _secret()  # sem chave configurada na Vercel não dá para guardar o login
+        _migrate_file_tokens()
+        has_tokens = bool(_get_secret(TOKENS_KEY))
+        key_ok, key_error = True, None
+    except GarminUnavailable as e:
+        has_tokens, key_ok, key_error = False, False, str(e)
+    st = sync_state()
     return {
         "library_installed": lib_ok,
-        "has_tokens": bool(has_tokens),
-        "connected": _client is not None,
-        "mfa_pending": bool(_pending_mfa),
-        "display_name": getattr(_client, "display_name", None) if _client else None,
+        "has_tokens": has_tokens,
+        "connected": _client is not None or has_tokens,
+        "mfa_pending": _mfa_pending() if key_ok else False,
+        "display_name": getattr(_client, "display_name", None) if _client else st.get("display_name"),
+        "storage_ok": key_ok,
+        "storage_error": key_error,
+        "needs_reconnect": bool(st.get("needs_reconnect")) and not has_tokens,
+        "sync": {k: st.get(k) for k in ("last_run", "last_ok", "last_imported", "last_error", "trigger")},
     }
 
 
+def _save_tokens(api) -> None:
+    """Grava os tokens atuais (podem ter sido renovados durante as chamadas)."""
+    try:
+        data = api.client.dumps()
+    except Exception:  # noqa: BLE001
+        return
+    if data and data != _get_secret(TOKENS_KEY):
+        _put_secret(TOKENS_KEY, data)
+
+
 def connect_with_tokens() -> bool:
-    """Tenta reconectar com tokens salvos. Retorna True se conectado."""
+    """Reconecta com os tokens guardados, sem nunca tentar login por senha."""
     global _client
     with _lock:
         if _client is not None:
             return True
-        tdir = token_dir()
-        if not tdir.exists() or not any(tdir.iterdir()):
+        _migrate_file_tokens()
+        tokens = _get_secret(TOKENS_KEY)
+        if not tokens:
             return False
         Garmin = _lib()
         api = Garmin()
-        api.login(str(tdir))
+        try:
+            api.login(tokens)  # JSON inline: carrega e renova o token se estiver vencendo
+        except Exception as e:  # noqa: BLE001 - refresh recusado → precisa entrar de novo
+            _del(TOKENS_KEY)
+            _set_sync_state(needs_reconnect=True, last_error=f"Login do Garmin expirou: entre de novo ({type(e).__name__}).")
+            return False
+        _save_tokens(api)
         _client = api
+        _set_sync_state(needs_reconnect=False, display_name=getattr(api, "display_name", None))
         return True
 
 
@@ -94,37 +237,38 @@ def login(email: str, password: str) -> dict:
     Garmin = _lib()
     with _lock:
         api = Garmin(email=email, password=password, return_on_mfa=True)
-        result, state = api.login(str(token_dir()))
+        result, state = api.login()
         if result == "needs_mfa":
             _pending_mfa.clear()
             _pending_mfa.update({"api": api, "state": state})
+            # Outra instância do servidor pode receber o código: guarda o estado (cifrado, 10 min)
+            _put_secret(MFA_KEY, {"state": state, "started": datetime.now().isoformat()})
             return {"mfa_required": True}
-        _save_tokens(api)
-        _client = api
-        return {"connected": True, "display_name": getattr(api, "display_name", None)}
+        return _finish_login(api)
+
+
+def _finish_login(api) -> dict:
+    global _client
+    _pending_mfa.clear()
+    _del(MFA_KEY)
+    _save_tokens(api)
+    _client = api
+    _set_sync_state(needs_reconnect=False, last_error=None, display_name=getattr(api, "display_name", None))
+    return {"connected": True, "display_name": getattr(api, "display_name", None)}
 
 
 def submit_mfa(code: str) -> dict:
-    global _client
     with _lock:
-        if not _pending_mfa:
-            raise RuntimeError("Nenhum login aguardando código MFA")
-        api, state = _pending_mfa["api"], _pending_mfa["state"]
+        if _pending_mfa:
+            api, state = _pending_mfa["api"], _pending_mfa["state"]
+        else:
+            raw = _get_secret(MFA_KEY) if _mfa_pending() else None
+            if not raw:
+                raise RuntimeError("Nenhum login aguardando código MFA (ou o código expirou). Entre de novo.")
+            state = json.loads(raw)["state"]
+            api = _lib()(return_on_mfa=True)
         api.resume_login(state, code.strip())
-        _pending_mfa.clear()
-        _save_tokens(api)
-        _client = api
-        return {"connected": True, "display_name": getattr(api, "display_name", None)}
-
-
-def _save_tokens(api) -> None:
-    tdir = token_dir()
-    tdir.mkdir(parents=True, exist_ok=True)
-    try:
-        api.client.dump(str(tdir))
-        os.chmod(tdir, 0o700)
-    except Exception:  # noqa: BLE001 - salvar tokens é melhor-esforço
-        pass
+        return _finish_login(api)
 
 
 def logout() -> None:
@@ -132,15 +276,18 @@ def logout() -> None:
     with _lock:
         _client = None
         _pending_mfa.clear()
+        _del(TOKENS_KEY)
+        _del(MFA_KEY)
         tdir = token_dir()
         if tdir.exists():
             for f in tdir.iterdir():
                 f.unlink()
+        _set_sync_state(needs_reconnect=False, display_name=None)
 
 
 def client():
     if _client is None and not connect_with_tokens():
-        raise RuntimeError("Não conectado ao Garmin Connect. Faça login em Configurações → Garmin.")
+        raise GarminNeedsLogin("Não conectado ao Garmin Connect. Entre em Perfil → Garmin.")
     return _client
 
 
@@ -260,3 +407,90 @@ def import_activity(activity_id: int, preferred_ids: set[str] | None = None, hr_
     if "strength" in str((flat["activityType"] or {}).get("typeKey", "")):
         sets = api.get_activity_exercise_sets(activity_id)
     return activity_to_session(flat, sets, preferred_ids, hr_max)
+
+
+# ---------------------------------------------------------------------------
+# Sincronização automática (cron diário + ao abrir o app)
+# ---------------------------------------------------------------------------
+
+AUTO_MIN_HOURS = 6     # ao abrir o app, só sincroniza se a última tiver mais que isso
+MAX_PER_RUN = 15       # limite de importações por execução (gentil com a API)
+FIRST_SYNC_DAYS = 14
+
+
+def _is_rate_limit(e: Exception) -> bool:
+    txt = f"{type(e).__name__} {e}".lower()
+    return "429" in txt or "too many" in txt or "toomanyrequests" in txt
+
+
+def due(min_hours: float = AUTO_MIN_HOURS, now: datetime | None = None) -> bool:
+    st = sync_state()
+    if st.get("needs_reconnect"):
+        return False
+    last = st.get("last_run")
+    if not last:
+        return True
+    try:
+        return (now or datetime.now()) - datetime.fromisoformat(last) >= timedelta(hours=min_hours)
+    except ValueError:
+        return True
+
+
+def sync(save_session, imported_ids: set, preferred_ids: set[str] | None = None, hr_max: int | None = None,
+         trigger: str = "manual", now: datetime | None = None) -> dict:
+    """Importa as atividades novas do Garmin como sessões.
+
+    `save_session` grava a sessão (db.save_session); `imported_ids` são os IDs já
+    importados. Só lê dados com os tokens guardados: se não houver login válido,
+    marca "reconectar" e não tenta entrar por senha.
+    """
+    now = now or datetime.now()
+    st = sync_state()
+    started = now.isoformat(timespec="seconds")
+    try:
+        api = client()
+    except GarminNeedsLogin as e:
+        _set_sync_state(last_run=started, last_ok=False, last_error=str(e), trigger=trigger,
+                        needs_reconnect=bool(st.get("display_name")) or bool(st.get("needs_reconnect")))
+        return {"ok": False, "needs_login": True, "error": str(e), "imported": []}
+
+    # Janela: desde a última sincronização boa (com 2 dias de folga), no máximo 30 dias
+    days = FIRST_SYNC_DAYS
+    if st.get("last_ok_at"):
+        try:
+            days = min(30, max(2, (now - datetime.fromisoformat(st["last_ok_at"])).days + 2))
+        except ValueError:
+            pass
+    imported, skipped, errors = [], 0, []
+    try:
+        acts = recent_activities(days)
+        new = [a for a in acts if a.get("activity_id") and str(a["activity_id"]) not in imported_ids]
+        new.sort(key=lambda a: str(a.get("start") or ""))
+        for a in new[:MAX_PER_RUN]:
+            try:
+                session = import_activity(a["activity_id"], preferred_ids, hr_max)
+            except Exception as e:  # noqa: BLE001
+                if _is_rate_limit(e):
+                    raise
+                errors.append(f"{a.get('name') or a['activity_id']}: {type(e).__name__}")
+                continue
+            if not session.get("items"):
+                skipped += 1  # corrida na rua, pedal etc.: o app só registra academia
+                continue
+            try:
+                saved = save_session(session)
+            except ValueError:
+                continue  # já importada por outra execução
+            imported.append({"session_id": saved.get("id"), "name": a.get("name"), "date": str(a.get("start"))[:10],
+                             "type": a.get("type")})
+        _save_tokens(api)
+    except Exception as e:  # noqa: BLE001
+        msg = ("O Garmin limitou as requisições agora; tento de novo na próxima sincronização."
+               if _is_rate_limit(e) else f"Falha ao sincronizar: {type(e).__name__}: {e}")
+        _set_sync_state(last_run=started, last_ok=False, last_error=msg, trigger=trigger)
+        return {"ok": False, "error": msg, "imported": imported}
+
+    _set_sync_state(last_run=started, last_ok=True, last_ok_at=started, last_error="; ".join(errors) or None,
+                    trigger=trigger, last_imported=imported[-10:] if imported else [], needs_reconnect=False)
+    return {"ok": True, "imported": imported, "skipped": skipped, "errors": errors, "window_days": days,
+            "pending": max(0, len(new) - MAX_PER_RUN)}

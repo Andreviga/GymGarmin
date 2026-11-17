@@ -8,7 +8,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
 
-from fastapi import Body, FastAPI, HTTPException, Query
+from fastapi import Body, FastAPI, Header, HTTPException, Query
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
@@ -350,14 +350,7 @@ def weekly(date: str | None = None):
 
 @app.get("/api/garmin/status")
 def g_status():
-    st = garmin_sync.status()
-    if st["has_tokens"] and not st["connected"] and st["library_installed"]:
-        try:
-            garmin_sync.connect_with_tokens()
-            st = garmin_sync.status()
-        except Exception as e:  # noqa: BLE001
-            st["error"] = str(e)
-    return st
+    return garmin_sync.status()
 
 
 @app.post("/api/garmin/login")
@@ -392,6 +385,37 @@ def g_activities(days: int = 14):
         raise HTTPException(401, str(e)) from e
     except Exception as e:  # noqa: BLE001
         raise HTTPException(502, str(e)) from e
+
+
+def _run_sync(trigger: str) -> dict:
+    plan_ids = {it.get("exercise_id") for p in db.list_plans() for d in p.get("days", []) for it in d.get("items", [])}
+    p = _profile()
+    try:
+        return garmin_sync.sync(db.save_session, db.garmin_imported_ids(), plan_ids,
+                                hr_max(p.get("age"), p.get("hr_max")), trigger=trigger)
+    except garmin_sync.GarminUnavailable as e:
+        raise HTTPException(501, str(e)) from e
+
+
+@app.post("/api/garmin/sync")
+def g_sync(auto: bool = False):
+    """Sincroniza agora. Com auto=1 (ao abrir o app) só roda se a última tiver mais de 6 h."""
+    if auto:
+        st = garmin_sync.status()
+        if not st["has_tokens"] or not garmin_sync.due():
+            return {"ok": True, "ran": False, "imported": []}
+    return {"ran": True, **_run_sync("auto" if auto else "manual")}
+
+
+@app.get("/api/cron/garmin-sync")
+def cron_garmin_sync(authorization: str | None = Header(None)):
+    """Chamado pelo cron diário da Vercel (envia 'Authorization: Bearer $CRON_SECRET')."""
+    secret = os.environ.get("CRON_SECRET")
+    if (secret or os.environ.get("VERCEL")) and authorization != f"Bearer {secret}":
+        raise HTTPException(401, "Não autorizado")
+    if not garmin_sync.status()["has_tokens"]:
+        return {"ok": True, "ran": False, "reason": "Garmin não conectado"}
+    return {"ran": True, **_run_sync("cron")}
 
 
 @app.post("/api/garmin/import/{activity_id}")

@@ -870,18 +870,22 @@ async function viewPerfil() {
   </div>
   <div class="card"><h2>Garmin Connect</h2>
     ${!g.library_installed ? `<p class="pill bad">Biblioteca garminconnect não instalada no servidor: <code>pip install "garminconnect>=0.3.20"</code></p>` : ""}
+    ${g.storage_error ? `<p class="pill bad">${esc(g.storage_error)}</p>` : ""}
     ${g.connected ? `<p><span class="pill ok">conectado</span> ${esc(g.display_name || "")}</p>
-      <div class="row gap wrap"><button class="btn sm ghost" id="g-acts">Importar treinos do relógio</button><button class="btn sm danger" id="g-logout">Desconectar</button></div><div id="g-acts-box"></div>`
-      : `<p class="small muted">Login feito uma vez; depois só os tokens ficam salvos neste computador (<code>~/.gymgarmin/garmin_tokens</code>). Sua senha não é armazenada.</p>
+      ${syncInfo(g.sync)}
+      <div class="row gap wrap"><button class="btn sm" id="g-sync">Sincronizar agora</button><button class="btn sm ghost" id="g-acts">Escolher treinos para importar</button><button class="btn sm danger" id="g-logout">Desconectar</button></div><div id="g-acts-box"></div>
+      <p class="small muted">Sincroniza sozinho todo dia à noite e quando você abre o app (se a última tiver mais de 6 h): traz musculação com séries/reps/carga e cardio de academia.</p>`
+      : `${g.needs_reconnect ? `<div class="rec atencao small"><b>Reconecte o Garmin.</b> O login expirou ou foi revogado pela Garmin; a sincronização automática está parada até você entrar de novo.</div>` : ""}
+      <p class="small muted">Login feito uma vez: o app guarda só os tokens (criptografados no banco), que se renovam sozinhos. Sua senha não é armazenada.</p>
       <div class="grid2"><div class="field"><label>E-mail Garmin</label><input id="g-email" type="email" autocomplete="username"></div>
       <div class="field"><label>Senha</label><input id="g-pass" type="password" autocomplete="current-password"></div></div>
-      <div id="g-mfa" hidden class="field"><label>Código MFA (e-mail/app)</label><input id="g-code" inputmode="numeric"></div>
-      <button class="btn" id="g-login">Conectar</button>${g.error ? `<p class="small pill bad">${esc(g.error)}</p>` : ""}`}
+      <div id="g-mfa" ${g.mfa_pending ? "" : "hidden"} class="field"><label>Código de verificação (e-mail/app)</label><input id="g-code" inputmode="numeric" autocomplete="one-time-code"></div>
+      <button class="btn" id="g-login">${g.mfa_pending ? "Confirmar código" : "Conectar"}</button>${g.sync && g.sync.last_error && !g.needs_reconnect ? `<p class="small muted">${esc(g.sync.last_error)}</p>` : ""}`}
     <div class="hr"></div>
     <details><summary class="small">Como funciona o envio para o Garmin?</summary><div class="small">
       <p><b>1. Arquivo .FIT (offline):</b> em cada treino da planilha, “Baixar .FIT”. Conecte o relógio no USB e copie para <code>GARMIN/NewFiles</code>. O relógio importa ao desconectar e mostra em Treinos. Gerado com o SDK oficial da Garmin.</p>
       <p><b>2. Garmin Connect (direto):</b> “Enviar ao Garmin Connect” cria o treino na sua biblioteca (mesmo formato do editor web) e agenda na data escolhida; o relógio recebe na próxima sincronização. Usa a API não-oficial (biblioteca <code>garminconnect</code>), pois a API oficial de treinos é restrita a empresas parceiras.</p>
-      <p><b>3. Volta do relógio:</b> “Importar treinos do relógio” traz séries/reps/carga registradas no relógio para a análise muscular.</p></div></details>
+      <p><b>3. Volta do relógio:</b> a sincronização automática (todo dia à noite, ao abrir o app ou em “Sincronizar agora”) traz séries/reps/carga registradas no relógio para o histórico de cargas e a análise muscular. Corridas e pedais na rua ficam de fora.</p></div></details>
   </div>`;
   api("/api/generator/options").then((o) => {
     const el = $("#cm-list"); if (!el) return;
@@ -919,6 +923,12 @@ async function viewPerfil() {
       toast("Conectado ao Garmin Connect"); viewPerfil(); updateGarminPill();
     } catch (e) { toast(e.message, 6000); } finally { gl.disabled = false; }
   };
+  const gs = $("#g-sync");
+  if (gs) gs.onclick = async () => {
+    gs.disabled = true; gs.textContent = "Sincronizando…";
+    try { const r = await api("/api/garmin/sync", { method: "POST" }); toast(syncToast(r) || (r.ok ? "Nada novo no Garmin" : r.error), 5000); viewPerfil(); updateGarminPill(); }
+    catch (e) { toast(e.message, 6000); gs.disabled = false; gs.textContent = "Sincronizar agora"; }
+  };
   const lo = $("#g-logout"); if (lo) lo.onclick = async () => { await api("/api/garmin/logout", { method: "POST" }); viewPerfil(); updateGarminPill(); };
   const ga = $("#g-acts");
   if (ga) ga.onclick = async () => {
@@ -934,8 +944,36 @@ async function viewPerfil() {
   };
 }
 
+function syncInfo(sy) {
+  if (!sy || !sy.last_run) return `<p class="small muted">Ainda não sincronizou.</p>`;
+  const when = new Date(sy.last_run).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+  const how = { cron: "automática (noite)", auto: "ao abrir o app", manual: "manual" }[sy.trigger] || "";
+  const imp = sy.last_imported || [];
+  return `<p class="small">Última sincronização: <b>${esc(when)}</b> ${how ? `<span class="muted">· ${esc(how)}</span>` : ""}
+    ${sy.last_ok ? `<span class="pill ok small">ok</span>` : `<span class="pill warn small">falhou</span>`}
+    ${imp.length ? `<br>Trouxe: ${imp.map((i) => `${esc(i.name || "atividade")} (${ddmm(i.date)})`).join(", ")}` : ""}
+    ${sy.last_error ? `<br><span class="muted">${esc(sy.last_error)}</span>` : ""}</p>`;
+}
+function syncToast(r) {
+  if (!r || !r.imported || !r.imported.length) return "";
+  return `Garmin: ${r.imported.length} treino${r.imported.length > 1 ? "s" : ""} importado${r.imported.length > 1 ? "s" : ""} (${r.imported.map((i) => i.name || "atividade").join(", ")})`;
+}
 async function updateGarminPill() {
-  try { const g = await api("/api/garmin/status"); const el = $("#garmin-pill"); el.textContent = g.connected ? "Garmin: conectado" : "Garmin: offline"; el.className = `pill ${g.connected ? "ok" : "muted"}`; } catch (_) { /* ignora */ }
+  try {
+    const g = await api("/api/garmin/status"); const el = $("#garmin-pill");
+    const [txt, cls] = g.connected ? ["Garmin: conectado", "ok"] : g.needs_reconnect ? ["Garmin: reconectar", "warn"] : ["Garmin: offline", "muted"];
+    el.textContent = txt; el.className = `pill ${cls}`;
+    if (g.needs_reconnect) { el.onclick = () => { location.hash = "#perfil"; }; el.style.cursor = "pointer"; }
+    return g;
+  } catch (_) { return null; }
+}
+async function autoSync() {
+  try {
+    const r = await api("/api/garmin/sync?auto=true", { method: "POST" });
+    const msg = syncToast(r);
+    if (msg) { toast(`${msg} 🎉`, 6000); if (["analise", "hoje", "evolucao"].includes((location.hash.slice(1) || "hoje").split("/")[0])) route(); }
+    if (r && r.ran) updateGarminPill();
+  } catch (_) { /* silencioso: o usuário pode sincronizar no Perfil */ }
 }
 
 /* --------------------------------------------------------------- router -- */
@@ -959,5 +997,5 @@ async function route() {
 }
 window.addEventListener("hashchange", route);
 route();
-updateGarminPill();
+updateGarminPill().then((g) => { if (g && g.connected) autoSync(); });
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});

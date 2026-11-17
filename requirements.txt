@@ -3,3 +3,4 @@ uvicorn>=0.29
 garmin-fit-sdk>=21.0
 garminconnect[workout]>=0.3.20
 pg8000>=1.31
+cryptography>=43
