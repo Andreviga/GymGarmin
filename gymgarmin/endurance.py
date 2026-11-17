@@ -209,15 +209,54 @@ def _trend(start: float, peak: float, n: int) -> float:
     return min(peak, start * (1.08 ** build_weeks)) if peak >= start else peak
 
 
+def done_ceiling(done: dict | None, sport: str, week_idx: int, planned_avg3: float | None = None) -> float | None:
+    """Teto pelo que o atleta REALMENTE fez (registros/Garmin), só quando ficou bem atrás do plano
+    (fez < 70% do planejado nas últimas 3 semanas: doença, lesão, viagem): volta a +15% da melhor semana recente.
+    Voltando de pausa (3 semanas sem nada, mas treinava antes), recomeça em ~60% do volume de antes.
+    Faltas normais (cumprir 80% do plano) não freiam a progressão. Só vale para quem registra os treinos."""
+    d = (done or {}).get(sport)
+    if not d or week_idx < 2 or not d.get("tracked"):
+        return None
+    avg3, mx3, before = float(d.get("avg3") or 0), float(d.get("max3") or 0), float(d.get("before") or 0)
+    wk = list(d.get("weeks") or [])  # [semana passada, retrasada, antes]
+    if avg3 <= 0:
+        return before * 0.6 if before > 0 else None
+    if planned_avg3 and avg3 >= 0.7 * planned_avg3:
+        return None
+    ref = max([before] + wk) if (before or wk) else mx3
+    low = lambda v: v < 0.25 * (planned_avg3 or ref or 1)  # noqa: E731
+    if len(wk) >= 2 and low(wk[0]) and low(wk[1]):
+        return ref * 0.65   # 2+ semanas paradas (doença, lesão): recomeça em ~65% do que fazia
+    if wk and low(wk[0]):
+        return mx3          # 1 semana falhada: repete o volume, sem subir
+    return max(mx3 * 1.15, avg3 * 1.3)
+
+
 def week_volume(sport: str, c: dict, level: str, week_idx: int, ws: date, recent: dict | None = None,
-                cap: float | None = None) -> dict:
+                cap: float | None = None, done: dict | None = None) -> dict:
     """Volume da semana e fase. week_idx = semanas desde o início do plano (0 = primeira).
 
     `cap` = teto semanal (sessões × tempo máximo no ritmo do atleta); entra antes da semana leve
     e do polimento, para que eles continuem reduzindo de verdade.
     """
     cap = min(cap or 1e12, weekly_cap(sport, int(c.get("sessions") or VOLUME[sport]["sessions"])))
-    start, peak = min(_current(sport, c, level, recent), cap), min(_peak(sport, c, level), cap)
+    out = _week_volume(sport, c, level, week_idx, ws, recent, cap)
+    planned3 = None
+    if done and week_idx >= 2:
+        prev = [_week_volume(sport, c, level, week_idx - k, ws - timedelta(weeks=k), recent, cap)["volume"]
+                for k in (1, 2, 3) if week_idx - k >= 0]
+        planned3 = sum(prev) / len(prev) if prev else None
+    ceil = done_ceiling(done, sport, week_idx, planned3)
+    if ceil is not None and out["phase"] not in ("prova", "recuperacao") and out["volume"] > ceil:
+        out = {**out, "planned_volume": out["volume"], "volume": max(VOLUME[sport]["min"], ceil), "adjusted": True}
+    return out
+
+
+def _week_volume(sport: str, c: dict, level: str, week_idx: int, ws: date, recent: dict | None, cap: float) -> dict:
+    start = min(_current(sport, c, level, recent), cap)
+    # corrida: o pico nunca fica abaixo do que a pessoa já faz (meta de 5 km não é motivo para cortar o volume pela metade)
+    floor = sport == "corrida" and int(c.get("sessions") or VOLUME[sport]["sessions"]) >= 3  # com 2 sessões não cabe
+    peak = min(max(_peak(sport, c, level), start) if floor else _peak(sport, c, level), cap)
     g = c.get("goal") or {}
     race = _d(g.get("date")) if g.get("type") in ("prova", "evento") else None
     n = max(0, week_idx)
@@ -663,7 +702,7 @@ def _round_vol(sport: str, v: float) -> float:
 
 def week_plan(profile: dict, ws: date, start: date, tier_key: str = "intermediario",
               recent: dict | None = None, today: date | None = None, sessions_override: dict | None = None,
-              full_slots: bool = False, max_hard: int | None = None) -> dict:
+              full_slots: bool = False, max_hard: int | None = None, done: dict | None = None) -> dict:
     """Todas as sessões de resistência da semana, por modalidade (sem dia definido)."""
     cfg = config(profile, sessions_override)
     level = _level(tier_key)
@@ -675,7 +714,7 @@ def week_plan(profile: dict, ws: date, start: date, tier_key: str = "intermediar
     for sport, c in cfg.items():
         n_cfg = int(c["sessions"])
         t_cap = session_max(sport, anchors, c.get("env")) * (1 if n_cfg <= 1 else (0.55 + 0.45 * (n_cfg - 1)) * 0.9)
-        wv = week_volume(sport, c, level, week_idx, ws, recent, cap=t_cap)
+        wv = week_volume(sport, c, level, week_idx, ws, recent, cap=t_cap, done=done)
         n = int(c["sessions"])
         test_due = False
         if end_cfg.get("tests", True) and sport in ANCHOR_KEY and not test_slot_used:
@@ -691,9 +730,21 @@ def week_plan(profile: dict, ws: date, start: date, tier_key: str = "intermediar
         n_week = n if full_slots else min(n, max(1, int(wv["volume"] // (mn * 1.1)) or 1))
         roles = _week_roles(sport, c, level, week_idx, wv["phase"], n_week, test_due)
         sessions = _compose(sport, roles, wv["volume"], c, anchors, level, week_idx, wv["phase"])
+        built = sum(_vol(x) for x in sessions)
+        if built and built < wv["volume"] * 0.85:
+            # poucas sessões para o volume (o longo tem teto pela distância da prova): a semana mostra o que cabe
+            wv = {**wv, "volume": built}
         for r, s in zip(roles, sessions):
             s["endurance"]["role"] = "longo" if s["endurance"]["type"] == "longo" else ("qualidade" if s["endurance"]["hard"] else "leve")
+        if wv.get("adjusted"):
+            unit = VOLUME[sport]["unit"]
+            fmt = (lambda v: f"{v:g} km") if unit == "km" else (lambda v: f"{int(v)} m") if unit == "m" else (lambda v: f"{v:.1f} h".replace(".", ","))
+            msg = (f"Volume ajustado ao que você fez nas últimas semanas: {fmt(_round_vol(sport, wv['volume']))} "
+                   f"em vez de {fmt(_round_vol(sport, wv['planned_volume']))} — volta a subir aos poucos, sem salto.")
+            for s in sessions:
+                s["endurance"]["note"] = (s["endurance"].get("note") + " · " if s["endurance"].get("note") else "") + msg
         out[sport] = {"volume": _round_vol(sport, wv["volume"]), "unit": VOLUME[sport]["unit"], "phase": wv["phase"],
+                      **({"adjusted": True, "planned_volume": _round_vol(sport, wv["planned_volume"])} if wv.get("adjusted") else {}),
                       "phase_pt": PHASE_PT.get(wv["phase"], wv["phase"]), "weeks_to_race": wv.get("weeks_to_race"),
                       "sessions": sessions}
     _cap_hard(out, level, anchors, max_hard)
@@ -878,7 +929,9 @@ def _goal_check(pred: float, tgt: float | None, g: dict, vd: float, dist: float)
         need = sp.vdot(dist, tgt) or vd
         race = _d(g.get("date"))
         weeks = max(0, (race - clock.today()).days // 7) if race else 12
-        realistic_gain = weeks / 4 * 1.0  # ~1 ponto de VDOT a cada 4 semanas de treino consistente
+        # ganho realista de VDOT a cada 4 semanas de treino consistente: quem já é rápido melhora mais devagar
+        per4 = 1.0 if vd < 35 else 0.7 if vd < 45 else 0.45 if vd < 55 else 0.3
+        realistic_gain = min(6.0, weeks / 4 * per4)
         res.update(gap_s=round(pred - tgt), vdot_needed=need,
                    status="no_alvo" if pred <= tgt else ("possivel" if need - vd <= realistic_gain else "ambicioso"))
         if res["status"] == "ambicioso":
@@ -915,7 +968,8 @@ def event_prediction(profile: dict, ev: dict) -> dict:
             "gap_s": round(total - tgt) if tgt and not missing else None}
 
 
-def recent_volumes(sessions: list[dict], profile: dict, today: date | None = None, weeks: int = 4) -> dict:
+def recent_volumes(sessions: list[dict], profile: dict, today: date | None = None, weeks: int = 4,
+                   fixed_span: bool = False) -> dict:
     """Volume semanal médio das últimas semanas por modalidade (na unidade de cada uma)."""
     from . import load
 
@@ -941,8 +995,22 @@ def recent_volumes(sessions: list[dict], profile: dict, today: date | None = Non
                 tot[sport] = tot.get(sport, 0) + mins / 60
     if not tot:
         return {}
-    span = max(1.0, min(weeks, ((today - first).days + 1) / 7)) if first else weeks
+    span = weeks if fixed_span else (max(1.0, min(weeks, ((today - first).days + 1) / 7)) if first else weeks)
     return {k: round(v / span, 2) for k, v in tot.items()}
+
+
+def done_volumes(sessions: list[dict], profile: dict, ws: date) -> dict:
+    """Por modalidade: média semanal das 3 semanas antes de `ws`, média das 3 anteriores a essas e se há registro."""
+    avg3 = recent_volumes(sessions, profile, today=ws - timedelta(days=1), weeks=3, fixed_span=True)
+    weeks = [recent_volumes(sessions, profile, today=ws - timedelta(days=1 + 7 * k), weeks=1, fixed_span=True) for k in range(3)]
+    before = recent_volumes(sessions, profile, today=ws - timedelta(days=22), weeks=3, fixed_span=True)
+    ever = recent_volumes(sessions, profile, today=ws - timedelta(days=1), weeks=8)
+    out = {}
+    for sport in set(avg3) | set(before) | set(ever):
+        out[sport] = {"avg3": avg3.get(sport, 0.0), "max3": max(w.get(sport, 0.0) for w in weeks),
+                      "weeks": [w.get(sport, 0.0) for w in weeks],
+                      "before": before.get(sport, 0.0), "tracked": sport in ever}
+    return out
 
 
 def options() -> dict:

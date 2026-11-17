@@ -803,6 +803,7 @@ def generate(profile: dict, seed: int = 0, recent: dict | None = None, today=Non
             "cardio_target": cardio_target, "cardio_planned_equiv": week_cardio, "rpe": tier["rpe"],
         },
         **({"endurance_plan": {"start": week0.isoformat(), "tier": tier_key, "sessions": sess_override, "max_hard": max_hard,
+                               "start_volumes": {k: v for k, v in (recent or {}).items() if k in (p.get("endurance") or {}).get("sports", {})} or None,
                                "week0": {k: {kk: v[kk] for kk in ("volume", "unit", "phase", "phase_pt")} for k, v in wp["sports"].items()}}}
            if wp else {}),
         "goals_week": {

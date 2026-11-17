@@ -201,6 +201,7 @@ def check_weeks(prof: dict) -> None:
     last = max(race_dates) if race_dates else MONDAY + timedelta(weeks=20)
     n_weeks = max(4, (last - MONDAY).days // 7 + 3)
     prev: dict = {}
+    hist: dict = defaultdict(list)
     vols: dict[str, list] = defaultdict(list)
     for w in range(min(n_weeks, 40)):
         ws = MONDAY + timedelta(weeks=w)
@@ -237,9 +238,11 @@ def check_weeks(prof: dict) -> None:
                     and prev[s][1] not in ("semana_leve", "polimento", "prova", "recuperacao") and prev[s][0] > 0:
                 jump = planned / prev[s][0]
                 gran = {"km": 0.5, "h": 1 / 12, "m": 100}[en.VOLUME[s]["unit"]]
-                if jump > 1.10 and planned - prev[s][0] > gran + 1e-9 and planned > prev[s][0] * 1.10 + gran:
+                ref = max([prev[s][0]] + hist[s][-3:])  # voltar ao volume de 2–3 semanas atrás não é progressão
+                if jump > 1.10 and planned - ref > gran + 1e-9 and planned > ref * 1.10 + gran:
                     issue("semana: aumento > 10%", (pid, s, w, round(prev[s][0], 2), round(planned, 2)))
             prev[s] = (planned, d["phase"])
+            hist[s].append(planned)
         cap = 2 if level == "iniciante" else 3
         if hard > cap:
             issue("semana: fortes acima do teto", (pid, w, hard, cap))

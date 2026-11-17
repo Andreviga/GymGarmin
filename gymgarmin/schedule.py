@@ -86,8 +86,11 @@ def _endurance_week(plan: dict, profile: dict, ws: date) -> dict | None:
     if not ep or not endurance.active(profile):
         return None
     start = _d(ep.get("start")) or ws
-    return endurance.week_plan(profile, ws, start, ep.get("tier") or "intermediario", sessions_override=ep.get("sessions"),
-                               max_hard=ep.get("max_hard"))
+    # o que foi realmente feito (registros/Garmin) limita o volume: falhou semanas ou ficou doente → plano não salta
+    sessions = db.list_sessions(since=(ws - timedelta(weeks=8)).isoformat(), limit=800)
+    done = endurance.done_volumes([s for s in sessions if s["date"][:10] < ws.isoformat()], profile, ws)
+    return endurance.week_plan(profile, ws, start, ep.get("tier") or "intermediario", recent=ep.get("start_volumes"),
+                               sessions_override=ep.get("sessions"), max_hard=ep.get("max_hard"), done=done)
 
 
 def _assign_sessions(days: list[dict], wp: dict) -> dict[int, dict | None]:
