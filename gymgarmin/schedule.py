@@ -209,6 +209,8 @@ def build_week(plan: dict, profile: dict, ws: date, from_date: date | None = Non
             "date": dt.isoformat(), "plan_id": plan["id"], "day_idx": idx, "status": "planejado",
             "day_name": name, "kind": _kind(day), "items": items, "cycle": pos, "changes": [], **extra,
         })
+    if gen.get("same_session"):
+        fit_same_session(entries, days, session_budget(profile, plan))
     for race in _race_entries(plan, profile, ws, wp):
         if not from_date or _d(race["date"]) >= from_date:
             # no dia da prova, os outros treinos daquele dia saem
@@ -216,6 +218,29 @@ def build_week(plan: dict, profile: dict, ws: date, from_date: date | None = Non
             entries.append(race)
     entries.sort(key=lambda e: (e["date"], e.get("kind") != "forca"))
     return entries
+
+
+def fit_same_session(entries: list[dict], days: list[dict], budget: float) -> None:
+    """Musculação + esporte no mesmo treino: a corrida da semana muda de duração (progressão, semana
+    leve, teste), então a força daquele dia é recortada para os dois caberem nos minutos do dia."""
+    from .generator import STRENGTH_MIN_COMBINED, _fit_time, time_breakdown
+
+    by_date: dict[str, list[dict]] = defaultdict(list)
+    for e in entries:
+        by_date[e["date"]].append(e)
+    for es in by_date.values():
+        strength = [e for e in es if e.get("kind") == "forca"]
+        ends = [e for e in es if e.get("sport") and (days[e["day_idx"]] if 0 <= e.get("day_idx", -1) < len(days) else {}).get("same_session")]
+        if not strength or not ends:
+            continue
+        end_min = sum(time_breakdown(e["items"])["total"] for e in ends)
+        target = max(STRENGTH_MIN_COMBINED, budget - end_min - 3)
+        for e in strength:
+            if time_breakdown(e["items"])["total"] > target + 0.5:
+                d = {"items": [dict(i) for i in e["items"]], "kind": "forca"}
+                _fit_time([d], target, protect_post=True)
+                e["items"] = d["items"]
+                e.setdefault("changes", []).append(f"ajustado para caber com o esporte do dia ({int(budget)} min no total)")
 
 
 def _sessions_in_week(ws: date) -> list[dict]:

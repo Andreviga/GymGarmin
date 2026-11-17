@@ -298,7 +298,7 @@ async function openGenerator() {
     $("#gm-out", body).innerHTML = `<p class="muted">Montando…</p>`;
     const plan = await api("/api/generator/preview", { method: "POST", body: { profile: prof, seed } });
     $("#gm-out", body).innerHTML = `<h3>Por que assim</h3><ul class="small">${plan.rationale.map((r) => `<li>${esc(r)}</li>`).join("")}</ul>
-      ${plan.days.map((d) => `<div class="day"><b>${esc(d.name)}</b>${timeBar(d.time)}${itemsByPhase(d.items.map((i) => ({ ...i, _name: i._name })))}</div>`).join("")}
+      ${previewDays(plan)}
       <h3>Volume semanal planejado</h3>${muscleBars(plan.analysis.muscles, "sets_week")}`;
     // nomes dos exercícios
     const ids = [...new Set(plan.days.flatMap((d) => d.items.map((i) => i.exercise_id)))];
@@ -315,6 +315,20 @@ async function openGenerator() {
     closeModal(); toast("Treino gerado e semana montada!");
     if (location.hash.startsWith("#hoje") || !location.hash) route(); else location.hash = "#hoje";
   };
+}
+
+// dias com musculação + esporte no mesmo treino aparecem juntos, com o tempo total do dia
+function previewDays(plan) {
+  const same = plan.generator && plan.generator.same_session; const budget = plan.generator && plan.generator.session_minutes;
+  const groups = [];
+  plan.days.forEach((d) => { const g = groups[groups.length - 1]; if (g && g[0].weekday === d.weekday) g.push(d); else groups.push([d]); });
+  const one = (d, inGroup) => `<div class="day"><b>${esc(inGroup ? d.name.split(" – ").slice(1).join(" – ") : d.name)}</b>${timeBar(inGroup ? { ...d.time, orcamento: null } : d.time)}${itemsByPhase(d.items.map((i) => ({ ...i, _name: i._name })))}</div>`;
+  return groups.map((g) => {
+    if (g.length < 2) return one(g[0], false);
+    const tot = Math.round(g.reduce((a, d) => a + d.time.total, 0));
+    const head = `<b>${esc(g[0].name.split(" – ")[0])}</b> · ${same ? "mesmo treino" : "dois treinos"}: <b>${tot} min</b>${budget ? ` de ${budget}` : ""}${same ? " — musculação primeiro, corrida logo depois" : ""}`;
+    return `<div class="day-group"><div class="small" style="margin:10px 0 4px">${head}</div>${g.map((d) => one(d, true)).join("")}</div>`;
+  }).join("");
 }
 
 /* ----------------------------------------------------------- PLANILHAS -- */

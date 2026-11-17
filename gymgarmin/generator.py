@@ -872,7 +872,7 @@ def generate(profile: dict, seed: int = 0, recent: dict | None = None, today=Non
         "generator": {
             "tier": tier_key, "tier_label": tier["label"], "goal": goal_key, "goal_label": goal["label"],
             "cycle_weeks": tier["cycle_weeks"], "ramp_sets": tier["ramp_sets"], "seed": seed,
-            "session_minutes": budget, "available_days": avail, "targets": targets,
+            "session_minutes": budget, "available_days": avail, "targets": targets, "same_session": combine,
             "cardio_target": cardio_target, "cardio_planned_equiv": week_cardio, "rpe": tier["rpe"],
         },
         **({"endurance_plan": {"start": week0.isoformat(), "tier": tier_key, "sessions": sess_override, "max_hard": max_hard,

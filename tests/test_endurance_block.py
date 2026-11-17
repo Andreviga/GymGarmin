@@ -84,3 +84,33 @@ def test_same_session_fits_strength_and_run_in_daily_minutes():
     legs = sorted(d["weekday"] for d in comb["days"] if d["kind"] == "forca" and d["template"] in generator.HEAVY_LEGS)
     assert not any(b - a == 1 for a, b in zip(legs, legs[1:]))
     assert any("mesmo treino" in r for r in comb["rationale"])
+
+
+def test_same_session_week_stays_within_daily_minutes_as_runs_grow(tmp_path, monkeypatch):
+    """A agenda recalcula a corrida a cada semana (progressão): a musculação do dia encolhe junto."""
+    from datetime import date
+
+    from gymgarmin import generator, schedule
+
+    monkeypatch.setenv("GYMGARMIN_HOME", str(tmp_path))
+    monkeypatch.setenv("GYMGARMIN_DB", str(tmp_path / "t.sqlite3"))
+    prof = {"age": 34, "weight_kg": 98, "training_months": 72, "goal": "hipertrofia", "session_minutes": 90,
+            "available_days": [0, 1, 2, 3, 4, 5, 6], "same_session": True,
+            "endurance": {"sports": {"corrida": {"enabled": True, "env": "esteira", "sessions": 4, "long_day": 6}}}}
+    plan = generator.generate(prof, 0, recent={"corrida": 16.0}, today=date(2026, 11, 16))
+    plan["id"] = 1
+    plan["generator"]["cycle_start"] = "2026-11-16"
+    assert plan["generator"]["same_session"]
+    for ws in (date(2026, 11, 16), date(2026, 11, 23), date(2026, 11, 30)):
+        tot = {}
+        for e in schedule.build_week(plan, prof, ws):
+            tot[e["date"]] = tot.get(e["date"], 0) + generator.time_breakdown(e["items"])["total"]
+        assert max(tot.values()) <= 92, (ws, tot)
+    # corrida que não cabe nem com a força no mínimo: passa do tempo (com aviso), mas a força fica >= 40 min
+    long_prof = {**prof, "endurance": {"sports": {"corrida": {**prof["endurance"]["sports"]["corrida"], "current_weekly": 45}}}}
+    plan2 = generator.generate(long_prof, 0, recent={"corrida": 45.0}, today=date(2026, 11, 16))
+    plan2["id"] = 2
+    plan2["generator"]["cycle_start"] = "2026-11-16"
+    for e in schedule.build_week(plan2, long_prof, date(2026, 11, 23)):
+        if e["kind"] == "forca":
+            assert generator.time_breakdown(e["items"])["total"] >= generator.STRENGTH_MIN_COMBINED - 3
