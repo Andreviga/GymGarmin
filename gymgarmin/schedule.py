@@ -406,6 +406,11 @@ def handle_missed(entry_id: int, profile: dict, today: date | None = None) -> di
                          and abs((_d(e["date"]) - cand).days) == 1]
             if any(_conflict(missed, n) for n in neighbors):
                 continue
+            same_day = [e for e in others if e["date"] == cand.isoformat() and e["status"] in ("planejado", "feito")
+                        and e.get("kind") != "cardio"]
+            if len(same_day) >= 2 or any(e["status"] == "feito" for e in same_day) or \
+                    any(_is_heavy_end(e) for e in same_day):
+                continue  # dia cheio, já treinado ou com sessão forte/longa de resistência
             new = {k: copy.deepcopy(v) for k, v in missed.items() if k not in ("id", "undo", "garmin_workout_id", "garmin_outdated")}
             new.update(date=cand.isoformat(), status="planejado", moved_from=missed["date"], changes=[])
             cardio_day = next((e for e in others if e["date"] == cand.isoformat() and e["status"] == "planejado"
@@ -585,7 +590,7 @@ def _missed_endurance(missed: dict, others: list[dict], future: list[dict], prof
         if cand < first or cand.isoformat() == missed["date"]:
             continue
         same = [e for e in active_entries if e["date"] == cand.isoformat()]
-        if any(e.get("kind") == "resistencia" for e in same):
+        if any(e.get("kind") == "resistencia" for e in same) or len(same) >= 2 or any(e["status"] == "feito" for e in same):
             continue
         near = [e for e in active_entries if abs((_d(e["date"]) - cand).days) == 1]
         if any(_is_heavy_end(e) for e in near) and sport in endurance.LEG_SPORTS:
@@ -659,8 +664,13 @@ def move(entry_id: int, to: str) -> dict:
     warn = [x for x in db.list_schedule(ws.isoformat(), (ws + timedelta(days=6)).isoformat())
             if x["id"] != entry_id and x.get("kind") == "forca" and x["status"] in ("planejado", "feito")
             and abs((_d(x["date"]) - _d(to)).days) <= 1 and _conflict(saved, x)]
-    return {"entry": saved, "warning": (f"Atenção: fica colado em {warn[0]['day_name']} ({_fmt(warn[0]['date'])}), "
-                                        "que treina os mesmos músculos.") if warn else None}
+    same = [x for x in db.list_schedule(saved["date"], saved["date"]) if x["status"] in ("planejado", "feito")]
+    msgs = []
+    if warn:
+        msgs.append(f"fica colado em {warn[0]['day_name']} ({_fmt(warn[0]['date'])}), que treina os mesmos músculos")
+    if len(same) > 2:
+        msgs.append(f"{_fmt(saved['date'])} ficou com {len(same)} treinos — considere outro dia")
+    return {"entry": saved, "warning": ("Atenção: " + "; ".join(msgs) + ".") if msgs else None}
 
 
 # ------------------------------------------------------------- metas da semana --

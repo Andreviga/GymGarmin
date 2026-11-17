@@ -207,3 +207,43 @@ def test_pull_not_far_above_push():
     for days in ([1, 4], [0, 1, 3, 4], [5, 6]):
         p = generator.generate({"training_months": 9, "goal": "hipertrofia", "available_days": days, "session_minutes": 60})
         assert generator._push_pull(generator._weekly_volume(p["days"])) <= 1.65
+
+
+# ------------------------------------------------------- agenda e reajustes ---
+def _per_day(entries):
+    from collections import Counter
+
+    return Counter(e["date"] for e in entries if e["status"] in ("planejado", "feito"))
+
+
+def test_missed_adjustments_never_stack_three_sessions(fresh_db):
+    """Simulação: faltas seguidas num plano misto nunca deixam um dia com 3+ treinos."""
+    prof, _ = _setup({"training_months": 18, "goal": "hibrido", "available_days": [0, 1, 3, 4, 6],
+                      "session_minutes": 45, "age": 34,
+                      "endurance": {"sports": {"corrida": {"enabled": True, "sessions": 3},
+                                               "ciclismo": {"enabled": True, "sessions": 3}},
+                                    "anchors": {"run_vdot": 45, "ftp_w": 220},
+                                    "anchors_meta": {k: {"date": MONDAY.isoformat()} for k in ("run_vdot", "ftp_w")}}})
+    week = schedule.ensure_week(prof, MONDAY, MONDAY)
+    assert max(_per_day(week).values()) <= 2
+    for day in range(6):
+        today = MONDAY + timedelta(days=day)
+        for e in [x for x in schedule.ensure_week(prof, MONDAY, today) if x["date"] == today.isoformat()
+                  and x["status"] == "planejado"]:
+            schedule.handle_missed(e["id"], prof, today)
+            assert max(_per_day(schedule.ensure_week(prof, MONDAY, today)).values(), default=0) <= 2, e["day_name"]
+
+
+def test_manual_move_warns_when_day_gets_crowded(fresh_db):
+    prof, _ = _setup({"training_months": 18, "goal": "hibrido", "available_days": [0, 1, 2, 3, 4, 5],
+                      "session_minutes": 60,
+                      "endurance": {"sports": {"corrida": {"enabled": True, "sessions": 3},
+                                               "ciclismo": {"enabled": True, "sessions": 3}},
+                                    "anchors": {"run_vdot": 45, "ftp_w": 220}}})
+    week = schedule.ensure_week(prof, MONDAY, MONDAY)
+    per = _per_day(week)
+    full = next((d for d, n in per.items() if n == 2), None)
+    assert full, per
+    src = next(e for e in week if e["date"] != full and e["status"] == "planejado")
+    res = schedule.move(src["id"], full)
+    assert res["warning"] and "3 treinos" in res["warning"]
