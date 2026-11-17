@@ -266,7 +266,9 @@ class _Picker:
         if pref:
             rank = {e: i for i, e in enumerate(pref)}
             out.sort(key=lambda c: rank.get(catalog.get(c[0]).get("equipment"), 99))
-        # "cuidado" vai para o fim da fila
+        # "cuidado" vai para o fim da fila; nos acessórios, os que treinam o músculo alongado vêm antes
+        if pattern in LENGTHENED_PATTERNS:
+            out.sort(key=lambda c: c[0] not in LENGTHENED)
         out.sort(key=lambda c: c[1] != "ok")
         return out
 
@@ -395,23 +397,69 @@ def _cardio_machine(lims, prefs, rotation: int, hiit: bool = False) -> str:
     return ok[rotation % len(ok)]
 
 
-def _prep_items(regions: set[str], lims, rotation: int, warm_machine: str, warm_min: int) -> list[dict]:
-    items = [{"exercise_id": warm_machine, "duration_min": warm_min, "zone": 1 if warm_min <= 5 else 2,
-              "phase": "preparo", "notes": "aquecimento geral: elevar temperatura e FC"}]
+# Repetições na reserva por papel (Refalo 2023, Robinson 2024): hipertrofia sobe perto da falha; força não precisa.
+RIR = {
+    "iniciante": {"main": "2–3", "sec": "2–3", "acc": "1–2"},
+    "intermediario": {"main": "1–3", "sec": "1–2", "acc": "0–2 (última até a falha técnica)"},
+    "avancado": {"main": "1–3", "sec": "1–2", "acc": "0–1 (última até a falha técnica)"},
+    "elite": {"main": "1–2", "sec": "1–2", "acc": "0–1 (última até a falha técnica)"},
+}
+# Exercícios que carregam o músculo alongado (Maeo 2021/2023, Pedrosa 2022, Kassiano 2023): preferidos nos acessórios
+LENGTHENED = {"Seated_Leg_Curl", "Cable_Rope_Overhead_Triceps_Extension", "Standing_Dumbbell_Triceps_Extension",
+              "Incline_Dumbbell_Curl", "Standing_Calf_Raises", "Standing_Dumbbell_Calf_Raise", "Dumbbell_Flyes",
+              "Low_Cable_Crossover", "Romanian_Deadlift"}
+LENGTHENED_PATTERNS = {"leg_curl", "triceps", "biceps", "calf", "chest_fly"}
+
+
+# Aquecimento RAMP (Jeffreys): Elevar → Ativar/mobilizar (dinâmico, específico do dia) → Potencializar
+# (séries de aproximação no 1º exercício e, para avançados, saltos/arremessos). Alongamento estático fica para o fim.
+RAMP_DRILLS = {
+    "inferior": ["Worlds_Greatest_Stretch", "Bodyweight_Walking_Lunge", "Single_Leg_Glute_Bridge", "Standing_Hip_Circles",
+                 "Goblet_Squat", "Ankle_Circles", "Inchworm", "Butt_Lift_Bridge"],
+    "superior": ["Band_Pull_Apart", "Scapular_Pull-Up", "External_Rotation_with_Band", "Arm_Circles", "Push_Up_to_Side_Plank",
+                 "Cat_Stretch", "Shoulder_Circles"],
+    "core": ["Dead_Bug", "Cat_Stretch"],
+}
+POTENTIATE = {"inferior": "Box_Jump_Multiple_Response", "superior": "Medicine_Ball_Chest_Pass"}
+
+
+def _prep_items(regions: set[str], lims, rotation: int, warm_machine: str, warm_min: int,
+                potentiate: bool = False, equipment: set[str] | None = None) -> list[dict]:
+    items = [{"exercise_id": warm_machine, "duration_min": warm_min, "zone": 1 if warm_min <= 3 else 2, "phase": "preparo",
+              "ramp": "elevar", "notes": f"Elevar: {warm_min} min subindo de leve a moderado (esquenta músculos e articulações)"}]
+    lower, upper = "inferior" in regions, "superior" in regions
+    if lower and upper:
+        plan = [("inferior", 2), ("superior", 2)]
+    elif lower:
+        plan = [("inferior", 4 if warm_min >= 5 else 3)]
+    else:
+        plan = [("superior", 4 if warm_min >= 5 else 3)]
     chosen: list[str] = []
-    for region in ["inferior", "superior", "core"]:
-        if region not in regions:
-            continue
-        pool = [m for m in MOBILITY[region] if catalog.get(m) and check_exercise(catalog.get(m), lims)["status"] != "evitar"]
-        k = 2 if region != "core" else 1
-        for i in range(k):
-            if pool:
-                cand = pool[(rotation + i) % len(pool)]
-                if cand not in chosen:
-                    chosen.append(cand)
-    for eid in chosen[:3 if warm_min and warm_min <= 4 else 4]:  # sessão curta: preparo mais enxuto
-        items.append({"exercise_id": eid, "sets": 1, "duration_s": 40, "rest_s": 10, "phase": "preparo",
-                      "notes": "mobilidade/ativação dinâmica"})
+    for region, k in plan:
+        pool = [m for m in RAMP_DRILLS[region] if _ok(m, lims, equipment) == "ok"]
+        pool = pool or [m for m in MOBILITY[region] if catalog.get(m) and check_exercise(catalog.get(m), lims)["status"] != "evitar"]
+        for i in range(len(pool)):
+            if len([c for c in chosen if c in pool]) >= k:
+                break
+            cand = pool[(rotation + i) % len(pool)]
+            if cand not in chosen:
+                chosen.append(cand)
+    for eid in chosen:
+        ex = catalog.get(eid)
+        timed = ex.get("timed") or ex.get("category") == "stretching"
+        it = {"exercise_id": eid, "sets": 1, "rest_s": 10, "phase": "preparo", "ramp": "ativar",
+              "notes": "Ativar/mobilizar: movimento controlado e amplo, sem cansar"}
+        if timed:
+            it["duration_s"] = 40
+        else:
+            it["reps"] = "8-10"
+        items.append(it)
+    if potentiate:
+        region = "inferior" if lower else "superior"
+        pid = POTENTIATE[region]
+        if _ok(pid, lims, equipment) == "ok":
+            items.append({"exercise_id": pid, "sets": 2, "reps": "3", "rest_s": 60, "phase": "preparo", "ramp": "potencializar",
+                          "notes": "Potencializar (opcional): 2 × 3 explosivos, descanso de 1 min — prepara o sistema nervoso para as séries pesadas"})
     return items
 
 
@@ -639,7 +687,8 @@ def generate(profile: dict, seed: int = 0, recent: dict | None = None, today=Non
 
     days: list[dict] = []
     variant_count: dict[str, int] = defaultdict(int)
-    warm_min = 4 if budget <= 45 else 5 if budget < 75 else 8
+    warm_min = 3 if budget <= 45 else 5  # RAMP: o "elevar" leva 3–5 min; o resto é específico do dia
+    potentiate = tier_key in ("avancado", "elite") and goal_key in ("forca", "hibrido", "condicionamento") and budget >= 60
     for di, (wd, key) in enumerate(zip(strength_days, split)):
         title, slots = DAY_TEMPLATES[key]
         variant = variant_count[key]
@@ -656,7 +705,8 @@ def generate(profile: dict, seed: int = 0, recent: dict | None = None, today=Non
             used.add(eid)
             ex = catalog.get(eid)
             item = {"exercise_id": eid, "sets": tier["sets"][role], "rest_s": int(round(tier["rest"][role] * rest_mult / 15) * 15),
-                    "role": role, "pattern": pattern, "phase": "principal", "rpe_target": tier["rpe"]}
+                    "role": role, "pattern": pattern, "phase": "principal", "rpe_target": tier["rpe"],
+                    "rir": RIR[tier_key][role]}
             if ex.get("timed"):
                 item["duration_s"] = tier["timed_s"]
             else:
@@ -668,14 +718,21 @@ def generate(profile: dict, seed: int = 0, recent: dict | None = None, today=Non
             first = main_items[0]
             if first["role"] == "main" and not first.get("duration_s"):
                 first["approach_sets"] = True
-                first["notes"] = ((first.get("notes") or "") + " · aproximação: 1×8 a 50% e 1×4 a 75% antes das séries válidas").strip(" ·")
+                heavy = _reps_bounds(first.get("reps"))[0] <= 6
+                ap = ("aproximação: barra×8, ~50%×5, ~70%×3, ~85%×1–2" if heavy else "aproximação: ~50%×8 e ~75%×4")
+                first["notes"] = ((first.get("notes") or "") + f" · {ap} antes das séries válidas").strip(" ·")
+                if heavy and tier_key in ("avancado", "elite"):
+                    first["notes"] += " · top set: 1 série pesada (RPE 8) e as demais ~10% mais leves"
+        accs = [i for i in main_items if i["role"] == "acc" and not catalog.get(i["exercise_id"]).get("timed")]
+        if accs and tier_key != "iniciante" and goal_key in ("hipertrofia", "emagrecimento", "hibrido"):
+            accs[-1]["notes"] = ((accs[-1].get("notes") or "") + " · última série: drop set (tire ~25% e continue até perto da falha)").strip(" ·")
         _pair_supersets(main_items)
         regions = set()
         for it in main_items:
             ex = catalog.get(it["exercise_id"])
             for m in ex["primaryMuscles"]:
                 regions.add("core" if MUSCLES.get(m, {}).get("region") == "core" else MUSCLES.get(m, {}).get("region", "superior"))
-        prep = _prep_items(regions, lims, di, _cardio_machine(lims, cardio_prefs, di), warm_min)
+        prep = _prep_items(regions, lims, di, _cardio_machine(lims, cardio_prefs, di), warm_min, potentiate, equipment)
         days.append({"name": f"{WEEKDAYS[wd]} – {title}", "weekday": wd, "kind": "forca", "template": key,
                      "items": prep + main_items})
 
@@ -699,7 +756,7 @@ def generate(profile: dict, seed: int = 0, recent: dict | None = None, today=Non
             items = [{"exercise_id": machine, "duration_min": int(min(30, budget - 5) // 5 * 5), "zone": min(2, mz), "phase": "principal",
                       "notes": "zona 2: dá para conversar em frases curtas"}]
             name = "Cardio zona 2" + (" (recuperação ativa)" if prev_is_legs else "")
-        mob = _prep_items({"inferior", "superior"}, lims, ci + 3, machine, 0)[1:3]
+        mob = _prep_items({"inferior", "superior"}, lims, ci + 3, machine, 0, equipment=equipment)[1:3]
         for m in mob:
             m["phase"] = "pos"
             m["notes"] = "mobilidade pós-cardio"
@@ -713,7 +770,7 @@ def generate(profile: dict, seed: int = 0, recent: dict | None = None, today=Non
                 wd = alloc[key]
                 items = [sess]
                 if sport_key in endurance.LEG_SPORTS:
-                    mob = _prep_items({"inferior"}, lims, i + 5, sess["exercise_id"], 0)[1:3]
+                    mob = _prep_items({"inferior"}, lims, i + 5, sess["exercise_id"], 0, equipment=equipment)[1:3]
                     for m in mob:
                         m["phase"] = "pos"
                         m["notes"] = "mobilidade pós-treino"

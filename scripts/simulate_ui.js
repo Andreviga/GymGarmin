@@ -127,7 +127,8 @@ async function audit(page, where) {
       }
     }
     // sobreposição: texto/campo/botão em cima de outro (fora os fixos: abas, cronômetro, aviso, modal)
-    const fixedish = (el) => el.closest(".tabbar, #timer, #toast, .topbar, .modal");
+    // fotos dos exercícios (.demo) são mídia de fundo: a legenda por cima é proposital
+    const fixedish = (el) => el.closest(".tabbar, #timer, #toast, .topbar, .modal") || (el.tagName === "IMG" && el.closest(".demo"));
     const leaves = all.filter((el) => !fixedish(el) && (/^(INPUT|SELECT|TEXTAREA|BUTTON|IMG)$/.test(el.tagName) ||
       ([...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim()) && !el.querySelector("input,select,button,textarea"))));
     // texto em linha que quebra: usa as caixas de cada linha (getClientRects), não o retângulo total

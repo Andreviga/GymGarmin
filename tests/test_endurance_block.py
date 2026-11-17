@@ -113,7 +113,7 @@ def test_same_session_week_stays_within_daily_minutes_as_runs_grow(tmp_path, mon
     plan2["generator"]["cycle_start"] = "2026-11-16"
     for e in schedule.build_week(plan2, long_prof, date(2026, 11, 23)):
         if e["kind"] == "forca":
-            assert generator.time_breakdown(e["items"])["total"] >= generator.STRENGTH_MIN_COMBINED - 3
+            assert generator.time_breakdown(e["items"])["total"] >= generator.STRENGTH_MIN_COMBINED - 5  # corta por série inteira
 
 
 def test_strength_tapers_with_race_and_legs_rest_before_race(tmp_path, monkeypatch):
@@ -144,3 +144,30 @@ def test_strength_tapers_with_race_and_legs_rest_before_race(tmp_path, monkeypat
         if e["kind"] == "forca" and e["date"] >= "2027-02-26":
             assert not any(set((catalog.get(i["exercise_id"]) or {}).get("primaryMuscles") or []) & legs
                            for i in e["items"] if i.get("phase") == "principal" and i.get("sets")), e["day_name"]
+
+
+def test_ramp_warmup_rir_lengthened_and_norwegian():
+    """Aquecimento RAMP específico do dia, RIR por papel, preferência por amplitude longa e 4×4 na corrida."""
+    from gymgarmin import catalog, endurance, generator
+
+    plan = generator.generate({"training_months": 36, "goal": "forca", "session_minutes": 75, "available_days": [0, 2, 4],
+                               "equipment": []}, 0)
+    for d in plan["days"]:
+        prep = [i for i in d["items"] if i.get("phase") == "preparo"]
+        assert prep[0]["ramp"] == "elevar" and 3 <= prep[0]["duration_min"] <= 5
+        assert any(i.get("ramp") == "ativar" for i in prep)
+        assert not any((catalog.get(i["exercise_id"]) or {}).get("category") == "stretching" and i.get("duration_s", 0) > 45 for i in prep)
+    assert any(i.get("ramp") == "potencializar" for d in plan["days"] for i in d["items"])  # avançado em força
+    mains = [i for d in plan["days"] for i in d["items"] if i.get("role") == "main"]
+    assert all(i.get("rir") for i in mains)
+    # sem caixa/bola de arremesso: o aquecimento não usa
+    no_eq = generator.generate({"training_months": 36, "goal": "forca", "session_minutes": 75, "available_days": [0, 2, 4],
+                                "equipment": ["barbell", "dumbbell"]}, 0)
+    eqs = {(catalog.get(i["exercise_id"]) or {}).get("equipment") for d in no_eq["days"] for i in d["items"] if i.get("phase") == "preparo"}
+    assert eqs <= {"barbell", "dumbbell", "body only", "other", None, "cardio machine"}
+    # amplitude longa nos acessórios
+    p2 = generator.generate({"training_months": 18, "goal": "hipertrofia", "session_minutes": 75, "available_days": [0, 1, 3, 4]}, 0)
+    acc = {i["exercise_id"] for d in p2["days"] for i in d["items"] if i.get("pattern") in generator.LENGTHENED_PATTERNS}
+    assert acc & generator.LENGTHENED
+    # corrida: o 4×4 entra na rotação de qualidade
+    assert "noruegues" in endurance.QUALITY_ROTATION["corrida"]

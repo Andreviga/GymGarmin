@@ -85,7 +85,9 @@ function balanceHtml(bal) {
 
 /* --------------------------------------------------------------- HOJE --- */
 const STATUS_INFO = { planejado: ["Planejado", ""], feito: ["Feito ✔", "ok"], perdido: ["Perdido", "bad"], pulado: ["Não treinou", "warn"], substituido: ["Substituído", "muted"] };
-const PHASES = [["preparo", "Preparação (aquecimento + mobilidade)"], ["principal", "Treino"], ["pos", "Pós-treino (alongamento)"]];
+const PHASES = [["preparo", "Aquecimento: elevar → ativar → potencializar"], ["principal", "Treino"], ["pos", "Pós-treino (alongamento)"]];
+const RAMP_TXT = { elevar: "elevar", ativar: "ativar", potencializar: "potencializar" };
+const RIR_TIP = "RIR = repetições que ainda sobrariam no fim da série (0 = falha). Perto da falha estimula mais o músculo.";
 const ddmm = (iso) => { const [y, m, d] = iso.slice(0, 10).split("-"); return `${d}/${m}`; };
 // data/hora local (toISOString é UTC: depois das 21h no Brasil já seria amanhã)
 const localISO = (d = new Date()) => { const p = (x) => String(x).padStart(2, "0"); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`; };
@@ -150,8 +152,8 @@ function itemLine(it) {
   let d = "";
   if (it.intervals) d = `${it.warmup_min || 0}′ + ${it.intervals.repeats}× (${it.intervals.work_s}s Z${it.intervals.work_zone} / ${it.intervals.rest_s}s) + ${it.cooldown_min || 0}′`;
   else if (it.duration_min) d = `${it.duration_min} min${it.zone ? " Z" + it.zone : ""}`;
-  else if (it.sets) d = `${it.sets}×${it.reps || (it.duration_s ? it.duration_s + "s" : "")}${it.rest_s && it.phase !== "preparo" && it.phase !== "pos" ? ` · ${it.rest_s}s` : ""}`;
-  const tags = [it.ramp ? `<span class="pill">+${it.ramp} série</span>` : "", it.deload ? `<span class="pill warn">deload</span>` : "", it.added ? `<span class="pill warn">+${it.added}</span>` : "", it.added_from ? `<span class="pill warn">compensação</span>` : "", it.finisher ? `<span class="pill muted">finalizador</span>` : "", it.superset ? `<span class="pill small" title="Bi-set: faça uma série de cada, emendadas, e descanse depois do segundo">bi-set ${it.superset}</span>` : "", it.rotated_from ? `<span class="pill muted small" title="Variação deste ciclo: estímulo novo para o músculo; no próximo ciclo volta o exercício de antes">variação do ciclo</span>` : ""].join(" ");
+  else if (it.sets) d = `${it.sets}×${it.reps || (it.duration_s ? it.duration_s + "s" : "")}${it.rest_s && it.phase !== "preparo" && it.phase !== "pos" ? ` · ${it.rest_s}s` : ""}${it.rir && !it.deload ? ` · RIR ${String(it.rir).split(" ")[0]}` : ""}`;
+  const tags = [it.ramp && RAMP_TXT[it.ramp] ? `<span class="pill muted small">${RAMP_TXT[it.ramp]}</span>` : it.ramp ? `<span class="pill">+${it.ramp} série</span>` : "", it.deload ? `<span class="pill warn">deload</span>` : "", it.added ? `<span class="pill warn">+${it.added}</span>` : "", it.added_from ? `<span class="pill warn">compensação</span>` : "", it.finisher ? `<span class="pill muted">finalizador</span>` : "", it.superset ? `<span class="pill small" title="Bi-set: faça uma série de cada, emendadas, e descanse depois do segundo">bi-set ${it.superset}</span>` : "", it.rotated_from ? `<span class="pill muted small" title="Variação deste ciclo: estímulo novo para o músculo; no próximo ciclo volta o exercício de antes">variação do ciclo</span>` : ""].join(" ");
   return `<li class="mline">${mediaHtml(it.exercise_id, "s")}<span><span data-ex="${esc(it.exercise_id)}" style="cursor:pointer">${name}</span> <span class="muted">${esc(d)}</span> ${tags}</span></li>`;
 }
 
@@ -289,7 +291,7 @@ function openStory(items, start) {
     const it = items[si]; if (!it || it.jump) return close();
     const sl = it.slides[k];
     box.innerHTML = `<div class="story-card s-${esc(it.key)}">
-      <div class="bars">${it.slides.map((_, j) => `<span class="${j < k ? "done" : j === k ? "run" : ""}"><i></i></span>`).join("")}</div>
+      <div class="sbars">${it.slides.map((_, j) => `<span class="${j < k ? "done" : j === k ? "run" : ""}"><i></i></span>`).join("")}</div>
       <div class="story-head"><span class="ring small"><span class="hole">${it.avatar || `<span class="picto av">${it.inner || ""}</span>`}</span></span><b>${esc(it.label)}</b>
         <button class="story-x" aria-label="Fechar">×</button></div>
       <div class="story-body">
@@ -326,7 +328,7 @@ function dayCard(e, today) {
       <div class="grow"><b>${esc(e.day_name)}</b>${e.race ? ` <span class="pill bad">PROVA</span>` : ""}
         <div class="small muted">${e.weekday} ${ddmm(e.date)}${e.time ? ` · ~${Math.round(e.time.total)} min` : ""}${e.endurance_phase ? ` · ${esc(e.endurance_phase)}` : ""}</div></div>
       <span class="pill ${cls}">${label}</span></div>
-    ${active && ids.length && !e.sport ? `<div class="carousel">${(e.items || []).filter((i) => (i.phase || "principal") === "principal").slice(0, 10).map((i) => `<figure data-ex="${esc(i.exercise_id)}">${mediaHtml(i.exercise_id, "car")}<figcaption>${esc(i._name || i._ex?.name || "")}<span>${i.sets ? `${i.sets}×${esc(i.reps || (i.duration_s ? i.duration_s + "s" : ""))}` : ""}</span></figcaption></figure>`).join("")}</div>` : ""}
+    ${active && ids.length && !e.sport ? `<div class="carousel">${(e.items || []).filter((i) => (i.phase || "principal") === "principal").slice(0, 10).map((i) => `<figure data-ex="${esc(i.exercise_id)}">${mediaHtml(i.exercise_id, "car")}<figcaption><b class="nm">${esc(i._name || i._ex?.name || "")}</b><span>${i.sets ? `${i.sets}×${esc(i.reps || (i.duration_s ? i.duration_s + "s" : ""))}` : ""}</span></figcaption></figure>`).join("")}</div>` : ""}
     ${active && e.sport ? `<div class="post-sport">${pictoHtml(SPORT_PICTO[e.sport] || "run", "xl")}<div>${(e.items || []).filter((i) => i.endurance).map((i) => `<b>${esc(i.endurance.title)}</b><br><span class="small">${esc(endSummary(i.endurance))}</span>`).join("<br>")}</div></div>` : ""}
     ${active ? timeBar(e.time) : ""}
     ${e.changes && e.changes.length ? `<ul class="small changes">${e.changes.map((c) => `<li>${esc(c)}</li>`).join("")}</ul>` : ""}
@@ -1098,11 +1100,11 @@ function renderSession() {
   const compact = (ph) => idxs.filter(([it]) => phaseOf(it) === ph);
   const compactCard = (ph, title) => compact(ph).length ? `<div class="card"><h3>${title}</h3><ul class="list">${compact(ph).map(([it, i]) => `<li class="row gap">
       <button class="check ${it.done ? "on" : ""}" data-pdone="${i}">✓</button>${mediaHtml(it.exercise_id, "m")}
-      <span class="grow"><b data-ex="${esc(it.exercise_id)}" style="cursor:pointer">${esc(it.name)}</b><br><span class="small muted">${it.kind === "cardio" ? `${it.duration_min} min Z${it.zone}` : `${(it.plan && it.plan.duration_s) || 30}s${(it.plan && it.plan.sets) > 1 ? ` × ${it.plan.sets}` : ""}`}${it.plan && it.plan.notes ? " · " + esc(it.plan.notes) : ""}</span></span></li>`).join("")}</ul></div>` : "";
+      <span class="grow"><b data-ex="${esc(it.exercise_id)}" style="cursor:pointer">${esc(it.name)}</b><br><span class="small muted">${it.kind === "cardio" ? `${it.duration_min} min Z${it.zone}` : it.plan && it.plan.reps ? `${it.plan.sets > 1 ? it.plan.sets + " × " : ""}${esc(it.plan.reps)} reps` : `${(it.plan && it.plan.duration_s) || 30}s${(it.plan && it.plan.sets) > 1 ? ` × ${it.plan.sets}` : ""}`}${it.plan && it.plan.notes ? " · " + esc(it.plan.notes) : ""}</span></span></li>`).join("")}</ul></div>` : "";
   view.innerHTML = `<div class="card"><h2>${esc(s.day_name || "Treino")}</h2>
       <div class="field" style="margin:0"><label for="s-date">Data e hora</label><input type="datetime-local" id="s-date" value="${esc((s.date || "").slice(0, 16))}"></div>
       ${s.deload ? `<p class="small rec">Semana de deload: menos séries, carga −10%, RPE ~6.</p>` : ""}</div>
-    ${compactCard("preparo", "Preparação — aquecimento e mobilidade")}
+    ${compactCard("preparo", "Aquecimento — elevar, ativar, potencializar")}
     ${idxs.filter(([it]) => phaseOf(it) === "principal").map(([it, i]) => sessionItemHtml(it, i)).join("")}
     ${compactCard("pos", "Pós-treino — alongamento")}
     <div class="card"><button class="btn sm ghost" id="s-add">+ Adicionar exercício</button>
@@ -1116,7 +1118,7 @@ function sessionItemHtml(it, i) {
   const lastTxt = it.last ? (it.last.sets ? it.last.sets.map((x) => `${x.reps ?? "-"}×${x.load_kg ?? 0}`).join(" · ") : `${it.last.duration_min} min Z${it.last.zone}`) : "";
   const head = `<div class="row gap">${mediaHtml(it.exercise_id, "m")}
     <div class="grow"><b data-ex="${esc(it.exercise_id)}" style="cursor:pointer">${esc(it.name)}</b> ${limBadge(it.limitation)}
-    <div class="small muted">${it.kind === "cardio" ? `${plan.duration_min || ""} min · Z${plan.zone || ""}` : `${plan.sets || ""}×${plan.reps || (plan.duration_s ? plan.duration_s + "s" : "")} ${plan.load_kg ? "· " + plan.load_kg + " kg" : ""} · descanso ${plan.rest_s || 90}s`}
+    <div class="small muted">${it.kind === "cardio" ? `${plan.duration_min || ""} min · Z${plan.zone || ""}` : `${plan.sets || ""}×${plan.reps || (plan.duration_s ? plan.duration_s + "s" : "")} ${plan.load_kg ? "· " + plan.load_kg + " kg" : ""} · descanso ${plan.rest_s || 90}s${plan.rir && !plan.deload ? ` · <span title="${RIR_TIP}">sobrar ${esc(plan.rir)} reps</span>` : ""}`}
     ${lastTxt ? `<br>Última: ${esc(lastTxt)}` : ""}${it.suggestion && it.suggestion.note ? `<br><b>${esc(it.suggestion.note)}</b>` : ""}${plan.notes ? `<br>${esc(plan.notes)}` : ""}</div></div></div>`;
   if (it.endurance) {
     const en = it.endurance; const meters = ["natacao", "remo"].includes(en.sport);

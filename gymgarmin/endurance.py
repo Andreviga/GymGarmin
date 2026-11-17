@@ -101,7 +101,7 @@ EVENT_SESSIONS = {"tri_supersprint": {"natacao": 2, "ciclismo": 2, "corrida": 2}
                   "duathlon_sprint": {"ciclismo": 2, "corrida": 3}, "duathlon_padrao": {"ciclismo": 2, "corrida": 3},
                   "aquathlon": {"natacao": 2, "corrida": 3}}
 
-QUALITY_ROTATION = {"corrida": ["intervalado", "ritmo"], "ciclismo": ["sweet_spot", "limiar", "vo2"],
+QUALITY_ROTATION = {"corrida": ["intervalado", "ritmo", "noruegues"], "ciclismo": ["sweet_spot", "limiar", "vo2"],
                     "natacao": ["css", "velocidade"], "remo": ["intervalos_1000", "intervalos_500"],
                     "caminhada": [], "trilha": []}
 QUALITY_SHARE = {"corrida": 0.18, "ciclismo": 0.22, "natacao": 0.32, "remo": 0.25}
@@ -386,11 +386,19 @@ def _run(kind, km, c, anchors, env, level, week_idx, phase):
         return "Regenerativo", [_steady(S, "steady", 1, anchors, env, dist_m=km * 1000)], None
     warm, cool = 2.0, 1.5
     work = max(3.0 if kind == "ritmo" else 1.5, km - warm - cool)
+    if kind == "noruegues":
+        # 4 × 4 min a 90–95% da FC máx com 3 min trotando (Helgerud 2007: o que mais sobe o VO2máx)
+        n = 3 if level == "iniciante" else 4
+        return f"Norueguês {n} × 4 min", [
+            _steady(S, "warmup", 2, anchors, env, dur_s=10 * 60,
+                    note="10 min leve + educativos (skipping, anfersen, 4 acelerações de 20 s)"),
+            _repeat(n, [_steady(S, "interval", 5, anchors, env, dur_s=4 * 60), _steady(S, "recovery", 1, anchors, env, dur_s=3 * 60)]),
+            _steady(S, "cooldown", 1, anchors, env, dur_s=8 * 60)], "4 min forte (90–95% da FC máx: falar só palavras soltas) e 3 min trotando"
     if kind == "intervalado":
         rep = 800 if level == "iniciante" else 1000
         n = max(3, min(8, round(work * 1000 / rep / 1.6)))  # ~60% do miolo é tiro
         return f"Intervalado {n} × {rep} m", [
-            _steady(S, "warmup", 2, anchors, env, dist_m=warm * 1000),
+            _steady(S, "warmup", 2, anchors, env, dist_m=warm * 1000, note="leve + educativos e 4 acelerações de 20 s"),
             _repeat(n, [_steady(S, "interval", 5, anchors, env, dist_m=rep), _rest(120 if rep >= 1000 else 90, sport=S, anchors=anchors, env=env)]),
             _steady(S, "cooldown", 1, anchors, env, dist_m=cool * 1000)], "Tiros no ritmo I: forte, mas igual do primeiro ao último"
     if kind == "ritmo":
@@ -557,7 +565,7 @@ def build_session(sport: str, kind: str, volume: float, c: dict, anchors: dict, 
         flat += [x for _ in range(st["n"]) for x in st["steps"]] if st["kind"] == "repeat" else [st]
     dur = sum(s.get("dur_s") or 0 for s in flat)
     dist = sum(s.get("dist_m") or 0 for s in flat)
-    hard = kind in ("intervalado", "ritmo", "ritmo_prova", "sweet_spot", "limiar", "vo2", "css", "velocidade",
+    hard = kind in ("intervalado", "noruegues", "ritmo", "ritmo_prova", "sweet_spot", "limiar", "vo2", "css", "velocidade",
                     "intervalos_1000", "intervalos_500", "teste", "prova")
     zone = max((s.get("zone") or 1) for s in flat) if hard else (2 if kind != "regenerativo" else 1)
     end = {"sport": sport, "env": env, "type": kind, "title": title, "steps": steps, "hard": hard, "zone": zone,
