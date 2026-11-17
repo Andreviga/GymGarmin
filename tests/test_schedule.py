@@ -290,3 +290,19 @@ def test_long_sessions_may_exceed_session_time_with_warnings(fresh_db):
         assert over and sch["time_warnings"]
         longo = [e for e in over if any((it.get("endurance") or {}).get("role") == "longo" for it in e["items"])]
         assert longo and longo[0]["time"]["total"] > 45 + 5  # o longo não é cortado para caber nos 45 min
+
+
+def test_accessories_rotate_every_other_cycle_mains_never():
+    prof = {"training_months": 18, "goal": "hipertrofia", "available_days": [0, 2, 4], "session_minutes": 60,
+            "limitations": [{"key": "ombro", "severity": "evitar"}]}
+    plan = generator.generate(prof)
+    items = [i for d in plan["days"] for i in d["items"]]
+    c1 = generator.rotate_accessories(items, 1, prof, "intermediario")
+    c2 = generator.rotate_accessories(items, 2, prof, "intermediario")
+    c3 = generator.rotate_accessories(items, 3, prof, "intermediario")
+    assert c1 == items and c3 == items  # ciclos ímpares: originais (cada variação mantém o próprio histórico)
+    rotated = [b for a, b in zip(items, c2) if a["exercise_id"] != b["exercise_id"]]
+    assert rotated and all(b["role"] == "acc" and b["rotated_from"] for b in rotated)
+    assert all(a["exercise_id"] == b["exercise_id"] for a, b in zip(items, c2) if a.get("role") in ("main", "sec"))
+    from gymgarmin.limitations import check_exercise
+    assert all(check_exercise(catalog.get(b["exercise_id"]), prof["limitations"])["status"] == "ok" for b in rotated)

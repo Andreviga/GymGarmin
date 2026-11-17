@@ -29,7 +29,7 @@ import math
 from collections import defaultdict
 from datetime import date, datetime, timedelta
 
-from . import catalog, clock, db, endurance, load
+from . import catalog, clock, db, endurance, generator, load
 from .generator import WEEKDAYS, _cardio_equiv, _default_days, item_time, time_breakdown, weekly_targets, tier_for
 from .muscles import PRIMARY_WEIGHT, muscle_pt
 from .progression import apply_cycle, cycle_position
@@ -190,7 +190,8 @@ def build_week(plan: dict, profile: dict, ws: date, from_date: date | None = Non
         dt = ws + timedelta(days=wd)
         if from_date and dt < from_date:
             continue
-        items = apply_cycle(day.get("items", []), pos, int(gen.get("ramp_sets") or 0),
+        base_items = generator.rotate_accessories(day.get("items", []), pos.get("cycle"), profile, gen.get("tier"))
+        items = apply_cycle(base_items, pos, int(gen.get("ramp_sets") or 0),
                             budget_min=session_budget(profile, plan), allowance=allowance)
         name = _clean_name(day.get("name") or f"Treino {idx + 1}")
         extra = {}

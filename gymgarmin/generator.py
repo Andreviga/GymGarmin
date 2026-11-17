@@ -24,6 +24,8 @@ Como decide:
 
 from __future__ import annotations
 
+import copy
+
 import math
 from collections import defaultdict
 
@@ -281,6 +283,30 @@ class _Picker:
         choice = pool[idx]
         self.used_week[pattern].append(choice[0])
         return choice
+
+
+def rotate_accessories(items: list[dict], cycle: int, profile: dict, tier_key: str | None) -> list[dict]:
+    """Variação por ciclo: nos ciclos pares, cada acessório troca por outra opção do mesmo padrão de movimento
+    (respeitando limitações e equipamento); nos ímpares volta ao original. Os principais nunca mudam —
+    são eles que medem a progressão — e cada variação mantém o próprio histórico de carga."""
+    if not cycle or cycle < 2 or cycle % 2:
+        return items
+    tier = TIERS.get(tier_key or "intermediario") or TIERS["intermediario"]
+    lims = profile.get("limitations") or []
+    equipment = set(profile.get("equipment") or []) or None
+    picker = _Picker(tier, lims, equipment, 0)
+    out = copy.deepcopy(items)
+    used = {it.get("exercise_id") for it in out}
+    for it in out:
+        if it.get("role") != "acc" or not it.get("pattern") or (it.get("phase") or "principal") != "principal":
+            continue
+        cands = [c for c, st in picker.candidates(it["pattern"]) if c not in used and st == "ok"]
+        if not cands:
+            continue
+        it["rotated_from"] = it["exercise_id"]
+        it["exercise_id"] = cands[0]
+        used.add(cands[0])
+    return out
 
 
 PATTERN_MUSCLES = {
