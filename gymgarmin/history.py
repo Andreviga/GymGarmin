@@ -43,6 +43,8 @@ def bracket(reps: int) -> int:
 # exercícios com o peso do corpo em que dá para pendurar anilha: 1RM = corpo + peso extra
 LOADABLE_BODYWEIGHT = {"Pullups", "Chin-Up", "Dips_-_Triceps_Version", "Dips_-_Chest_Version", "Wide-Grip_Pulldown_Behind_The_Neck",
                        "Weighted_Pull_Ups", "Pushups", "Inverted_Row", "Parallel_Bar_Dip"}
+WATCH_ONLY_IDS = {"Garmin_desconhecido", "Garmin_musculacao"}  # sem exercício real
+IRREGULAR_PCT_WEEK = 15.0  # %/semana acima disso é erro de dado, não treino
 DEFAULT_BW = 75.0
 
 
@@ -128,7 +130,7 @@ def _points_by_exercise(sessions: list[dict], bodyweight: float | None = None) -
     for s in sorted(sessions, key=lambda x: str(x.get("date"))):
         for it in s.get("items") or []:
             eid = it.get("exercise_id")
-            if not eid or not it.get("sets"):
+            if not eid or not it.get("sets") or eid in WATCH_ONLY_IDS:
                 continue
             p = session_point(s, it, (bodyweight or DEFAULT_BW) if eid in loaded_bw else None)
             if p:
@@ -146,16 +148,35 @@ def _points_by_exercise(sessions: list[dict], bodyweight: float | None = None) -
 
 def _mark_suspects(points: list[dict]) -> None:
     """Valor fora da curva que os treinos vizinhos não confirmam (600 kg digitado no lugar de 60,
-    exercício trocado pelo relógio): fica no histórico marcado, mas fora de recordes e tendência."""
-    vals = [p["value"] for p in points]
-    for i, p in enumerate(points):
+    exercício trocado pelo relógio): fica no histórico marcado, mas fora de recordes e tendência.
+
+    Também fica de fora o treino de um exercício com carga em que nenhuma série teve peso
+    (o relógio grava 0 quando a carga não é digitada) — misturar reps com kg no mesmo gráfico
+    dá saltos absurdos."""
+    for p in points:
+        p["suspect"] = False
+        p.pop("suspect_why", None)
+    if any(p["metric"] == "carga" for p in points):
+        for p in points:
+            if p["metric"] != "carga":
+                p["suspect"], p["suspect_why"] = True, "sem_carga"
+    valid = [p for p in points if not p["suspect"]]
+    vals = [p["value"] for p in valid]
+    flagged = []
+    for i, p in enumerate(valid):
         nb = [v for v in vals[max(0, i - 3):i] + vals[i + 1:i + 3] if v]
         if len(nb) < 2 or not p["value"]:
-            p["suspect"] = False
             continue
         nb.sort()
         ref = nb[len(nb) // 2]
-        p["suspect"] = p["value"] > 1.4 * ref or p["value"] < 0.6 * ref
+        if p["value"] > 1.4 * ref or p["value"] < 0.6 * ref:
+            flagged.append(p)
+    # muitos "fora da curva" = a série toda é irregular (o relógio mistura exercícios): não dá para
+    # dizer qual está errado, então nenhum é descartado
+    if len(flagged) * 3 > len(valid):
+        return
+    for p in flagged:
+        p["suspect"], p["suspect_why"] = True, "fora_da_curva"
 
 
 def _merge(a: dict, b: dict) -> dict:
@@ -187,7 +208,8 @@ def _mark_prs(points: list[dict]) -> None:
     best: dict[str, float] = {}
     best_br: dict[int, float] = {}      # melhor 1RM estimado por faixa de reps
     rep_best: dict[int, float] = {}     # maior carga já feita para pelo menos N reps
-    metric = points[-1]["metric"] if points else "carga"
+    ok = [p for p in points if not p.get("suspect")]
+    metric = ok[-1]["metric"] if ok else (points[-1]["metric"] if points else "carga")
     relevant = {"carga": ("e1rm", "top_load", "volume"), "reps": ("max_reps", "volume"),
                 "tempo": ("max_duration_s",)}[metric]
     for i, p in enumerate(points):
@@ -259,7 +281,14 @@ def summary(points: list[dict], today: date | None = None) -> dict:
     if not points:
         return {"sessions": 0}
     suspects = [p["date"] for p in points if p.get("suspect")]
-    points = [p for p in points if not p.get("suspect")] or points
+    n_all = len(points)
+    points = [p for p in points if not p.get("suspect")]
+    if not points:
+        return {"sessions": n_all, "status": "inicio", "metric": "carga", "suspect_dates": suspects,
+                "last_date": max(suspects), "first_date": min(suspects), "last_value": None, "first_value": None,
+                "best": {"e1rm": 0, "top_load": 0, "volume": 0, "max_reps": 0, "max_duration_s": 0},
+                "change_total_pct": None, "change_30d_pct": None, "change_90d_pct": None,
+                "message": "Nenhum treino com carga registrada ainda: digite o peso usado para acompanhar a evolução."}
     metric = points[-1]["metric"]
     first, last = points[0], points[-1]
     recent = [p for p in points if _day(p["date"]) >= today - timedelta(weeks=8)]
@@ -283,6 +312,12 @@ def summary(points: list[dict], today: date | None = None) -> dict:
 
     if len(points) < 3:
         status, msg = "inicio", "Poucos registros ainda: a tendência aparece a partir de 3 treinos."
+    elif pct_week is not None and abs(pct_week) > IRREGULAR_PCT_WEEK:
+        # ninguém ganha (ou perde) 15% de força por semana: são cargas trocadas, faltando ou de outro exercício
+        status, msg = "irregular", ("As cargas variam demais entre os treinos para indicar uma tendência "
+                                    "(comum quando o relógio detecta o exercício sozinho ou o peso não foi digitado). "
+                                    "Confira as séries no Garmin Connect ou registre pelo app.")
+        pct_week = slope = None
     elif pct_week is not None and pct_week <= -1:
         status, msg = "caindo", "Queda nas últimas semanas: confira sono, alimentação e se não é hora de deload."
     elif pct_week is not None and pct_week >= 0.5 and (since_pr < 4 or (tail_pct is not None and tail_pct >= 0.5)):
@@ -351,7 +386,7 @@ def overview(sessions: list[dict], today: date | None = None, bodyweight: float 
                                    "prs": p["prs"], "best_set": p["best_set"], "value": p["value"],
                                    "max_reps": p["max_reps"], "max_duration_s": p["max_duration_s"],
                                    "metric": p["metric"], "rep_pr": p.get("rep_pr")})
-    rows.sort(key=lambda r: r["summary"]["last_date"], reverse=True)
+    rows.sort(key=lambda r: r["summary"].get("last_date") or "", reverse=True)
     recent_prs.sort(key=lambda r: r["date"], reverse=True)
     return {"exercises": rows, "recent_prs": recent_prs[:20]}
 

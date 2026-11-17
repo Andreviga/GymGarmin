@@ -21,6 +21,7 @@ FC de repouso ≥ 5 bpm acima da base com HRV abaixo da faixa = sinal clássico 
 from __future__ import annotations
 
 import json
+import time
 import math
 import statistics as st
 from datetime import date, datetime, timedelta, timezone
@@ -177,8 +178,11 @@ def fetch_weekly(api, today: date) -> dict:
     return out
 
 
-def collect(api, today: date, kv_get, kv_set, backfill: int = BACKFILL_PER_RUN) -> dict:
-    """Atualiza os dias que faltam (hoje, ontem e alguns para trás) e as métricas semanais."""
+def collect(api, today: date, kv_get, kv_set, backfill: int = BACKFILL_PER_RUN, until: float | None = None) -> dict:
+    """Atualiza os dias que faltam (hoje, ontem e alguns para trás) e as métricas semanais.
+
+    `until` (time.monotonic) é o prazo: na Vercel a função morre aos 30 s, então para antes e
+    continua na próxima sincronização."""
     now = clock.now()
     fetched = []
     # índice num registro só (evita ler 28 chaves a cada sincronização): data → "final" | tentativas
@@ -188,6 +192,8 @@ def collect(api, today: date, kv_get, kv_set, backfill: int = BACKFILL_PER_RUN) 
     pending.sort(key=lambda d: (d.isoformat() in idx, -d.toordinal()))  # primeiro os nunca buscados, do mais recente
     todo += pending[:backfill]
     for d in todo:
+        if until is not None and time.monotonic() > until:
+            break
         raw = kv_get(f"health:{d.isoformat()}")
         cur = json.loads(raw) if raw else None
         if cur and cur.get("final"):
@@ -220,7 +226,8 @@ def collect(api, today: date, kv_get, kv_set, backfill: int = BACKFILL_PER_RUN) 
         cut = (today - timedelta(days=KEEP_DAYS)).isoformat()
         kv_set("health_index", json.dumps({k: v for k, v in idx.items() if k >= cut}))
     wk = json.loads(kv_get("health_weekly") or "{}")
-    if not wk or wk.get("date", "") <= (today - timedelta(days=WEEKLY_EVERY_DAYS)).isoformat():
+    late = until is not None and time.monotonic() > until
+    if not late and (not wk or wk.get("date", "") <= (today - timedelta(days=WEEKLY_EVERY_DAYS)).isoformat()):
         w = fetch_weekly(api, today)
         hist = wk.get("history") or []
         if w.get("vo2max") or w.get("weight_kg") or w.get("fitness_age"):

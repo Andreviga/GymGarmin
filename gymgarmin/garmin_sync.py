@@ -23,6 +23,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import time
 import os
 import secrets
 import threading
@@ -357,17 +358,92 @@ def delete_workout(workout_id: int) -> None:
 # ---------------------------------------------------------------------------
 
 
+# Quando o relógio detecta só a categoria (o nome do exercício vem vazio, o comum na
+# detecção automática), usa o exercício mais comum da categoria, não o primeiro do catálogo.
+CATEGORY_DEFAULT = {
+    "BENCH_PRESS": "Barbell_Bench_Press_-_Medium_Grip", "LATERAL_RAISE": "Side_Lateral_Raise",
+    "TRICEPS_EXTENSION": "Triceps_Pushdown", "ROW": "Seated_Cable_Rows", "PULL_UP": "Wide-Grip_Lat_Pulldown",
+    "CURL": "Dumbbell_Bicep_Curl", "SQUAT": "Barbell_Squat", "DEADLIFT": "Barbell_Deadlift",
+    "SHOULDER_PRESS": "Dumbbell_Shoulder_Press", "LUNGE": "Dumbbell_Lunges", "FLYE": "Dumbbell_Flyes",
+    "LEG_CURL": "Lying_Leg_Curls", "CALF_RAISE": "Standing_Calf_Raises", "CRUNCH": "Crunches", "SIT_UP": "Sit-Up",
+    "PLANK": "Plank", "HIP_RAISE": "Barbell_Hip_Thrust", "SHRUG": "Barbell_Shrug", "PUSH_UP": "Pushups",
+    "LEG_RAISE": "Hanging_Leg_Raise", "CORE": "Ab_Roller", "HYPEREXTENSION": "Hyperextensions_Back_Extensions",
+    "CARRY": "Farmers_Walk", "OLYMPIC_LIFT": "Power_Clean", "HIP_SWING": "One-Arm_Kettlebell_Swings",
+    "PLYO": "Box_Jump_Multiple_Response", "HIP_STABILITY": "Thigh_Abductor",
+}
+UNKNOWN_ID = "Garmin_desconhecido"
+UNKNOWN_NAME = "Exercício não identificado pelo relógio"
+WATCH_ONLY_IDS = {UNKNOWN_ID, "Garmin_musculacao"}  # sem exercício real: fora do histórico de cargas
+
+
 def _reverse_map(preferred: set[str] | None = None) -> dict[tuple[str, str], str]:
+    """(categoria, exercício do Garmin) → exercício do app; (categoria, None) → o mais provável da categoria.
+
+    Prioridade: o que está no plano do usuário > o padrão da categoria > o primeiro popular > o primeiro."""
+    preferred = preferred or set()
+    defaults = set(CATEGORY_DEFAULT.values())
+
+    def rank(ex):
+        return (ex["id"] in preferred, ex["id"] in defaults, bool(ex.get("popular")))
+
+    best: dict[tuple[str, str], dict] = {}
+    for ex in catalog.all_exercises():
+        g = ex.get("garmin") or {}
+        if not g.get("category"):
+            continue
+        keys = [(g["category"], None)] + ([(g["category"], g["exercise"])] if g.get("exercise") else [])
+        for key in keys:
+            cur = best.get(key)
+            if cur is None or rank(ex) > rank(cur):
+                best[key] = ex
+    rev = {k: v["id"] for k, v in best.items()}
+    for cat, eid in CATEGORY_DEFAULT.items():
+        if rev.get((cat, None)) not in preferred:
+            rev[(cat, None)] = eid
+    return rev
+
+
+def _legacy_reverse_map() -> dict[tuple[str, str], str]:
+    """O mapa usado até a v1 (primeiro exercício do catálogo por categoria) — para corrigir importações antigas."""
     rev: dict[tuple[str, str], str] = {}
     for ex in catalog.all_exercises():
         g = ex.get("garmin") or {}
         key = (g.get("category"), g.get("exercise"))
-        if key not in rev or ex["id"] in (preferred or set()) or (ex["popular"] and rev[key] not in (preferred or set())):
+        if key not in rev or ex["popular"]:
             rev[key] = ex["id"]
-        cat_key = (g.get("category"), None)
-        if cat_key not in rev or ex["id"] in (preferred or set()):
-            rev[cat_key] = ex["id"]
+        rev.setdefault((g.get("category"), None), ex["id"])
     return rev
+
+
+def remap_imported(sessions: list[dict], preferred_ids: set[str] | None = None) -> list[dict]:
+    """Corrige sessões já importadas com o mapa antigo (ex.: supino → 'Alternating_Floor_Press').
+
+    Só mexe em itens cujo exercício ainda é o palpite antigo da categoria (o usuário não trocou)."""
+    old, rev = _legacy_reverse_map(), _reverse_map(preferred_ids)
+    changed = []
+    for s in sessions:
+        if s.get("source") != "garmin":
+            continue
+        dirty = False
+        for it in s.get("items") or []:
+            g = it.get("garmin") or {}
+            if not g or not it.get("sets"):
+                continue
+            cat, name = g.get("category"), g.get("name")
+            if it.get("exercise_id") == UNKNOWN_ID:
+                if not it.get("_name"):
+                    it["_name"], dirty = UNKNOWN_NAME, True
+                continue
+            was = old.get((cat, name)) if name else None
+            was = was or old.get((cat, None))
+            now = rev.get((cat, name)) or rev.get((cat, None))
+            if now and it.get("exercise_id") == was and now != was:
+                it["exercise_id"], dirty = now, True
+            if not name and not it.get("guess"):
+                it["guess"], dirty = True, True
+        if dirty:
+            changed.append(s)
+    return changed
 
 
 def activity_to_session(activity: dict, exercise_sets: dict | None, preferred_ids: set[str] | None = None,
@@ -391,7 +467,7 @@ def activity_to_session(activity: dict, exercise_sets: dict | None, preferred_id
             exs = sorted(s.get("exercises") or [], key=lambda e: -(e.get("probability") or 0))
             cat = exs[0].get("category") if exs else None
             name = exs[0].get("name") if exs else None
-            eid = rev.get((cat, name)) or rev.get((cat, None)) or "Garmin_desconhecido"
+            eid = rev.get((cat, name)) or rev.get((cat, None)) or UNKNOWN_ID
             w = s.get("weight")
             load = (w / 1000.0 if w and w > 500 else w) or 0
             entry = {"reps": s.get("repetitionCount") or 0, "load_kg": round(load, 1),
@@ -400,6 +476,10 @@ def activity_to_session(activity: dict, exercise_sets: dict | None, preferred_id
                 current["sets"].append(entry)
             else:
                 current = {"exercise_id": eid, "sets": [entry], "garmin": {"category": cat, "name": name}}
+                if eid == UNKNOWN_ID:
+                    current["_name"] = UNKNOWN_NAME
+                elif not name or (cat, name) not in rev:
+                    current["guess"] = True  # o relógio só disse a categoria: confira e troque se precisar
                 session["items"].append(current)
     else:
         item = endurance_item(activity, hr_max)
@@ -579,12 +659,14 @@ def _save_skipped(d: dict) -> None:
 
 
 def sync(save_session, imported_ids: set, preferred_ids: set[str] | None = None, hr_max: int | None = None,
-         trigger: str = "manual", now: datetime | None = None, merge=None) -> dict:
+         trigger: str = "manual", now: datetime | None = None, merge=None, until: float | None = None) -> dict:
     """Importa as atividades novas do Garmin como sessões.
 
     `save_session` grava a sessão (db.save_session); `imported_ids` são os IDs já
     importados; `merge(session)` (opcional) junta a atividade a um treino já registrado
     no app no mesmo dia e devolve a sessão gravada (ou None se não há par).
+    `until` (time.monotonic) é o prazo: ao passar dele para de importar e o resto fica
+    para a próxima vez (na Vercel a função é cortada aos 30 s, sem gravar nada).
     Só lê dados com os tokens guardados: se não houver login válido, marca
     "reconectar" e não tenta entrar por senha.
     """
@@ -624,7 +706,11 @@ def sync(save_session, imported_ids: set, preferred_ids: set[str] | None = None,
                 continue
             new.append(a)
         new.sort(key=lambda a: str(a.get("start") or ""))
+        done = 0
         for a in new[:MAX_PER_RUN]:
+            if until is not None and done and time.monotonic() > until:
+                break  # sem tempo: o resto entra na próxima sincronização
+            done += 1
             aid = str(a["activity_id"])
             try:
                 session = import_activity(a["activity_id"], preferred_ids, hr_max)
@@ -662,4 +748,4 @@ def sync(save_session, imported_ids: set, preferred_ids: set[str] | None = None,
     _set_sync_state(last_run=started, last_ok=True, last_ok_at=started, last_error="; ".join(errors) or None,
                     trigger=trigger, last_imported=imported[-10:] if imported else [], needs_reconnect=False)
     return {"ok": True, "imported": imported, "skipped": skipped, "errors": errors, "window_days": days,
-            "pending": max(0, len(new) - MAX_PER_RUN)}
+            "pending": max(0, len(new) - done)}

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import time
 import os
 from contextlib import asynccontextmanager
 from datetime import datetime
@@ -425,32 +426,55 @@ def _merge_garmin(session: dict) -> dict | None:
     return {**db.save_session(dedupe.merge(twin, session), session_id=twin["id"]), "merged": True}
 
 
+# A função da Vercel é cortada aos 30 s sem gravar nada: cada etapa tem um prazo
+SYNC_BUDGET_S = float(os.environ.get("SYNC_BUDGET_S", "17"))     # importar atividades
+EXTRAS_BUDGET_S = float(os.environ.get("EXTRAS_BUDGET_S", "23"))  # saúde, prontidão, métricas
+
+
+def _remap_garmin_once(plan_ids: set) -> None:
+    """Importações antigas usavam o primeiro exercício do catálogo para cada categoria do relógio
+    (supino → 'Alternating_Floor_Press'): corrige uma vez."""
+    if db.kv_get("garmin_remap_v2"):
+        return
+    try:
+        for s in garmin_sync.remap_imported(db.list_sessions(limit=5000), plan_ids):
+            db.save_session(s, session_id=s["id"])
+        db.kv_set("garmin_remap_v2", clock.now().isoformat(timespec="seconds"))
+    except Exception:  # noqa: BLE001 - não impede a sincronização
+        pass
+
+
 def _run_sync(trigger: str) -> dict:
+    t0 = time.monotonic()
     plan_ids = {it.get("exercise_id") for p in db.list_plans() for d in p.get("days", []) for it in d.get("items", [])}
+    _remap_garmin_once(plan_ids)
     p = _profile()
     try:
         r = garmin_sync.sync(db.save_session, db.garmin_imported_ids(), plan_ids,
-                             hr_max(p.get("age"), p.get("hr_max")), trigger=trigger, merge=_merge_garmin)
+                             hr_max(p.get("age"), p.get("hr_max")), trigger=trigger, merge=_merge_garmin,
+                             until=t0 + SYNC_BUDGET_S)
     except garmin_sync.GarminUnavailable as e:
         raise HTTPException(501, str(e)) from e
     if garmin_sync._client is not None:  # mesmo se a importação parou num 429, a prontidão é outra chamada
         today = clock.today()
+        until = t0 + EXTRAS_BUDGET_S
         try:  # saúde e sono (sono, HRV, FC de repouso, estresse, passos; VO2máx de tempos em tempos)
-            health.collect(garmin_sync._client, today, db.kv_get, db.kv_set)
+            health.collect(garmin_sync._client, today, db.kv_get, db.kv_set, until=until)
         except Exception:  # noqa: BLE001 - opcional
             pass
-        if trigger != "cron":  # à noite a prontidão do dia já não importa
+        if trigger != "cron" and time.monotonic() < until:  # à noite a prontidão do dia já não importa
             try:
                 _refresh_readiness(today, auto_apply=True)
             except Exception:  # noqa: BLE001 - prontidão é opcional
                 pass
         try:
             gm = json.loads(db.kv_get("garmin_metrics") or "{}")
-            if not gm or gm.get("date", "") < (today - timedelta(days=3)).isoformat():
+            if time.monotonic() < until and (not gm or gm.get("date", "") < (today - timedelta(days=3)).isoformat()):
                 db.kv_set("garmin_metrics", json.dumps(calibration.garmin_metrics(garmin_sync._client, today)))
         except Exception:  # noqa: BLE001
             pass
         garmin_sync.persist()
+    r["elapsed_s"] = round(time.monotonic() - t0, 1)
     return r
 
 

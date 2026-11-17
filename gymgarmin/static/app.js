@@ -766,7 +766,7 @@ async function viewAnalise() {
     <p class="small">Leve ${c.light} · Moderado ${c.moderate} · Vigoroso ${c.vigorous} min → <b>${c.who_equivalent}</b> min equivalentes.<br>${esc(c.message)}</p>
     <div class="meter"><span style="width:${Math.min(100, c.who_equivalent / 3)}%"></span></div>
     <p class="small muted">${Object.entries(c.by_machine).map(([k, v]) => `${esc(k)}: ${v} min`).join(" · ")}</p></div>
-  <div class="card"><h2>Histórico</h2>${sessions.length ? `<ul class="list">${sessions.map((s) => `<li class="row between gap"><span><b>${esc(s.day_name || "Treino")}</b> <span class="small muted">${fmtDate(s.date)} ${s.source === "garmin" ? "· Garmin" : ""}</span><br>
+  <div class="card"><h2>Histórico</h2>${sessions.length ? `<ul class="list">${sessions.map((s) => `<li class="row between gap"><span><b>${esc(s.day_name || s.notes || "Treino")}</b> <span class="small muted">${fmtDate(s.date)} ${s.source === "garmin" ? "· Garmin" : ""}</span><br>
       <span class="small muted">${s.items.length} exercícios · ${s.items.reduce((a, it) => a + (it.sets ? it.sets.length : 0), 0)} séries</span></span>
       <button class="icon-btn" data-del="${s.id}" title="Excluir">🗑</button></li>`).join("")}</ul>` : `<p class="empty">Nenhum treino registrado.</p>`}</div>`;
   view.onclick = async (e) => {
@@ -783,7 +783,7 @@ const METRIC = {
   tempo: { label: "Tempo máximo", unit: " s", fmt: (v) => fmtSec(v) },
 };
 const PR_TXT = { e1rm: "1RM est.", top_load: "carga", rep_load: "carga × reps", volume: "volume", max_reps: "reps", max_duration_s: "tempo" };
-const HIST_STATUS = { progredindo: ["Progredindo", "ok"], estavel: ["Estável", ""], estagnado: ["Estagnado", "warn"], caindo: ["Caindo", "bad"], inicio: ["Começando", "muted"] };
+const HIST_STATUS = { progredindo: ["Progredindo", "ok"], estavel: ["Estável", ""], estagnado: ["Estagnado", "warn"], caindo: ["Caindo", "bad"], inicio: ["Começando", "muted"], irregular: ["Dados irregulares", "warn"] };
 const fmtKg = (v) => `${(+v || 0).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} kg`;
 function fmtSec(v) { v = Math.round(v || 0); return v >= 60 ? `${Math.floor(v / 60)}:${String(v % 60).padStart(2, "0")} min` : `${v} s`; }
 function prText(p) {
@@ -808,7 +808,7 @@ function historyCard(h) {
       return `<li class="hist-row" data-hist="${esc(r.exercise_id)}">
         <span class="grow"><b>${esc(r.name)}</b> <span class="pill small ${st[1]}">${st[0]}</span><br>
         <span class="small muted">${sm.sessions} treino${sm.sessions > 1 ? "s" : ""} · último ${ddmm(sm.last_date)} · 30 dias ${pctTxt(sm.change_30d_pct)}</span></span>
-        <span class="hist-val">${spark(r.spark)}<b>${esc(m.fmt(sm.last_value))}</b></span></li>`; }).join("")}</ul>
+        <span class="hist-val">${spark(r.spark)}<b>${sm.last_value == null ? "—" : esc(m.fmt(sm.last_value))}</b></span></li>`; }).join("")}</ul>
     <p class="small muted">Valor principal: 1RM estimado (fórmula de Epley) para exercícios com carga; reps máximas no peso corporal; tempo máximo nos isométricos.</p></div>`;
 }
 function historyChart(points, metric) {
@@ -851,12 +851,12 @@ async function viewEvolucao(id) {
   ${sm.bodyweight ? `<p class="small muted card">O 1RM estimado soma o peso do corpo (${fmtKg(sm.bodyweight)}, do Perfil) com a anilha — assim barra só com o corpo e barra com peso entram na mesma curva.</p>` : ""}
   <div class="card"><h3>${esc(m.label)} ao longo do tempo</h3>${historyChart(h.points.filter((p) => !p.suspect), sm.metric)}</div>
   <div class="card"><h3>Treinos</h3><div class="table-wrap"><table class="hist-table"><thead><tr><th>Data</th><th>Melhor série</th><th>${sm.metric === "carga" ? "1RM est." : "Máx."}</th><th>Volume</th><th>Séries</th></tr></thead><tbody>
-    ${rows.map((p) => `<tr${p.prs.length ? ' class="pr-row"' : p.suspect ? ' class="suspect-row"' : ""}><td>${ddmm(p.date)}${p.prs.length ? ` <span title="Recorde: ${p.prs.map((k) => PR_TXT[k]).join(", ")}">🏆</span>` : ""}${p.suspect ? ' <span title="Fora da curva: parece erro de digitação ou exercício trocado pelo relógio. Não entra em recordes nem na tendência — corrija o treino se for erro.">⚠</span>' : ""}${p.source === "garmin" ? ' <span class="small muted" title="Importado do Garmin">G</span>' : ""}</td>
+    ${rows.map((p) => `<tr${p.prs.length ? ' class="pr-row"' : p.suspect ? ' class="suspect-row"' : ""}><td>${ddmm(p.date)}${p.prs.length ? ` <span title="Recorde: ${p.prs.map((k) => PR_TXT[k]).join(", ")}">🏆</span>` : ""}${p.suspect ? (p.suspect_why === "sem_carga" ? ' <span title="Sem carga registrada (o relógio grava 0 kg quando o peso não é digitado). Não entra em recordes nem na tendência.">⚠</span>' : ' <span title="Fora da curva: parece erro de digitação ou exercício trocado pelo relógio. Não entra em recordes nem na tendência — corrija o treino se for erro.">⚠</span>') : ""}${p.source === "garmin" ? ' <span class="small muted" title="Importado do Garmin">G</span>' : ""}</td>
       <td>${p.best_set ? `${fmtKg(p.best_set.load_kg)} × ${p.best_set.reps}` : sm.metric === "tempo" ? fmtSec(p.max_duration_s) : `${p.max_reps} reps`}</td>
       <td>${esc(m.fmt(p.value))}${p.e1rm_weak ? '<span class="small muted" title="Muitas reps: estimativa menos precisa">*</span>' : ""}</td>
       <td>${p.volume ? Math.round(p.volume).toLocaleString("pt-BR") : "—"}</td>
       <td>${p.sets}</td></tr>`).join("")}
-  </tbody></table></div><p class="small muted">🏆 = recorde · G = importado do Garmin${rows.some((p) => p.suspect) ? " · ⚠ = fora da curva (provável erro de digitação), ignorado nos recordes e na tendência" : ""}</p>${rows.some((p) => p.e1rm_weak) ? `<p class="small muted">* série com mais de 12 reps: o 1RM estimado é menos preciso.</p>` : ""}</div>`;
+  </tbody></table></div><p class="small muted">🏆 = recorde · G = importado do Garmin${rows.some((p) => p.suspect) ? " · ⚠ = fora da curva ou sem carga registrada, ignorado nos recordes e na tendência" : ""}</p>${rows.some((p) => p.e1rm_weak) ? `<p class="small muted">* série com mais de 12 reps: o 1RM estimado é menos preciso.</p>` : ""}</div>`;
 }
 
 /* ------------------------------------------------- RESISTÊNCIA / ESPORTES -- */

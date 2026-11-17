@@ -177,3 +177,46 @@ def test_pullups_bodyweight_then_weighted_same_curve():
     sm = h["summary"]
     assert sm["metric"] == "carga" and sm["bodyweight"] == 80 and sm["status"] == "progredindo"
     assert abs(sm["change_total_pct"]) < 60  # antes: reps × kg misturados davam variações absurdas
+
+
+def _gs(d, eid, sets, source="garmin"):
+    return {"id": hash(d + eid) % 10000, "date": d, "source": source,
+            "items": [{"exercise_id": eid, "sets": [{"reps": r, "load_kg": kg} for r, kg in sets]}]}
+
+
+def test_watch_sets_without_weight_do_not_mix_with_loaded_ones():
+    from gymgarmin import history
+
+    S = [_gs("2026-10-01", "Barbell_Squat", [(10, 60), (10, 60)]), _gs("2026-10-08", "Barbell_Squat", [(10, 0)]),
+         _gs("2026-10-15", "Barbell_Squat", [(10, 62.5)]), _gs("2026-10-22", "Barbell_Squat", [(10, 65)]),
+         _gs("2026-10-22", "Garmin_desconhecido", [(10, 40)])]
+    ov = history.overview(S, today=__import__("datetime").date(2026, 10, 23))
+    assert [r["exercise_id"] for r in ov["exercises"]] == ["Barbell_Squat"]  # o não identificado não entra
+    h = history.exercise_history(S, "Barbell_Squat", today=__import__("datetime").date(2026, 10, 23))
+    nl = [p for p in h["points"] if p["date"] == "2026-10-08"][0]
+    assert nl["suspect"] and nl["suspect_why"] == "sem_carga" and not nl["prs"]
+    assert h["summary"]["metric"] == "carga" and h["summary"]["status"] == "progredindo"
+
+
+def test_implausible_trend_is_flagged_irregular_not_progress():
+    from datetime import date
+
+    from gymgarmin import history
+
+    S = [_gs("2026-11-01", "Triceps_Pushdown", [(10, 10)]), _gs("2026-11-08", "Triceps_Pushdown", [(8, 20)]),
+         _gs("2026-11-15", "Triceps_Pushdown", [(7, 61)])]
+    sm = history.exercise_history(S, "Triceps_Pushdown", today=date(2026, 11, 17))["summary"]
+    assert sm["status"] == "irregular" and sm["pct_per_week"] is None
+
+
+def test_only_unloaded_sessions_still_render():
+    from datetime import date
+
+    from gymgarmin import history
+
+    S = [_gs("2026-11-01", "Barbell_Squat", [(10, 60)]), _gs("2026-11-08", "Barbell_Squat", [(10, 0)])]
+    sm = history.exercise_history(S, "Barbell_Squat", today=date(2026, 11, 17))["summary"]
+    assert sm["sessions"] == 1 and sm["suspect_dates"] == ["2026-11-08"]
+    # só treinos sem peso digitado num exercício que costuma ter carga: lista sem quebrar
+    S2 = [_gs("2026-11-08", "Barbell_Squat", [(10, 0)])]
+    assert history.overview(S2, today=date(2026, 11, 17))["exercises"][0]["summary"]["metric"] == "reps"

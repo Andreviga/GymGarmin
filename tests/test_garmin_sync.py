@@ -346,3 +346,49 @@ def test_plan_comes_with_exercise_names(client):
     plan = client.post("/api/generator/apply", json={}).json()
     p = client.get(f"/api/plans/{plan['id']}").json()
     assert all(it.get("_ex", {}).get("name") for d in p["days"] for it in d["items"])
+
+
+def test_category_only_detection_maps_to_common_exercise():
+    """A detecção automática do relógio costuma trazer só a categoria: vira o exercício mais comum dela."""
+    rev = garmin_sync._reverse_map()
+    assert rev[("BENCH_PRESS", None)] == "Barbell_Bench_Press_-_Medium_Grip"
+    assert rev[("LATERAL_RAISE", None)] == "Side_Lateral_Raise"
+    assert rev[("TRICEPS_EXTENSION", None)] == "Triceps_Pushdown"
+    assert rev[("DEADLIFT", "BARBELL_DEADLIFT")] == "Barbell_Deadlift"  # não o stiff
+    # exercício do plano do usuário ganha a categoria
+    assert garmin_sync._reverse_map({"Close-Grip_Barbell_Bench_Press"})[("BENCH_PRESS", None)] == "Close-Grip_Barbell_Bench_Press"
+    s = garmin_sync.activity_to_session({"activityId": 1, "startTimeLocal": "2026-11-13 05:00:00"}, {"exerciseSets": [
+        {"setType": "ACTIVE", "repetitionCount": 10, "weight": 40000, "exercises": [{"category": "BENCH_PRESS", "name": None}]},
+        {"setType": "ACTIVE", "repetitionCount": 9, "weight": 0, "exercises": [{"category": "UNKNOWN", "name": None}]},
+    ]})
+    bench, unknown = s["items"]
+    assert bench["exercise_id"] == "Barbell_Bench_Press_-_Medium_Grip" and bench["guess"]
+    assert unknown["exercise_id"] == garmin_sync.UNKNOWN_ID and unknown["_name"] == garmin_sync.UNKNOWN_NAME
+
+
+def test_remap_fixes_old_imports_once_and_keeps_user_choice():
+    old = [{"id": 1, "source": "garmin", "items": [
+        {"exercise_id": "Alternating_Floor_Press", "sets": [{"reps": 8, "load_kg": 50}], "garmin": {"category": "BENCH_PRESS", "name": None}},
+        {"exercise_id": "Incline_Dumbbell_Press", "sets": [{"reps": 8, "load_kg": 20}], "garmin": {"category": "BENCH_PRESS", "name": None}},
+        {"exercise_id": "Stiff-Legged_Barbell_Deadlift", "sets": [{"reps": 8, "load_kg": 80}], "garmin": {"category": "DEADLIFT", "name": "BARBELL_DEADLIFT"}},
+    ]}, {"id": 2, "source": "app", "items": [{"exercise_id": "Alternating_Floor_Press", "sets": [{"reps": 8, "load_kg": 50}]}]}]
+    changed = garmin_sync.remap_imported(old)
+    assert [s["id"] for s in changed] == [1]
+    a, b, c = old[0]["items"]
+    assert a["exercise_id"] == "Barbell_Bench_Press_-_Medium_Grip" and a["guess"]
+    assert b["exercise_id"] == "Incline_Dumbbell_Press"  # o usuário trocou: fica
+    assert c["exercise_id"] == "Barbell_Deadlift"
+    assert old[1]["items"][0]["exercise_id"] == "Alternating_Floor_Press"  # registrado no app: não mexe
+    assert garmin_sync.remap_imported(old) == []
+
+
+def test_sync_stops_at_deadline_and_saves_state(monkeypatch):
+    """Na Vercel a função morre aos 30 s sem gravar nada: com prazo, importa o que der e grava o estado."""
+    import time as _t
+
+    garmin_sync.login("eu@x.com", "senha")
+    r = garmin_sync.sync(db.save_session, db.garmin_imported_ids(), until=_t.monotonic() - 1)
+    assert r["ok"] and len(r["imported"]) == 1 and r["pending"] == 2  # pelo menos uma por vez, para avançar
+    assert garmin_sync.status()["sync"]["last_ok"]
+    r2 = garmin_sync.sync(db.save_session, db.garmin_imported_ids())
+    assert len(r2["imported"]) == 2 and r2["pending"] == 0
