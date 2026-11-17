@@ -208,6 +208,7 @@ def test_api_sync_auto_and_cron(client, monkeypatch):
     assert client.get("/api/cron/garmin-sync").status_code == 401
     assert client.get("/api/cron/garmin-sync", headers={"Authorization": "Bearer errado"}).status_code == 401
     assert client.get("/api/cron/garmin-sync", headers={"Authorization": "Bearer s3"}).json()["ran"] is False
+    assert client.get("/api/garmin/status").json()["sync"]["last_cron"]
 
     assert client.post("/api/garmin/login", json={"email": "eu@x.com", "password": "senha"}).json()["connected"]
     r = client.get("/api/cron/garmin-sync", headers={"Authorization": "Bearer s3"}).json()

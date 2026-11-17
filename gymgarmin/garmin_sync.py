@@ -193,7 +193,7 @@ def status() -> dict:
         "storage_ok": key_ok,
         "storage_error": key_error,
         "needs_reconnect": bool(st.get("needs_reconnect")) and not has_tokens,
-        "sync": {k: st.get(k) for k in ("last_run", "last_ok", "last_imported", "last_error", "trigger")},
+        "sync": {k: st.get(k) for k in ("last_run", "last_ok", "last_imported", "last_error", "trigger", "last_cron")},
     }
 
 

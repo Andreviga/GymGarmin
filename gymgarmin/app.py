@@ -413,6 +413,7 @@ def cron_garmin_sync(authorization: str | None = Header(None)):
     secret = os.environ.get("CRON_SECRET")
     if (secret or os.environ.get("VERCEL")) and authorization != f"Bearer {secret}":
         raise HTTPException(401, "Não autorizado")
+    garmin_sync._set_sync_state(last_cron=datetime.now().isoformat(timespec="seconds"))  # prova de que o cron chega
     if not garmin_sync.status()["has_tokens"]:
         return {"ok": True, "ran": False, "reason": "Garmin não conectado"}
     return {"ran": True, **_run_sync("cron")}
