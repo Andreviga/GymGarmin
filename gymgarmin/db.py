@@ -1,4 +1,8 @@
-"""Persistência local em SQLite (um arquivo, sem servidor).
+"""Persistência: SQLite local (um arquivo, sem servidor) ou Postgres quando houver DATABASE_URL.
+
+- No computador: SQLite em ~/.gymgarmin/gymgarmin.sqlite3.
+- No Vercel: Postgres (Neon) via DATABASE_URL — os dados persistem entre execuções.
+  Sem DATABASE_URL o Vercel usa SQLite em /tmp (temporário).
 
 Modelo pensado para multiusuário desde já (coluna user_id), embora a primeira
 versão seja de uso pessoal: o usuário 1 é criado automaticamente.
@@ -9,8 +13,12 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sqlite3
+import ssl
+import threading
 from contextlib import contextmanager
+from urllib.parse import parse_qs, unquote, urlparse
 from datetime import datetime
 from pathlib import Path
 
@@ -114,19 +122,139 @@ def db_path() -> Path:
 
 
 _ready: set[str] = set()
+ID_TABLES = ("users", "plans", "sessions", "schedule", "garmin_pushes")
 
 
 def now() -> str:
     return datetime.now().isoformat(timespec="seconds")
 
 
+def database_url() -> str | None:
+    url = os.environ.get("DATABASE_URL") or os.environ.get("POSTGRES_URL")
+    return url if url and url.startswith(("postgres://", "postgresql://")) else None
+
+
+def is_postgres() -> bool:
+    return database_url() is not None
+
+
+# ---- adaptador Postgres (mesma interface usada com sqlite3) ----------------
+
+class _PGCursor:
+    def __init__(self, cur, returning_id: bool):
+        self._cur = cur
+        self.lastrowid = None
+        self._rows = None
+        if cur.description:
+            cols = [d[0] for d in cur.description]
+            self._rows = [dict(zip(cols, r)) for r in cur.fetchall()]
+            if returning_id and self._rows:
+                self.lastrowid = self._rows[0].get("id")
+
+    def fetchone(self):
+        return self._rows[0] if self._rows else None
+
+    def fetchall(self):
+        return self._rows or []
+
+
+class _PGConn:
+    """Conexão pg8000 com tradução mínima do SQL do SQLite (? → %s, RETURNING id)."""
+
+    def __init__(self, url: str):
+        import pg8000.dbapi
+
+        u = urlparse(url)
+        q = parse_qs(u.query)
+        ctx = None
+        if q.get("sslmode", ["require"])[0] != "disable":
+            ctx = ssl.create_default_context()
+        self.raw = pg8000.dbapi.connect(
+            user=unquote(u.username or ""), password=unquote(u.password or ""), host=u.hostname,
+            port=u.port or 5432, database=(u.path or "/postgres").lstrip("/") or "postgres",
+            ssl_context=ctx, timeout=20,
+        )
+
+    @staticmethod
+    def _sql(sql: str) -> tuple[str, bool]:
+        out = sql.replace("?", "%s")
+        returning = False
+        m = re.match(r"\s*INSERT\s+INTO\s+(\w+)", out, re.I)
+        if m and m.group(1) in ID_TABLES and "RETURNING" not in out.upper():
+            out += " RETURNING id"
+            returning = True
+        return out, returning
+
+    def execute(self, sql: str, args=()):
+        q, returning = self._sql(sql)
+        cur = self.raw.cursor()
+        cur.execute(q, tuple(args))
+        return _PGCursor(cur, returning)
+
+    def executescript(self, script: str) -> None:
+        script = script.replace("INTEGER PRIMARY KEY,", "SERIAL PRIMARY KEY,")
+        for stmt in script.split(";"):
+            if stmt.strip():
+                self.raw.cursor().execute(stmt)
+
+    def commit(self):
+        self.raw.commit()
+
+    def rollback(self):
+        self.raw.rollback()
+
+    def close(self):
+        try:
+            self.raw.close()
+        except Exception:  # noqa: BLE001
+            pass
+
+
+_pg_lock = threading.RLock()
+_pg_state = threading.local()
+_pg_shared: dict[str, _PGConn] = {}
+
+
+@contextmanager
+def _pg_conn(url: str):
+    with _pg_lock:
+        depth = getattr(_pg_state, "depth", 0)
+        if depth == 0:
+            c = _pg_shared.get(url)
+            if c is None:
+                c = _pg_shared[url] = _PGConn(url)
+            else:
+                try:  # conexão reaproveitada (função "quente"): confere se ainda está viva
+                    c.raw.cursor().execute("SELECT 1")
+                except Exception:  # noqa: BLE001
+                    c.close()
+                    c = _pg_shared[url] = _PGConn(url)
+        c = _pg_shared[url]
+        _pg_state.depth = depth + 1
+        try:
+            yield c
+            if depth == 0:
+                c.commit()
+        except Exception:
+            if depth == 0:
+                c.rollback()
+            raise
+        finally:
+            _pg_state.depth = depth
+
+
 @contextmanager
 def conn():
-    path = db_path()
-    if str(path) not in _ready:
-        _ready.add(str(path))
+    url = database_url()
+    key = url or str(db_path())
+    if key not in _ready:
+        _ready.add(key)
         init()
-    c = sqlite3.connect(path)
+    if url:
+        with _pg_conn(url) as c:
+            yield c
+        return
+    c = sqlite3.connect(db_path())
     c.row_factory = sqlite3.Row
     try:
         yield c
@@ -135,13 +263,21 @@ def conn():
         c.close()
 
 
+def _fix_sequences(c) -> None:
+    if not is_postgres():
+        return
+    for t in ID_TABLES:
+        c.execute(f"SELECT setval(pg_get_serial_sequence('{t}', 'id'), COALESCE((SELECT MAX(id) FROM {t}), 0) + 1, false)")
+
+
 def init() -> None:
-    _ready.add(str(db_path()))
+    _ready.add(database_url() or str(db_path()))
     with conn() as c:
         c.executescript(SCHEMA)
         if not c.execute("SELECT 1 FROM users WHERE id = 1").fetchone():
             c.execute("INSERT INTO users (id, name, profile, created_at) VALUES (1, 'Eu', ?, ?)",
                       (json.dumps(DEFAULT_PROFILE), now()))
+            _fix_sequences(c)
 
 
 # ---- perfil ---------------------------------------------------------------
@@ -285,7 +421,9 @@ def garmin_overrides(user_id: int = 1) -> dict[str, dict]:
 
 def set_garmin_override(exercise_id: str, category: str, exercise: str, user_id: int = 1) -> None:
     with conn() as c:
-        c.execute("INSERT OR REPLACE INTO garmin_override (user_id, exercise_id, category, exercise) VALUES (?,?,?,?)",
+        c.execute("INSERT INTO garmin_override (user_id, exercise_id, category, exercise) VALUES (?,?,?,?) "
+                  "ON CONFLICT (user_id, exercise_id) DO UPDATE SET category = excluded.category, "
+                  "exercise = excluded.exercise",
                   (user_id, exercise_id, category, exercise))
 
 
@@ -356,15 +494,15 @@ def export_all() -> dict:
 
 def import_all(data: dict) -> dict:
     counts = {}
+    present = [t for t in BACKUP_TABLES if data.get(t) is not None]
     with conn() as c:
-        for t in BACKUP_TABLES:
-            rows = data.get(t)
-            if rows is None:
-                continue
+        for t in reversed(present):  # filhos antes dos pais (chaves estrangeiras no Postgres)
             c.execute(f"DELETE FROM {t}")
-            for r in rows:
+        for t in present:
+            for r in data[t]:
                 cols = list(r.keys())
                 c.execute(f"INSERT INTO {t} ({', '.join(cols)}) VALUES ({', '.join('?' for _ in cols)})",
                           [r[k] for k in cols])
-            counts[t] = len(rows)
+            counts[t] = len(data[t])
+        _fix_sequences(c)
     return counts

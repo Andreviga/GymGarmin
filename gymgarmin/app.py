@@ -56,7 +56,7 @@ def meta():
         "hr_max": fc,
         "equipment": [{"key": k, "pt": v} for k, v in EQUIPMENT_PT.items() if k],
         "templates": templates.list_templates(),
-        "ephemeral_storage": bool(os.environ.get("VERCEL")) and not os.environ.get("GYMGARMIN_DB"),
+        "ephemeral_storage": bool(os.environ.get("VERCEL")) and not os.environ.get("GYMGARMIN_DB") and not db.is_postgres(),
     }
 
 
