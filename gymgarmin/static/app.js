@@ -242,8 +242,10 @@ function bindAgenda(sch) {
 /* ------------------------------------------------------------- GERADOR -- */
 const MONTH_OPTS = [[2, "Começando (< 3 meses)"], [4, "3 a 6 meses"], [9, "6 a 12 meses"], [18, "1 a 2 anos"], [36, "2 a 5 anos"], [72, "Mais de 5 anos"]];
 async function openGenerator() {
-  const opts = await api("/api/generator/options");
+  const [opts, eopts, fresh] = await Promise.all([api("/api/generator/options"), api("/api/endurance/options"), api("/api/profile")]);
+  state.profile = fresh;
   const p = state.profile || {};
+  const ecfg = JSON.parse(JSON.stringify(p.endurance || {})); ecfg.sports = ecfg.sports || {};
   const avail = p.available_days || [0, 2, 4];
   const nearest = (m) => MONTH_OPTS.reduce((a, b) => (Math.abs(b[0] - (m ?? 12)) < Math.abs(a[0] - (m ?? 12)) ? b : a))[0];
   let seed = 0;
@@ -256,8 +258,13 @@ async function openGenerator() {
     </div>
     <label>Dias que você pode treinar</label>
     <div class="chips" id="gm-days">${opts.weekdays.map((w, i) => `<label class="chip"><input type="checkbox" value="${i}" ${avail.includes(i) ? "checked" : ""}> ${w}</label>`).join("")}</div>
-    <p class="small muted">Limitações, equipamentos e aparelhos preferidos vêm do seu Perfil. Corrida, bike, natação, remo, caminhada,
-      trilha e provas/triathlon entram pela página <a href="#esportes" id="gm-esportes">Esportes</a>.</p>
+    <label style="margin-top:12px">Junto com a musculação</label>
+    <div class="chips" id="gm-sports">${eopts.sports.map((sp) => `<label class="chip"><input type="checkbox" data-sp="${sp.id}" ${(ecfg.sports[sp.id] || {}).enabled ? "checked" : ""}> ${SPORT_ICON[sp.id] || ""} ${esc(sp.name)}</label>`).join("")}</div>
+    <div class="stack" id="gm-sport-opts" style="margin-top:8px">${eopts.sports.map((sp) => { const c = ecfg.sports[sp.id] || {}; return `<div class="gm-sport" data-sp="${sp.id}" ${c.enabled ? "" : "hidden"}>
+      <div class="grid2"><div class="field"><label>${SPORT_ICON[sp.id] || ""} ${esc(sp.name)}: onde</label><select data-k="env">${sp.envs.map((e) => `<option value="${e.id}" ${(c.env || sp.envs[0].id) === e.id ? "selected" : ""}>${esc(e.name)}</option>`).join("")}</select></div>
+      <div class="field"><label>Vezes por semana</label><input type="number" min="1" max="7" data-k="sessions" value="${c.sessions || sp.sessions}"></div></div></div>`; }).join("")}</div>
+    <p class="small muted">Entra na mesma semana da musculação: longe dos dias de perna pesada, longo no fim de semana, ~80% leve.
+      Metas de prova, triathlon e zonas ficam em <a href="#esportes" id="gm-esportes">Esportes</a>. Limitações e equipamentos vêm do Perfil.</p>
     <div class="row gap wrap"><button class="btn ghost" id="gm-prev">Pré-visualizar</button><button class="btn ghost" id="gm-var" hidden>Outra variação</button><button class="btn" id="gm-apply" hidden>Usar e montar minha semana</button></div>
     <div id="gm-out" style="margin-top:12px"></div>`);
   const read = () => ({
@@ -265,7 +272,22 @@ async function openGenerator() {
     session_minutes: +$("#gm-min", body).value || 60,
     cardio_target_min: $("#gm-cardio", body).value === "" ? null : +$("#gm-cardio", body).value,
     available_days: $$("#gm-days input", body).filter((c) => c.checked).map((c) => +c.value),
+    endurance: readSports(),
   });
+  const readSports = () => {
+    const out = JSON.parse(JSON.stringify(ecfg));
+    $$(".gm-sport", body).forEach((row) => {
+      const id = row.dataset.sp; const c = out.sports[id] = { ...(out.sports[id] || {}) };
+      c.enabled = $(`#gm-sports input[data-sp="${id}"]`, body).checked;
+      c.env = $("[data-k=env]", row).value;
+      c.sessions = Math.max(1, Math.min(7, +$("[data-k=sessions]", row).value || 1));
+    });
+    return out;
+  };
+  $("#gm-sports", body).onchange = (e) => {
+    const id = e.target.dataset.sp;
+    if (id) $(`.gm-sport[data-sp="${id}"]`, body).hidden = !e.target.checked;
+  };
   const preview = async () => {
     const prof = read();
     if (!prof.available_days.length) return toast("Escolha pelo menos um dia");
