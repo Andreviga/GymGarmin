@@ -153,6 +153,16 @@ def score(data: dict, form: float | None = None) -> dict:
             reasons.append(f"forma {form:g}")
         elif form > 15:
             reasons.append(f"forma +{form:g} (descansado)")
+    # assinatura de doença/recuperação muito ruim: FC de repouso alta junto com HRV baixa ou bateria/sono no chão
+    # (o Training Readiness sozinho às vezes ainda mostra "moderado" no primeiro dia de gripe)
+    low_hrv = data.get("hrv_status") in ("LOW", "POOR")
+    drained = (data.get("body_battery_max") is not None and data["body_battery_max"] < 40) or \
+              (data.get("sleep_score") is not None and data["sleep_score"] < 50)
+    if rd is not None and rd >= 5 and (low_hrv or drained):
+        severe = rd >= 7 and low_hrv and drained
+        s = min(s, 24.0 if severe else 39.0)
+        reasons.append("FC de repouso alta + " + ("HRV baixa" if low_hrv else "pouca energia/sono") +
+                       ": sinal de doença começando ou recuperação muito incompleta")
     s = max(0.0, min(100.0, s))
     action = "seguir" if s >= 60 else "moderar" if s >= 40 else "trocar" if s >= 25 else "descanso"
     level = {"seguir": "alta", "moderar": "moderada", "trocar": "baixa", "descanso": "muito_baixa"}[action]
@@ -171,7 +181,15 @@ ACTION_TEXT = {
 def _scale_repeats(steps: list[dict], frac: float) -> None:
     for st in steps:
         if st.get("kind") == "repeat":
-            st["n"] = max(2, int(round(st["n"] * frac)))
+            n = max(2, int(round(st["n"] * frac)))
+            if n >= st["n"]:
+                # poucos tiros (2 × 20 min): encurta cada tiro em vez de cortar um inteiro
+                for inner in st.get("steps") or []:
+                    if inner.get("kind") in ("work", "interval", "active") or inner.get("zone", 0) >= 3:
+                        inner["dur_s"] = int(round((inner.get("dur_s") or 0) * frac))
+                        if inner.get("dist_m"):
+                            inner["dist_m"] = int(round(inner["dist_m"] * frac))
+            st["n"] = n
 
 
 def adjust_entry(entry: dict, action: str, anchors: dict | None = None, force: bool = False) -> dict | None:
@@ -207,7 +225,8 @@ def adjust_entry(entry: dict, action: str, anchors: dict | None = None, force: b
                 it["duration_min"] = round(end["dur_s"] / 60)
                 notes.append(f"{end['title']}: −25% dos tiros")
                 changed = True
-            elif action in ("trocar", "descanso") and (end.get("hard") or end.get("role") == "longo") and end.get("type") != "prova":
+            elif action in ("trocar", "descanso") and (end.get("hard") or end.get("role") == "longo" or end.get("type") == "longo") \
+                    and end.get("type") != "prova":
                 sport = end["sport"]
                 unit = en.VOLUME[sport]["unit"]
                 vol = (end.get("dist_m") or 0) / 1000 if unit == "km" else (end.get("dist_m") or 0) if unit == "m" else end["dur_s"] / 3600

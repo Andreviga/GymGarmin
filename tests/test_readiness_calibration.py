@@ -155,3 +155,22 @@ def test_app_clock_uses_brazil_time():
 
     late_utc = datetime(2026, 11, 18, 1, 30, tzinfo=timezone.utc)  # 22h30 de 17/11 em Brasília
     assert late_utc.astimezone(clock.TZ).date() == date(2026, 11, 17)
+
+
+def test_illness_signature_overrides_moderate_readiness():
+    # Training Readiness ainda "moderado" no 1º dia de gripe, mas FC de repouso +8 com HRV baixa e bateria no chão
+    sc = readiness.score({"garmin_readiness": 58, "rhr_delta": 8, "hrv_status": "LOW", "body_battery_max": 30})
+    assert sc["action"] == "descanso" and any("doença" in r for r in sc["reasons"])
+    assert readiness.score({"garmin_readiness": 58, "rhr_delta": 6, "hrv_status": "LOW"})["action"] == "trocar"
+    assert readiness.score({"garmin_readiness": 72, "rhr_delta": 2, "hrv_status": "BALANCED"})["action"] == "seguir"
+
+
+def test_moderate_shortens_few_long_intervals_and_long_ride_swapped():
+    a = {"ftp_w": 230}
+    thr = en.build_session("ciclismo", "limiar", 1.5, {}, a, "intermediario")
+    entry = {"id": 1, "status": "planejado", "items": [thr]}
+    mod = readiness.adjust_entry(entry, "moderar", a)
+    assert mod["items"][0]["endurance"]["dur_s"] < thr["endurance"]["dur_s"] * 0.95
+    longo = en.build_session("ciclismo", "longo", 3.0, {}, a, "intermediario")  # sem 'role' (sessão avulsa)
+    sw = readiness.adjust_entry({"id": 2, "status": "planejado", "items": [longo]}, "trocar", a)
+    assert sw and sw["items"][0]["endurance"]["dur_s"] < longo["endurance"]["dur_s"]
