@@ -100,12 +100,51 @@ function timeBar(t) {
     <div class="small muted">${on.map((x) => `<span class="dot" style="background:${x[2]}"></span>${x[1]} ${Math.round(t[x[0]])}′`).join(" ")} · <b>${Math.round(t.total)} min</b>${t.orcamento ? ` de ${t.orcamento}` : ""}</div>`;
 }
 
+/* ---- mídia dos exercícios: 2 quadros alternando (como um GIF) ou pictograma desenhado */
+const PICTO_SVG = {
+  run: '<circle cx="15" cy="4.5" r="2"/><path d="M13 8l-3 3 3 2.5-1.5 5M10 11l-3.5.5M13 8l3.5 2.5 3-1M13.5 13.5l3 3.5 2.5-.5"/>',
+  bike: '<circle cx="6" cy="16" r="3.5"/><circle cx="18" cy="16" r="3.5"/><circle cx="14" cy="4.5" r="1.8"/><path d="M6 16l4-7h5l3 7M10 9l4 7M12.5 6.5l1.5 2.5h3"/>',
+  swim: '<circle cx="16" cy="6" r="2"/><path d="M3 15c2 1.5 4 1.5 6 0s4-1.5 6 0 4 1.5 6 0M3 19c2 1.5 4 1.5 6 0s4-1.5 6 0 4 1.5 6 0M6 12l5-4 3 2.5 3-1"/>',
+  row: '<circle cx="8" cy="6" r="2"/><path d="M3 18h18M8 9l2 5h5M10 14l-3 4M15 14l4-6M19 8l2-1"/>',
+  walk: '<circle cx="13" cy="4.5" r="2"/><path d="M13 8l-2 5 2.5 3.5-1 4.5M11 13l-2.5 6.5M12.5 8.5l3 2.5 2 0M12 9l-3 2v3"/>',
+  hike: '<circle cx="12" cy="4.5" r="2"/><path d="M12 8l-2 5 2.5 3.5-1 4.5M10 13l-2.5 6.5M12 8.5l3 2v3M17 10v11M3 21l5-6 3 3 4-5 6 8"/>',
+  ski: '<circle cx="12" cy="4.5" r="2"/><path d="M8 8v12M16 8v12M12 7.5v6l-3 3M12 13.5l3 3M6 8h4M14 8h4"/>',
+  elliptical: '<circle cx="12" cy="4.5" r="2"/><path d="M12 7.5v6M12 9l4-2M12 9l-3 3M12 13.5l-3 5M12 13.5l3 5M5 20h14M17 4l1 6"/>',
+  stairs: '<path d="M3 20h4v-4h4v-4h4V8h4V4h2"/><circle cx="9" cy="8" r="1.8"/>',
+  rope: '<circle cx="12" cy="4.5" r="2"/><path d="M12 7.5v7M12 10l-4 2M12 10l4 2M12 14.5l-2 6M12 14.5l2 6M8 12c-5 3-5 10 4 10s9-7 4-10"/>',
+  kettlebell: '<path d="M8.5 9a3.5 3.5 0 117 0"/><path d="M6.5 11h11l1 6a4 4 0 01-4 4h-5a4 4 0 01-4-4z"/>',
+  dumbbell: '<path d="M3 10v4M6 8v8M18 8v8M21 10v4M6 12h12"/>',
+};
+let MEDIA = null;
+async function loadMedia() {
+  if (MEDIA) return MEDIA;
+  try { MEDIA = store("gg_media_v1"); } catch (_) { MEDIA = null; }
+  if (!MEDIA || !MEDIA.f) {
+    try { MEDIA = await api("/api/media"); store("gg_media_v1", MEDIA); } catch (_) { MEDIA = { base: "", f: {}, p: {} }; }
+  }
+  return MEDIA;
+}
+function frames(id) {
+  const M = MEDIA; if (!M || !(id in M.f)) return null;
+  const folder = M.f[id] || id; return [`${M.base}${folder}/0.jpg`, `${M.base}${folder}/1.jpg`];
+}
+function pictoHtml(key, cls = "") {
+  return `<span class="picto ${cls}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${PICTO_SVG[key] || PICTO_SVG.dumbbell}</svg></span>`;
+}
+// size: "s" (lista), "m" (cartão), "l" (detalhe). Animada alternando início/fim do movimento.
+function mediaHtml(id, size = "s", fallback = null) {
+  const f = frames(id);
+  if (f) return `<span class="demo ${size}"><img loading="lazy" src="${esc(f[0])}" alt=""><img loading="lazy" src="${esc(f[1])}" alt="" class="f2"></span>`;
+  const p = (MEDIA && MEDIA.p[id]) || fallback || "dumbbell";
+  return pictoHtml(p, size);
+}
+
 function itemLine(it) {
   if (it.endurance) {
     const en = it.endurance;
-    return `<li>${SPORT_ICON[en.sport] || ""} <b>${esc(en.title)}</b> <span class="muted">${esc(endSummary(en))}</span>
+    return `<li class="mline">${mediaHtml(it.exercise_id, "s", { corrida: "run", ciclismo: "bike", natacao: "swim", remo: "row", caminhada: "walk", trilha: "hike" }[en.sport])}<span>${SPORT_ICON[en.sport] || ""} <b>${esc(en.title)}</b> <span class="muted">${esc(endSummary(en))}</span>
       ${en.hard ? `<span class="pill warn small">forte</span>` : ""}${en.role === "longo" ? `<span class="pill small">longo</span>` : ""}
-      ${en.note ? `<div class="small muted">${esc(en.note)}</div>` : ""}${endStepsHtml(en)}</li>`;
+      ${en.note ? `<div class="small muted">${esc(en.note)}</div>` : ""}${endStepsHtml(en)}</span></li>`;
   }
   const name = esc(it._name || it._ex?.name || it.exercise_id);
   let d = "";
@@ -113,7 +152,7 @@ function itemLine(it) {
   else if (it.duration_min) d = `${it.duration_min} min${it.zone ? " Z" + it.zone : ""}`;
   else if (it.sets) d = `${it.sets}×${it.reps || (it.duration_s ? it.duration_s + "s" : "")}${it.rest_s && it.phase !== "preparo" && it.phase !== "pos" ? ` · ${it.rest_s}s` : ""}`;
   const tags = [it.ramp ? `<span class="pill">+${it.ramp} série</span>` : "", it.deload ? `<span class="pill warn">deload</span>` : "", it.added ? `<span class="pill warn">+${it.added}</span>` : "", it.added_from ? `<span class="pill warn">compensação</span>` : "", it.finisher ? `<span class="pill muted">finalizador</span>` : "", it.superset ? `<span class="pill small" title="Bi-set: faça uma série de cada, emendadas, e descanse depois do segundo">bi-set ${it.superset}</span>` : "", it.rotated_from ? `<span class="pill muted small" title="Variação deste ciclo: estímulo novo para o músculo; no próximo ciclo volta o exercício de antes">variação do ciclo</span>` : ""].join(" ");
-  return `<li><span data-ex="${esc(it.exercise_id)}" style="cursor:pointer">${name}</span> <span class="muted">${esc(d)}</span> ${tags}</li>`;
+  return `<li class="mline">${mediaHtml(it.exercise_id, "s")}<span><span data-ex="${esc(it.exercise_id)}" style="cursor:pointer">${name}</span> <span class="muted">${esc(d)}</span> ${tags}</span></li>`;
 }
 
 function itemsByPhase(items) {
@@ -143,7 +182,7 @@ async function viewHoje(weekDate) {
   const outdated = sch.entries.some((e) => e.garmin_outdated && e.status === "planejado");
   const cyc = sch.cycle;
   const athleteHtml = weekDate ? "" : await athleteCards();
-  view.innerHTML = `${athleteHtml}
+  view.innerHTML = `${weekDate ? "" : `<div id="stories" class="stories" aria-label="Resumo do dia"></div>`}${athleteHtml}
   ${readinessCard(rd, sch.entries.some((e) => e.date === sch.today && e.status === "planejado"),
     sch.entries.some((e) => e.date === sch.today && e.status === "planejado" && e.readiness_backup))}
   ${missed.length ? `<div class="rec alerta"><b>Treino perdido:</b> ${missed.map((e) => `${e.weekday} ${ddmm(e.date)} – ${esc(e.day_name)}`).join(", ")}.
@@ -172,16 +211,123 @@ async function viewHoje(weekDate) {
     ${Object.entries(g.endurance || {}).map(([k, x]) => meter(`${SPORT_ICON[k] || ""} ${esc(x.name)}`, x.done, x.planned, " " + x.unit)).join("")}
   </div></div>
   <div class="card" id="hoje-recs"><h2>O que ajustar</h2><p class="muted small">Carregando…</p></div>`;
+  sch._rd = rd;
   bindAgenda(sch);
   api("/api/report/weekly").then((rep) => { const b = $("#hoje-recs"); if (b) b.innerHTML = `<h2>O que ajustar</h2>${recsHtml(rep.recommendations.slice(0, 6))}`; }).catch(() => {});
+}
+
+/* ---------------------------------------------------------- STORIES -- */
+const SPORT_PICTO = { corrida: "run", ciclismo: "bike", natacao: "swim", remo: "row", caminhada: "walk", trilha: "hike" };
+function mainIds(e) {
+  return (e.items || []).filter((i) => (i.phase || "principal") === "principal").map((i) => i.exercise_id);
+}
+function avatarHtml(e) {
+  const id = mainIds(e)[0];
+  return id ? mediaHtml(id, "av", SPORT_PICTO[e.sport]) : pictoHtml(SPORT_PICTO[e.sport] || "dumbbell", "av");
+}
+async function fillStories(sch, rd) {
+  const bar = $("#stories"); if (!bar) return;
+  const [hl, hist] = await Promise.all([api("/api/health").catch(() => null), api("/api/history").catch(() => null)]);
+  if (!$("#stories")) return;
+  const today = sch.today;
+  const todays = sch.entries.filter((e) => e.date === today);
+  const items = [];
+  const fmt1 = (v) => (+v).toLocaleString("pt-BR", { maximumFractionDigits: 1 });
+  // 1. treino de hoje
+  const plannedToday = todays.filter((e) => e.status === "planejado");
+  items.push({ key: "hoje", label: "Hoje", seen: !plannedToday.length, avatar: todays[0] ? avatarHtml(todays[0]) : pictoHtml("dumbbell", "av"),
+    slides: todays.length ? todays.map((e) => ({ kicker: `${e.weekday} ${ddmm(e.date)} · ${STATUS_INFO[e.status] ? STATUS_INFO[e.status][0] : e.status}`, big: e.day_name,
+      text: e.time ? `~${Math.round(e.time.total)} min` : "", ids: mainIds(e).slice(0, 4), cta: e.status === "planejado" ? { href: `#treinar/agenda/${e.id}`, label: "Treinar agora" } : null }))
+      : [{ kicker: "Hoje", big: "Descanso", text: "Dia livre no plano: caminhar, alongar e dormir bem também é treino." }] });
+  // 2. prontidão
+  if (rd && rd.score != null) {
+    items.push({ key: "pront", label: "Prontidão", inner: `<b class="sv">${rd.score}</b>`, seen: false,
+      slides: [{ kicker: "Prontidão de hoje", big: `${rd.score}`, unit: "/100", text: rd.text || "", sub: rd.night ? rd.night.text : "" }] });
+  }
+  // 3. sono
+  if (hl && hl.last_night) {
+    const n = hl.last_night;
+    items.push({ key: "sono", label: "Sono", inner: `<b class="sv">${fmt1(n.duration_h)}h</b>`, seen: false,
+      slides: [{ kicker: `Noite de ${ddmm(n.date)}`, big: `${fmt1(n.duration_h)} h`, text: (n.reasons || []).slice(0, 2).join(" · "), sub: (n.tips || [])[0] || "" }] });
+  }
+  // 4. semana
+  const g = sch.goals || {};
+  if (g.sessions) {
+    const pct = g.sessions.planned ? Math.round(100 * g.sessions.done / g.sessions.planned) : 0;
+    const end = Object.values((g.endurance) || {})[0];
+    items.push({ key: "semana", label: "Semana", inner: `<b class="sv">${pct}%</b>`, seen: false,
+      slides: [{ kicker: "Sua semana", big: `${g.sessions.done}/${g.sessions.planned}`, unit: "treinos", text: `${g.sets.done} de ${g.sets.planned} séries · ${g.cardio.done} de ${g.cardio.target} min de cardio`,
+        sub: end ? `${end.name}: ${fmt1(end.done)} de ${fmt1(end.planned)} ${end.unit}` : "" }] });
+  }
+  // 5. recordes recentes
+  const prs = ((hist && hist.recent_prs) || []).filter((p) => p.date >= addDays(today, -7));
+  if (prs.length) {
+    items.push({ key: "prs", label: "Recordes", avatar: mediaHtml(prs[0].exercise_id, "av"), seen: false,
+      slides: prs.slice(0, 5).map((p) => ({ kicker: `Recorde · ${ddmm(p.date)}`, big: p.name, text: prText(p), ids: [p.exercise_id], trophy: true })) });
+  }
+  // 6. check-in
+  if ($("#checkin")) items.push({ key: "checkin", label: "Check-in", inner: `<b class="sv">+</b>`, seen: false, jump: "#checkin" });
+  const seen = store("gg_story_seen") || {};
+  bar.innerHTML = items.map((it, i) => {
+    const sk = `${today}:${it.key}`; const isSeen = it.seen || seen[sk];
+    return `<button class="story-item" data-story="${i}" aria-label="${esc(it.label)}"><span class="ring ${isSeen ? "seen" : ""}"><span class="hole">${it.avatar || `<span class="picto av">${it.inner || ""}</span>`}</span></span><span class="slabel">${esc(it.label)}</span></button>`;
+  }).join("");
+  bar.onclick = (ev) => {
+    const b = ev.target.closest("[data-story]"); if (!b) return;
+    const it = items[+b.dataset.story];
+    if (it.jump) { const el = $(it.jump); if (el) el.scrollIntoView({ behavior: "smooth", block: "center" }); return; }
+    seen[`${today}:${it.key}`] = 1; store("gg_story_seen", seen);
+    b.querySelector(".ring").classList.add("seen");
+    openStory(items, +b.dataset.story);
+  };
+}
+function openStory(items, start) {
+  const box = $("#story"); let si = start, k = 0, timer = null;
+  const close = () => { clearTimeout(timer); box.hidden = true; box.innerHTML = ""; document.body.classList.remove("no-scroll"); };
+  const show = () => {
+    clearTimeout(timer);
+    const it = items[si]; if (!it || it.jump) return close();
+    const sl = it.slides[k];
+    box.innerHTML = `<div class="story-card s-${esc(it.key)}">
+      <div class="bars">${it.slides.map((_, j) => `<span class="${j < k ? "done" : j === k ? "run" : ""}"><i></i></span>`).join("")}</div>
+      <div class="story-head"><span class="ring small"><span class="hole">${it.avatar || `<span class="picto av">${it.inner || ""}</span>`}</span></span><b>${esc(it.label)}</b>
+        <button class="story-x" aria-label="Fechar">×</button></div>
+      <div class="story-body">
+        <div class="kicker">${esc(sl.kicker || "")}</div>
+        <div class="big">${sl.trophy ? "🏆 " : ""}${esc(sl.big || "")}${sl.unit ? `<small> ${esc(sl.unit)}</small>` : ""}</div>
+        ${sl.text ? `<p>${esc(sl.text)}</p>` : ""}${sl.sub ? `<p class="sub">${esc(sl.sub)}</p>` : ""}
+        ${sl.ids && sl.ids.length ? `<div class="story-media">${sl.ids.map((id) => mediaHtml(id, "st")).join("")}</div>` : ""}
+        ${sl.cta ? `<a class="btn story-cta" href="${sl.cta.href}">${esc(sl.cta.label)}</a>` : ""}
+      </div><div class="tap prev" aria-hidden="true"></div><div class="tap next" aria-hidden="true"></div></div>`;
+    box.hidden = false; document.body.classList.add("no-scroll");
+    timer = setTimeout(next, 5000);
+  };
+  const next = () => { if (k + 1 < items[si].slides.length) k++; else { si++; k = 0; while (items[si] && items[si].jump) si++; } if (!items[si]) return close(); show(); };
+  const prev = () => { if (k > 0) k--; else if (si > 0) { si--; k = 0; } show(); };
+  box.onclick = (ev) => {
+    if (ev.target.closest(".story-x")) return close();
+    if (ev.target.closest(".story-cta")) return close();
+    if (ev.target.closest(".tap.next")) return next();
+    if (ev.target.closest(".tap.prev")) return prev();
+  };
+  let y0 = null;
+  box.ontouchstart = (ev) => { y0 = ev.touches[0].clientY; };
+  box.ontouchend = (ev) => { if (y0 !== null && ev.changedTouches[0].clientY - y0 > 80) close(); y0 = null; };
+  document.onkeydown = (ev) => { if (box.hidden) return; if (ev.key === "Escape") close(); if (ev.key === "ArrowRight") next(); if (ev.key === "ArrowLeft") prev(); };
+  show();
 }
 
 function dayCard(e, today) {
   const [label, cls] = STATUS_INFO[e.status] || [e.status, ""];
   const active = e.status === "planejado" || e.status === "perdido";
-  return `<div class="day ${e.date === today ? "today" : ""} ${active ? "" : "dim"}">
-    <div class="row between gap"><div><b>${e.weekday} ${ddmm(e.date)}</b> · ${e.sport ? SPORT_ICON[e.sport] + " " : ""}${esc(e.day_name)}
-      ${e.race ? `<span class="pill bad">PROVA</span>` : ""}${e.endurance_phase ? ` <span class="pill muted small">${esc(e.endurance_phase)}</span>` : ""}</div><span class="pill ${cls}">${label}</span></div>
+  const ids = mainIds(e);
+  return `<div class="day post ${e.date === today ? "today" : ""} ${active ? "" : "dim"}">
+    <div class="post-head"><span class="ring ${e.date === today && e.status === "planejado" ? "" : "seen"} small"><span class="hole">${avatarHtml(e)}</span></span>
+      <div class="grow"><b>${esc(e.day_name)}</b>${e.race ? ` <span class="pill bad">PROVA</span>` : ""}
+        <div class="small muted">${e.weekday} ${ddmm(e.date)}${e.time ? ` · ~${Math.round(e.time.total)} min` : ""}${e.endurance_phase ? ` · ${esc(e.endurance_phase)}` : ""}</div></div>
+      <span class="pill ${cls}">${label}</span></div>
+    ${active && ids.length && !e.sport ? `<div class="carousel">${(e.items || []).filter((i) => (i.phase || "principal") === "principal").slice(0, 10).map((i) => `<figure data-ex="${esc(i.exercise_id)}">${mediaHtml(i.exercise_id, "car")}<figcaption>${esc(i._name || i._ex?.name || "")}<span>${i.sets ? `${i.sets}×${esc(i.reps || (i.duration_s ? i.duration_s + "s" : ""))}` : ""}</span></figcaption></figure>`).join("")}</div>` : ""}
+    ${active && e.sport ? `<div class="post-sport">${pictoHtml(SPORT_PICTO[e.sport] || "run", "xl")}<div>${(e.items || []).filter((i) => i.endurance).map((i) => `<b>${esc(i.endurance.title)}</b><br><span class="small">${esc(endSummary(i.endurance))}</span>`).join("<br>")}</div></div>` : ""}
     ${active ? timeBar(e.time) : ""}
     ${e.changes && e.changes.length ? `<ul class="small changes">${e.changes.map((c) => `<li>${esc(c)}</li>`).join("")}</ul>` : ""}
     ${e.skip_result ? `<ul class="small changes">${e.skip_result.changes.map((c) => `<li>${esc(c)}</li>`).join("")}</ul>` : ""}
@@ -202,6 +348,7 @@ function dayCard(e, today) {
 
 function bindAgenda(sch) {
   bindAthleteCards();
+  if ($("#stories")) fillStories(sch, sch._rd).catch(() => {});
   view.onclick = async (ev) => {
     const t = ev.target.closest("button, [data-ex]"); if (!t) return;
     const d = t.dataset;
@@ -870,7 +1017,7 @@ function pickExercise(kind, onPick) {
     if ($("#pk-m", body).value) qs.set("muscle", $("#pk-m", body).value);
     const res = await api(`/api/exercises?${qs}`);
     $("#pk-list", body).innerHTML = res.map((ex) => `<li class="ex-item" data-pick="${esc(ex.id)}">
-      ${ex.images[0] ? `<img class="thumb" loading="lazy" src="${esc(ex.images[0])}" alt="">` : `<span class="thumb"></span>`}
+      ${mediaHtml(ex.id, "s")}
       <span class="grow"><b>${esc(ex.name)}</b> ${limBadge(ex.limitation)}<br><span class="small muted">${esc(ex.primary_pt.join(", "))} · ${esc(ex.equipment_pt || "")}</span></span></li>`).join("") || `<li class="empty">Nada encontrado.</li>`;
     body._res = res;
   };
@@ -886,7 +1033,8 @@ async function showExercise(id) {
   const g = ex.garmin || {};
   const body = openModal(`<h2>${esc(ex.name)}</h2>
     ${ex.name !== ex.name_en ? `<p class="small muted">${esc(ex.name_en)}</p>` : ""}
-    <div class="imgs">${ex.images.map((s) => `<img loading="lazy" src="${esc(s)}" alt="">`).join("")}</div>
+    <div class="ex-hero">${mediaHtml(ex.id, "l")}</div>
+    ${ex.images.length > 1 ? `<div class="imgs">${ex.images.map((s, i) => `<figure><img loading="lazy" src="${esc(s)}" alt=""><figcaption class="small muted">${i ? "fim do movimento" : "início"}</figcaption></figure>`).join("")}</div>` : ""}
     <p><span class="pill">${esc(ex.category_pt)}</span> <span class="pill muted">${esc(ex.equipment_pt || "")}</span> <span class="pill muted">${esc(ex.level_pt || "")}</span>
       ${ex.mechanic_pt && ex.mechanic_pt !== "—" ? `<span class="pill muted">${esc(ex.mechanic_pt)}</span>` : ""} ${ex.impact ? `<span class="pill muted">impacto ${esc(ex.impact)}</span>` : ""}</p>
     <p><b>Primários:</b> ${esc(ex.primary_pt.join(", ") || "—")}<br><b>Secundários:</b> ${esc(ex.secondary_pt.join(", ") || "—")}</p>
@@ -949,7 +1097,7 @@ function renderSession() {
   const phaseOf = (it) => it.phase || "principal";
   const compact = (ph) => idxs.filter(([it]) => phaseOf(it) === ph);
   const compactCard = (ph, title) => compact(ph).length ? `<div class="card"><h3>${title}</h3><ul class="list">${compact(ph).map(([it, i]) => `<li class="row gap">
-      <button class="check ${it.done ? "on" : ""}" data-pdone="${i}">✓</button>
+      <button class="check ${it.done ? "on" : ""}" data-pdone="${i}">✓</button>${mediaHtml(it.exercise_id, "m")}
       <span class="grow"><b data-ex="${esc(it.exercise_id)}" style="cursor:pointer">${esc(it.name)}</b><br><span class="small muted">${it.kind === "cardio" ? `${it.duration_min} min Z${it.zone}` : `${(it.plan && it.plan.duration_s) || 30}s${(it.plan && it.plan.sets) > 1 ? ` × ${it.plan.sets}` : ""}`}${it.plan && it.plan.notes ? " · " + esc(it.plan.notes) : ""}</span></span></li>`).join("")}</ul></div>` : "";
   view.innerHTML = `<div class="card"><h2>${esc(s.day_name || "Treino")}</h2>
       <div class="field" style="margin:0"><label for="s-date">Data e hora</label><input type="datetime-local" id="s-date" value="${esc((s.date || "").slice(0, 16))}"></div>
@@ -966,7 +1114,7 @@ function renderSession() {
 function sessionItemHtml(it, i) {
   const plan = it.plan || {};
   const lastTxt = it.last ? (it.last.sets ? it.last.sets.map((x) => `${x.reps ?? "-"}×${x.load_kg ?? 0}`).join(" · ") : `${it.last.duration_min} min Z${it.last.zone}`) : "";
-  const head = `<div class="row gap">${it.images && it.images[0] ? `<img class="thumb" src="${esc(it.images[0])}" alt="" loading="lazy">` : ""}
+  const head = `<div class="row gap">${mediaHtml(it.exercise_id, "m")}
     <div class="grow"><b data-ex="${esc(it.exercise_id)}" style="cursor:pointer">${esc(it.name)}</b> ${limBadge(it.limitation)}
     <div class="small muted">${it.kind === "cardio" ? `${plan.duration_min || ""} min · Z${plan.zone || ""}` : `${plan.sets || ""}×${plan.reps || (plan.duration_s ? plan.duration_s + "s" : "")} ${plan.load_kg ? "· " + plan.load_kg + " kg" : ""} · descanso ${plan.rest_s || 90}s`}
     ${lastTxt ? `<br>Última: ${esc(lastTxt)}` : ""}${it.suggestion && it.suggestion.note ? `<br><b>${esc(it.suggestion.note)}</b>` : ""}${plan.notes ? `<br>${esc(plan.notes)}` : ""}</div></div></div>`;
@@ -1424,9 +1572,10 @@ async function viewExercicios() {
     [["muscle", "#ex-m"], ["equipment", "#ex-e"], ["kind", "#ex-k"]].forEach(([k, s]) => { if ($(s).value) qs.set(k, $(s).value); });
     const res = await api(`/api/exercises?${qs}`);
     const list = $("#ex-list"); if (!list) return;  // saiu da tela antes da resposta chegar (4G lento)
-    list.innerHTML = res.map((ex) => `<li class="ex-item" data-ex="${esc(ex.id)}">
-      ${ex.images[0] ? `<img class="thumb" loading="lazy" src="${esc(ex.images[0])}" alt="">` : `<span class="thumb"></span>`}
-      <span class="grow" data-ex="${esc(ex.id)}"><b data-ex="${esc(ex.id)}">${esc(ex.name)}</b> ${limBadge(ex.limitation)}<br><span class="small muted" data-ex="${esc(ex.id)}">${esc(ex.primary_pt.join(", "))} · ${esc(ex.equipment_pt || "")} · ${esc(ex.category_pt)}</span></span></li>`).join("") || `<li class="empty">Nada encontrado.</li>`;
+    list.classList.add("ex-grid");
+    list.innerHTML = res.map((ex) => `<li class="tile" data-ex="${esc(ex.id)}" title="${esc(ex.name)}">
+      ${mediaHtml(ex.id, "tile")}${ex.limitation && ex.limitation.status !== "ok" ? `<span class="tile-lim ${ex.limitation.status}" data-ex="${esc(ex.id)}">${ex.limitation.status === "evitar" ? "evitar" : "cuidado"}</span>` : ""}
+      <span class="tile-cap" data-ex="${esc(ex.id)}"><b data-ex="${esc(ex.id)}">${esc(ex.name)}</b><span data-ex="${esc(ex.id)}">${esc(ex.primary_pt.slice(0, 2).join(", "))}</span></span></li>`).join("") || `<li class="empty">Nada encontrado.</li>`;
   };
   view.oninput = () => { clearTimeout(t); t = setTimeout(load, 200); };
   view.onchange = view.oninput;
@@ -1704,6 +1853,7 @@ async function route() {
   view.oninput = view.onchange = view.onclick = null;
   view.innerHTML = `<p class="muted">Carregando…</p>`;
   try {
+    await loadMedia();
     if (!state.meta) {
       [state.meta, state.profile] = await Promise.all([api("/api/meta"), api("/api/profile")]);
       if (state.meta.ephemeral_storage && !$("#eph")) {

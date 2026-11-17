@@ -661,6 +661,31 @@ def exercises(q: str = "", muscle: str | None = None, equipment: str | None = No
     return res[:limit]
 
 
+PICTO = [(("corrida", "esteira_corrida"), "run"), (("ciclismo", "bike", "spinning"), "bike"), (("natacao",), "swim"),
+         (("remo",), "row"), (("trilha",), "hike"), (("caminhada",), "walk"), (("ski",), "ski"), (("eliptico",), "elliptical"),
+         (("escada",), "stairs"), (("corda",), "rope"), (("kettlebell",), "kettlebell")]
+
+
+@app.get("/api/media")
+def media_index():
+    """Imagens de todos os exercícios (2 quadros: início e fim do movimento) e pictograma para quem não tem foto.
+    Vai em cache no aparelho: as telas mostram a foto animada de qualquer exercício da agenda/planilha."""
+    base = "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/"
+    out: dict = {"base": base, "f": {}, "p": {}}
+    for ex in catalog.all_exercises():
+        im = ex.get("images") or []
+        if len(im) >= 2 and im[0].startswith(base):
+            folder = im[0][len(base):].rsplit("/", 1)[0]
+            out["f"][ex["id"]] = "" if folder == ex["id"] else folder  # "" = mesma pasta do id
+        lid = ex["id"].lower()
+        pic = next((k for keys, k in PICTO if any(x in lid for x in keys)), None)
+        if pic and not im:
+            out["p"][ex["id"]] = pic
+        elif not im:
+            out["p"][ex["id"]] = "dumbbell"
+    return JSONResponse(out, headers={"Cache-Control": "public, max-age=86400"})
+
+
 @app.get("/api/exercises/{exercise_id}")
 def exercise_detail(exercise_id: str):
     ex = catalog.get(exercise_id)
@@ -901,7 +926,7 @@ def _prefill_items(day_items: list[dict], deload: bool = False) -> list[dict]:
         last = db.last_performance(ex["id"])
         entry = {"exercise_id": ex["id"], "name": ex["name"], "kind": ex["kind"], "plan": it,
                  "phase": it.get("phase") or "principal", "last": last,
-                 "limitation": limitations.check_exercise(ex, lims), "images": ex["images"][:1], "timed": ex.get("timed")}
+                 "limitation": limitations.check_exercise(ex, lims), "images": ex["images"][:2], "timed": ex.get("timed")}
         if ex["kind"] == "cardio":
             iv = it.get("intervals") or {}
             mins = it.get("duration_min") or (garmin_export.estimate_duration_s([it]) / 60 if iv else 10)
