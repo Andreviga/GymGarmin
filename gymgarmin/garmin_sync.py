@@ -636,7 +636,10 @@ def due(min_hours: float = AUTO_MIN_HOURS, now: datetime | None = None) -> bool:
     if not last:
         return True
     try:
-        return (now or clock.now()) - datetime.fromisoformat(last) >= timedelta(hours=min_hours)
+        gap = (now or clock.now()) - datetime.fromisoformat(last)
+        if st.get("pending") and gap >= timedelta(minutes=1):
+            return True  # a última parou no limite/prazo com atividades na fila: continua já
+        return gap >= timedelta(hours=min_hours)
     except ValueError:
         return True
 
@@ -746,6 +749,7 @@ def sync(save_session, imported_ids: set, preferred_ids: set[str] | None = None,
             _save_skipped(skip)
 
     _set_sync_state(last_run=started, last_ok=True, last_ok_at=started, last_error="; ".join(errors) or None,
-                    trigger=trigger, last_imported=imported[-10:] if imported else [], needs_reconnect=False)
+                    trigger=trigger, last_imported=imported[-10:] if imported else [], needs_reconnect=False,
+                    pending=max(0, len(new) - done))
     return {"ok": True, "imported": imported, "skipped": skipped, "errors": errors, "window_days": days,
             "pending": max(0, len(new) - done)}

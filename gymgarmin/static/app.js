@@ -1282,7 +1282,7 @@ async function viewPerfil() {
   const gs = $("#g-sync");
   if (gs) gs.onclick = async () => {
     gs.disabled = true; gs.textContent = "Sincronizando…";
-    try { const r = await api("/api/garmin/sync", { method: "POST" }); toast(syncToast(r) || (r.ok ? "Nada novo no Garmin" : r.error), 5000); viewPerfil(); updateGarminPill(); }
+    try { const r = await syncAll(""); toast(syncToast(r) || (r.ok ? "Nada novo no Garmin" : r.error), 5000); viewPerfil(); updateGarminPill(); }
     catch (e) { toast(e.message, 6000); gs.disabled = false; gs.textContent = "Sincronizar agora"; }
   };
   const lo = $("#g-logout"); if (lo) lo.onclick = async () => { await api("/api/garmin/logout", { method: "POST" }); viewPerfil(); updateGarminPill(); };
@@ -1323,9 +1323,19 @@ async function updateGarminPill() {
     return g;
   } catch (_) { return null; }
 }
+// cada chamada importa até 15 atividades dentro do prazo do servidor: repete enquanto sobrar fila
+async function syncAll(qs) {
+  let r = await api(`/api/garmin/sync${qs}`, { method: "POST" });
+  const imported = [...(r.imported || [])];
+  for (let i = 0; i < 4 && r && r.ok && r.pending > 0; i++) {
+    r = await api("/api/garmin/sync", { method: "POST" });
+    imported.push(...(r.imported || []));
+  }
+  return { ...r, imported, ran: r.ran !== false };
+}
 async function autoSync() {
   try {
-    const r = await api("/api/garmin/sync?auto=true", { method: "POST" });
+    const r = await syncAll("?auto=true");
     const msg = syncToast(r);
     if (msg) { toast(`${msg} 🎉`, 6000); if (["analise", "hoje", "evolucao"].includes((location.hash.slice(1) || "hoje").split("/")[0])) route(); }
     if (r && r.ran) updateGarminPill();

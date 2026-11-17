@@ -392,3 +392,17 @@ def test_sync_stops_at_deadline_and_saves_state(monkeypatch):
     assert garmin_sync.status()["sync"]["last_ok"]
     r2 = garmin_sync.sync(db.save_session, db.garmin_imported_ids())
     assert len(r2["imported"]) == 2 and r2["pending"] == 0
+
+
+def test_queue_left_by_limit_runs_again_on_open(monkeypatch):
+    """Primeira sincronização com mais que o limite por vez: ao abrir o app de novo, continua já
+    (não espera as 6 h do intervalo normal)."""
+    monkeypatch.setattr(garmin_sync, "MAX_PER_RUN", 2)
+    garmin_sync.login("eu@x.com", "senha")
+    r = garmin_sync.sync(db.save_session, db.garmin_imported_ids())
+    assert r["pending"] == 1 and garmin_sync.sync_state()["pending"] == 1
+    assert not garmin_sync.due()  # logo em seguida, não (evita rajada)
+    assert garmin_sync.due(now=clock.now() + timedelta(minutes=2))
+    garmin_sync.sync(db.save_session, db.garmin_imported_ids())
+    assert garmin_sync.sync_state()["pending"] == 0
+    assert not garmin_sync.due(now=clock.now() + timedelta(minutes=2))

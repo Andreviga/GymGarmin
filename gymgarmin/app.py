@@ -503,7 +503,7 @@ def g_sync(auto: bool = False):
         st = garmin_sync.status()
         if not st["has_tokens"]:
             return {"ok": True, "ran": False, "imported": []}
-        if not garmin_sync.due():
+        if not garmin_sync.due() and db.kv_get("garmin_remap_v2"):
             # sem sincronizar atividades, mas a prontidão de hoje pode ter chegado (o relógio sincroniza a noite ao acordar)
             today = clock.today()
             try:
