@@ -92,6 +92,12 @@ function timeBar(t) {
 }
 
 function itemLine(it) {
+  if (it.endurance) {
+    const en = it.endurance;
+    return `<li>${SPORT_ICON[en.sport] || ""} <b>${esc(en.title)}</b> <span class="muted">${esc(endSummary(en))}</span>
+      ${en.hard ? `<span class="pill warn small">forte</span>` : ""}${en.role === "longo" ? `<span class="pill small">longo</span>` : ""}
+      ${en.note ? `<div class="small muted">${esc(en.note)}</div>` : ""}${endStepsHtml(en)}</li>`;
+  }
   const name = esc(it._name || it._ex?.name || it.exercise_id);
   let d = "";
   if (it.intervals) d = `${it.warmup_min || 0}′ + ${it.intervals.repeats}× (${it.intervals.work_s}s Z${it.intervals.work_zone} / ${it.intervals.rest_s}s) + ${it.cooldown_min || 0}′`;
@@ -114,7 +120,8 @@ function meter(label, done, target, unit = "") {
 }
 
 async function viewHoje(weekDate) {
-  const sch = await api(`/api/schedule${weekDate ? `?date=${weekDate}` : ""}`);
+  const [sch, rd] = await Promise.all([api(`/api/schedule${weekDate ? `?date=${weekDate}` : ""}`),
+    weekDate ? Promise.resolve(null) : api("/api/readiness").catch(() => null)]);
   if (!sch.plan) {
     view.innerHTML = `<div class="card"><h2>Monte seu treino automático</h2>
       <p>Diga há quanto tempo treina, quais dias pode ir e quanto tempo tem — o app monta a divisão, escolhe os exercícios respeitando suas limitações, calcula o tempo de cada sessão (aquecimento, séries, descanso, cardio e alongamento) e reorganiza a semana quando você faltar.</p>
@@ -127,6 +134,7 @@ async function viewHoje(weekDate) {
   const outdated = sch.entries.some((e) => e.garmin_outdated && e.status === "planejado");
   const cyc = sch.cycle;
   view.innerHTML = `
+  ${readinessCard(rd, sch.entries.some((e) => e.date === sch.today && e.status === "planejado"))}
   ${missed.length ? `<div class="rec alerta"><b>Treino perdido:</b> ${missed.map((e) => `${e.weekday} ${ddmm(e.date)} – ${esc(e.day_name)}`).join(", ")}.
      <div class="row gap wrap" style="margin-top:6px">${missed.map((e) => `<button class="btn sm" data-skip="${e.id}">Ajustar a semana (${e.weekday})</button>`).join("")}</div></div>` : ""}
   <div class="card">
@@ -149,6 +157,7 @@ async function viewHoje(weekDate) {
     ${meter("Cardio (min equivalentes OMS)", g.cardio.done, g.cardio.target)}
     ${meter("Séries de força", g.sets.done, g.sets.planned)}
     ${meter("Tempo treinado", g.minutes.done, g.minutes.planned, " min")}
+    ${Object.entries(g.endurance || {}).map(([k, x]) => meter(`${SPORT_ICON[k] || ""} ${esc(x.name)}`, x.done, x.planned, " " + x.unit)).join("")}
   </div></div>
   <div class="card" id="hoje-recs"><h2>O que ajustar</h2><p class="muted small">Carregando…</p></div>`;
   bindAgenda(sch);
@@ -159,7 +168,8 @@ function dayCard(e, today) {
   const [label, cls] = STATUS_INFO[e.status] || [e.status, ""];
   const active = e.status === "planejado" || e.status === "perdido";
   return `<div class="day ${e.date === today ? "today" : ""} ${active ? "" : "dim"}">
-    <div class="row between gap"><div><b>${e.weekday} ${ddmm(e.date)}</b> · ${esc(e.day_name)}</div><span class="pill ${cls}">${label}</span></div>
+    <div class="row between gap"><div><b>${e.weekday} ${ddmm(e.date)}</b> · ${e.sport ? SPORT_ICON[e.sport] + " " : ""}${esc(e.day_name)}
+      ${e.race ? `<span class="pill bad">PROVA</span>` : ""}${e.endurance_phase ? ` <span class="pill muted small">${esc(e.endurance_phase)}</span>` : ""}</div><span class="pill ${cls}">${label}</span></div>
     ${active ? timeBar(e.time) : ""}
     ${e.changes && e.changes.length ? `<ul class="small changes">${e.changes.map((c) => `<li>${esc(c)}</li>`).join("")}</ul>` : ""}
     ${e.skip_result ? `<ul class="small changes">${e.skip_result.changes.map((c) => `<li>${esc(c)}</li>`).join("")}</ul>` : ""}
@@ -173,6 +183,7 @@ function dayCard(e, today) {
         <a class="btn sm ghost" href="/api/schedule/${e.id}/fit">.FIT</a>` : ""}
       ${e.status === "perdido" ? `<button class="btn sm" data-skip="${e.id}">Ajustar a semana</button><a class="btn sm ghost" href="#treinar/agenda/${e.id}">Registrar mesmo assim</a>` : ""}
       ${e.status === "pulado" && e.can_undo ? `<button class="btn sm ghost" data-undo="${e.id}">Desfazer ajuste</button>` : ""}
+      ${e.readiness_backup && e.status === "planejado" ? `<button class="btn sm ghost" data-rundo="${e.id}">Desfazer ajuste de prontidão</button>` : ""}
     </div></div>`;
 }
 
@@ -194,6 +205,9 @@ function bindAgenda(sch) {
         return viewHoje(sch.week_start);
       }
       if (d.undo) { await api(`/api/schedule/${d.undo}/undo`, { method: "POST" }); toast("Ajuste desfeito"); return viewHoje(sch.week_start); }
+      if (d.rundo) { await api(`/api/readiness/undo/${d.rundo}`, { method: "POST" }); toast("Treino original de volta"); return viewHoje(sch.week_start); }
+      if (t.id === "rd-apply") { t.disabled = true; const r = await api("/api/readiness/apply", { method: "POST", body: {} }); toast(r.changed.length ? `Ajustado: ${r.changed.join(", ")}` : "Nada para ajustar hoje", 5000); return viewHoje(); }
+      if (t.id === "rd-refresh") { t.disabled = true; await api("/api/readiness/refresh", { method: "POST" }); return viewHoje(); }
       if (d.move) {
         const days = [0, 1, 2, 3, 4, 5, 6].map((i) => addDays(sch.week_start, i)).filter((x) => x >= sch.today && x !== d.date);
         const body = openModal(`<h2>Mover para…</h2><div class="chips">${days.map((x) => `<button class="chip" data-to="${x}">${["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"][(new Date(x + "T12:00:00").getDay() + 6) % 7]} ${ddmm(x)}</button>`).join("")}</div>`);
@@ -233,7 +247,8 @@ async function openGenerator() {
     </div>
     <label>Dias que você pode treinar</label>
     <div class="chips" id="gm-days">${opts.weekdays.map((w, i) => `<label class="chip"><input type="checkbox" value="${i}" ${avail.includes(i) ? "checked" : ""}> ${w}</label>`).join("")}</div>
-    <p class="small muted">Limitações, equipamentos e aparelhos preferidos vêm do seu Perfil.</p>
+    <p class="small muted">Limitações, equipamentos e aparelhos preferidos vêm do seu Perfil. Corrida, bike, natação, remo, caminhada,
+      trilha e provas/triathlon entram pela página <a href="#esportes" id="gm-esportes">Esportes</a>.</p>
     <div class="row gap wrap"><button class="btn ghost" id="gm-prev">Pré-visualizar</button><button class="btn ghost" id="gm-var" hidden>Outra variação</button><button class="btn" id="gm-apply" hidden>Usar e montar minha semana</button></div>
     <div id="gm-out" style="margin-top:12px"></div>`);
   const read = () => ({
@@ -256,6 +271,7 @@ async function openGenerator() {
     $$("#gm-out [data-ex]", body).forEach((el) => { if (names[el.dataset.ex]) el.textContent = names[el.dataset.ex]; });
     $("#gm-var", body).hidden = false; $("#gm-apply", body).hidden = false;
   };
+  $("#gm-esportes", body).onclick = () => closeModal();
   $("#gm-prev", body).onclick = () => preview().catch((e) => toast(e.message));
   $("#gm-var", body).onclick = () => { seed += 1; preview().catch((e) => toast(e.message)); };
   $("#gm-apply", body).onclick = async () => {
@@ -595,6 +611,18 @@ function sessionItemHtml(it, i) {
     <div class="grow"><b data-ex="${esc(it.exercise_id)}" style="cursor:pointer">${esc(it.name)}</b> ${limBadge(it.limitation)}
     <div class="small muted">${it.kind === "cardio" ? `${plan.duration_min || ""} min · Z${plan.zone || ""}` : `${plan.sets || ""}×${plan.reps || (plan.duration_s ? plan.duration_s + "s" : "")} ${plan.load_kg ? "· " + plan.load_kg + " kg" : ""} · descanso ${plan.rest_s || 90}s`}
     ${lastTxt ? `<br>Última: ${esc(lastTxt)}` : ""}${it.suggestion && it.suggestion.note ? `<br><b>${esc(it.suggestion.note)}</b>` : ""}${plan.notes ? `<br>${esc(plan.notes)}` : ""}</div></div></div>`;
+  if (it.endurance) {
+    const en = it.endurance; const meters = ["natacao", "remo"].includes(en.sport);
+    return `<div class="card"><div><b>${SPORT_ICON[en.sport] || ""} ${esc(en.title)}</b> <span class="small muted">${esc(endSummary(en))}</span>
+      ${en.note ? `<div class="small">${esc(en.note)}</div>` : ""}${endStepsHtml(en, true)}</div>
+      <div class="grid2" style="margin-top:8px">
+      <div><label>Distância (${meters ? "m" : "km"})</label><input inputmode="decimal" data-c="dist_in" data-i="${i}" value="${esc(it.dist_in ?? "")}" placeholder="${meters ? (en.dist_m || "") : (en.dist_m ? (en.dist_m / 1000).toFixed(1) : "")}"></div>
+      <div><label>Tempo (h:mm:ss ou mm:ss)</label><input data-t="time_str" data-i="${i}" value="${esc(it.time_str ?? "")}" placeholder="${fmtS(en.dur_s)}"></div>
+      <div><label>FC média</label><input type="number" data-c="avg_hr" data-i="${i}" value="${esc(it.avg_hr ?? "")}"></div>
+      ${en.sport === "ciclismo" ? `<div><label>Potência média (W)</label><input type="number" data-c="avg_power" data-i="${i}" value="${esc(it.avg_power ?? "")}"></div>` : ""}
+      <div><label>Feito</label><button class="check ${it.done ? "on" : ""}" data-cdone="${i}">✓</button></div></div>
+      <p class="small muted" id="pace-${i}">${esc(paceTxt(it))}</p></div>`;
+  }
   if (it.kind === "cardio") {
     return `<div class="card">${head}<div class="grid2" style="margin-top:8px">
       <div><label>Minutos</label><input type="number" data-c="duration_min" data-i="${i}" value="${esc(it.duration_min ?? "")}"></div>
@@ -622,7 +650,9 @@ function bindSession() {
     if (el.id === "s-date") s.date = el.value;
     if (el.id === "s-notes") s.notes = el.value;
     if (el.dataset.s) { const v = el.value === "" ? null : parseFloat(el.value.replace(",", ".")); s.items[+el.dataset.i].sets[+el.dataset.j][el.dataset.s] = v; }
-    if (el.dataset.c) { s.items[+el.dataset.i][el.dataset.c] = el.value === "" ? null : +el.value; }
+    if (el.dataset.c) { s.items[+el.dataset.i][el.dataset.c] = el.value === "" ? null : +String(el.value).replace(",", "."); }
+    if (el.dataset.t) { s.items[+el.dataset.i][el.dataset.t] = el.value; }
+    if (el.dataset.c || el.dataset.t) { const pe = $(`#pace-${el.dataset.i}`); if (pe) pe.textContent = paceTxt(s.items[+el.dataset.i]); }
     save();
   };
   view.onchange = view.oninput;
@@ -654,7 +684,9 @@ function bindSession() {
     }
     const payload = {
       date: s.date, plan_id: s.plan_id || null, day_name: s.day_name, notes: s.notes, schedule_id: s.schedule_id || null,
-      items: s.items.filter((it) => it.kind === "cardio" || (it.phase || "principal") === "principal").map((it) => it.kind === "cardio"
+      items: s.items.filter((it) => it.kind === "cardio" || (it.phase || "principal") === "principal").map((it) => it.endurance
+        ? (it.done ? endPayload(it) : null)
+        : it.kind === "cardio"
         ? (it.done ? { exercise_id: it.exercise_id, duration_min: it.duration_min, zone: it.zone, avg_hr: it.avg_hr } : null)
         : { exercise_id: it.exercise_id, sets: it.sets.filter((x) => x.done).map(({ reps, load_kg, rpe, duration_s }) => ({ reps, load_kg, rpe, duration_s })) })
         .filter((it) => it && (it.duration_min || (it.sets && it.sets.length))),
@@ -689,8 +721,10 @@ $("#timer").addEventListener("click", (e) => {
 async function viewAnalise() {
   const [rep, sessions] = await Promise.all([api("/api/report/weekly"), api("/api/sessions?limit=30")]);
   const c = rep.cardio;
-  const hist = await api("/api/history").catch(() => ({ exercises: [], recent_prs: [] }));
+  const [hist, ld] = await Promise.all([api("/api/history").catch(() => ({ exercises: [], recent_prs: [] })),
+    api("/api/load?days=90").catch(() => null)]);
   view.innerHTML = `
+  ${loadCard(ld)}
   ${historyCard(hist)}
   <div class="card"><h2>Volume por músculo — últimos 7 dias</h2>${muscleBars(rep.muscles, "sets_7d")}
     <details><summary class="small">Detalhes por músculo</summary><ul class="list small">${rep.muscles.map((m) => `<li><b>${esc(m.pt)}</b>: ${m.sets_7d} séries (${m.direct_7d} diretas, ${m.indirect_7d} indiretas) · média 4 sem. ${m.sets_avg_4w} · ${m.frequency_7d}× na semana · ${m.days_since === null ? "nunca treinado" : `há ${m.days_since} dias`} · tonelagem ${m.tonnage_7d} kg</li>`).join("")}</ul></details></div>
@@ -793,6 +827,203 @@ async function viewEvolucao(id) {
   </tbody></table></div><p class="small muted">🏆 = recorde · G = importado do Garmin</p>${rows.some((p) => p.e1rm_weak) ? `<p class="small muted">* série com mais de 12 reps: o 1RM estimado é menos preciso.</p>` : ""}</div>`;
 }
 
+/* ------------------------------------------------- RESISTÊNCIA / ESPORTES -- */
+const SPORT_ICON = { corrida: "🏃", ciclismo: "🚴", natacao: "🏊", remo: "🚣", caminhada: "🚶", trilha: "🥾", multi: "🏅" };
+const STEP_PT = { warmup: "Aquecimento", cooldown: "Desaquecimento", interval: "Tiro", steady: "Contínuo", recovery: "Recuperação", rest: "Descanso" };
+const UNIT_TXT = { km: "km", h: "h", m: "m" };
+function fmtS(sec) { sec = Math.round(sec || 0); const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), x = sec % 60; return h ? `${h}:${String(m).padStart(2, "0")}:${String(x).padStart(2, "0")}` : `${m}:${String(x).padStart(2, "0")}`; }
+function parseDur(v) {
+  if (v === null || v === undefined || v === "") return null;
+  const parts = String(v).trim().replace(",", ".").split(":").map(Number);
+  if (parts.some((x) => Number.isNaN(x))) return null;
+  if (parts.length === 1) return parts[0] * 60; // só número = minutos
+  if (parts.length === 2) return parts[0] * 60 + parts[1];
+  return parts[0] * 3600 + parts[1] * 60 + parts[2];
+}
+function distTxt(m, sport) { if (!m) return ""; return ["natacao", "remo"].includes(sport) ? `${Math.round(m)} m` : `${(m / 1000).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} km`; }
+function endSummary(en) { return [distTxt(en.dist_m, en.sport), en.dur_s ? `~${fmtS(en.dur_s)}` : ""].filter(Boolean).join(" · "); }
+function stepTxt(st, sport) {
+  if (st.kind === "repeat") return `${st.n}× [ ${st.steps.map((x) => stepTxt(x, sport)).join(" | ")} ]`;
+  const amount = st.dist_m && !(st.kind === "recovery" && sport !== "natacao") && sport !== "ciclismo" && sport !== "trilha" ? distTxt(st.dist_m, sport) : fmtS(st.dur_s);
+  const tgt = st.target && st.target.label ? ` · ${st.target.label}` : "";
+  return `${STEP_PT[st.kind] || st.kind} ${amount}${tgt}${st.note ? ` (${st.note})` : ""}`;
+}
+function endStepsHtml(en, open) {
+  if (!en.steps) return "";
+  return `<details ${open ? "open" : ""}><summary class="small">Passos e alvos</summary><ol class="small steps">${en.steps.map((st) => `<li>${esc(stepTxt(st, en.sport))}</li>`).join("")}</ol></details>`;
+}
+function paceTxt(it) {
+  const en = it.endurance || {}; const secs = parseDur(it.time_str); const d = +it.dist_in;
+  if (!secs || !d) return "";
+  if (en.sport === "natacao") return `Ritmo: ${fmtS(secs / (d / 100))}/100 m`;
+  if (en.sport === "remo") return `Split: ${fmtS(secs / (d / 500))}/500 m`;
+  if (["ciclismo"].includes(en.sport)) return `Velocidade: ${(d / (secs / 3600)).toFixed(1)} km/h`;
+  return `Ritmo: ${fmtS(secs / d)}/km`;
+}
+function endPayload(it) {
+  const en = it.endurance; const meters = ["natacao", "remo"].includes(en.sport);
+  const secs = parseDur(it.time_str) || en.dur_s;
+  const out = { exercise_id: it.exercise_id, sport: en.sport, duration_min: Math.round((secs / 60) * 10) / 10, zone: en.zone };
+  const d = it.dist_in !== null && it.dist_in !== undefined && it.dist_in !== "" ? +it.dist_in : (en.dist_m ? (meters ? en.dist_m : en.dist_m / 1000) : null);
+  if (d) out.distance_km = meters ? d / 1000 : d;
+  if (it.avg_hr) out.avg_hr = it.avg_hr;
+  if (it.avg_power) out.avg_power = it.avg_power;
+  return out;
+}
+function readinessCard(rd, hasToday = true) {
+  if (!rd) return "";
+  if (rd.score === null || rd.score === undefined) {
+    return state.garmin && state.garmin.connected ? `<div class="card flat small row between gap"><span>Prontidão de hoje: sem dados do relógio ainda.</span><button class="btn sm ghost" id="rd-refresh">Buscar no Garmin</button></div>` : "";
+  }
+  const cls = { seguir: "ok", moderar: "warn", trocar: "warn", descanso: "bad" }[rd.action] || "";
+  return `<div class="card readiness ${cls}"><div class="row between gap"><h2 style="margin:0">Prontidão de hoje</h2><span class="kpi">${rd.score}</span></div>
+    <p><span class="pill ${cls}">${esc({ alta: "Alta", moderada: "Moderada", baixa: "Baixa", muito_baixa: "Muito baixa" }[rd.level] || rd.level)}</span> ${esc(rd.text)}</p>
+    <p class="small muted">${esc((rd.reasons || []).join(" · "))}${rd.sleep_h ? ` · ${rd.sleep_h} h de sono` : ""}${rd.rhr ? ` · FC repouso ${rd.rhr}` : ""}</p>
+    <div class="row gap wrap">${rd.action !== "seguir" && hasToday ? `<button class="btn sm" id="rd-apply">Ajustar o treino de hoje</button>` : ""}<button class="btn sm ghost" id="rd-refresh">Atualizar</button></div></div>`;
+}
+function loadChart(series) {
+  if (!series || series.length < 7) return "";
+  const W = 340, H = 170, L = 30, R = 8, T = 10, B = 22;
+  const vals = series.flatMap((p) => [p.ctl, p.atl, p.tsb]);
+  const mn = Math.min(0, ...vals), mx = Math.max(10, ...vals);
+  const X = (i) => L + (i / (series.length - 1)) * (W - L - R);
+  const Y = (v) => T + (1 - (v - mn) / (mx - mn)) * (H - T - B);
+  const path = (k) => series.map((p, i) => `${i ? "L" : "M"}${X(i).toFixed(1)},${Y(p[k]).toFixed(1)}`).join(" ");
+  return `<svg class="hist-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Condicionamento, fadiga e forma nos últimos ${series.length} dias">
+    <line x1="${L}" x2="${W - R}" y1="${Y(0)}" y2="${Y(0)}" class="grid"/>
+    ${[mn, mx].map((t) => `<text x="${L - 4}" y="${Y(t) + 3}" text-anchor="end" class="axis">${Math.round(t)}</text>`).join("")}
+    <text x="${L}" y="${H - 6}" class="axis">${ddmm(series[0].date)}</text><text x="${W - R}" y="${H - 6}" text-anchor="end" class="axis">${ddmm(series[series.length - 1].date)}</text>
+    <path d="${path("tsb")}" class="line-tsb"/><path d="${path("atl")}" class="line2"/><path d="${path("ctl")}" class="line1"/></svg>
+    <div class="row gap small muted"><span><i class="lg lg1"></i>Condicionamento</span><span><i class="lg lg2"></i>Fadiga</span><span><i class="lg lgtsb"></i>Forma</span></div>`;
+}
+function loadCard(ld) {
+  if (!ld) return "";
+  const st = { risco: "bad", subida_rapida: "warn", produtivo: "ok", equilibrado: "ok", descansado: "", inicio: "muted" }[ld.status] || "";
+  const by = Object.entries(ld.week.by_sport || {});
+  return `<div class="card"><h2>Carga de treino (todas as modalidades)</h2>
+    <div class="grid2 kpis"><div><div class="kpi">${Math.round(ld.ctl)}</div><div class="small muted">condicionamento (42 dias)</div></div>
+      <div><div class="kpi">${Math.round(ld.atl)}</div><div class="small muted">fadiga (7 dias)</div></div>
+      <div><div class="kpi">${ld.form > 0 ? "+" : ""}${Math.round(ld.form)}</div><div class="small muted">forma</div></div>
+      <div><div class="kpi">${ld.ramp_week > 0 ? "+" : ""}${ld.ramp_week}</div><div class="small muted">variação em 7 dias</div></div></div>
+    <p><span class="pill ${st}">${esc({ risco: "Risco", subida_rapida: "Subida rápida", produtivo: "Produtivo", equilibrado: "Equilibrado", descansado: "Descansado", inicio: "Começando" }[ld.status] || ld.status)}</span> <span class="small">${esc(ld.message)}</span></p>
+    ${loadChart(ld.series)}
+    ${by.length ? `<p class="small">Últimos 7 dias: ${by.map(([k, v]) => `${SPORT_ICON[k] || (k === "musculacao" ? "🏋️" : "❤️")} ${Math.round(v.tss)}${v.km ? ` (${v.km.toLocaleString("pt-BR")} km)` : ""}`).join(" · ")}</p>` : ""}
+    <p class="small muted">Cada treino vira uma carga (100 = 1 h no limiar), por potência, ritmo, FC ou RPE da musculação. <a href="#esportes">Esportes e zonas</a></p></div>`;
+}
+
+async function viewEsportes() {
+  const [opts, ov] = await Promise.all([api("/api/endurance/options"), api("/api/endurance/overview")]);
+  const cfg = ov.config || {}; const sc = cfg.sports || {}; const ev = cfg.event || {};
+  const wd = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
+  const sportBox = (sp) => {
+    const c = sc[sp.id] || {}; const g = c.goal || {}; const unit = UNIT_TXT[sp.unit];
+    const recent = ov.recent && ov.recent[sp.id];
+    return `<details class="sport-box" ${c.enabled ? "open" : ""}><summary><label class="row gap" style="margin:0;display:inline-flex"><input type="checkbox" data-sp="${sp.id}" data-k="enabled" ${c.enabled ? "checked" : ""}> ${SPORT_ICON[sp.id]} <b>${esc(sp.name)}</b></label></summary>
+      <div class="grid2">
+        <div class="field"><label>Onde</label><select data-sp="${sp.id}" data-k="env">${sp.envs.map((e) => `<option value="${e.id}" ${c.env === e.id ? "selected" : ""}>${esc(e.name)}</option>`).join("")}</select></div>
+        <div class="field"><label>Sessões por semana</label><input type="number" min="1" max="7" data-sp="${sp.id}" data-k="sessions" value="${c.sessions || sp.sessions}"></div>
+        <div class="field"><label>Volume atual (${unit}/semana)</label><input type="number" step="any" min="0" data-sp="${sp.id}" data-k="current_weekly" value="${c.current_weekly ?? ""}" placeholder="${recent ? `Garmin: ${recent}` : "pelo nível"}"></div>
+        <div class="field"><label>Dia do longo</label><select data-sp="${sp.id}" data-k="long_day"><option value="">automático</option>${wd.map((w, i) => `<option value="${i}" ${String(c.long_day) === String(i) ? "selected" : ""}>${w}</option>`).join("")}</select></div>
+        ${sp.id === "natacao" ? `<div class="field"><label>Piscina (m)</label><select data-sp="${sp.id}" data-k="pool_m">${[25, 50, 20, 33].map((x) => `<option ${+(c.pool_m || 25) === x ? "selected" : ""}>${x}</option>`).join("")}</select></div>` : ""}
+        <div class="field"><label>Meta</label><select data-sp="${sp.id}" data-k="goal_type">
+          <option value="" ${!g.type ? "selected" : ""}>Sem meta (manter)</option><option value="volume" ${g.type === "volume" ? "selected" : ""}>Volume semanal</option>
+          ${sp.race_distances.length ? `<option value="prova" ${g.type === "prova" ? "selected" : ""}>Prova (distância × tempo)</option>` : ""}</select></div>
+        <div class="field goal-volume"><label>Meta de volume (${unit}/semana)</label><input type="number" step="any" data-sp="${sp.id}" data-k="weekly" value="${g.weekly ?? ""}"></div>
+        <div class="field goal-race"><label>Distância da prova (${sp.id === "natacao" || sp.id === "remo" ? "m" : "km"})</label><input type="number" step="any" list="dl-${sp.id}" data-sp="${sp.id}" data-k="distance" value="${g.distance ?? ""}"><datalist id="dl-${sp.id}">${sp.race_distances.map((d) => `<option value="${d}">`).join("")}</datalist></div>
+        <div class="field goal-race"><label>Tempo alvo (h:mm:ss)</label><input data-sp="${sp.id}" data-k="target" value="${esc(g.target ?? "")}" placeholder="ex.: 48:00"></div>
+        <div class="field goal-race"><label>Data da prova</label><input type="date" data-sp="${sp.id}" data-k="date" value="${esc(g.date ?? "")}"></div>
+      </div></details>`;
+  };
+  const pr = ov.predictions || {}; const prs = pr.sports || {};
+  const anchorsHtml = ov.anchors.map((a) => `<li class="row between gap"><span><b>${esc(a.label)}</b>: ${esc(a.text)}${a.date ? ` <span class="small muted">(${esc(a.source || "")}, ${ddmm(a.date)})</span>` : ""}</span></li>`).join("");
+  const sugHtml = (ov.suggestions || []).map((x, i) => `<li class="row between gap"><span><b>${esc(x.label)}</b>: ${esc(x.current_txt)} → <b>${esc(x.value_txt)}</b><br><span class="small muted">${esc(x.source)}</span></span><button class="btn sm" data-sug="${i}">Aplicar</button></li>`).join("");
+  const zonesHtml = Object.entries(ov.zones || {}).map(([sp, zs]) => `<details><summary>${SPORT_ICON[sp]} Zonas – ${esc(opts.sports.find((x) => x.id === sp).name)}</summary>
+      <table class="hist-table"><tbody>${zs.map((z) => `<tr><td>Z${z.zone}</td><td>${esc(z.name)}</td><td>${esc(z.label)}</td></tr>`).join("")}</tbody></table></details>`).join("");
+  const goalTxt = (gx) => gx ? `Meta ${esc(gx.target || "—")} · previsão hoje <b>${esc(gx.predicted)}</b> — ${gx.status === "no_alvo" ? "já no alvo ✅" : gx.status === "possivel" ? "alcançável até a prova 👍" : `ambicioso: realista ~${esc(gx.realistic || "")}`}` : "";
+  const evp = pr.event;
+  view.innerHTML = `
+  <div class="card"><h2>Esportes de resistência</h2><p class="small muted">Escolha as modalidades e metas: o gerador distribui junto com a musculação (longo no fim de semana, sessões fortes longe do longo e de perna pesada, ~80% leve).</p>
+    <div class="stack" id="sp-list">${opts.sports.map(sportBox).join("")}</div></div>
+  <div class="card"><h2>Prova multiesporte</h2><div class="grid2">
+    <div class="field"><label>Evento</label><select id="ev-type"><option value="">Nenhum</option>${opts.events.map((e) => `<option value="${e.id}" ${ev.type === e.id ? "selected" : ""}>${esc(e.name)}</option>`).join("")}</select></div>
+    <div class="field"><label>Data</label><input type="date" id="ev-date" value="${esc(ev.date || "")}"></div>
+    <div class="field"><label>Tempo alvo (h:mm:ss)</label><input id="ev-target" value="${esc(ev.target || "")}" placeholder="ex.: 2:45:00"></div></div>
+    <p class="small muted">O evento define as metas de natação, bike e corrida, a fase de cada semana e o brick (corrida logo após o pedal).</p></div>
+  <div class="card"><h2>Opções</h2>
+    <label class="row gap"><input type="checkbox" id="opt-tests" ${cfg.tests !== false ? "checked" : ""}> Agendar testes para calibrar as zonas (a cada ~8 semanas)</label>
+    <label class="row gap"><input type="checkbox" id="opt-ready" ${cfg.readiness_auto ? "checked" : ""}> Ajustar o treino do dia sozinho pela prontidão do relógio (dá para desfazer)</label>
+    <div class="row gap wrap" style="margin-top:8px"><button class="btn" id="end-save">Salvar</button><button class="btn ghost" id="end-gen">Salvar e regerar o treino</button></div></div>
+  <div class="card"><h2>Referências de intensidade</h2><ul class="list small">${anchorsHtml}</ul>
+    ${sugHtml ? `<h3>Sugestões de atualização</h3><ul class="list small">${sugHtml}</ul>` : ""}
+    <details><summary>Registrar teste / valor</summary><div class="stack small">
+      <div class="row gap wrap"><b>🏃 Corrida</b><input id="t-run-d" type="number" step="any" placeholder="km (ex. 5)" style="width:90px"><input id="t-run-t" placeholder="tempo 24:30" style="width:110px"><button class="btn sm" data-test="corrida">Calcular</button></div>
+      <div class="row gap wrap"><b>🚴 Ciclismo</b><input id="t-bike-p" type="number" placeholder="média 20 min (W)" style="width:150px"><span>ou FTP</span><input id="t-bike-f" type="number" placeholder="W" style="width:80px"><button class="btn sm" data-test="ciclismo">Salvar</button></div>
+      <div class="row gap wrap"><b>🏊 Natação</b><input id="t-sw-4" placeholder="400 m 7:20" style="width:110px"><input id="t-sw-2" placeholder="200 m 3:25" style="width:110px"><button class="btn sm" data-test="natacao">Calcular CSS</button></div>
+      <div class="row gap wrap"><b>🚣 Remo</b><input id="t-row" placeholder="2 km 7:40" style="width:110px"><button class="btn sm" data-test="remo">Salvar</button></div>
+      <div class="row gap wrap"><b>❤️ FC</b><input id="t-lthr" type="number" placeholder="limiar" style="width:90px"><button class="btn sm" data-test="lthr">Salvar</button><input id="t-hrmax" type="number" placeholder="máxima" style="width:90px"><button class="btn sm" data-test="hrmax">Salvar</button></div>
+    </div></details>
+    ${zonesHtml}</div>
+  <div class="card"><h2>Previsões</h2>
+    ${prs.corrida ? `<p>🏃 VDOT ${prs.corrida.vdot}: ${Object.entries(prs.corrida.times).map(([d, t]) => `${d} km ${esc(t)}`).join(" · ")}${prs.corrida.goal ? `<br><span class="small">${goalTxt(prs.corrida.goal)}</span>` : ""}</p>` : ""}
+    ${prs.natacao ? `<p>🏊 CSS ${esc(prs.natacao.css)}: ${Object.entries(prs.natacao.times).map(([d, t]) => `${d} m ${esc(t)}`).join(" · ")}</p>` : ""}
+    ${prs.ciclismo ? `<p>🚴 FTP ${prs.ciclismo.ftp} W (${prs.ciclismo.w_kg} W/kg): ${Object.entries(prs.ciclismo.speed_kmh).map(([k, v]) => `${esc(k)} ${v} km/h`).join(" · ")}</p>` : ""}
+    ${prs.remo ? `<p>🚣 2 km ${esc(prs.remo["2k"])} (${esc(prs.remo.split)})</p>` : ""}
+    ${evp ? `<p>🏅 <b>${esc(evp.name)}</b>${evp.date ? ` em ${ddmm(evp.date)}` : ""}: ${evp.predicted ? `previsão <b>${esc(evp.predicted)}</b>${evp.target ? ` (alvo ${esc(evp.target)}${evp.gap_s !== null ? `, ${evp.gap_s > 0 ? "+" : ""}${fmtS(Math.abs(evp.gap_s))}${evp.gap_s > 0 ? " acima" : " abaixo"}` : ""})` : ""}` : `faltam referências: ${esc(evp.missing_anchors.join(", "))}`}
+      <br><span class="small muted">${evp.legs.map((l) => `${SPORT_ICON[l.sport]} ${l.distance}${l.sport === "natacao" ? " m" : " km"} ${esc(l.time || "—")}`).join(" · ")} · transições ${esc(evp.transitions)}</span></p>` : ""}
+    ${!Object.keys(prs).length && !evp ? `<p class="empty">Registre um teste ou sincronize o Garmin para ver previsões.</p>` : ""}</div>`;
+  const toggleGoals = () => $$(".sport-box").forEach((box) => {
+    const t = $("[data-k=goal_type]", box).value;
+    $$(".goal-volume", box).forEach((x) => { x.hidden = t !== "volume"; });
+    $$(".goal-race", box).forEach((x) => { x.hidden = t !== "prova"; });
+  });
+  toggleGoals();
+  const read = () => {
+    const sportsOut = {};
+    opts.sports.forEach((sp) => {
+      const v = (k) => { const el = $(`[data-sp="${sp.id}"][data-k="${k}"]`); return el ? (el.type === "checkbox" ? el.checked : el.value) : undefined; };
+      const gt = v("goal_type");
+      const num = (x) => (x === "" || x === undefined ? null : +String(x).replace(",", "."));
+      const goal = gt === "volume" ? { type: "volume", weekly: num(v("weekly")) } : gt === "prova" ? { type: "prova", distance: num(v("distance")), target: v("target") || null, date: v("date") || null } : {};
+      sportsOut[sp.id] = { enabled: v("enabled"), env: v("env"), sessions: num(v("sessions")), current_weekly: num(v("current_weekly")),
+        long_day: v("long_day") === "" ? null : +v("long_day"), goal, ...(sp.id === "natacao" ? { pool_m: num(v("pool_m")) } : {}) };
+    });
+    const et = $("#ev-type").value;
+    return { sports: sportsOut, event: et ? { type: et, date: $("#ev-date").value || null, target: $("#ev-target").value || null } : null,
+      tests: $("#opt-tests").checked, readiness_auto: $("#opt-ready").checked };
+  };
+  view.onchange = (e) => { if (e.target.dataset.k === "goal_type") toggleGoals(); };
+  view.onclick = async (e) => {
+    const t = e.target.closest("button"); if (!t) return;
+    try {
+      if (t.id === "end-save" || t.id === "end-gen") {
+        const body = read();
+        if (body.event && !body.event.date) return toast("Informe a data do evento");
+        await api("/api/endurance", { method: "PUT", body });
+        state.profile = await api("/api/profile");
+        toast("Esportes salvos");
+        if (t.id === "end-gen") return openGenerator();
+        return;
+      }
+      if (t.dataset.sug !== undefined) {
+        const x = ov.suggestions[+t.dataset.sug];
+        await api("/api/anchors", { method: "POST", body: { key: x.key, value: x.value, source: x.source } });
+        toast(`${x.label} atualizado: ${x.value_txt}`); return viewEsportes();
+      }
+      if (t.dataset.test) {
+        const k = t.dataset.test; let data = {};
+        if (k === "corrida") data = { distance_km: +$("#t-run-d").value || 5, time: $("#t-run-t").value };
+        if (k === "ciclismo") data = $("#t-bike-f").value ? { ftp: +$("#t-bike-f").value } : { power_20min: +$("#t-bike-p").value };
+        if (k === "natacao") data = { t400: $("#t-sw-4").value, t200: $("#t-sw-2").value };
+        if (k === "remo") data = { t2k: $("#t-row").value };
+        if (k === "lthr") data = { value: +$("#t-lthr").value };
+        if (k === "hrmax") data = { value: +$("#t-hrmax").value };
+        const r = await api("/api/anchors/test", { method: "POST", body: { sport: k, data } });
+        toast(`Referência salva: ${r.text}`); return viewEsportes();
+      }
+    } catch (err) { toast(err.message, 5000); }
+  };
+}
+
 /* ---------------------------------------------------------- EXERCÍCIOS -- */
 async function viewExercicios() {
   view.innerHTML = `<div class="card"><div class="stack">
@@ -868,6 +1099,8 @@ async function viewPerfil() {
     <div class="row gap wrap"><a class="btn sm ghost" href="/api/backup">Baixar backup</a>
       <label class="btn sm ghost" style="margin:0">Restaurar backup<input type="file" id="restore" accept=".json,application/json" hidden></label></div>
   </div>
+  <div class="card"><h2>Esportes de resistência</h2><p class="small">Corrida, ciclismo, natação, remo, caminhada e trilha — com meta de volume, prova com tempo alvo ou triathlon/duathlon; zonas por ritmo, potência ou FC; prontidão diária do relógio.</p>
+    <a class="btn sm" href="#esportes">Configurar esportes</a></div>
   <div class="card"><h2>Garmin Connect</h2>
     ${!g.library_installed ? `<p class="pill bad">Biblioteca garminconnect não instalada no servidor: <code>pip install "garminconnect>=0.3.20"</code></p>` : ""}
     ${g.storage_error ? `<p class="pill bad">${esc(g.storage_error)}</p>` : ""}
@@ -960,7 +1193,7 @@ function syncToast(r) {
 }
 async function updateGarminPill() {
   try {
-    const g = await api("/api/garmin/status"); const el = $("#garmin-pill");
+    const g = await api("/api/garmin/status"); state.garmin = g; const el = $("#garmin-pill");
     const [txt, cls] = g.connected ? ["Garmin: conectado", "ok"] : g.needs_reconnect ? ["Garmin: reconectar", "warn"] : ["Garmin: offline", "muted"];
     el.textContent = txt; el.className = `pill ${cls}`;
     if (g.needs_reconnect) { el.onclick = () => { location.hash = "#perfil"; }; el.style.cursor = "pointer"; }
@@ -979,7 +1212,7 @@ async function autoSync() {
 /* --------------------------------------------------------------- router -- */
 async function route() {
   const [name, a, b] = (location.hash.slice(1) || "hoje").split("/");
-  $$(".tabbar a").forEach((el) => el.classList.toggle("active", el.dataset.tab === ({ plano: "planilhas", evolucao: "analise" }[name] || name)));
+  $$(".tabbar a").forEach((el) => el.classList.toggle("active", el.dataset.tab === ({ plano: "planilhas", evolucao: "analise", esportes: "perfil" }[name] || name)));
   view.oninput = view.onchange = view.onclick = null;
   view.innerHTML = `<p class="muted">Carregando…</p>`;
   try {
@@ -989,7 +1222,7 @@ async function route() {
         document.querySelector(".topbar").insertAdjacentHTML("afterend", `<div id="eph" class="rec atencao small" style="margin:8px 16px 0">Versão de teste online: os dados podem ser apagados pelo servidor. Use <a href="#perfil">Perfil → Backup</a> para salvar e restaurar.</div>`);
       }
     }
-    const routes = { hoje: () => viewHoje(a), planilhas: viewPlanilhas, plano: () => viewPlano(a), treinar: () => viewTreinar(a, b), analise: viewAnalise, evolucao: () => viewEvolucao(decodeURIComponent(a || "")), exercicios: viewExercicios, perfil: viewPerfil };
+    const routes = { hoje: () => viewHoje(a), planilhas: viewPlanilhas, plano: () => viewPlano(a), treinar: () => viewTreinar(a, b), analise: viewAnalise, evolucao: () => viewEvolucao(decodeURIComponent(a || "")), esportes: viewEsportes, exercicios: viewExercicios, perfil: viewPerfil };
     await (routes[name] || viewHoje)();
     if (!view.onclick) view.onclick = (e) => { const id = e.target.dataset && e.target.dataset.ex; if (id) showExercise(id); };
   } catch (e) { view.innerHTML = `<div class="card"><p class="pill bad">Erro: ${esc(e.message)}</p></div>`; }

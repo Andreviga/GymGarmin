@@ -206,3 +206,15 @@ label.chip { display: inline-flex; align-items: center; color: var(--ink); font-
 .hist-table th, .hist-table td { text-align: left; padding: 6px 6px; border-bottom: 1px solid var(--line); white-space: nowrap; }
 .hist-table th { font-weight: 600; color: var(--ink-2); font-size: .8rem; }
 .hist-table tr.pr-row td { background: var(--ok-bg); }
+
+/* ---- resistência / esportes ---- */
+.steps { margin: 4px 0 0; padding-left: 20px; }
+.steps li { margin: 2px 0; }
+.sport-box { border: 1px solid var(--line); border-radius: 12px; padding: 8px 10px; }
+.sport-box > summary { cursor: pointer; list-style: none; }
+.sport-box[open] > summary { margin-bottom: 8px; }
+.readiness.ok { border-left: 4px solid var(--ok); }
+.readiness.warn { border-left: 4px solid var(--warn); }
+.readiness.bad { border-left: 4px solid var(--bad); }
+.hist-chart .line-tsb { fill: none; stroke: var(--warn); stroke-width: 1.5; opacity: .8; }
+.lgtsb { background: var(--warn); }

@@ -304,6 +304,11 @@ def _prefill_items(day_items: list[dict], deload: bool = False) -> list[dict]:
             iv = it.get("intervals") or {}
             mins = it.get("duration_min") or (garmin_export.estimate_duration_s([it]) / 60 if iv else 10)
             entry.update(duration_min=round(mins), zone=it.get("zone") or iv.get("work_zone") or 2)
+            if it.get("endurance"):
+                end = it["endurance"]
+                entry.update(endurance=end, sport=it.get("sport") or end.get("sport"), plan=it,
+                             name=f"{sports.SPORTS[end['sport']]['name']}: {end['title']}",
+                             planned_distance_km=round((end.get("dist_m") or 0) / 1000, 2) or None)
         else:
             sug = progression.suggest(it, last, deload=deload or it.get("deload", False)) \
                 if entry["phase"] == "principal" and not ex.get("timed") else {"load_kg": it.get("load_kg"), "note": None}
