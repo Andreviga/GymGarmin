@@ -26,10 +26,13 @@ async function api(path, opts = {}) {
   const isGet = !opts.method || opts.method === "GET";
   const ck = `${act ? act.id : "me"}|${path}`;
   if (isGet && SWR.mode && !SWR.skip.test(path) && SWR.mem.has(ck)) { SWR.used.add(path); return clone(SWR.mem.get(ck)); }
-  const o = { ...opts, signal: opts.signal, headers: { "Content-Type": "application/json", ...(act ? { "X-GG-Athlete": String(act.id) } : {}), ...(opts.headers || {}) } };
+  // leituras da tela atual são canceladas se a pessoa trocar de tela antes de terminarem
+  const signal = opts.signal || (isGet && route.ctl ? route.ctl.signal : undefined);
+  const o = { ...opts, signal, headers: { "Content-Type": "application/json", ...(act ? { "X-GG-Athlete": String(act.id) } : {}), ...(opts.headers || {}) } };
   if (o.body && typeof o.body !== "string") o.body = JSON.stringify(o.body);
   let r;
-  try { r = await fetch(path, o); } catch (_) {
+  try { r = await fetch(path, o); } catch (e0) {
+    if (e0 && e0.name === "AbortError") throw e0;
     const err = new Error("Sem conexão com a internet. Tente de novo quando o sinal voltar.");
     err.offline = true; throw err;
   }
@@ -1376,6 +1379,7 @@ function historyChart(points, metric) {
   <div class="row gap small muted"><span><i class="lg lg1"></i>${esc(m.label)}</span>${series[1] ? `<span><i class="lg lg2"></i>Carga máxima</span>` : ""}<span><i class="lg lgpr"></i>Recorde</span></div>`;
 }
 async function viewEvolucao(id) {
+  if (!id) return viewAnalise();  // sem exercício escolhido: a lista fica no Progresso
   const h = await api(`/api/history/${encodeURIComponent(id)}`);
   const sm = h.summary;
   if (!sm.sessions) { view.innerHTML = `<div class="card"><a href="#analise" class="small">← Análise</a><h2>${esc(h.name)}</h2><p class="empty">Ainda não há treinos registrados com este exercício.</p></div>`; return; }
@@ -1904,7 +1908,15 @@ async function autoSync() {
 }
 
 /* --------------------------------------------------------------- router -- */
-async function route() {
+// uma tela por vez: trocar de tela cancela as leituras da anterior e espera ela sair, para nunca aparecer
+// a tela velha por cima da nova (4G lento de academia)
+function route() {
+  if (route.ctl) route.ctl.abort();
+  const ctl = route.ctl = new AbortController();
+  route.chain = (route.chain || Promise.resolve()).then(() => (ctl.signal.aborted ? null : doRoute(ctl))).catch(() => {});
+  return route.chain;
+}
+async function doRoute(ctl) {
   const [name, a, b] = (location.hash.slice(1) || "hoje").split("/");
   $$(".tabbar a").forEach((el) => el.classList.toggle("active", el.dataset.tab === ({ plano: "planilhas", exercicios: "planilhas", evolucao: "analise", saude: "analise", esportes: "perfil", coach: "perfil" }[name] || name)));
   const TITLES = { planilhas: "Planos", exercicios: "Planos", plano: "Planilha", treinar: "Treinar", analise: "Progresso", evolucao: "Evolução", saude: "Saúde e sono", perfil: "Perfil", esportes: "Esportes", coach: "Coach" };
@@ -1919,6 +1931,7 @@ async function route() {
   prefetchStop();
   const seq = route.seq = (route.seq || 0) + 1;
   const live = ["treinar", "plano"].includes(name);  // telas com edição em andamento: sempre direto da rede
+  view.dataset.route = ""; view.setAttribute("aria-busy", "true");
   const skel = setTimeout(() => { if (route.seq === seq) view.innerHTML = skeletonHtml(name); }, 90);
   SWR.mode = live ? null : "cache"; SWR.used = new Set();
   try {
@@ -1936,6 +1949,7 @@ async function route() {
     };
     await render();
     clearTimeout(skel); SWR.mode = null;
+    view.dataset.route = name; view.setAttribute("aria-busy", "false");
     view.classList.remove("enter"); void view.offsetWidth; view.classList.add("enter");
     window.scrollTo(0, 0);
     if (SWR.used.size) refreshInBackground(seq, [...SWR.used], render);
@@ -1943,6 +1957,8 @@ async function route() {
     return;
   } catch (e) {
     clearTimeout(skel); SWR.mode = null;
+    if (route.seq !== seq || ctl.signal.aborted || (e && e.name === "AbortError")) return;
+    view.dataset.route = name; view.setAttribute("aria-busy", "false");
     view.innerHTML = e.offline
       ? `<div class="card"><h2>Sem internet</h2><p>${esc(e.message)}</p><p class="small muted">Um treino em andamento continua salvo no celular (aba Treinar).</p><button class="btn" id="retry">Tentar de novo</button></div>`
       : `<div class="card"><p class="pill bad">Erro: ${esc(e.message)}</p><p><button class="btn ghost" id="retry">Tentar de novo</button></p></div>`;

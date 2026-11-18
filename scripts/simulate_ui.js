@@ -172,6 +172,9 @@ async function go(page, hash, where) {
   const t0 = Date.now();
   await page.evaluate((h) => { location.hash = h; }, hash);
   await page.waitForTimeout(80);
+  // espera a tela nova terminar (o app marca #view[data-route]); evita contar a tela anterior como carregada
+  const want = (hash.slice(1) || "hoje").split("/")[0];
+  await page.waitForFunction((w) => document.getElementById("view").dataset.route === w || document.body.classList.contains("auth-mode"), want, { timeout: 8000 }).catch(() => {});
   await page.waitForLoadState("networkidle").catch(() => {});
   await page.waitForFunction(() => { const v = document.getElementById("view"); return v && v.innerText.trim().length > 10 && !/^Carregando/.test(v.innerText.trim()); }, null, { timeout: 8000 }).catch(() => {});
   STATS.render_ms.push(Date.now() - t0);
