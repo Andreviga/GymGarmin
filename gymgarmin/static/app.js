@@ -186,13 +186,20 @@ async function viewHoje(weekDate) {
   const cyc = sch.cycle;
   const athleteHtml = weekDate ? "" : await athleteCards();
   const todays = weekDate ? [] : sch.entries.filter((e) => e.date === sch.today);
-  const heroE = todays.find((e) => e.status === "planejado") || todays[0] || null;
-  const adjusted = todays.some((e) => e.status === "planejado" && e.readiness_backup);
-  view.innerHTML = `${weekDate ? "" : heroHtml(heroE, sch) + statsHtml(rd, g, adjusted, !!(heroE && heroE.status === "planejado"))}${athleteHtml}
+  const plannedToday = todays.filter((e) => e.status === "planejado");
+  const doneToday = todays.filter((e) => e.status === "feito");
+  // treino de hoje já feito (ou dia livre): o destaque passa para o próximo treino, juntando o que cai no mesmo dia
+  let heroList = plannedToday;
+  if (!heroList.length && !weekDate) {
+    const nx = sch.entries.find((x) => x.date > sch.today && x.status === "planejado");
+    if (nx) heroList = sch.entries.filter((x) => x.date === nx.date && x.status === "planejado");
+  }
+  const adjusted = plannedToday.some((e) => e.readiness_backup);
+  view.innerHTML = `${weekDate ? "" : heroHtml(heroList, sch, doneToday) + statsHtml(rd, g, adjusted, plannedToday.length > 0)}${athleteHtml}
   ${missed.length ? `<div class="rec alerta"><b>Treino perdido:</b> ${missed.map((e) => `${e.weekday} ${ddmm(e.date)} – ${esc(e.day_name)}`).join(", ")}.
      <div class="row gap wrap" style="margin-top:6px">${missed.map((e) => `<button class="btn sm" data-skip="${e.id}">Ajustar a semana (${e.weekday})</button>`).join("")}</div></div>` : ""}
   ${(sch.time_warnings || []).length ? `<details class="rec atencao small"><summary><b>⏱ ${sch.time_warnings.length} ${sch.time_warnings.length > 1 ? "dias passam" : "dia passa"} do seu tempo de treino</b></summary><ul class="plain">${sch.time_warnings.map((w) => `<li>${esc(w)}</li>`).join("")}</ul></details>` : ""}
-  ${heroE && heroE.status !== "pulado" ? todayListHtml(heroE) : ""}
+  ${heroList.length ? todayListHtml(heroList, sch) : ""}
   <section class="sec">
     <div class="sec-head"><button class="icon-btn" data-week="${addDays(sch.week_start, -7)}" title="Semana anterior" aria-label="Semana anterior">‹</button>
       <div class="grow" style="text-align:center"><h2>Semana de ${ddmm(sch.week_start)}</h2>
@@ -230,28 +237,35 @@ function dayKind(e) {
   const end = (e.items || []).filter((i) => i.endurance);
   const str = (e.items || []).some((i) => (i.phase || "principal") === "principal" && !i.endurance);
   if (end.length && str) return `musculação + ${SPORT_WORD[end[0].endurance.sport] || "cardio"}`;
-  return end.length ? end.map((i) => i.endurance.title).join(" + ") : "musculação";
+  return end.length ? (SPORT_WORD[end[0].endurance.sport] || "cardio") : "musculação";
 }
-function heroHtml(e, sch) {
-  const d = new Date(sch.today + "T12:00:00");
-  const dateTxt = `${WD_LONG[d.getDay()]}, ${ddmm(sch.today)}`;
-  if (!e) {
-    const nx = sch.entries.find((x) => x.date > sch.today && x.status === "planejado");
-    return `<section class="hero rest"><div class="hero-txt"><div class="kick">Hoje · ${dateTxt}</div><div class="ttl">Descanso</div>
-      <div class="meta">${nx ? `Próximo: ${esc(nx.weekday)} · ${esc(nx.day_name)}` : "Caminhar, alongar e dormir bem também contam."}</div></div></section>`;
+function dayLabel(date, sch) {
+  const d = new Date(date + "T12:00:00");
+  const when = date === sch.today ? "Hoje" : date === addDays(sch.today, 1) ? "Amanhã" : WD_LONG[d.getDay()][0].toUpperCase() + WD_LONG[d.getDay()].slice(1);
+  return { when, full: `${when} · ${WD_LONG[d.getDay()]}, ${ddmm(date)}` };
+}
+function shortName(e) { return e.sport ? String(e.day_name).replace(/^[^:]+:\s*/, "") : e.day_name; }
+function heroHtml(list, sch, doneToday = []) {
+  const doneTxt = doneToday.length ? `<div class="hero-done">✔ Treino de hoje feito</div>` : "";
+  if (!list.length) {
+    const d = new Date(sch.today + "T12:00:00");
+    return `<section class="hero rest"><div class="hero-txt">${doneTxt}<div class="kick">Hoje · ${WD_LONG[d.getDay()]}, ${ddmm(sch.today)}</div>
+      <div class="ttl">${doneToday.length ? "Semana concluída" : "Descanso"}</div>
+      <div class="meta">Caminhar, alongar e dormir bem também contam.</div></div></section>`;
   }
-  const id = e.sport ? null : mainIds(e).find((x) => frames(x));
+  const date = list[0].date, lb = dayLabel(date, sch);
+  const strength = list.find((e) => !e.sport);
+  const id = strength ? mainIds(strength).find((x) => frames(x)) : null;
   const f = id ? frames(id) : null;
-  const st = STATUS_INFO[e.status] || [e.status, ""];
-  const mins = e.time ? `~${Math.round(e.time.total)} min` : "";
-  return `<section class="hero ${f ? "photo" : "rest"} ${e.status === "planejado" ? "" : "done"}">
-    ${f ? `<img class="hero-img" src="${esc(f[0])}" alt="">` : `<span class="hero-picto">${pictoHtml(SPORT_PICTO[e.sport] || "dumbbell", "hp")}</span>`}
-    <div class="hero-txt"><div class="kick">Hoje · ${dateTxt}${mins ? ` · ${mins}` : ""}</div>
-      <div class="ttl">${esc(e.day_name)}</div>
-      <div class="meta">${esc(dayKind(e))}${e.endurance_phase ? ` · ${esc(e.endurance_phase)}` : ""}${e.race ? " · PROVA" : ""}</div>
-      <div class="row gap wrap" style="margin-top:12px">${e.status === "planejado"
-        ? `<a class="btn light" href="#treinar/agenda/${e.id}">Começar treino</a>`
-        : `<span class="pill ${st[1]}">${esc(st[0])}</span>`}</div></div></section>`;
+  const mins = list.reduce((t, e) => t + (e.time ? e.time.total : 0), 0);
+  const kinds = [...new Set(list.map(dayKind).join(" + ").split(" + "))].join(" + ");
+  const sport = list.find((e) => e.sport);
+  return `<section class="hero ${f ? "photo" : "rest"}">
+    ${f ? `<img class="hero-img" src="${esc(f[0])}" alt="">` : `<span class="hero-picto">${pictoHtml(SPORT_PICTO[(sport || {}).sport] || "dumbbell", "hp")}</span>`}
+    <div class="hero-txt">${doneTxt}<div class="kick">${lb.full}${mins ? ` · ~${Math.round(mins)} min` : ""}</div>
+      <div class="ttl">${list.map((e) => esc(shortName(e))).join(" + ")}</div>
+      <div class="meta">${esc(kinds)}${list.some((e) => e.race) ? " · PROVA" : ""}</div>
+      <div class="row gap wrap" style="margin-top:12px"><a class="btn ${date === sch.today ? "light" : "ghost-light"}" href="#treinar/agenda/${list[0].id}">${date === sch.today ? "Começar treino" : "Treinar agora"}</a></div></div></section>`;
 }
 function ringSvg(score, cls) {
   const v = Math.max(0, Math.min(100, +score || 0)), c = 2 * Math.PI * 15.5;
@@ -275,11 +289,13 @@ function statsHtml(rd, g, adjusted, hasToday) {
   ${act ? `<div class="rec ${cls === "bad" ? "alerta" : "atencao"} small row between gap"><span class="grow">${esc(rd.text)}</span>
     ${adjusted ? `<span class="pill ok">ajustado</span>` : `<button class="btn sm" id="rd-apply">Ajustar hoje</button>`}</div>` : ""}`;
 }
-function todayListHtml(e) {
-  const main = (e.items || []).filter((i) => (i.phase || "principal") === "principal");
+function todayListHtml(list, sch) {
+  const all = list.flatMap((e) => e.items || []);
+  const main = all.filter((i) => (i.phase || "principal") === "principal");
   if (!main.length) return "";
-  const extra = (e.items || []).filter((i) => (i.phase || "principal") !== "principal");
-  return `<section class="sec"><h2 class="sec-title">Treino de hoje</h2>
+  const extra = all.filter((i) => (i.phase || "principal") !== "principal");
+  const lb = dayLabel(list[0].date, sch);
+  return `<section class="sec"><h2 class="sec-title">${lb.when === "Hoje" ? "Treino de hoje" : `Próximo treino · ${lb.when.toLowerCase()}`}</h2>
     <ul class="exlist">${main.map((it) => {
       const en = it.endurance;
       const name = en ? en.title : (it._name || it._ex?.name || it.exercise_id);
