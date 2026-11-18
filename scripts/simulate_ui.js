@@ -128,7 +128,7 @@ async function audit(page, where) {
     }
     // sobreposição: texto/campo/botão em cima de outro (fora os fixos: abas, cronômetro, aviso, modal)
     // fotos dos exercícios (.demo) são mídia de fundo: a legenda por cima é proposital
-    const fixedish = (el) => el.closest(".tabbar, #timer, #toast, .topbar, .modal, .savebar") || (el.tagName === "IMG" && el.closest(".demo, .hero"));
+    const fixedish = (el) => el.closest(".tabbar, #timer, #toast, .topbar, .modal, .savebar, .fx-go") || (el.tagName === "IMG" && el.closest(".demo, .hero"));
     const leaves = all.filter((el) => !fixedish(el) && (/^(INPUT|SELECT|TEXTAREA|BUTTON|IMG)$/.test(el.tagName) ||
       ([...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim()) && !el.querySelector("input,select,button,textarea"))));
     // texto em linha que quebra: usa as caixas de cada linha (getClientRects), não o retângulo total
@@ -254,12 +254,28 @@ async function flows(page, base, persona, tag) {
   const e = sch.entries.find((x) => x.status === "planejado" && x.kind === "forca") || sch.entries.find((x) => x.status === "planejado");
   if (e) {
     await go(page, `#treinar/agenda/${e.id}`, W(`treinar ${e.kind}`));
-    const inp = page.locator("input[data-s='reps']").first();
+    // treino guiado (padrão): um exercício por vez, descanso cronometrado
+    if (await page.locator(".fx-top").count()) {
+      for (let k = 0; k < 14 && !(await page.locator("[data-fx='set']").count()) && (await page.locator("[data-fx='done']").count()); k++) {
+        await page.locator("[data-fx='done']").first().click(); await page.waitForTimeout(80);
+      }
+      if (await page.locator("[data-fx='set']").count()) {
+        await audit(page, W("treino guiado: exercício"));
+        const go_ = await page.locator("[data-fx='set']").boundingBox(); const tb = await page.locator(".tabbar").boundingBox();
+        if (go_ && tb && (go_.y + go_.height > tb.y + 1 || go_.y < 0)) issue("treino guiado: botão da série fora da tela", W(`y=${Math.round(go_.y)}`));
+        await click("[data-st='reps:1']", "+1 repetição");
+        await click("[data-fx='set']", "série feita (guiado)");
+        if (!(await page.locator(".fx-rest #fx-clock").count())) issue("treino guiado: descanso não começou", W("treinar"));
+        else { await audit(page, W("treino guiado: descanso")); await click("[data-fx='r+15']", "+15 s"); await click("[data-fx='r-skip']", "Pular descanso (guiado)"); }
+      } else if (e.kind === "forca") issue("treino guiado: sem exercício com séries", W("treinar"));
+      await click("[data-fx='list']", "Ver lista");
+    } else issue("treino guiado não abriu", W("treinar"));
+    const inp = page.locator("tr:not(.done) input[data-s='reps']").first();
     if (await inp.count()) {
       await inp.scrollIntoViewIfNeeded();
       await inp.fill("10");
       await page.locator("input[data-s='load_kg']").first().fill("42.5");
-      await click("button[data-done]", "marcar série feita");
+      await click("button[data-done]:not(.on)", "marcar série feita");
       const t = await page.evaluate(() => { const el = document.getElementById("timer"); if (!el || el.hidden) return null; const r = el.getBoundingClientRect(); const tb = document.querySelector(".tabbar").getBoundingClientRect();
         return { timer: { x: r.x, y: r.y, width: r.width, height: r.height }, tab: { x: tb.x, y: tb.y, width: tb.width, height: tb.height }, vh: innerHeight }; });
       if (!t) issue("cronômetro de descanso não apareceu", W("treinar"));

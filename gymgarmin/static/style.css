@@ -607,3 +607,67 @@ details.adv { margin-top: 12px; }
 .pi-mv:disabled { opacity: .35; cursor: default; }
 .plan-item textarea.autogrow { min-height: 44px; resize: none; overflow: hidden; line-height: 1.35; padding: 10px 8px; font: inherit; font-size: 16px; width: 100%; }
 .pi-mv { min-height: 40px; }
+
+/* treino guiado: um exercício por vez */
+.focus-on .timer { display: none !important; }
+.fx-top { display: flex; align-items: center; gap: 10px; margin: 2px 0 12px; }
+.fx-nav { appearance: none; flex: none; width: 44px; height: 44px; border-radius: 50%; border: 0; background: var(--card); box-shadow: var(--shadow);
+  font-size: 26px; line-height: 1; color: var(--ink); cursor: pointer; }
+.fx-nav:disabled { opacity: .3; cursor: default; }
+.fx-count { font-size: 13px; font-weight: 700; color: var(--ink-2); margin-bottom: 6px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fx-card { background: var(--card); border-radius: 22px; box-shadow: var(--shadow); padding: 16px; margin-bottom: 12px; }
+.fx-media { cursor: pointer; display: flex; justify-content: center; }
+.fx-media .demo.l, .fx-media .picto.l { width: 100%; max-width: 40vh; display: flex; }
+.fx-media .demo.l { display: block; }
+.fx-name { font-size: 22px; font-weight: 850; letter-spacing: -.5px; margin: 2px 0 4px; line-height: 1.15; cursor: pointer; overflow-wrap: anywhere; }
+.fx-plan { color: var(--ink-2); font-size: 14px; margin-top: 2px; }
+.fx-tip { margin-top: 8px; padding: 8px 12px; border-radius: 12px; background: var(--brand-soft); color: var(--ink); font-size: 14px; font-weight: 650; }
+.fx-sets { display: flex; gap: 8px; justify-content: center; margin: 16px 0 6px; flex-wrap: wrap; }
+.fx-dot { appearance: none; width: 42px; height: 42px; border-radius: 50%; border: 2px solid var(--line); background: transparent; font: inherit; font-weight: 800;
+  color: var(--ink-2); cursor: pointer; }
+.fx-dot.done { background: var(--ok); border-color: var(--ok); color: var(--ok-ink); }
+.fx-dot.cur { border-color: var(--brand); color: var(--brand); box-shadow: 0 0 0 3px var(--brand-soft); }
+.fx-dot.done.cur { color: var(--ok-ink); border-color: var(--brand); }
+.fx-setlbl { text-align: center; font-weight: 750; margin-bottom: 10px; }
+.fx-inputs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.fx-step label { text-align: center; font-size: 12.5px; }
+.stepper { display: grid; grid-template-columns: 44px minmax(0, 1fr) 44px; align-items: center; background: var(--bg); border-radius: 14px; overflow: hidden; }
+.stepper button { appearance: none; border: 0; background: transparent; height: 54px; font-size: 26px; line-height: 1; color: var(--brand); cursor: pointer; font-weight: 700; }
+.stepper input { border: 0; background: transparent; text-align: center; font-size: 24px; font-weight: 800; min-height: 54px; padding: 0; font-variant-numeric: tabular-nums; min-width: 0; }
+.fx-rpe { display: flex; align-items: center; gap: 6px; margin: 12px 0 2px; flex-wrap: wrap; justify-content: center; }
+.fx-rpe button { appearance: none; width: 40px; height: 40px; border-radius: 12px; border: 1px solid var(--line); background: transparent; font: inherit; font-weight: 750; color: var(--ink); cursor: pointer; }
+.fx-rpe button.on { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.fx-go { min-height: 58px; font-size: 17px; margin-top: 14px; }
+.fx-start { margin-top: 12px; min-height: 52px; }
+.fx-setmini, .fx-tools { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 12px; }
+.fx-tools { margin-bottom: 14px; }
+.fx-rest { background: var(--ink); color: var(--bg); border-radius: 22px; padding: 22px 16px 18px; text-align: center; margin-bottom: 12px; }
+.fx-rest .eyebrow { color: inherit; opacity: .8; font-size: 13px; }
+.fx-clock { font-size: 84px; font-weight: 850; letter-spacing: -3px; font-variant-numeric: tabular-nums; line-height: 1; margin: 10px 0 14px; }
+.fx-bar { height: 6px; border-radius: 3px; background: color-mix(in srgb, currentColor 22%, transparent); overflow: hidden; }
+.fx-bar span { display: block; height: 100%; width: 0; background: currentColor; transition: width .25s linear; }
+.fx-next { display: flex; align-items: center; gap: 12px; text-align: left; margin: 18px 0 14px; padding: 10px; border-radius: 16px;
+  background: color-mix(in srgb, var(--bg) 12%, transparent); }
+.fx-next .grow { display: flex; flex-direction: column; min-width: 0; }
+.fx-next .small { opacity: .85; }
+.fx-rest-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.fx-rest .btn.ghost { background: transparent; color: var(--bg); border: 1px solid color-mix(in srgb, var(--bg) 55%, transparent); min-height: 50px; font-size: 16px; }
+.fx-skip { margin-top: 10px; background: var(--bg); color: var(--ink); border-color: var(--bg); min-height: 54px; }
+.fx-work { text-align: center; margin-top: 12px; color: var(--brand); }
+.fx-work .fx-clock { font-size: 64px; margin: 4px 0 10px; }
+@media (max-width: 360px) { .fx-clock { font-size: 68px; } .stepper { grid-template-columns: 40px minmax(0, 1fr) 40px; } }
+/* botão principal sempre à vista (sem rolar a cada série) e foto menor */
+.fx-media .demo.l, .fx-media .picto.l { max-width: 30vh; }
+.fx-go { position: sticky; bottom: calc(66px + env(safe-area-inset-bottom)); z-index: 3; box-shadow: 0 10px 24px -8px rgba(0,0,0,.45); }
+.fx-plan.small { font-size: 13px; }
+.fx-head { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 12px; align-items: center; }
+.fx-thumb { cursor: pointer; }
+.fx-thumb .demo.l, .fx-thumb .picto.l { width: 96px; height: 96px; aspect-ratio: auto; border-radius: 16px; display: block; }
+.fx-thumb .picto.l { display: flex; }
+.fx-hd { min-width: 0; }
+.fx-hd .fx-name { font-size: 20px; margin: 2px 0 2px; }
+.fx-hd .fx-plan { font-size: 13px; }
+.fx-sets { margin-top: 12px; }
+.fx-extra { margin-top: 12px; }
+.fx-extra:empty, .fx-extra:not(:has(div)) { display: none; }
+.fx-name[data-ex] { padding: 8px 0; min-height: 40px; }

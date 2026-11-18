@@ -1180,6 +1180,8 @@ async function viewTreinar(planId, idx) {
 
 function renderSession() {
   const s = state.session;
+  if (s.view !== "lista") return renderFocus();
+  fxLeave();
   store("gg_session", s);
   const idxs = s.items.map((it, i) => [it, i]);
   const phaseOf = (it) => it.phase || "principal";
@@ -1192,6 +1194,7 @@ function renderSession() {
   const when = (() => { try { const d = new Date(s.date); return d.toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "2-digit" }) + " · " + d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }); } catch (_) { return ""; } })();
   view.innerHTML = `<section class="today-card sess-head"><div class="eyebrow">Treino em andamento</div>
       <div class="tc-title">${esc(s.day_name || "Treino")}</div>
+      <button class="btn block" id="to-focus" style="margin:2px 0 12px">▶ Treinar um exercício por vez</button>
       <div class="tc-chips"><span id="s-prog" class="${doneN && doneN === mainIt.length ? "ok" : ""}">${doneN} de ${mainIt.length} ${mainIt.length === 1 ? "exercício feito" : "exercícios feitos"}</span></div>
       <div class="meter" style="margin-top:10px"><span style="width:${mainIt.length ? Math.round(100 * doneN / mainIt.length) : 0}%"></span></div>
       <details class="small sub" style="margin-top:8px"><summary>Data e hora: ${esc(when)}</summary>
@@ -1268,6 +1271,7 @@ function bindSession() {
   view.onchange = view.oninput;
   view.onclick = (e) => {
     const t = e.target;
+    if (t.id === "to-focus") { s.view = "foco"; s.fx = null; s.fsel = null; stopTimer(); return renderSession(); }
     if (t.dataset.ex) return showExercise(t.dataset.ex);
     if (t.dataset.done) {
       const [i, j] = t.dataset.done.split(":").map(Number); const set = s.items[i].sets[j]; set.done = !set.done; save();
@@ -1285,7 +1289,10 @@ function bindSession() {
     renderSession();
   });
   $("#s-cancel").onclick = () => { if (confirm("Descartar este treino?")) { store("gg_session", null); state.session = null; location.hash = "#hoje"; } };
-  $("#s-finish").onclick = async () => {
+  $("#s-finish").onclick = finishSession;
+}
+async function finishSession() {
+    const s = state.session; const save = () => store("gg_session", s);
     const main = s.items.filter((it) => (it.phase || "principal") === "principal");
     let anyDone = main.some((it) => it.kind === "cardio" ? it.done : (it.sets || []).some((x) => x.done));
     if (!anyDone) {
@@ -1310,15 +1317,227 @@ function bindSession() {
       if (!err.offline) return toast(err.message, 5000);
       // academia sem sinal: guarda no celular e envia sozinho quando a conexão voltar
       const box = store("gg_outbox") || []; if (!box.some((x) => x.client_id === payload.client_id)) box.push(payload); store("gg_outbox", box);
-      store("gg_session", null); state.session = null; stopTimer();
+      store("gg_session", null); state.session = null; stopTimer(); fxLeave();
       toast("Sem internet: o treino ficou guardado no celular e será enviado sozinho quando a conexão voltar.", 7000);
       location.hash = "#hoje"; return;
     }
-    store("gg_session", null); state.session = null; stopTimer();
+    store("gg_session", null); state.session = null; stopTimer(); fxLeave();
     const prs = (saved && saved.prs) || [];
     toast(prs.length ? `Treino salvo! 🏆 Recorde em ${prs.map((p) => `${p.name} (${prText(p)})`).join(", ")}` : "Treino salvo! 🎉", prs.length ? 6000 : 2600);
     location.hash = s.schedule_id ? "#hoje" : "#analise";
+}
+
+/* ---- treino guiado: um exercício por vez, descanso cronometrado ---- */
+const PH_RANK = { preparo: 0, principal: 1, pos: 2 };
+const fxPh = (it) => it.phase || "principal";
+const fxStrength = (it) => !(it.kind === "cardio" || it.endurance) && fxPh(it) === "principal" && (it.sets || []).length;
+const fxDone = (it) => fxStrength(it) ? it.sets.every((x) => x.done) : !!it.done;
+const fxOrder = (s) => s.items.map((_, i) => i).sort((a, b) => (PH_RANK[fxPh(s.items[a])] - PH_RANK[fxPh(s.items[b])]) || a - b);
+const mmss = (t) => `${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`;
+function fxCurSet(it, s) {
+  if (Number.isInteger(s.fsel) && s.fsel < it.sets.length) return s.fsel;
+  const k = it.sets.findIndex((x) => !x.done); return k < 0 ? it.sets.length - 1 : k;
+}
+function fxNextPos(s, order, pos) {
+  for (let p = pos + 1; p < order.length; p++) if (!fxDone(s.items[order[p]])) return p;
+  for (let p = 0; p < pos; p++) if (!fxDone(s.items[order[p]])) return p;
+  return order.length;
+}
+const fxSetTxt = (it, x) => x ? `${it.timed && x.duration_s ? `${x.duration_s} s` : `${x.reps ?? "?"} reps`}${x.load_kg ? ` × ${x.load_kg} kg` : ""}` : "";
+function fxPlanTxt(it) {
+  const p = it.plan || {};
+  if (it.endurance) return endSummary(it.endurance);
+  if (it.kind === "cardio") return `${it.duration_min || p.duration_min || ""} min · zona ${it.zone || p.zone || 2}`;
+  const what = p.reps ? `${esc(String(p.reps))} reps` : `${p.duration_s || 30} s`;
+  return `${p.sets > 1 ? p.sets + " × " : ""}${what}${fxPh(it) === "principal" ? ` · descanso ${p.rest_s ?? 90} s` : ""}${p.rir && !p.deload ? ` · sobrar ${esc(p.rir)} reps` : ""}`;
+}
+
+// som, vibração e tela acesa
+let AC = null, WL = null, fxInt = null, fxLast = null;
+function audioUnlock() { try { AC = AC || new (window.AudioContext || window.webkitAudioContext)(); if (AC.state === "suspended") AC.resume(); } catch (_) { /* sem áudio */ } }
+function beep(f = 880, d = 0.15, vol = 0.3) {
+  try { if (!AC) return; const o = AC.createOscillator(), g = AC.createGain(); o.frequency.value = f; o.connect(g); g.connect(AC.destination);
+    g.gain.setValueAtTime(vol, AC.currentTime); g.gain.exponentialRampToValueAtTime(0.001, AC.currentTime + d); o.start(); o.stop(AC.currentTime + d); } catch (_) { /* sem áudio */ }
+}
+function alarm() { beep(988, 0.25); setTimeout(() => beep(1318, 0.35), 280); try { navigator.vibrate && navigator.vibrate([300, 120, 300]); } catch (_) { /* sem vibração */ } }
+async function wakeOn() { try { if ("wakeLock" in navigator && !WL && !document.hidden) { WL = await navigator.wakeLock.request("screen"); WL.addEventListener("release", () => { WL = null; }); } } catch (_) { WL = null; } }
+function wakeOff() { try { WL && WL.release(); } catch (_) { /* já liberado */ } WL = null; }
+function fxLeave() { clearInterval(fxInt); fxInt = null; wakeOff(); document.body.classList.remove("focus-on"); }
+document.addEventListener("visibilitychange", () => { if (!document.hidden && document.body.classList.contains("focus-on")) { wakeOn(); fxTick(); } });
+
+function fxTick() {
+  const s = state.session; if (!s || !document.body.classList.contains("focus-on")) return;
+  const end = s.restEnd || s.workEnd; if (!end) return;
+  const total = s.restEnd ? s.restTotal : s.workTotal;
+  const left = Math.max(0, Math.ceil((end - Date.now()) / 1000));
+  const el = $("#fx-clock"); if (el) el.textContent = mmss(left);
+  const bar = $("#fx-bar span"); if (bar && total) bar.style.width = `${Math.min(100, 100 * (1 - left / total))}%`;
+  if (left !== fxLast && left > 0 && left <= 3) beep(660, 0.12, 0.22);
+  fxLast = left;
+  if (left > 0) return;
+  const late = Date.now() - end > 8000;   // voltou ao app bem depois: não toca alarme atrasado
+  if (!late) alarm();
+  if (s.restEnd) { s.restEnd = null; store("gg_session", s); toast("Descanso terminado — bora!"); return renderFocus(); }
+  const kind = s.workKind; s.workEnd = null; s.workKind = null;
+  if (kind === "set") return fxSetDone();
+  store("gg_session", s); toast("Tempo concluído ✓"); renderFocus();
+}
+
+function fxSetDone() {
+  const s = state.session; const order = fxOrder(s); const it = s.items[order[s.fx]]; if (!it) return;
+  const x = it.sets[fxCurSet(it, s)]; x.done = true; s.fsel = null;
+  const rest = (it.plan || {}).rest_s ?? 90;
+  if (it.sets.every((y) => y.done)) s.fx = fxNextPos(s, order, s.fx);
+  if (rest > 0 && s.fx < order.length) { s.restTotal = rest; s.restEnd = Date.now() + rest * 1000; fxLast = null; }
+  store("gg_session", s); renderFocus();
+}
+
+function fxNextHtml(s, order) {
+  const it = s.items[order[s.fx]];
+  if (!it) return `<div class="fx-next"><span class="grow"><span class="small">A seguir</span><b>Fim do treino 🎉</b></span></div>`;
+  const k = fxStrength(it) ? fxCurSet(it, s) : null;
+  return `<div class="fx-next">${mediaHtml(it.exercise_id, "m", it.kind === "cardio" ? "run" : null)}<span class="grow"><span class="small">A seguir</span>
+    <b>${esc(it.name)}</b><span class="small">${k !== null ? `Série ${k + 1} de ${it.sets.length} · ${esc(fxSetTxt(it, it.sets[k]))}` : esc(fxPlanTxt(it).replace(/&amp;/g, "&"))}</span></span></div>`;
+}
+
+function renderFocus() {
+  const s = state.session; const order = fxOrder(s);
+  s.view = "foco";
+  if (!Number.isInteger(s.fx) || s.fx > order.length) { const p = order.findIndex((i) => !fxDone(s.items[i])); s.fx = p < 0 ? order.length : p; }
+  store("gg_session", s); stopTimer();
+  document.body.classList.add("focus-on"); wakeOn();
+  if (!fxInt) fxInt = setInterval(fxTick, 250);
+  const doneN = order.filter((i) => fxDone(s.items[i])).length;
+  const pos = s.fx; const it = s.items[order[pos]];
+  const top = `<div class="fx-top"><button class="fx-nav" data-fx="prev" ${pos <= 0 ? "disabled" : ""} aria-label="Exercício anterior">‹</button>
+    <div class="grow"><div class="fx-count">${esc(s.day_name || "Treino")} · ${it ? `${pos + 1} de ${order.length}` : "fim"}</div>
+      <div class="meter"><span style="width:${order.length ? Math.round(100 * doneN / order.length) : 0}%"></span></div></div>
+    <button class="fx-nav" data-fx="next" ${pos >= order.length ? "disabled" : ""} aria-label="Próximo exercício">›</button></div>`;
+  const tools = `<div class="fx-tools"><button class="act" data-fx="list">☰ Ver lista</button><button class="act" data-fx="add">+ Exercício</button></div>`;
+  let body;
+  if (s.restEnd) {
+    const left = Math.max(0, Math.ceil((s.restEnd - Date.now()) / 1000));
+    body = `<section class="fx-rest" aria-live="polite"><div class="eyebrow">Descanso</div>
+      <div class="fx-clock" id="fx-clock">${mmss(left)}</div><div class="fx-bar" id="fx-bar"><span style="width:${Math.round(100 * (1 - left / (s.restTotal || 1)))}%"></span></div>
+      ${fxNextHtml(s, order)}
+      <div class="fx-rest-btns"><button class="btn ghost" data-fx="r-15">−15 s</button><button class="btn ghost" data-fx="r+15">+15 s</button></div>
+      <button class="btn block fx-skip" data-fx="r-skip">Pular descanso</button></section>`;
+  } else if (!it) {
+    const sets = s.items.reduce((n, x) => n + (fxStrength(x) ? x.sets.filter((y) => y.done).length : 0), 0);
+    body = `<section class="today-card fx-end"><div class="eyebrow">Treino concluído</div><div class="tc-title">${esc(s.day_name || "Treino")} ✓</div>
+      <p class="muted">${doneN} de ${order.length} exercícios · ${sets} séries feitas</p>
+      <div class="field"><label for="s-notes">Como foi o treino?</label><textarea id="s-notes" placeholder="Sensações, dores, energia…">${esc(s.notes || "")}</textarea></div>
+      <button class="btn block" id="s-finish">Finalizar e salvar</button>
+      <button class="act" data-fx="list" style="margin-top:10px">Revisar na lista</button> <button class="act" id="s-cancel" style="margin-top:10px">Descartar treino</button></section>`;
+  } else {
+    const i = order[pos]; const p = it.plan || {};
+    const eyebrow = it.endurance ? "Resistência" : it.kind === "cardio" ? "Cardio" : fxPh(it) === "preparo" ? "Aquecimento" : fxPh(it) === "pos" ? "Alongamento" : "Exercício";
+    const compact = fxStrength(it);
+    const extra = `${p.notes ? `<div class="fx-plan small">${esc(p.notes)}</div>` : ""}
+      ${it.last && it.last.sets ? `<div class="fx-plan small">Última vez: ${esc(it.last.sets.map((x) => `${x.reps ?? "-"}×${x.load_kg ?? 0}`).join(" · "))}</div>` : ""}`;
+    const head = compact
+      ? `<div class="fx-head"><div class="fx-thumb" data-ex="${esc(it.exercise_id)}">${mediaHtml(it.exercise_id, "l")}</div>
+          <div class="fx-hd"><div class="eyebrow">${eyebrow}</div><h2 class="fx-name" data-ex="${esc(it.exercise_id)}">${esc(it.name)}</h2>
+          <div class="fx-plan">${fxPlanTxt(it)}</div>${limBadge(it.limitation)}</div></div>
+        ${it.suggestion && it.suggestion.note ? `<div class="fx-tip">${esc(it.suggestion.note)}</div>` : ""}`
+      : `<div class="fx-media" data-ex="${esc(it.exercise_id)}">${mediaHtml(it.exercise_id, "l", it.kind === "cardio" ? "run" : null)}</div>
+      <div class="eyebrow" style="margin-top:12px">${eyebrow}</div>
+      <h2 class="fx-name" data-ex="${esc(it.exercise_id)}">${esc(it.name)} ${limBadge(it.limitation)}</h2>
+      <div class="fx-plan">${fxPlanTxt(it)}</div>${extra}`;
+    const workClock = (label, sec, kind) => s.workEnd
+      ? `<div class="fx-work"><div class="fx-clock" id="fx-clock">${mmss(Math.max(0, Math.ceil((s.workEnd - Date.now()) / 1000)))}</div><div class="fx-bar" id="fx-bar"><span></span></div>
+          <button class="act" data-fx="work-stop" style="margin-top:8px">Parar cronômetro</button></div>`
+      : `<button class="btn ghost block fx-start" data-fx="work" data-sec="${sec}" data-kind="${kind}">▶ ${label}</button>`;
+    if (fxStrength(it)) {
+      const k = fxCurSet(it, s); const x = it.sets[k];
+      const timed = it.timed && it.sets.some((y) => y.duration_s);
+      const fld = timed ? "duration_s" : "reps";
+      const stepper = (f, label, step, mode) => `<div class="fx-step"><label>${label}</label><div class="stepper">
+        <button data-st="${f}:-${step}" aria-label="menos">−</button><input data-fv="${f}" inputmode="${mode}" value="${esc(x[f] ?? "")}" aria-label="${label}">
+        <button data-st="${f}:${step}" aria-label="mais">+</button></div></div>`;
+      body = `<section class="fx-card">${head}
+        <div class="fx-sets">${it.sets.map((y, j) => `<button class="fx-dot ${y.done ? "done" : ""} ${j === k ? "cur" : ""}" data-fset="${j}" aria-label="Série ${j + 1}${y.done ? " feita" : ""}">${y.done ? "✓" : j + 1}</button>`).join("")}</div>
+        <div class="fx-setlbl">Série ${k + 1} de ${it.sets.length}${x.done ? " · feita" : ""}</div>
+        <div class="fx-inputs">${stepper(fld, timed ? "Segundos" : "Repetições", timed ? 5 : 1, "numeric")}${stepper("load_kg", "Carga (kg)", 2.5, "decimal")}</div>
+        <div class="fx-rpe"><span class="small muted">Esforço</span>${[6, 7, 8, 9, 10].map((r) => `<button class="${+x.rpe === r ? "on" : ""}" data-rpe="${r}">${r}</button>`).join("")}</div>
+        ${timed && !x.done ? workClock(`Iniciar ${x.duration_s || p.duration_s || 30} s`, x.duration_s || p.duration_s || 30, "set") : ""}
+        ${x.done ? `<button class="btn ghost block fx-go" data-fx="undo-set">Desmarcar série ${k + 1}</button>`
+          : `<button class="btn block fx-go" data-fx="set">✓ Série ${k + 1} feita${(p.rest_s ?? 90) > 0 ? ` · descansar ${mmss(p.rest_s ?? 90)}` : ""}</button>`}
+        <div class="fx-extra">${extra}</div>
+        ${it.sets.length ? `<div class="fx-setmini"><button class="act" data-fx="addset">+ série</button>${it.sets.length > 1 ? `<button class="act" data-fx="rmset">− série</button>` : ""}<button class="act" data-fx="skip">Pular exercício</button></div>` : ""}
+      </section>`;
+    } else if (it.endurance) {
+      body = `<section class="fx-card">${head}</section>${sessionItemHtml(it, i)}
+        <button class="btn block fx-go" data-fx="done">${it.done ? "Feito ✓ — próximo" : "✓ Feito — próximo"}</button>`;
+    } else if (it.kind === "cardio") {
+      body = `<section class="fx-card">${head}
+        ${workClock(`Cronômetro de ${it.duration_min || 10} min`, (it.duration_min || 10) * 60, "item")}
+        <div class="grid2" style="margin-top:10px"><div><label>Minutos</label><input type="number" inputmode="numeric" data-c="duration_min" data-i="${i}" value="${esc(it.duration_min ?? "")}"></div>
+          <div><label>Zona</label><select data-c="zone" data-i="${i}">${zoneOpts(it.zone)}</select></div>
+          <div><label>FC média</label><input type="number" inputmode="numeric" data-c="avg_hr" data-i="${i}" value="${esc(it.avg_hr ?? "")}"></div></div>
+        <button class="btn block fx-go" data-fx="done">${it.done ? "Feito ✓ — próximo" : "✓ Feito — próximo"}</button>
+        <div class="fx-setmini"><button class="act" data-fx="skip">Pular</button></div></section>`;
+    } else {
+      const sec = (p.duration_s || (p.reps ? 0 : 30)) * (p.sets || 1);
+      body = `<section class="fx-card">${head}
+        ${sec ? workClock(`Iniciar ${sec >= 60 ? mmss(sec) + " min" : sec + " s"}`, sec, "item") : ""}
+        <button class="btn block fx-go" data-fx="done">${it.done ? "Feito ✓ — próximo" : "✓ Feito — próximo"}</button>
+        <div class="fx-setmini"><button class="act" data-fx="skip">Pular</button></div></section>`;
+    }
+  }
+  view.innerHTML = top + body + (s.restEnd ? "" : tools);
+  bindFocus();
+}
+
+function bindFocus() {
+  const s = state.session; const save = () => store("gg_session", s);
+  const order = fxOrder(s); const it = s.items[order[s.fx]];
+  view.oninput = (e) => {
+    const el = e.target;
+    if (el.id === "s-notes") s.notes = el.value;
+    if (el.dataset.fv && it && fxStrength(it)) { const x = it.sets[fxCurSet(it, s)]; x[el.dataset.fv] = el.value === "" ? null : parseFloat(el.value.replace(",", ".")); }
+    if (el.dataset.c) s.items[+el.dataset.i][el.dataset.c] = el.value === "" ? null : +String(el.value).replace(",", ".");
+    if (el.dataset.t) s.items[+el.dataset.i][el.dataset.t] = el.value;
+    if (el.dataset.c || el.dataset.t) { const pe = $(`#pace-${el.dataset.i}`); if (pe) pe.textContent = paceTxt(s.items[+el.dataset.i]); }
+    if (el.dataset.s) s.items[+el.dataset.i].sets[+el.dataset.j][el.dataset.s] = el.value === "" ? null : parseFloat(el.value.replace(",", "."));
+    save();
   };
+  view.onchange = view.oninput;
+  view.onclick = (e) => {
+    audioUnlock();
+    const t = e.target.closest("[data-fx],[data-fset],[data-st],[data-rpe],[data-ex],[data-cdone]"); if (!t) return;
+    if (t.dataset.ex && !t.dataset.fx) return showExercise(t.dataset.ex);
+    if (t.dataset.cdone) { const x = s.items[+t.dataset.cdone]; x.done = !x.done; t.classList.toggle("on", x.done); return save(); }
+    if (t.dataset.fset) { s.fsel = +t.dataset.fset; s.workEnd = null; return renderFocus(); }
+    if (t.dataset.st && it) {
+      const [f, d] = t.dataset.st.split(":"); const x = it.sets[fxCurSet(it, s)];
+      x[f] = Math.max(0, Math.round(((+x[f] || 0) + +d) * 100) / 100); const inp = $(`[data-fv="${f}"]`); if (inp) inp.value = x[f]; return save();
+    }
+    if (t.dataset.rpe && it) { const x = it.sets[fxCurSet(it, s)]; x.rpe = +x.rpe === +t.dataset.rpe ? null : +t.dataset.rpe; $$(".fx-rpe [data-rpe]").forEach((b) => b.classList.toggle("on", +b.dataset.rpe === x.rpe)); return save(); }
+    const a = t.dataset.fx;
+    if (a === "set") return fxSetDone();
+    if (a === "undo-set") { it.sets[fxCurSet(it, s)].done = false; save(); return renderFocus(); }
+    if (a === "done") { it.done = true; s.workEnd = null; s.fx = fxNextPos(s, order, s.fx); save(); return renderFocus(); }
+    if (a === "skip") { s.workEnd = null; s.fsel = null; s.fx = Math.min(order.length, s.fx + 1); save(); return renderFocus(); }
+    if (a === "prev" || a === "next") { s.restEnd = null; s.workEnd = null; s.fsel = null; s.fx = Math.max(0, Math.min(order.length, s.fx + (a === "next" ? 1 : -1))); save(); return renderFocus(); }
+    if (a === "r-15" || a === "r+15") { s.restEnd = Math.max(Date.now(), s.restEnd + (a === "r+15" ? 15000 : -15000)); s.restTotal = Math.max(s.restTotal, Math.ceil((s.restEnd - Date.now()) / 1000)); save(); return fxTick(); }
+    if (a === "r-skip") { s.restEnd = null; save(); return renderFocus(); }
+    if (a === "work") { s.workTotal = +t.dataset.sec; s.workEnd = Date.now() + s.workTotal * 1000; s.workKind = t.dataset.kind; fxLast = null; save(); return renderFocus(); }
+    if (a === "work-stop") { s.workEnd = null; save(); return renderFocus(); }
+    if (a === "addset" && it) { const last = it.sets[it.sets.length - 1] || {}; it.sets.push({ ...last, done: false }); save(); return renderFocus(); }
+    if (a === "rmset" && it && it.sets.length > 1) { it.sets.pop(); s.fsel = null; save(); return renderFocus(); }
+    if (a === "list") {
+      const left = s.restEnd ? Math.ceil((s.restEnd - Date.now()) / 1000) : 0;
+      s.view = "lista"; s.restEnd = null; s.workEnd = null; save(); renderSession(); if (left > 0) startTimer(left); return;
+    }
+    if (a === "add") return pickExercise(null, (ex) => {
+      s.items.push(ex.kind === "cardio" ? { exercise_id: ex.id, name: ex.name, kind: "cardio", plan: {}, duration_min: 10, zone: 2, images: ex.images, limitation: ex.limitation }
+        : { exercise_id: ex.id, name: ex.name, kind: ex.kind, plan: { rest_s: 90 }, sets: [1, 2, 3].map(() => ({ reps: 10, load_kg: null, done: false })), images: ex.images, limitation: ex.limitation, timed: ex.timed });
+      s.fx = fxOrder(s).indexOf(s.items.length - 1); save(); renderFocus();
+    });
+  };
+  const fin = $("#s-finish"); if (fin) fin.onclick = finishSession;
+  const cancel = $("#s-cancel"); if (cancel) cancel.onclick = () => { if (confirm("Descartar este treino?")) { store("gg_session", null); state.session = null; fxLeave(); location.hash = "#hoje"; } };
 }
 
 /* ---- timer de descanso ---- */
@@ -2096,6 +2315,7 @@ function route() {
 async function doRoute(ctl) {
   const [name, a, b] = (location.hash.slice(1) || "hoje").split("/");
   if (!$("#modal").hidden) closeModal();  // trocar de tela fecha a janela aberta (não fica por cima da tela nova)
+  if (name !== "treinar") fxLeave();
   $$(".tabbar a").forEach((el) => el.classList.toggle("active", el.dataset.tab === ({ plano: "planilhas", exercicios: "planilhas", aparelhos: "planilhas", evolucao: "analise", saude: "analise", esportes: "perfil", coach: "perfil" }[name] || name)));
   const TITLES = { planilhas: "Planos", exercicios: "Planos", aparelhos: "Planos", plano: "Planilha", treinar: "Treinar", analise: "Progresso", evolucao: "Evolução", saude: "Saúde e sono", perfil: "Perfil", esportes: "Esportes", coach: "Coach" };
   const pt = $("#page-title"); pt.textContent = TITLES[name] || ""; pt.hidden = !TITLES[name] || (name === "treinar" && a);
