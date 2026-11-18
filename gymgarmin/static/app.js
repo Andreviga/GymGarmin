@@ -67,7 +67,7 @@ const zoneOpts = (sel) => [1, 2, 3, 4, 5].map((z) => `<option value="${z}" ${+se
 
 function limBadge(lim) {
   if (!lim || lim.status === "ok") return "";
-  return `<span class="pill ${LIM_CLASS[lim.status]}" title="${esc(lim.reasons.join("\n"))}">${LIM_TXT[lim.status]}</span>`;
+  return `<span class="pill lim-pill ${LIM_CLASS[lim.status]}" title="${esc(lim.reasons.join("\n"))}">${LIM_TXT[lim.status]}</span>`;
 }
 
 /* ------------------------------------------------------------ barras --- */
@@ -941,28 +941,37 @@ function renderPlano() {
   <div class="card" id="plan-analysis"><h2>Análise da planilha</h2><p class="muted small">Calculando…</p></div>
   <div class="row gap wrap" style="margin-bottom:16px"><a class="btn sm ghost" href="/api/plans/${p.id}/csv">Exportar CSV</a><button class="btn sm danger" id="del-plan">Excluir planilha</button></div>`;
   bindPlano();
+  $$("textarea.autogrow").forEach(growTA);
   refreshPlanAnalysis();
 }
+function growTA(t) { t.style.height = "auto"; t.style.height = t.scrollHeight + 2 + "px"; }
 
 function planItemHtml(it, i, n) {
   const ex = it._ex || {};
   const isCardio = (it.exercise_id || "").startsWith("cardio_") || ex.kind === "cardio";
+  const timed = !isCardio && (ex.timed || it.duration_s);
   const name = ex.name || it._name || it.exercise_id;
-  const f = (k, label, type = "text", extra = "") => `<div><label>${label}</label><input data-f="${k}" data-i="${i}" type="${type}" value="${esc(it[k] ?? "")}" ${extra}></div>`;
-  return `<div class="plan-item">
-    <div class="row gap"><span class="grow"><b class="link" data-ex="${esc(it.exercise_id)}" style="cursor:pointer">${esc(name)}</b>
-      ${it.phase === "preparo" ? `<span class="pill">preparo</span>` : it.phase === "pos" ? `<span class="pill">pós</span>` : ""}${it.finisher ? ` <span class="pill muted">finalizador</span>` : ""} ${limBadge(it._lim)}</span>
-      <button class="icon-btn" data-mv="${i}:-1" ${i === 0 ? "disabled" : ""} title="Subir">↑</button>
-      <button class="icon-btn" data-mv="${i}:1" ${i === n - 1 ? "disabled" : ""} title="Descer">↓</button>
-      <button class="icon-btn" data-rm="${i}" title="Remover">✕</button></div>
-    <div class="fields">
-      ${isCardio ? `${f("duration_min", "Minutos", "number", 'min="1"')}
+  const f = (k, label, type = "text", extra = "", cls = "") => `<div class="${cls}"><label>${label}</label><input data-f="${k}" data-i="${i}" type="${type}" value="${esc(it[k] ?? "")}" ${extra}></div>`;
+  const note = (label) => `<div class="wide"><label>${label}</label><textarea data-f="notes" data-i="${i}" rows="1" class="autogrow">${esc(it.notes ?? "")}</textarea></div>`;
+  const tags = [it.phase === "preparo" ? `<span class="pill muted">aquecimento</span>` : it.phase === "pos" ? `<span class="pill muted">volta à calma</span>` : "",
+    it.finisher ? `<span class="pill muted">finalizador</span>` : "", limBadge(it._lim)].filter(Boolean).join(" ");
+  const sub = isCardio ? `${it.duration_min || "?"} min · Z${it.zone || 2}` : timed ? `${it.sets || 1} × ${it.duration_s || "?"} s` : `${it.sets || "?"} × ${it.reps || "?"}${it.load_kg ? ` · ${it.load_kg} kg` : ""}`;
+  return `<div class="plan-item${it.phase ? " pi-" + it.phase : ""}">
+    <div class="pi-head">
+      <button class="pi-media" data-ex="${esc(it.exercise_id)}" aria-label="Ver ${esc(name)}">${mediaHtml(it.exercise_id, "s", isCardio ? "run" : null)}<span class="pi-n">${i + 1}</span></button>
+      <div class="pi-title"><b class="link" data-ex="${esc(it.exercise_id)}">${esc(name)}</b>
+        <span class="pi-sub">${esc(sub)}</span><span class="pi-tags">${tags}</span></div>
+      <button class="pi-rm" data-rm="${i}" aria-label="Remover ${esc(name)}">✕</button>
+    </div>
+    <div class="fields ${isCardio ? "f-cardio" : "f-str"}">
+      ${isCardio ? `${f("duration_min", "Minutos", "number", 'min="1" inputmode="numeric"')}
         <div><label>Zona FC</label><select data-f="zone" data-i="${i}">${zoneOpts(it.zone || 2)}</select></div>
-        ${f("notes", "Obs. (vel./incl./nível)")}`
-      : `${f("sets", "Séries", "number", 'min="1"')}${f("reps", "Reps")}${f("load_kg", "Carga kg", "number", 'step="0.5"')}
-        ${f("rest_s", "Descanso s", "number", 'step="15"')}${f("duration_s", "Tempo s", "number")}${f("notes", "Obs.")}`}
+        ${note("Observação (velocidade, inclinação, nível)")}`
+      : `${f("sets", "Séries", "number", 'min="1" inputmode="numeric"')}${timed ? f("duration_s", "Tempo (s)", "number", 'inputmode="numeric"') : f("reps", "Reps")}${f("load_kg", "Carga kg", "number", 'step="0.5" inputmode="decimal"')}
+        ${f("rest_s", "Pausa (s)", "number", 'step="15" inputmode="numeric"')}${note("Observação")}`}
     </div>
     ${isCardio && it.intervals ? `<p class="small muted">Intervalado: ${it.intervals.repeats}× ${it.intervals.work_s}s Z${it.intervals.work_zone} / ${it.intervals.rest_s}s Z${it.intervals.rest_zone}</p>` : ""}
+    <div class="pi-move"><button class="pi-mv" data-mv="${i}:-1" ${i === 0 ? "disabled" : ""}>↑ Subir</button><button class="pi-mv" data-mv="${i}:1" ${i === n - 1 ? "disabled" : ""}>↓ Descer</button></div>
   </div>`;
 }
 
@@ -1007,7 +1016,7 @@ function refreshPlanAnalysis() {
       const lims = {}; a.conflicts.forEach((c) => (lims[c.exercise_id] = c));
       let changed = false;
       state.draftPlan.days.forEach((d) => d.items.forEach((it) => { const l = lims[it.exercise_id] || null; if ((it._lim || null) !== l) { it._lim = l; changed = true; } }));
-      if (changed) $$(".plan-item").forEach((el, i) => { const it = state.draftPlan.days[state.planTab]?.items[i]; const b = $(".grow", el); if (it && b) { const old = $(".pill", b); if (old) old.remove(); b.insertAdjacentHTML("beforeend", limBadge(it._lim)); } });
+      if (changed) $$(".plan-item").forEach((el, i) => { const it = state.draftPlan.days[state.planTab]?.items[i]; const b = $(".pi-tags", el); if (it && b) { $$(".lim-pill", b).forEach((x) => x.remove()); b.insertAdjacentHTML("beforeend", limBadge(it._lim)); } });
     } catch (e) { box.innerHTML = `<p class="pill bad">${esc(e.message)}</p>`; }
   }, 250);
 }
@@ -1031,13 +1040,14 @@ function bindPlano() {
   };
   ensureNames();
   $("#plan-save").onclick = () => savePlan().catch((e) => toast(e.message));
-  view.oninput = (e) => { if (e.target.matches("[data-f], #plan-dpw")) { readPlanForm(); refreshPlanAnalysis(); } };
+  view.oninput = (e) => { if (e.target.matches("textarea.autogrow")) growTA(e.target); if (e.target.matches("[data-f], #plan-dpw")) { readPlanForm(); refreshPlanAnalysis(); } };
   view.onchange = view.oninput;
   $$("[data-day]").forEach((b) => (b.onclick = () => { readPlanForm(); state.planTab = +b.dataset.day; renderPlano(); }));
   $("#add-day").onclick = () => { readPlanForm(); p.days.push({ name: String.fromCharCode(65 + p.days.length), items: [] }); state.planTab = p.days.length - 1; renderPlano(); };
   const dd = $("#del-day"); if (dd) dd.onclick = () => { if (!confirm("Excluir este treino?")) return; p.days.splice(state.planTab, 1); state.planTab = Math.max(0, state.planTab - 1); renderPlano(); };
   $$("[data-rm]").forEach((b) => (b.onclick = () => { readPlanForm(); p.days[state.planTab].items.splice(+b.dataset.rm, 1); renderPlano(); }));
   $$("[data-mv]").forEach((b) => (b.onclick = () => { readPlanForm(); const [i, d] = b.dataset.mv.split(":").map(Number); const items = p.days[state.planTab].items; [items[i], items[i + d]] = [items[i + d], items[i]]; renderPlano(); }));
+  loadMedia().then((m) => { if (m && !$(".pi-media .demo") && $(".pi-media") && Object.keys(m.f || {}).length) { readPlanForm(); renderPlano(); } }).catch(() => {});
   const addEx = (kind) => pickExercise(kind, (ex) => {
     readPlanForm();
     const item = ex.kind === "cardio" ? { exercise_id: ex.id, duration_min: 10, zone: 2 }
@@ -1065,7 +1075,7 @@ function bindPlano() {
     openModal(`<h2>JSON do Garmin Connect</h2><p class="small muted">Formato do editor de treinos (workout-service).</p>
       <a class="btn sm ghost" href="/api/plans/${p.id}/days/${state.planTab}/connect.json?download=1">Baixar</a><pre class="json">${esc(JSON.stringify(j, null, 2))}</pre>`);
   };
-  view.onclick = (e) => { const id = e.target.dataset && e.target.dataset.ex; if (id) showExercise(id); };
+  view.onclick = (e) => { const t = e.target.closest && e.target.closest("[data-ex]"); if (t) showExercise(t.dataset.ex); };
 }
 
 /* ----------------------------------------------------- seletor exercício */
