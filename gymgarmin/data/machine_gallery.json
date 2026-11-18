@@ -1,0 +1,4700 @@
+[
+ {
+  "machine_id": "mx_kneeling_leg_curl",
+  "name": "Flexora ajoelhada (kneeling leg curl)",
+  "name_en": "Kneeling Leg Curl",
+  "category": "pernas",
+  "is_new": true,
+  "availability_br": "rara",
+  "tips": [
+   "Ajuste a almofada logo acima do tendão de Aquiles e alinhe o joelho com o eixo da máquina.",
+   "Apoie o tronco no peitoral/antebraços e não arqueie a lombar para 'roubar' a subida.",
+   "Erro comum: encurtar a descida — o trecho com a perna estendida é o que mais estimula."
+  ],
+  "why": "Unilateral e com o quadril parcialmente flexionado, coloca o posterior em posição mais alongada que a mesa flexora; voltou à moda em linhas novas como a Matrix Magnum (2025) e é clássico da Hammer Strength.",
+  "sources": [
+   "https://insider.fitt.co/press-release/for-strength-that-never-rests-matrix-unveils-the-magnum-plate-loaded-range/",
+   "https://www.lifefitness.com/en-us/catalog/strength-training/plate-loaded/plate-loaded-iso-lateral-kneeling-leg-curl",
+   "https://pubmed.ncbi.nlm.nih.gov/?term=Maeo+seated+prone+leg+curl+hamstrings+hypertrophy+2021"
+  ],
+  "brands": [
+   "Hammer Strength",
+   "Life Fitness Signature",
+   "Matrix Magnum",
+   "Vision Keystone",
+   "Nautilus"
+  ],
+  "existing_exercise_ids": [
+   "KneelingLegCurl_Machine"
+  ],
+  "exercises": [
+   {
+    "name": "Flexora ajoelhada unilateral",
+    "how": "Joelho no apoio, coxa contra a almofada, flexione um joelho de cada vez trazendo o calcanhar ao glúteo.",
+    "muscles": [
+     "hamstrings"
+    ]
+   },
+   {
+    "name": "Flexora ajoelhada com pausa no alongamento",
+    "how": "Pare 1–2 s com a perna quase estendida antes de subir; não deixe a carga bater.",
+    "muscles": [
+     "hamstrings"
+    ]
+   },
+   {
+    "name": "Parciais no alongamento",
+    "how": "No fim da série, faça meias-repetições só na metade de baixo (perna mais estendida).",
+    "muscles": [
+     "hamstrings"
+    ]
+   },
+   {
+    "name": "Flexora ajoelhada com pé em dorsiflexão vs. ponta do pé",
+    "how": "Dedos para cima aumenta participação da panturrilha; ponta estendida isola mais o posterior.",
+    "muscles": [
+     "hamstrings",
+     "calves"
+    ]
+   }
+  ],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=LNLsT-p2Jc8",
+    "title": "Life Fitness Signature Series Plate-Loaded Kneeling Leg Curl Instructions",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=H-uAI_TmGKs",
+    "title": "Kneeling Leg Curl for Stronger Hamstrings (How-To)",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=mztaRfefang",
+    "title": "The Kneeling Leg Curl Machine",
+    "status": "pending"
+   }
+  ],
+  "photos": []
+ },
+ {
+  "machine_id": "mx_v_squat",
+  "name": "Agachamento V-squat (máquina V)",
+  "name_en": "V-Squat Machine",
+  "category": "pernas",
+  "is_new": true,
+  "availability_br": "rara",
+  "tips": [
+   "Trave as costas no encosto antes de destravar a máquina.",
+   "Desça controlando 2–3 s; não 'quique' no fundo.",
+   "Encosto não regula na maioria dos modelos: pessoas muito baixas ou altas podem não encaixar bem."
+  ],
+  "why": "Trilho em arco que dá agachamento profundo com a coluna apoiada; muito usado em academias de hipertrofia como alternativa ao hack/pêndulo.",
+  "sources": [
+   "https://www.youtube.com/watch?v=u_GSjH58s0g",
+   "https://pubmed.ncbi.nlm.nih.gov/31230110/",
+   "https://www.mbhfit.com/en/news/detail/Gym-Equipment-Trends-2026-971"
+  ],
+  "brands": [
+   "Hammer Strength",
+   "Panatta",
+   "Watson",
+   "Arsenal Strength"
+  ],
+  "existing_exercise_ids": [
+   "VSquat_Machine"
+  ],
+  "exercises": [
+   {
+    "name": "V-squat de frente (padrão)",
+    "how": "Ombros sob as almofadas, costas no encosto, desça fundo e suba empurrando o pé inteiro.",
+    "muscles": [
+     "quadriceps",
+     "glutes"
+    ]
+   },
+   {
+    "name": "V-squat invertido (de frente para o encosto)",
+    "how": "Vire de frente para a máquina e jogue o quadril para trás: mais glúteo e posterior.",
+    "muscles": [
+     "glutes",
+     "hamstrings"
+    ]
+   },
+   {
+    "name": "Pés juntos e baixos",
+    "how": "Pés próximos e mais para baixo na plataforma = mais flexão de joelho e foco no quadríceps.",
+    "muscles": [
+     "quadriceps"
+    ]
+   },
+   {
+    "name": "Pés altos e afastados",
+    "how": "Pés na parte alta da plataforma e mais abertos para enfatizar glúteo e adutores.",
+    "muscles": [
+     "glutes",
+     "adductors"
+    ]
+   }
+  ],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=u_GSjH58s0g",
+    "title": "Hammer Strength Plate-Loaded V Squat Instructions",
+    "status": "pending"
+   },
+   {
+    "url": "https://youtube.com/watch?v=h4eE6-Hs2hQ",
+    "title": "How To Do A MACHINE V-SQUAT (Hammer Strength)",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=k3pE9_L0ARo",
+    "title": "How To Do A MACHINE REVERSE V-SQUAT (Hammer Strength)",
+    "status": "pending"
+   }
+  ],
+  "photos": []
+ },
+ {
+  "machine_id": "mx_vertical_leg_press",
+  "name": "Leg press vertical",
+  "name_en": "Vertical Leg Press",
+  "category": "pernas",
+  "is_new": true,
+  "availability_br": "rara",
+  "tips": [
+   "Mantenha o quadril e a lombar colados no banco — se o quadril 'enrolar', diminua a amplitude.",
+   "Use as travas de segurança sempre; é carga diretamente sobre você.",
+   "Erro comum: travar os joelhos no topo."
+  ],
+  "why": "Máquina rara mas compacta que dá muita flexão de joelho com pouca carga; tem versão improvisada no Smith (Smith_Machine_Leg_Press) já existente no app.",
+  "sources": [
+   "https://www.youtube.com/watch?v=Nxl8X6zjsrc"
+  ],
+  "brands": [
+   "Hammer Strength",
+   "Panatta",
+   "Atlantis",
+   "Bodysolid"
+  ],
+  "existing_exercise_ids": [
+   "VerticalLegPress_Machine",
+   "Smith_Machine_Leg_Press"
+  ],
+  "exercises": [
+   {
+    "name": "Leg vertical padrão",
+    "how": "Deitado com o quadril sob a plataforma, desça os joelhos em direção ao peito e empurre para cima.",
+    "muscles": [
+     "quadriceps",
+     "glutes"
+    ]
+   },
+   {
+    "name": "Pés afastados e altos",
+    "how": "Pés na parte de cima da plataforma para mais glúteo e posterior.",
+    "muscles": [
+     "glutes",
+     "hamstrings"
+    ]
+   },
+   {
+    "name": "Pés juntos",
+    "how": "Pés próximos e no centro para enfatizar quadríceps.",
+    "muscles": [
+     "quadriceps"
+    ]
+   },
+   {
+    "name": "Panturrilha no leg vertical",
+    "how": "Pernas quase estendidas, empurre só com a ponta dos pés.",
+    "muscles": [
+     "calves"
+    ]
+   }
+  ],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=Nxl8X6zjsrc",
+    "title": "How To: Vertical Leg Press",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=loFQjiAZGqU",
+    "title": "V LEG PRESS MACHINE SETUP AND EXECUTION",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=jAcAfsAtHHc",
+    "title": "Smith Machine Leg Press: How To",
+    "status": "pending"
+   }
+  ],
+  "photos": []
+ },
+ {
+  "machine_id": "mx_sissy_squat_bench",
+  "name": "Banco de sissy squat",
+  "name_en": "Sissy Squat Bench / Machine",
+  "category": "pernas",
+  "is_new": true,
+  "availability_br": "rara",
+  "tips": [
+   "Comece sem carga e com amplitude curta: é exigente para o tendão patelar.",
+   "Quadril e tronco em linha reta (não sente para trás).",
+   "Erro comum: transformar em agachamento comum jogando o quadril para trás."
+  ],
+  "why": "Estímulo muito alongado do quadríceps (inclusive reto femoral) com equipamento barato; virou tendência em academias 'old school' e de hipertrofia.",
+  "sources": [
+   "https://youtube.com/watch?v=W6osqAEKHJs",
+   "https://doi.org/10.51224/SRXIV.407"
+  ],
+  "brands": [
+   "Panatta",
+   "Atlantis",
+   "Rogue",
+   "Bells of Steel"
+  ],
+  "existing_exercise_ids": [
+   "SissySquatBench"
+  ],
+  "exercises": [
+   {
+    "name": "Sissy squat no banco",
+    "how": "Calcanhares presos e canelas no rolo; incline o corpo para trás levando os joelhos à frente.",
+    "muscles": [
+     "quadriceps"
+    ]
+   },
+   {
+    "name": "Sissy squat com anilha",
+    "how": "Segure uma anilha no peito para progredir a carga.",
+    "muscles": [
+     "quadriceps",
+     "abdominals"
+    ]
+   },
+   {
+    "name": "Sissy parcial no alongamento",
+    "how": "Faça só a metade de baixo do movimento (joelho bem flexionado).",
+    "muscles": [
+     "quadriceps"
+    ]
+   }
+  ],
+  "videos": [
+   {
+    "url": "https://youtube.com/watch?v=W6osqAEKHJs",
+    "title": "How To Do A MACHINE SISSY SQUAT",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=nd6J1SgfKlY",
+    "title": "How to use the sissy squat machine",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=-slSZpf-Kfo",
+    "title": "Machine Sissy Squat",
+    "status": "pending"
+   }
+  ],
+  "photos": []
+ },
+ {
+  "machine_id": "mx_nordic_bench",
+  "name": "Banco nórdico (nordic curl)",
+  "name_en": "Nordic Hamstring Curl Bench",
+  "category": "pernas",
+  "is_new": true,
+  "availability_br": "rara",
+  "tips": [
+   "Quadril estendido: corpo em linha reta dos joelhos à cabeça.",
+   "Coloque uma almofada sob os joelhos.",
+   "Erro comum: dobrar o quadril para fugir da carga."
+  ],
+  "why": "Exercício com forte evidência na prevenção de lesão de posterior; bancos dedicados (ATG/'Knees Over Toes') popularizaram o equipamento.",
+  "sources": [
+   "https://www.youtube.com/watch?v=amN_5WUfuCI",
+   "https://www.youtube.com/watch?v=YVwz3oFBFrs"
+  ],
+  "brands": [
+   "ATG/Knees Over Toes",
+   "Rogue",
+   "Eleiko",
+   "NordBord (Vald)"
+  ],
+  "existing_exercise_ids": [
+   "NordicBench",
+   "Natural_Glute_Ham_Raise",
+   "Floor_Glute-Ham_Raise"
+  ],
+  "exercises": [
+   {
+    "name": "Nordic curl excêntrico",
+    "how": "Tornozelos presos, desça o corpo reto o mais lento possível (3–5 s) e apoie as mãos no fim.",
+    "muscles": [
+     "hamstrings"
+    ],
+    "exercise_id": "Natural_Glute_Ham_Raise"
+   },
+   {
+    "name": "Nordic com assistência de elástico",
+    "how": "Elástico no peito/sobre a barra para reduzir a carga e completar a amplitude.",
+    "muscles": [
+     "hamstrings"
+    ]
+   },
+   {
+    "name": "Nordic parcial",
+    "how": "Desça só até onde controla e volte; aumente a amplitude semana a semana.",
+    "muscles": [
+     "hamstrings",
+     "glutes"
+    ]
+   }
+  ],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=YVwz3oFBFrs",
+    "title": "How To Use the NORDIC BENCH: Become Crazy Athletic with this Glute & Hamstring Exercise",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=amN_5WUfuCI",
+    "title": "Introducing the NORDIC BENCH - Ultimate Glute & Hamstring Workout (ATG & KneesOverToes Equipment)",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=Lgibr8od0yA",
+    "title": "How to Perform the GHD Nordic Hamstring Curl",
+    "status": "pending"
+   }
+  ],
+  "photos": []
+ },
+ {
+  "machine_id": "mx_tibialis_machine",
+  "name": "Máquina de tibial (dorsiflexão)",
+  "name_en": "Tibia Dorsi-Flexion Machine / Tib Bar",
+  "category": "pernas",
+  "is_new": true,
+  "availability_br": "rara",
+  "tips": [
+   "Amplitude completa: ponta do pé bem para baixo e bem para cima.",
+   "Séries de 15–25 repetições funcionam bem.",
+   "Obs.: o app não tem músculo 'tibial'; registramos em 'calves' (perna)."
+  ],
+  "why": "Tendência 'Knees Over Toes' para saúde de joelho/canela de corredores; a Life Fitness/Hammer tem modelo próprio para ficar atrás da panturrilha sentada.",
+  "sources": [
+   "https://www.lifefitness.com/en-us/catalog/strength-training/plate-loaded/plate-loaded-tibia-dorsi-flexion",
+   "https://www.scienceforsport.com/best-tib-bars/"
+  ],
+  "brands": [
+   "Hammer Strength",
+   "The Tib Bar Guy",
+   "Atlantis",
+   "Mirafit"
+  ],
+  "existing_exercise_ids": [
+   "TibialisMachine"
+  ],
+  "exercises": [
+   {
+    "name": "Elevação de tibial sentado",
+    "how": "Peito do pé sob o rolo, puxe a ponta dos pés em direção à canela e desça devagar.",
+    "muscles": [
+     "calves"
+    ]
+   },
+   {
+    "name": "Tib bar em pé encostado na parede",
+    "how": "Costas na parede, calcanhares à frente, levante as pontas dos pés com a tib bar.",
+    "muscles": [
+     "calves"
+    ]
+   },
+   {
+    "name": "Tibial unilateral com pausa",
+    "how": "Uma perna por vez, 1 s de pausa no topo.",
+    "muscles": [
+     "calves"
+    ]
+   }
+  ],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=m6fr7gcl97Q",
+    "title": "How to do Tibia Raises or Anterior Tibialis Machine the correct way (Perfect Technique Tutorial)",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=d31uehotdao",
+    "title": "How to Use: Tibia Dorsi Flexion Machine",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=NXTqaKtA4OY",
+    "title": "How to do a Tib Raise with a Tib Bar",
+    "status": "pending"
+   }
+  ],
+  "photos": []
+ },
+ {
+  "machine_id": "mx_reclined_leg_extension",
+  "name": "Cadeira extensora reclinada (encosto deitado)",
+  "name_en": "Reclining Leg Extension",
+  "category": "pernas",
+  "is_new": true,
+  "availability_br": "rara",
+  "tips": [
+   "Alinhe o joelho com o eixo da máquina e o rolo sobre o peito do pé.",
+   "Na extensora comum, dá para imitar inclinando o encosto ao máximo ou deitando o tronco para trás.",
+   "Erro comum: levantar o quadril do banco para subir mais carga."
+  ],
+  "why": "Com o quadril menos flexionado (~40°) o reto femoral fica alongado e cresceu mais que a 90° num estudo de 10 semanas (Larsen et al., 2025); a Matrix Magnum lançou uma 'reclining leg extension' em 2025.",
+  "sources": [
+   "https://doi.org/10.51224/SRXIV.407",
+   "https://insider.fitt.co/press-release/for-strength-that-never-rests-matrix-unveils-the-magnum-plate-loaded-range/",
+   "https://biolayne.com/reps/issue-15/perfecting-the-leg-extension-for-maximum-quad-growth/"
+  ],
+  "brands": [
+   "Matrix Magnum",
+   "Prime Fitness",
+   "Panatta",
+   "Gym80"
+  ],
+  "existing_exercise_ids": [
+   "ReclinedLegExtension_Machine",
+   "Leg_Extensions"
+  ],
+  "exercises": [
+   {
+    "name": "Extensora com encosto reclinado",
+    "how": "Encosto inclinado para trás (quadril mais estendido) e extensão completa do joelho.",
+    "muscles": [
+     "quadriceps"
+    ]
+   },
+   {
+    "name": "Parciais no alongamento",
+    "how": "No fim da série, faça meias-repetições na parte de baixo (joelho dobrado).",
+    "muscles": [
+     "quadriceps"
+    ]
+   },
+   {
+    "name": "Unilateral reclinada",
+    "how": "Uma perna por vez para corrigir assimetrias.",
+    "muscles": [
+     "quadriceps"
+    ]
+   }
+  ],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=0osEbWp4hoM",
+    "title": "Get more growth out of your leg extension! Adjust the seat back: Extend your hips to lengthen",
+    "status": "pending"
+   },
+   {
+    "url": "https://m.youtube.com/watch?v=iOc1X_Q0n5M",
+    "title": "Increase Quadriceps Growth: Lean Back Leg Extensions for ...",
+    "status": "pending"
+   }
+  ],
+  "photos": []
+ },
+ {
+  "machine_id": "mx_lever_squat",
+  "name": "Agachamento alavanca (super squat / ground base)",
+  "name_en": "Lever / Ground-Base Squat (Super Squat)",
+  "category": "pernas",
+  "is_new": true,
+  "availability_br": "rara",
+  "tips": [
+   "Tronco firme: a alavanca guia o arco, mas a coluna não fica totalmente apoiada.",
+   "Pés à frente do corpo aliviam o joelho e aumentam o glúteo.",
+   "Erro comum: deixar os joelhos caírem para dentro."
+  ],
+  "why": "Carga pesada de agachamento sem barra nas costas e sem equilíbrio; boa opção para quem não se dá bem com agachamento livre.",
+  "sources": [
+   "https://www.youtube.com/watch?v=RMpIZ5NAWQA"
+  ],
+  "brands": [
+   "Hammer Strength (Ground Base Squat Lunge)",
+   "Panatta",
+   "Atlantis"
+  ],
+  "existing_exercise_ids": [
+   "LeverSquat_Machine",
+   "Lying_Machine_Squat"
+  ],
+  "exercises": [
+   {
+    "name": "Agachamento alavanca padrão",
+    "how": "Ombros sob as almofadas, pés na plataforma, desça até a coxa paralela ou abaixo.",
+    "muscles": [
+     "quadriceps",
+     "glutes"
+    ]
+   },
+   {
+    "name": "Afundo na alavanca (lunge)",
+    "how": "Um pé à frente e outro atrás na plataforma (modelos 'Squat Lunge').",
+    "muscles": [
+     "quadriceps",
+     "glutes"
+    ]
+   },
+   {
+    "name": "Panturrilha na alavanca",
+    "how": "Pernas estendidas, ponta dos pés na borda.",
+    "muscles": [
+     "calves"
+    ]
+   }
+  ],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=RMpIZ5NAWQA",
+    "title": "How to use Ground Based Squat Hammerstrength",
+    "status": "pending"
+   }
+  ],
+  "photos": []
+ },
+ {
+  "machine_id": "mx_standing_hip_thrust",
+  "name": "Hip thrust em pé (standing hip thrust)",
+  "name_en": "Standing Hip Thrust Machine",
+  "category": "gluteo",
+  "is_new": true,
+  "availability_br": "rara",
+  "tips": [
+   "Ajuste a almofada na altura do osso do quadril, não na barriga.",
+   "Movimento vem do quadril — não arqueie a lombar no topo.",
+   "Joelhos levemente flexionados o tempo todo."
+  ],
+  "why": "Novo formato 2024–2025 (Matrix Magnum, Panatta) que tira o atrito de montar banco e barra; segue a onda de máquinas de glúteo que dominam as feiras (Arnold/Fitness Brasil Expo).",
+  "sources": [
+   "https://insider.fitt.co/press-release/for-strength-that-never-rests-matrix-unveils-the-magnum-plate-loaded-range/",
+   "https://www.youtube.com/watch?v=55M9ofHMkSw",
+   "https://www.mbhfit.com/en/news/detail/Gym-Equipment-Trends-2026-971"
+  ],
+  "brands": [
+   "Matrix Magnum",
+   "Panatta",
+   "Arsenal Strength",
+   "Booty Builder"
+  ],
+  "existing_exercise_ids": [
+   "StandingHipThrust_Machine"
+  ],
+  "exercises": [
+   {
+    "name": "Hip thrust em pé",
+    "how": "Almofada no quadril, empurre o quadril à frente até a extensão total e contraia o glúteo.",
+    "muscles": [
+     "glutes"
+    ]
+   },
+   {
+    "name": "Hip thrust em pé com pausa",
+    "how": "Segure 2 s com o quadril estendido.",
+    "muscles": [
+     "glutes",
+     "hamstrings"
+    ]
+   },
+   {
+    "name": "Pés mais à frente",
+    "how": "Pés mais à frente na plataforma para aumentar o alongamento no início.",
+    "muscles": [
+     "glutes",
+     "hamstrings"
+    ]
+   }
+  ],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=55M9ofHMkSw",
+    "title": "Panatta Standing Hip Thrust Plate-Loaded Machine",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=D5g5joMA3e0",
+    "title": "Plate-loaded-Standing Hip Thrust",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=WiIEIlQxDAw",
+    "title": "Standing Hip Thrust",
+    "status": "pending"
+   }
+  ],
+  "photos": []
+ },
+ {
+  "machine_id": "mx_back_extension_machine",
+  "name": "Extensão lombar na máquina (sentado)",
+  "name_en": "Selectorized Back Extension",
+  "category": "core",
+  "is_new": true,
+  "availability_br": "média",
+  "tips": [
+   "Comece leve; carga alta com coluna hiperestendida não é o objetivo.",
+   "Ajuste o rolo na região das escápulas e o cinto/apoio das coxas firme.",
+   "Quem tem dor lombar deve liberar com fisioterapeuta antes."
+  ],
+  "why": "Versão guiada e de carga fácil de ajustar para fortalecer a lombar; comum em linhas selectorized e circuito.",
+  "sources": [
+   "https://www.youtube.com/watch?v=w6KkLw_gFk8"
+  ],
+  "brands": [
+   "Life Fitness",
+   "Technogym",
+   "Matrix",
+   "Movement",
+   "Booty Builder"
+  ],
+  "existing_exercise_ids": [
+   "BackExtensionMachine"
+  ],
+  "exercises": [
+   {
+    "name": "Extensão lombar sentado",
+    "how": "Costas no rolo, quadril fixo; estenda o tronco para trás de forma controlada.",
+    "muscles": [
+     "lower back"
+    ]
+   },
+   {
+    "name": "Extensão com foco em glúteo",
+    "how": "Em modelos com pivô no quadril, empurre com o quadril e mantenha a coluna neutra.",
+    "muscles": [
+     "glutes",
+     "lower back"
+    ]
+   },
+   {
+    "name": "Isometria na extensão",
+    "how": "Segure 10–20 s na posição neutra para resistência da lombar.",
+    "muscles": [
+     "lower back"
+    ]
+   }
+  ],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=w6KkLw_gFk8",
+    "title": "How To: Back Extension Machine",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=cvf7a9UT-aw",
+    "title": "Back Extension Machine (Precor) Demonstration",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=lEQsObmktQQ",
+    "title": "Booty Builder Selectorized Back Extension",
+    "status": "pending"
+   }
+  ],
+  "photos": []
+ },
+ {
+  "machine_id": "mx_rotary_torso",
+  "name": "Rotação de tronco na máquina (rotary torso)",
+  "name_en": "Rotary Torso Machine",
+  "category": "core",
+  "is_new": true,
+  "availability_br": "média",
+  "tips": [
+   "Amplitude moderada; não force a coluna no fim do giro.",
+   "Mesmas repetições para os dois lados.",
+   "Erro comum: girar rápido usando o embalo da placa de peso."
+  ],
+  "why": "Trabalha oblíquos com carga graduada e segura, presente em quase todas as linhas de circuito (Life Fitness, Technogym, Movement).",
+  "sources": [
+   "https://www.youtube.com/watch?v=V6K9bt4zbjc"
+  ],
+  "brands": [
+   "Life Fitness",
+   "Technogym",
+   "Matrix",
+   "Movement",
+   "Nautilus"
+  ],
+  "existing_exercise_ids": [
+   "RotaryTorso_Machine"
+  ],
+  "exercises": [
+   {
+    "name": "Rotação de tronco sentado",
+    "how": "Quadril travado, gire o tronco para um lado de forma lenta e volte; repita do outro lado.",
+    "muscles": [
+     "abdominals"
+    ]
+   },
+   {
+    "name": "Rotação com pausa",
+    "how": "Pause 1 s no fim da rotação para tirar o embalo.",
+    "muscles": [
+     "abdominals"
+    ]
+   },
+   {
+    "name": "Anti-rotação isométrica",
+    "how": "Segure a posição central contra a carga por 20–30 s.",
+    "muscles": [
+     "abdominals"
+    ]
+   }
+  ],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=V6K9bt4zbjc",
+    "title": "How To Use The TORSO ROTATION MACHINE (Life Fitness)",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=10JY7RMxnXk",
+    "title": "Kenosha YMCA - How to use the LifeFitness Torso Rotation",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=YR-XvXi7hO4",
+    "title": "Torso Rotation: Proper Form",
+    "status": "pending"
+   }
+  ],
+  "photos": []
+ },
+ {
+  "machine_id": "mx_ab_coaster",
+  "name": "Ab coaster (abdominal no trilho)",
+  "name_en": "Ab Coaster",
+  "category": "core",
+  "is_new": true,
+  "availability_br": "média",
+  "tips": [
+   "O movimento é enrolar a pelve, não só dobrar o quadril.",
+   "Desça devagar até quase encostar no batente.",
+   "Erro comum: puxar com os braços."
+  ],
+  "why": "Versão guiada do abdominal infra (reverse crunch) fácil para iniciantes; comum em redes como Planet Fitness e algumas academias brasileiras.",
+  "sources": [
+   "https://www.youtube.com/watch?v=2FTBFO7IDVs"
+  ],
+  "brands": [
+   "Ab Coaster (Ab Coaster LLC)",
+   "Stamina"
+  ],
+  "existing_exercise_ids": [
+   "AbCoaster_Machine"
+  ],
+  "exercises": [
+   {
+    "name": "Elevação de joelhos no ab coaster",
+    "how": "Joelhos no carrinho, enrole o quadril trazendo os joelhos ao peito.",
+    "muscles": [
+     "abdominals"
+    ]
+   },
+   {
+    "name": "Ab coaster oblíquo",
+    "how": "Gire o carrinho para um lado e suba os joelhos em diagonal.",
+    "muscles": [
+     "abdominals"
+    ]
+   },
+   {
+    "name": "Ab coaster com carga",
+    "how": "Adicione anilhas no pino para progredir.",
+    "muscles": [
+     "abdominals"
+    ]
+   }
+  ],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=2FTBFO7IDVs",
+    "title": "AbCoaster CTL - Proper Usage",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=mPgT9vXHzaY",
+    "title": "How to use the Ab Coaster",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/shorts/fAWfHyBiJuA",
+    "title": "AB COASTER MACHINE TUTORIAL / Work your abs and obliques on this machine at #PlanetFitness!",
+    "status": "pending"
+   }
+  ],
+  "photos": []
+ },
+ {
+  "machine_id": "mx_dy_row",
+  "name": "Remada DY (Iso-Lateral D.Y. Row)",
+  "name_en": "Iso-Lateral D.Y. Row",
+  "category": "costas",
+  "is_new": true,
+  "availability_br": "rara",
+  "tips": [
+   "Assento na altura em que a alça fica acima do ombro no início.",
+   "Peito firme na almofada.",
+   "Erro comum: puxar com o bíceps e encolher os ombros."
+  ],
+  "why": "Máquina da Hammer Strength inspirada na remada de Dorian Yates: o pivô alto e a pegada supinada dão arco natural que mira o dorsal.",
+  "sources": [
+   "https://www.youtube.com/watch?v=xH7afHVeuEQ"
+  ],
+  "brands": [
+   "Hammer Strength"
+  ],
+  "existing_exercise_ids": [
+   "DyRow_Machine",
+   "Leverage_High_Row"
+  ],
+  "exercises": [
+   {
+    "name": "Remada DY pegada supinada",
+    "how": "Pegada por baixo, puxe as alças em arco em direção ao quadril, cotovelos junto ao corpo.",
+    "muscles": [
+     "lats",
+     "middle back"
+    ]
+   },
+   {
+    "name": "Remada DY unilateral",
+    "how": "Um braço por vez para maior amplitude e alongamento do dorsal.",
+    "muscles": [
+     "lats"
+    ]
+   },
+   {
+    "name": "Remada DY com pausa no alongamento",
+    "how": "Deixe a escápula subir no topo 1 s antes de puxar.",
+    "muscles": [
+     "lats",
+     "middle back"
+    ]
+   }
+  ],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=xH7afHVeuEQ",
+    "title": "How to: Hammer Strength DY Row 101 #theeducatedmeathead",
+    "status": "pending"
+   }
+  ],
+  "photos": []
+ },
+ {
+  "machine_id": "mx_seal_row_bench",
+  "name": "Banco de remada seal (seal row / remada apoiada)",
+  "name_en": "Seal Row Bench / Chest-Supported Row",
+  "category": "costas",
+  "is_new": true,
+  "availability_br": "rara",
+  "tips": [
+   "Peito sempre colado no banco — se descolar, a carga está alta.",
+   "Pausa breve no topo apertando as escápulas.",
+   "Erro comum: encolher os ombros em vez de puxar com as costas."
+  ],
+  "why": "Remada sem carga na lombar e sem 'roubo', muito recomendada por coaches de hipertrofia (Nippard, Israetel) para dorsal e meio das costas.",
+  "sources": [
+   "https://www.youtube.com/watch?v=NRHiNw-xGSA"
+  ],
+  "brands": [
+   "Rogue",
+   "Eleiko",
+   "Gym80",
+   "Panatta"
+  ],
+  "existing_exercise_ids": [
+   "SealRowBench",
+   "Lying_T-Bar_Row"
+  ],
+  "exercises": [
+   {
+    "name": "Seal row com barra",
+    "how": "Deitado de bruços no banco alto, puxe a barra até o banco sem tirar o peito.",
+    "muscles": [
+     "middle back",
+     "lats"
+    ]
+   },
+   {
+    "name": "Remada apoiada com halteres (banco 30–45°)",
+    "how": "Peito no banco inclinado, puxe os halteres levando os cotovelos para trás.",
+    "muscles": [
+     "middle back",
+     "lats"
+    ]
+   },
+   {
+    "name": "Seal row pegada aberta",
+    "how": "Cotovelos abertos a ~45–60° para enfatizar posterior de ombro e trapézio médio.",
+    "muscles": [
+     "middle back",
+     "shoulders",
+     "traps"
+    ]
+   }
+  ],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=NRHiNw-xGSA",
+    "title": "How to: Seal Row",
+    "status": "pending"
+   },
+   {
+    "url": "https://youtube.com/watch?v=KqbGIs16oAk",
+    "title": "Seal Row",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=h2Xafysr43E",
+    "title": "Chest Supported DB Row (Exercise Library)",
+    "status": "pending"
+   }
+  ],
+  "photos": []
+ },
+ {
+  "machine_id": "mx_incline_fly_machine",
+  "name": "Voador inclinado (incline chest fly)",
+  "name_en": "Incline Chest Fly Machine",
+  "category": "peito",
+  "is_new": true,
+  "availability_br": "rara",
+  "tips": [
+   "Ombros para trás e para baixo, peito alto.",
+   "Cotovelo fixo — não vire supino.",
+   "Abra até sentir alongamento sem dor no ombro."
+  ],
+  "why": "Isolamento da porção clavicular (peito superior) com alongamento sob tensão; aparece nas linhas plate-loaded novas de marcas premium.",
+  "sources": [
+   "https://www.youtube.com/watch?v=PAi3IgRjD2I",
+   "https://barbend.com/news/jeff-nippard-ranks-chest-exercises-for-hypertrophy/"
+  ],
+  "brands": [
+   "Panatta",
+   "Primal Strength",
+   "Gym80",
+   "Prime Fitness"
+  ],
+  "existing_exercise_ids": [
+   "InclineFlyMachine",
+   "Butterfly"
+  ],
+  "exercises": [
+   {
+    "name": "Voador inclinado",
+    "how": "Encosto inclinado, braços levemente flexionados; feche à frente do peito alto.",
+    "muscles": [
+     "chest",
+     "shoulders"
+    ]
+   },
+   {
+    "name": "Voador inclinado unilateral",
+    "how": "Um braço por vez para mais alongamento.",
+    "muscles": [
+     "chest"
+    ]
+   },
+   {
+    "name": "Parciais no alongamento",
+    "how": "No fim da série, meias-repetições na parte aberta.",
+    "muscles": [
+     "chest"
+    ]
+   }
+  ],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=PAi3IgRjD2I",
+    "title": "How to Use: Inclined Chest Fly Machine",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=-OHG7-lXOHY",
+    "title": "Isolateral Incline Pec Fly",
+    "status": "pending"
+   }
+  ],
+  "photos": []
+ },
+ {
+  "machine_id": "mx_overhead_triceps_machine",
+  "name": "Tríceps acima da cabeça na máquina (francês máquina)",
+  "name_en": "Overhead Triceps Extension Machine",
+  "category": "bracos",
+  "is_new": true,
+  "availability_br": "rara",
+  "tips": [
+   "Ajuste o banco para o cotovelo ficar alinhado ao eixo.",
+   "Desça até o tríceps alongar bem (cotovelo bem dobrado).",
+   "Erro comum: abrir os cotovelos e transformar em desenvolvimento."
+  ],
+  "why": "Com o braço acima da cabeça a cabeça longa do tríceps fica alongada e cresceu ~1,4x mais que no pulley em 12 semanas (Maeo et al., 2023).",
+  "sources": [
+   "https://sci-sport.com/en/articles/Triceps-hypertrophy-impact-of-arm-position-225.php",
+   "https://barbend.com/news/jeff-nippard-ranks-best-and-worst-triceps-exercises/"
+  ],
+  "brands": [
+   "Panatta",
+   "Prime Fitness",
+   "Star Trac",
+   "Paramount",
+   "Hammer Strength"
+  ],
+  "existing_exercise_ids": [
+   "OverheadTricepsMachine",
+   "Machine_Triceps_Extension",
+   "Triceps_Overhead_Extension_with_Rope",
+   "Cable_Rope_Overhead_Triceps_Extension"
+  ],
+  "exercises": [
+   {
+    "name": "Francês na máquina",
+    "how": "Braços acima da cabeça apoiados, estenda os cotovelos sem mexer os ombros.",
+    "muscles": [
+     "triceps"
+    ]
+   },
+   {
+    "name": "Francês unilateral na máquina",
+    "how": "Um braço por vez para mais amplitude.",
+    "muscles": [
+     "triceps"
+    ]
+   },
+   {
+    "name": "Francês com corda no cabo (alternativa)",
+    "how": "De costas para a polia, corda atrás da cabeça, estenda para frente/cima.",
+    "muscles": [
+     "triceps"
+    ],
+    "exercise_id": "Cable_Rope_Overhead_Triceps_Extension"
+   }
+  ],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=uzL7zqarpUY",
+    "title": "How To Do A SEATED MACHINE INCLINE OVERHEAD TRICEPS EXTENSION (Star Trac)",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/shorts/FPVGCISTV7g",
+    "title": "How to use the paramount overhead triceps extension machine",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=o_WWmC5jtDY",
+    "title": "How To Do A SEATED MACHINE TRICEPS EXTENSION (Hammer Strength)",
+    "status": "pending"
+   }
+  ],
+  "photos": []
+ },
+ {
+  "machine_id": "mx_viking_press",
+  "name": "Viking press (desenvolvimento em alavanca)",
+  "name_en": "Viking Press",
+  "category": "ombros",
+  "is_new": true,
+  "availability_br": "rara",
+  "tips": [
+   "Abdômen e glúteo contraídos para não arquear a lombar.",
+   "Pegada neutra costuma ser mais confortável para ombros sensíveis.",
+   "Erro comum: inclinar o tronco para trás para completar."
+  ],
+  "why": "Desenvolvimento pesado com pegada neutra e trajeto em arco, amigável para o ombro; popular em academias de força/strongman e como acessório de racks.",
+  "sources": [
+   "https://www.youtube.com/watch?v=11cdAXyFhl4"
+  ],
+  "brands": [
+   "Rogue",
+   "Bells of Steel",
+   "Hammer Strength",
+   "Watson"
+  ],
+  "existing_exercise_ids": [
+   "VikingPress_Machine"
+  ],
+  "exercises": [
+   {
+    "name": "Viking press em pé",
+    "how": "Pegada neutra nas alças, empurre acima da cabeça em arco até estender os braços.",
+    "muscles": [
+     "shoulders",
+     "triceps"
+    ]
+   },
+   {
+    "name": "Viking press unilateral",
+    "how": "Um braço por vez para estabilidade do core.",
+    "muscles": [
+     "shoulders",
+     "abdominals"
+    ]
+   },
+   {
+    "name": "Viking push press",
+    "how": "Pequeno impulso de pernas para cargas mais pesadas.",
+    "muscles": [
+     "shoulders",
+     "quadriceps",
+     "triceps"
+    ]
+   }
+  ],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=11cdAXyFhl4",
+    "title": "How to Use The Viking Press",
+    "status": "pending"
+   },
+   {
+    "url": "https://m.youtube.com/watch?v=Pt3z8hFX6Rg",
+    "title": "Ways to use the Viking Press",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=MMtlr53BYTw",
+    "title": "PRESSING to BUILD TRICEPS with the BELLS OF STEEL VIKING PRESS ATTACHMENT",
+    "status": "pending"
+   }
+  ],
+  "photos": []
+ },
+ {
+  "machine_id": "mx_landmine_station",
+  "name": "Estação landmine (barra articulada no chão)",
+  "name_en": "Landmine Station",
+  "category": "funcional",
+  "is_new": true,
+  "availability_br": "média",
+  "tips": [
+   "Trave bem a base (ou use um canto com anilha) para a barra não escorregar.",
+   "No press, mantenha costelas para baixo e glúteo contraído.",
+   "Comece leve — a alavanca engana sobre a carga real."
+  ],
+  "why": "Equipamento barato e muito versátil (empurrar, remar, rotação, agachar), queridinho do treino híbrido e de academias funcionais; o press é amigável para ombros.",
+  "sources": [
+   "https://www.youtube.com/watch?v=J2M-trq1L9A"
+  ],
+  "brands": [
+   "Rogue",
+   "Eleiko",
+   "Matrix",
+   "Life Fitness",
+   "Hammer Strength"
+  ],
+  "existing_exercise_ids": [
+   "LandmineStation",
+   "Landmine_180s",
+   "Landmine_Linear_Jammer",
+   "T-Bar_Row_with_Handle"
+  ],
+  "exercises": [
+   {
+    "name": "Landmine press em pé / meio ajoelhado",
+    "how": "Segure a ponta da barra no ombro e empurre para cima e à frente.",
+    "muscles": [
+     "shoulders",
+     "chest",
+     "triceps"
+    ]
+   },
+   {
+    "name": "Landmine 180 (rotação)",
+    "how": "Braços estendidos, gire a barra de um quadril ao outro.",
+    "muscles": [
+     "abdominals"
+    ],
+    "exercise_id": "Landmine_180s"
+   },
+   {
+    "name": "Remada cavalinho na landmine",
+    "how": "Com o puxador em V sob a barra, incline o tronco e reme.",
+    "muscles": [
+     "middle back",
+     "lats"
+    ],
+    "exercise_id": "T-Bar_Row_with_Handle"
+   },
+   {
+    "name": "Agachamento landmine",
+    "how": "Barra no peito, agache mantendo o tronco ereto.",
+    "muscles": [
+     "quadriceps",
+     "glutes"
+    ]
+   },
+   {
+    "name": "Jammer (empurrar explosivo)",
+    "how": "Agache e empurre a barra explosivamente para cima.",
+    "muscles": [
+     "shoulders",
+     "quadriceps",
+     "triceps"
+    ],
+    "exercise_id": "Landmine_Linear_Jammer"
+   }
+  ],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=7eb_ziZFduE",
+    "title": "Landmine Press Technique",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=LN1zCeoIfbE",
+    "title": "Half Kneeling Landmine Press Exercise",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=N9_1DnqUAQw",
+    "title": "5 Best Landmine Press Exercises",
+    "status": "pending"
+   }
+  ],
+  "photos": []
+ },
+ {
+  "machine_id": "mx_neck_machine",
+  "name": "Máquina de pescoço 4 direções",
+  "name_en": "4-Way Neck Machine",
+  "category": "funcional",
+  "is_new": true,
+  "availability_br": "rara",
+  "tips": [
+   "Carga bem leve e movimento lento; nada de trancos.",
+   "Ajuste o banco para mover só o pescoço, sem mexer o tronco nem encolher os ombros.",
+   "Interessante para esportes de contato e luta."
+  ],
+  "why": "Treino de pescoço virou tendência nas redes ('neck training') e é padrão em centros de esportes de contato; a Hammer Strength e a Nautilus têm modelos dedicados.",
+  "sources": [
+   "https://www.youtube.com/watch?v=jQ17ybYWOdQ"
+  ],
+  "brands": [
+   "Hammer Strength",
+   "Nautilus",
+   "Pendulum (Rogue)"
+  ],
+  "existing_exercise_ids": [],
+  "exercises": [
+   {
+    "name": "Flexão de pescoço",
+    "how": "De frente para a almofada, leve o queixo ao peito contra a resistência.",
+    "muscles": [
+     "neck"
+    ]
+   },
+   {
+    "name": "Extensão de pescoço",
+    "how": "De costas para a almofada, leve a cabeça para trás devagar.",
+    "muscles": [
+     "neck",
+     "traps"
+    ]
+   },
+   {
+    "name": "Flexão lateral",
+    "how": "De lado, incline a orelha em direção ao ombro; repita dos dois lados.",
+    "muscles": [
+     "neck"
+    ]
+   }
+  ],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=jQ17ybYWOdQ",
+    "title": "Hammer Strength 4 Way Neck: Neck Extension",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=6coelieHY30",
+    "title": "How to use the Nautilus 4-Way Neck Developer",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=2amJzoyxuNw",
+    "title": "4-Way Neck",
+    "status": "pending"
+   }
+  ],
+  "photos": []
+ },
+ {
+  "machine_id": "mx_smart_strength",
+  "name": "Máquinas inteligentes de força (Biostrength, Tonal, Vitruvian, Keiser)",
+  "name_en": "Smart / Connected Strength Machines",
+  "category": "funcional",
+  "is_new": true,
+  "availability_br": "rara",
+  "tips": [
+   "Use os modos de teste de força para o app calibrar sua carga.",
+   "Excêntrico extra gera mais dor muscular: comece com volume menor.",
+   "Registre manualmente no Hybrid Lab se o app da máquina não exportar."
+  ],
+  "why": "Motores/ar comprimido substituem a pilha de pesos: carga adaptativa, excêntrico extra e dados automáticos — Tonal 2 (2025, até 250 lb), Vitruvian Trainer+ (até 200 kg) e Technogym Biostrength nas academias premium (ex.: Bio Ritmo).",
+  "sources": [
+   "https://connectthewatts.com/2025/08/13/tonal-2-review-the-ai-powered-home-gym-delivering-real-results/",
+   "https://www.garagegymreviews.com/vitruvian-trainer-review",
+   "https://www.infomoney.com.br/?p=2989602"
+  ],
+  "brands": [
+   "Technogym Biostrength",
+   "Tonal",
+   "Vitruvian",
+   "Keiser (pneumático)",
+   "eGym"
+  ],
+  "existing_exercise_ids": [
+   "Cable_Chest_Press",
+   "Seated_Cable_Rows"
+  ],
+  "exercises": [
+   {
+    "name": "Supino/chest press com resistência adaptativa",
+    "how": "A máquina ajusta a carga e pode reduzir no fim da série (modo 'drop').",
+    "muscles": [
+     "chest",
+     "triceps",
+     "shoulders"
+    ]
+   },
+   {
+    "name": "Remada com carga excêntrica extra",
+    "how": "Modo excêntrico: a volta é mais pesada que a puxada.",
+    "muscles": [
+     "middle back",
+     "lats",
+     "biceps"
+    ]
+   },
+   {
+    "name": "Agachamento/terra no cabo digital",
+    "how": "Barra ou alças no cabo motorizado; o app guia a carga.",
+    "muscles": [
+     "quadriceps",
+     "glutes",
+     "hamstrings"
+    ]
+   }
+  ],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=MrSkCG0ZJsk",
+    "title": "GREENLINE SPORTS CHEST PRESS (TECHNOGYM BIOSTRENGHT)",
+    "status": "pending"
+   }
+  ],
+  "photos": []
+ },
+ {
+  "machine_id": "mx_jacobs_ladder",
+  "name": "Jacob's Ladder (escada infinita)",
+  "name_en": "Jacob's Ladder",
+  "category": "cardio",
+  "is_new": true,
+  "availability_br": "rara",
+  "tips": [
+   "Ajuste o cinto e a altura antes de começar.",
+   "Para parar, diminua o ritmo e deixe descer até a base.",
+   "Impacto baixo para joelhos e quadril."
+  ],
+  "why": "Cardio de corpo inteiro de baixo impacto e autorregulado; usado em boxes e no treino de bombeiros/militares.",
+  "sources": [
+   "https://www.youtube.com/watch?v=dwpzOAZh7Pc"
+  ],
+  "brands": [
+   "Jacobs Ladder LLC"
+  ],
+  "existing_exercise_ids": [],
+  "exercises": [
+   {
+    "name": "Subida contínua",
+    "how": "Cinto ajustado, suba os degraus em ritmo constante usando mãos e pés.",
+    "muscles": [
+     "quadriceps",
+     "glutes",
+     "shoulders"
+    ]
+   },
+   {
+    "name": "Tiros (intervalado)",
+    "how": "20–30 s forte / 60 s leve; a velocidade acompanha o seu ritmo.",
+    "muscles": [
+     "quadriceps",
+     "glutes",
+     "lats"
+    ]
+   },
+   {
+    "name": "Só pernas",
+    "how": "Segure nos corrimãos e suba apenas com as pernas.",
+    "muscles": [
+     "quadriceps",
+     "glutes",
+     "calves"
+    ]
+   }
+  ],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=dwpzOAZh7Pc",
+    "title": "Jacobs Ladder Exercise Machine Guide",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=yCuAGD3YJ8Q",
+    "title": "JACOBS LADDER TRAINING TIPS FOR BEGINNERS",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=wsIrayNMmlo",
+    "title": "Jacobs Ladder How To Video",
+    "status": "pending"
+   }
+  ],
+  "photos": []
+ },
+ {
+  "machine_id": "mx_bike_erg",
+  "name": "BikeErg (bike de ar Concept2)",
+  "name_en": "Concept2 BikeErg",
+  "category": "cardio",
+  "is_new": true,
+  "availability_br": "rara",
+  "tips": [
+   "Ajuste altura do selim e do guidão antes (3 pontos de ajuste).",
+   "Damper alto não é 'mais treino' — controle pelos watts.",
+   "O PM5 transmite watts/cadência via Bluetooth (relógios e Zwift)."
+  ],
+  "why": "Mesmo monitor PM5 do remo e do SkiErg, medição de potência confiável e manutenção baixa; padrão em boxes e no treino híbrido.",
+  "sources": [
+   "https://www.youtube.com/watch?v=xWE5Q_NljyY"
+  ],
+  "brands": [
+   "Concept2"
+  ],
+  "existing_exercise_ids": [
+   "Bicycling_Stationary"
+  ],
+  "exercises": [
+   {
+    "name": "Pedal contínuo zona 2",
+    "how": "Damper médio, cadência 80–95 rpm, conversa possível.",
+    "muscles": [
+     "quadriceps",
+     "glutes"
+    ]
+   },
+   {
+    "name": "Tiros em watts",
+    "how": "Ex.: 10 × 30 s forte / 90 s leve, acompanhando os watts no PM5.",
+    "muscles": [
+     "quadriceps",
+     "glutes",
+     "hamstrings"
+    ]
+   },
+   {
+    "name": "Calorias para WOD/híbrido",
+    "how": "Meta de calorias em blocos, como nos treinos CrossFit.",
+    "muscles": [
+     "quadriceps",
+     "glutes",
+     "calves"
+    ]
+   }
+  ],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=yRfy9LgzLAI",
+    "title": "Getting Ready to Work Out on the BikeErg",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=ClgAYjvqP_s",
+    "title": "Correct Set up and Position for Concept2 Bike Erg",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=xWE5Q_NljyY",
+    "title": "Concept2 BikeErg - Setup Tips and Training Options",
+    "status": "pending"
+   }
+  ],
+  "photos": []
+ },
+ {
+  "machine_id": "mx_pendulum_squat",
+  "name": "Agachamento pêndulo (pendulum squat)",
+  "name_en": "Pendulum Squat",
+  "category": "pernas",
+  "is_new": false,
+  "availability_br": "média",
+  "tips": [
+   "Descida de 2–3 s até o fundo sem o quadril descolar do encosto.",
+   "Não trave os joelhos no topo.",
+   "Erro comum: encurtar a amplitude para pôr mais carga."
+  ],
+  "why": "Um dos favoritos de Nippard para quadríceps: arco que permite agachar fundo com costas apoiadas; virou padrão nas linhas novas (Life Fitness Pendulum X, Matrix Magnum 2025).",
+  "sources": [
+   "https://doaj.org/article/99e86b317bec40f5abc2f0008358737e",
+   "https://pubmed.ncbi.nlm.nih.gov/31230110/",
+   "https://insider.fitt.co/press-release/for-strength-that-never-rests-matrix-unveils-the-magnum-plate-loaded-range/",
+   "https://lifefitness.com/pt-br/catalog/forca/plate-loaded/pendulum-x-squat"
+  ],
+  "brands": [
+   "Life Fitness/Hammer Strength",
+   "Matrix Magnum",
+   "Atlantis",
+   "Pendulum (Rogue)",
+   "Panatta",
+   "Arsenal Strength"
+  ],
+  "existing_exercise_ids": [
+   "Pendulum_Squat"
+  ],
+  "exercises": [
+   {
+    "name": "Pêndulo padrão",
+    "how": "Costas no encosto, pés no meio da plataforma, desça o mais fundo que controlar.",
+    "muscles": [
+     "quadriceps",
+     "glutes"
+    ],
+    "exercise_id": "Pendulum_Squat"
+   },
+   {
+    "name": "Pés baixos e juntos",
+    "how": "Mais flexão de joelho: foco no quadríceps.",
+    "muscles": [
+     "quadriceps"
+    ]
+   },
+   {
+    "name": "Pés altos e afastados",
+    "how": "Mais quadril: glúteo e adutores.",
+    "muscles": [
+     "glutes",
+     "adductors"
+    ]
+   },
+   {
+    "name": "Pêndulo com parciais no fundo",
+    "how": "Meias-repetições na metade de baixo no fim da série.",
+    "muscles": [
+     "quadriceps"
+    ]
+   }
+  ],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=Wz6EjnvifE4",
+    "title": "How To: Pendulum Squat Machine",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=cLMpfZX8bQ0",
+    "title": "How To: Pendulum Squats for BIGGER Quads (Step by Step)",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=WH9avpMc64M",
+    "title": "HOW TO USE GYM MACHINES: Pendulum Squat",
+    "status": "pending"
+   }
+  ],
+  "photos": []
+ },
+ {
+  "machine_id": "mx_belt_squat",
+  "name": "Agachamento com cinto (belt squat)",
+  "name_en": "Belt Squat",
+  "category": "pernas",
+  "is_new": false,
+  "availability_br": "rara",
+  "tips": [
+   "Cinto bem baixo no quadril para não puxar a lombar.",
+   "Segure nas alças só para equilíbrio.",
+   "Ótimo para quem tem dor lombar no agachamento livre."
+  ],
+  "why": "Carrega as pernas sem comprimir a coluna; Hammer Strength e Matrix Magnum (2025) têm versões dedicadas.",
+  "sources": [
+   "https://insider.fitt.co/press-release/for-strength-that-never-rests-matrix-unveils-the-magnum-plate-loaded-range/",
+   "https://www.youtube.com/watch?v=lUR-SYbu3kE"
+  ],
+  "brands": [
+   "Hammer Strength",
+   "Matrix Magnum",
+   "Pit Shark",
+   "Rogue",
+   "Cybex",
+   "Kinta"
+  ],
+  "existing_exercise_ids": [
+   "Belt_Squat"
+  ],
+  "exercises": [
+   {
+    "name": "Belt squat",
+    "how": "Cinto no quadril, agache com tronco ereto sem carga na coluna.",
+    "muscles": [
+     "quadriceps",
+     "glutes"
+    ],
+    "exercise_id": "Belt_Squat"
+   },
+   {
+    "name": "Stiff/RDL no belt squat",
+    "how": "Cinto no quadril, empurre o quadril para trás com joelhos semiflexionados.",
+    "muscles": [
+     "hamstrings",
+     "glutes"
+    ]
+   },
+   {
+    "name": "Marcha no belt squat",
+    "how": "Carga presa, marche no lugar (hip march) para condicionamento.",
+    "muscles": [
+     "quadriceps",
+     "glutes",
+     "calves"
+    ]
+   },
+   {
+    "name": "Afundo no belt squat",
+    "how": "Um pé à frente, outro atrás, desça o joelho de trás.",
+    "muscles": [
+     "quadriceps",
+     "glutes"
+    ]
+   }
+  ],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=lUR-SYbu3kE",
+    "title": "Hammer Strength Belt Squat - Instructional Video",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=zNl73FGvTc0",
+    "title": "All The Ways I Use The BELT SQUAT Machine (For Way More Than Squatting!)",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=OfitTmkNL7A",
+    "title": "How to do Romanian Deadlifts with the Belt Squat Machine (Proper Form)",
+    "status": "pending"
+   }
+  ],
+  "photos": []
+ },
+ {
+  "machine_id": "mx_leg_press_45",
+  "name": "Leg press 45°",
+  "name_en": "45° Leg Press",
+  "category": "pernas",
+  "is_new": false,
+  "availability_br": "comum",
+  "tips": [
+   "Ajuste o encosto e a trava para sua altura antes da primeira série.",
+   "Não deixe a lombar/quadril descolar no fundo.",
+   "Erro comum: travar os joelhos no topo."
+  ],
+  "why": "Máquina de perna mais comum do Brasil (Smart Fit, Bluefit, Selfit); permite muito volume com segurança.",
+  "sources": [
+   "https://www.youtube.com/watch?v=itJDw9I1qu4",
+   "https://www.starkstrong.com.br/"
+  ],
+  "brands": [
+   "Movement",
+   "Hammer Strength",
+   "Righetto",
+   "Matrix",
+   "Technogym"
+  ],
+  "existing_exercise_ids": [
+   "Leg_Press",
+   "Single-Leg_Leg_Press",
+   "Narrow_Stance_Leg_Press",
+   "Calf_Press_On_The_Leg_Press_Machine"
+  ],
+  "exercises": [
+   {
+    "name": "Leg press padrão",
+    "how": "Pés na largura dos ombros no meio da plataforma, desça até ~90° ou mais sem tirar o quadril do banco.",
+    "muscles": [
+     "quadriceps",
+     "glutes"
+    ],
+    "exercise_id": "Leg_Press"
+   },
+   {
+    "name": "Pés altos e afastados",
+    "how": "Mais glúteo e posterior.",
+    "muscles": [
+     "glutes",
+     "hamstrings",
+     "adductors"
+    ]
+   },
+   {
+    "name": "Pés baixos e juntos",
+    "how": "Mais quadríceps.",
+    "muscles": [
+     "quadriceps"
+    ],
+    "exercise_id": "Narrow_Stance_Leg_Press"
+   },
+   {
+    "name": "Leg press unilateral",
+    "how": "Uma perna por vez para corrigir assimetrias.",
+    "muscles": [
+     "quadriceps",
+     "glutes"
+    ],
+    "exercise_id": "Single-Leg_Leg_Press"
+   },
+   {
+    "name": "Panturrilha no leg press",
+    "how": "Pernas quase estendidas, empurre com a ponta dos pés.",
+    "muscles": [
+     "calves"
+    ],
+    "exercise_id": "Calf_Press_On_The_Leg_Press_Machine"
+   }
+  ],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=itJDw9I1qu4",
+    "title": "LEG PRESS 45: COMO FAZER E ATÉ ONDE DESCER?",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=HIN899EE788",
+    "title": "LEG PRESS 45°: Como Fazer Corretamente e Ativar Mais Coxas e Glúteos",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=tRV9hBDT3us",
+    "title": "How to Do the 45-Degree Leg Press: Proper Form in 4 Steps (Coach Breakdown)",
+    "status": "pending"
+   }
+  ],
+  "photos": [
+   {
+    "url": "https://upload.wikimedia.org/wikipedia/commons/9/9f/Leg_Press_Machine.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Leg_Press_Machine.jpg",
+    "author": "Paulmcdonald",
+    "license": "CC BY-SA 4.0",
+    "status": "pending"
+   },
+   {
+    "url": "https://upload.wikimedia.org/wikipedia/commons/e/e9/Marian-Leg-Press.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Marian-Leg-Press.jpg",
+    "author": "não exibido",
+    "license": "CC BY 4.0",
+    "status": "pending"
+   }
+  ]
+ },
+ {
+  "machine_id": "mx_leg_press_horizontal",
+  "name": "Leg press horizontal (sentado)",
+  "name_en": "Seated / Horizontal Leg Press",
+  "category": "pernas",
+  "is_new": false,
+  "availability_br": "comum",
+  "tips": [
+   "Ajuste o assento para passar de 90° de joelho na posição baixa.",
+   "Joelhos alinhados com a ponta dos pés.",
+   "Bom para iniciantes: carga em pilha de peso."
+  ],
+  "why": "Versão selectorized amigável para iniciantes, presente em praticamente toda academia de rede.",
+  "sources": [
+   "https://www.youtube.com/watch?v=8ZrJ8Q9SNbY"
+  ],
+  "brands": [
+   "Technogym",
+   "Life Fitness",
+   "Matrix",
+   "Movement"
+  ],
+  "existing_exercise_ids": [
+   "Horizontal_Leg_Press"
+  ],
+  "exercises": [
+   {
+    "name": "Leg horizontal padrão",
+    "how": "Costas no encosto, pés na largura dos ombros, empurre sem travar o joelho.",
+    "muscles": [
+     "quadriceps",
+     "glutes"
+    ],
+    "exercise_id": "Horizontal_Leg_Press"
+   },
+   {
+    "name": "Pés juntos",
+    "how": "Mais quadríceps.",
+    "muscles": [
+     "quadriceps"
+    ]
+   },
+   {
+    "name": "Unilateral",
+    "how": "Uma perna por vez.",
+    "muscles": [
+     "quadriceps",
+     "glutes"
+    ]
+   },
+   {
+    "name": "Panturrilha no leg horizontal",
+    "how": "Pontas dos pés na borda da plataforma.",
+    "muscles": [
+     "calves"
+    ]
+   }
+  ],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=8ZrJ8Q9SNbY",
+    "title": "Exercise Tutorial: Technogym Horizontal Leg Press",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=30N6fKpuTNo",
+    "title": "Life Fitness Pro2 Seated Leg Press Instructions",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=QQEW__B5y9I",
+    "title": "How To: Horizontal Leg Press",
+    "status": "pending"
+   }
+  ],
+  "photos": []
+ },
+ {
+  "machine_id": "mx_hack_squat",
+  "name": "Hack machine (agachamento hack)",
+  "name_en": "Hack Squat Machine",
+  "category": "pernas",
+  "is_new": false,
+  "availability_br": "comum",
+  "tips": [
+   "Costas inteiras no encosto o tempo todo.",
+   "Pressione o pé inteiro, não só a ponta.",
+   "Comece leve até dominar a profundidade."
+  ],
+  "why": "Nippard coloca o hack entre os melhores para quadríceps; crescendo em compras de academias 2026.",
+  "sources": [
+   "https://barbend.com/news/best-quad-exercises-ranking-best-to-worst-jeff-nippard/",
+   "https://powergymequip.com/commercial-fitness-equipment-trends-2026/"
+  ],
+  "brands": [
+   "Movement",
+   "Hammer Strength",
+   "Panatta",
+   "Matrix",
+   "Righetto",
+   "Prime"
+  ],
+  "existing_exercise_ids": [
+   "Hack_Squat",
+   "Narrow_Stance_Hack_Squats",
+   "Reverse_Hack_Squat",
+   "Hack_Machine_Calf_Raise"
+  ],
+  "exercises": [
+   {
+    "name": "Hack padrão",
+    "how": "Ombros sob as almofadas, costas no encosto, desça fundo.",
+    "muscles": [
+     "quadriceps",
+     "glutes"
+    ],
+    "exercise_id": "Hack_Squat"
+   },
+   {
+    "name": "Hack pés juntos",
+    "how": "Pés mais juntos e baixos para foco em quadríceps.",
+    "muscles": [
+     "quadriceps"
+    ],
+    "exercise_id": "Narrow_Stance_Hack_Squats"
+   },
+   {
+    "name": "Hack invertido",
+    "how": "De frente para o encosto, quadril para trás: glúteo e posterior.",
+    "muscles": [
+     "glutes",
+     "hamstrings"
+    ],
+    "exercise_id": "Reverse_Hack_Squat",
+    "video": {
+     "url": "https://www.youtube.com/watch?v=YOUD9vexs2o",
+     "status": "pending"
+    }
+   },
+   {
+    "name": "Panturrilha no hack",
+    "how": "Pontas dos pés na borda (ou acessório), joelhos quase estendidos.",
+    "muscles": [
+     "calves"
+    ],
+    "exercise_id": "Hack_Machine_Calf_Raise",
+    "video": {
+     "url": "https://www.youtube.com/watch?v=Jw33qwHb5jA",
+     "status": "pending"
+    }
+   }
+  ],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=hglQExHCM9Q",
+    "title": "Hack Squat Machine (Exercise Tutorial + Form Tips)",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=36_EC-MgVz8",
+    "title": "The Hack Squat Guide: Form, Muscles, and Mistakes to Avoid",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=YOUD9vexs2o",
+    "title": "How to REVERSE HACK SQUAT Correctly: Cues & Form Tips to Maximize Gains! #brookehackett #hacksquat",
+    "status": "pending"
+   }
+  ],
+  "photos": [
+   {
+    "url": "https://upload.wikimedia.org/wikipedia/commons/d/dd/HackSquatMachineExercise.JPG",
+    "page": "https://commons.wikimedia.org/wiki/File:HackSquatMachineExercise.JPG",
+    "author": "não exibido (2005)",
+    "license": "GFDL / CC BY-SA 3.0",
+    "status": "pending"
+   },
+   {
+    "url": "https://upload.wikimedia.org/wikipedia/commons/c/c5/David_Jobson_%26_Ziggy_Chima%3B_machine_hack_squat.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:David_Jobson_%26_Ziggy_Chima%3B_machine_hack_squat.jpg",
+    "author": "Flickr (David Jobson)",
+    "license": "CC BY 2.0",
+    "status": "pending"
+   }
+  ]
+ },
+ {
+  "machine_id": "mx_smith_machine",
+  "name": "Smith machine (barra guiada)",
+  "name_en": "Smith Machine",
+  "category": "funcional",
+  "is_new": false,
+  "availability_br": "comum",
+  "tips": [
+   "Regule as travas de segurança na altura certa antes de começar.",
+   "A posição dos pés muda tudo: ajuste ao trilho da sua máquina.",
+   "Erro comum: soltar a barra sem girar o gancho até travar."
+  ],
+  "why": "Estação mais versátil e comum das academias brasileiras; Nippard usa muito (ex.: JM press no Smith é 'A-tier' para tríceps).",
+  "sources": [
+   "https://barbend.com/news/jeff-nippard-ranks-best-and-worst-triceps-exercises/",
+   "https://www.starkstrong.com.br/"
+  ],
+  "brands": [
+   "Movement",
+   "Technogym",
+   "Life Fitness",
+   "Matrix",
+   "Righetto"
+  ],
+  "existing_exercise_ids": [
+   "Smith_Machine_Squat",
+   "Smith_Machine_Hip_Thrust",
+   "Smith_Machine_Hip_Raise",
+   "Smith_Machine_Bench_Press",
+   "Smith_Machine_Incline_Bench_Press",
+   "Smith_Single-Leg_Split_Squat",
+   "Smith_Machine_Calf_Raise",
+   "Smith_Machine_Stiff-Legged_Deadlift",
+   "Smith_Machine_Overhead_Shoulder_Press",
+   "Smith_Machine_Bent_Over_Row"
+  ],
+  "exercises": [
+   {
+    "name": "Agachamento no Smith",
+    "how": "Barra no trapézio, pés levemente à frente, desça controlando.",
+    "muscles": [
+     "quadriceps",
+     "glutes"
+    ],
+    "exercise_id": "Smith_Machine_Squat",
+    "video": {
+     "url": "https://www.youtube.com/watch?v=iAcRGCsG_PY",
+     "status": "pending"
+    }
+   },
+   {
+    "name": "Elevação pélvica no Smith",
+    "how": "Costas no banco, barra com protetor no quadril, estenda o quadril.",
+    "muscles": [
+     "glutes",
+     "hamstrings"
+    ],
+    "exercise_id": "Smith_Machine_Hip_Thrust"
+   },
+   {
+    "name": "Afundo/búlgaro no Smith",
+    "how": "Pé de trás no banco, desça o joelho de trás.",
+    "muscles": [
+     "quadriceps",
+     "glutes"
+    ],
+    "exercise_id": "Smith_Single-Leg_Split_Squat"
+   },
+   {
+    "name": "Supino inclinado no Smith",
+    "how": "Banco 30–45°, desça a barra ao peito alto.",
+    "muscles": [
+     "chest",
+     "shoulders",
+     "triceps"
+    ],
+    "exercise_id": "Smith_Machine_Incline_Bench_Press"
+   },
+   {
+    "name": "Panturrilha em pé no Smith",
+    "how": "Ponta dos pés num step, barra nos ombros.",
+    "muscles": [
+     "calves"
+    ],
+    "exercise_id": "Smith_Machine_Calf_Raise"
+   }
+  ],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=iAcRGCsG_PY",
+    "title": "Exercise Tutorial: Smith Machine Squat",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=DUWK_gKcRCc",
+    "title": "HOW TO SQUAT ON THE SMITH MACHINE",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=OCA4iWoxW4s",
+    "title": "How to do Smith Machine Squats with a Glute Bias!",
+    "status": "pending"
+   }
+  ],
+  "photos": [
+   {
+    "url": "https://upload.wikimedia.org/wikipedia/commons/e/eb/Smith_machine.GIF",
+    "page": "https://commons.wikimedia.org/wiki/File:Smith_machine.GIF",
+    "author": "GeorgeStepanek (en.wikipedia)",
+    "license": "CC BY-SA 3.0",
+    "status": "pending"
+   },
+   {
+    "url": "https://upload.wikimedia.org/wikipedia/commons/b/bb/Smith_machine_squats_1.svg",
+    "page": "https://commons.wikimedia.org/wiki/File:Smith_machine_squats_1.svg",
+    "author": "Everkinetic",
+    "license": "CC BY-SA 3.0",
+    "status": "pending"
+   }
+  ]
+ },
+ {
+  "machine_id": "mx_hip_thrust_machine",
+  "name": "Elevação pélvica na máquina (hip thrust / glute drive)",
+  "name_en": "Hip Thrust Machine (Glute Drive)",
+  "category": "gluteo",
+  "is_new": false,
+  "availability_br": "média",
+  "tips": [
+   "Queixo levemente para baixo e costelas fechadas no topo.",
+   "Canelas verticais no topo do movimento.",
+   "Erro comum: hiperestender a lombar em vez de estender o quadril."
+  ],
+  "why": "Nippard põe o hip thrust na máquina no 'A-tier' para glúteo; máquinas de glúteo são a febre das feiras brasileiras (Movement linha Next).",
+  "sources": [
+   "https://www.mensfitness.com/news/jeff-nippard-ranks-glute-hypertrophy-exercises",
+   "https://www.movement.com.br/wp-content/uploads/2025/03/Apresentacao-Next-Selectorized-compactado_1.pdf",
+   "https://www.mbhfit.com/en/news/detail/Gym-Equipment-Trends-2026-971"
+  ],
+  "brands": [
+   "Hammer Strength",
+   "Nautilus Glute Drive",
+   "Movement (Next)",
+   "Atlantis",
+   "Booty Builder",
+   "Panatta"
+  ],
+  "existing_exercise_ids": [
+   "Hip_Thrust_Machine"
+  ],
+  "exercises": [
+   {
+    "name": "Hip thrust na máquina",
+    "how": "Costas no encosto, cinto/almofada no quadril, estenda o quadril até alinhar o tronco.",
+    "muscles": [
+     "glutes"
+    ],
+    "exercise_id": "Hip_Thrust_Machine"
+   },
+   {
+    "name": "Hip thrust unilateral",
+    "how": "Um pé na plataforma, outro elevado.",
+    "muscles": [
+     "glutes",
+     "hamstrings"
+    ]
+   },
+   {
+    "name": "Hip thrust com pausa de 2 s",
+    "how": "Pausa no topo contraindo o glúteo.",
+    "muscles": [
+     "glutes"
+    ]
+   },
+   {
+    "name": "Pés afastados e abertos",
+    "how": "Mais glúteo médio/superior.",
+    "muscles": [
+     "glutes",
+     "abductors"
+    ]
+   }
+  ],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=amcaUtVnjkY",
+    "title": "Hammer Strength Glute Drive - Instructional Video",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=KKw3Pueff0I",
+    "title": "How to use the Nautilus Glute Drive",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=n709jYONQe4",
+    "title": "How to Use a Hip Thrust Machine Properly",
+    "status": "pending"
+   }
+  ],
+  "photos": []
+ },
+ {
+  "machine_id": "mx_glute_kickback_machine",
+  "name": "Glúteo na máquina (coice / multi-hip)",
+  "name_en": "Glute Kickback / Multi-Hip Machine",
+  "category": "gluteo",
+  "is_new": false,
+  "availability_br": "comum",
+  "tips": [
+   "Não arqueie a lombar: o movimento termina quando o quadril estende.",
+   "Controle a volta para alongar o glúteo.",
+   "Mesmas repetições para as duas pernas."
+  ],
+  "why": "Isolador de glúteo muito usado no Brasil; a Movement lançou versões articuladas (Kick Back) na linha Next.",
+  "sources": [
+   "https://www.movement.com.br/wp-content/uploads/2025/03/Apresentacao-Next-Selectorized-compactado_1.pdf"
+  ],
+  "brands": [
+   "Movement",
+   "Life Fitness",
+   "Star Trac",
+   "Panatta",
+   "Technogym"
+  ],
+  "existing_exercise_ids": [
+   "Glute_Kickback_Machine",
+   "One-Legged_Cable_Kickback"
+  ],
+  "exercises": [
+   {
+    "name": "Coice em pé na máquina",
+    "how": "Tronco apoiado, empurre a plataforma/rolo para trás estendendo o quadril.",
+    "muscles": [
+     "glutes",
+     "hamstrings"
+    ],
+    "exercise_id": "Glute_Kickback_Machine"
+   },
+   {
+    "name": "Coice ajoelhado (4 apoios)",
+    "how": "Joelho no apoio, empurre a plataforma com o pé.",
+    "muscles": [
+     "glutes"
+    ]
+   },
+   {
+    "name": "Abdução no multi-hip",
+    "how": "Rolo na lateral da coxa, afaste a perna para o lado.",
+    "muscles": [
+     "abductors",
+     "glutes"
+    ]
+   },
+   {
+    "name": "Coice no cabo (alternativa)",
+    "how": "Caneleira na polia baixa, chute para trás.",
+    "muscles": [
+     "glutes"
+    ],
+    "exercise_id": "One-Legged_Cable_Kickback"
+   }
+  ],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=24pvhNOoK80",
+    "title": "How To Do A STANDING SINGLE LEG GLUTE KICKBACK MACHINE (Life Fitness)",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=YFenEkt2ovQ",
+    "title": "How To Do A MACHINE KNEELING GLUTE KICKBACK (Star Trac)",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=-auDAitDQp8",
+    "title": "How to use the Life Fitness Pro Series 1 Glute Kickback",
+    "status": "pending"
+   }
+  ],
+  "photos": []
+ },
+ {
+  "machine_id": "mx_leg_extension",
+  "name": "Cadeira extensora",
+  "name_en": "Leg Extension",
+  "category": "pernas",
+  "is_new": false,
+  "availability_br": "comum",
+  "tips": [
+   "Rolo sobre o peito do pé, não na canela.",
+   "Segure nas alças e mantenha o quadril no banco.",
+   "Desça controlando; não deixe a placa bater."
+  ],
+  "why": "Nippard considera a extensora quase perfeita para quadríceps; parciais no alongamento cresceram mais que no encurtamento (Pedrosa 2022).",
+  "sources": [
+   "https://barbend.com/news/best-quad-exercises-ranking-best-to-worst-jeff-nippard/",
+   "https://exxentric.com/blog/improved-singleexx-devices/",
+   "https://doi.org/10.51224/SRXIV.407"
+  ],
+  "brands": [
+   "Movement",
+   "Technogym",
+   "Life Fitness",
+   "Matrix",
+   "Righetto"
+  ],
+  "existing_exercise_ids": [
+   "Leg_Extensions",
+   "Single-Leg_Leg_Extension"
+  ],
+  "exercises": [
+   {
+    "name": "Extensora bilateral",
+    "how": "Joelho alinhado ao eixo, rolo no peito do pé, estenda e desça devagar.",
+    "muscles": [
+     "quadriceps"
+    ],
+    "exercise_id": "Leg_Extensions"
+   },
+   {
+    "name": "Extensora unilateral",
+    "how": "Uma perna por vez.",
+    "muscles": [
+     "quadriceps"
+    ],
+    "exercise_id": "Single-Leg_Leg_Extension"
+   },
+   {
+    "name": "Extensora inclinando o tronco para trás",
+    "how": "Encosto/ tronco para trás para alongar o reto femoral.",
+    "muscles": [
+     "quadriceps"
+    ]
+   },
+   {
+    "name": "Parciais no alongamento",
+    "how": "Meias-repetições com o joelho dobrado no fim da série.",
+    "muscles": [
+     "quadriceps"
+    ]
+   }
+  ],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=pJZXbaF-MCM",
+    "title": "Cadeira Extensora: Como fazer, Dicas e Cuidados",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/shorts/GcWsKoElyMo",
+    "title": "Como fazer cadeira extensora: ajustes e execução",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=2gx_rMQyRL4",
+    "title": "Life Fitness Signature Series Plate-Loaded Leg Extension Instructions",
+    "status": "pending"
+   }
+  ],
+  "photos": []
+ },
+ {
+  "machine_id": "mx_seated_leg_curl",
+  "name": "Cadeira flexora (sentado)",
+  "name_en": "Seated Leg Curl",
+  "category": "pernas",
+  "is_new": false,
+  "availability_br": "comum",
+  "tips": [
+   "Ajuste o encosto para o joelho ficar exatamente no eixo da máquina.",
+   "Trave bem a almofada da coxa.",
+   "Erro comum: levantar o quadril do banco."
+  ],
+  "why": "Sentado cresceu mais o posterior que deitado (+14% vs +9%; Maeo et al., 2021) por treinar o músculo alongado — hoje é a flexora preferida de Nippard/Israetel.",
+  "sources": [
+   "https://pubmed.ncbi.nlm.nih.gov/?term=Maeo+seated+prone+leg+curl+hamstrings+hypertrophy+2021",
+   "https://www.youtube.com/watch?v=jp26pWOgGgA"
+  ],
+  "brands": [
+   "Movement",
+   "Technogym",
+   "Life Fitness",
+   "Matrix",
+   "Nautilus"
+  ],
+  "existing_exercise_ids": [
+   "Seated_Leg_Curl"
+  ],
+  "exercises": [
+   {
+    "name": "Flexora sentada bilateral",
+    "how": "Joelho no eixo, almofada da coxa firme, puxe os calcanhares para baixo e volte devagar.",
+    "muscles": [
+     "hamstrings"
+    ],
+    "exercise_id": "Seated_Leg_Curl"
+   },
+   {
+    "name": "Flexora sentada unilateral",
+    "how": "Uma perna por vez.",
+    "muscles": [
+     "hamstrings"
+    ]
+   },
+   {
+    "name": "Inclinando o tronco à frente",
+    "how": "Tronco para frente aumenta o alongamento do posterior (quadril mais flexionado).",
+    "muscles": [
+     "hamstrings"
+    ]
+   },
+   {
+    "name": "Parciais no alongamento",
+    "how": "Meias-repetições com a perna quase estendida.",
+    "muscles": [
+     "hamstrings"
+    ]
+   }
+  ],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=rdZS_kgnjZs",
+    "title": "Como executar corretamente o exercício Cadeira Flexora - Clube.Fitness",
+    "status": "pending"
+   },
+   {
+    "url": "https://youtube.com/watch?v=IOufFLwNOTU",
+    "title": "Exercise Tutorial: Technogym Seated Leg Curl Machine",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=YLJJJYOfSfc",
+    "title": "Life Fitness Signature Series Seated Leg Curl Instructions",
+    "status": "pending"
+   }
+  ],
+  "photos": [
+   {
+    "url": "https://upload.wikimedia.org/wikipedia/commons/3/3e/Seated-leg-curl-1.png",
+    "page": "https://commons.wikimedia.org/wiki/File:Seated-leg-curl-1.png",
+    "author": "Everkinetic",
+    "license": "CC BY-SA 3.0",
+    "status": "pending"
+   }
+  ]
+ },
+ {
+  "machine_id": "mx_lying_leg_curl",
+  "name": "Mesa flexora (deitado)",
+  "name_en": "Lying Leg Curl",
+  "category": "pernas",
+  "is_new": false,
+  "availability_br": "comum",
+  "tips": [
+   "Quadril pressionado no banco o tempo todo.",
+   "Joelho logo abaixo da borda, alinhado ao eixo.",
+   "Prefira a cadeira flexora se tiver as duas (mais alongamento)."
+  ],
+  "why": "Muito comum e boa para posterior, mas o estudo de Maeo 2021 mostrou vantagem da versão sentada; mantenha as duas no cardápio.",
+  "sources": [
+   "https://pubmed.ncbi.nlm.nih.gov/?term=Maeo+seated+prone+leg+curl+hamstrings+hypertrophy+2021"
+  ],
+  "brands": [
+   "Movement",
+   "Technogym",
+   "Life Fitness",
+   "Cybex",
+   "Righetto"
+  ],
+  "existing_exercise_ids": [
+   "Lying_Leg_Curls"
+  ],
+  "exercises": [
+   {
+    "name": "Mesa flexora bilateral",
+    "how": "De bruços, rolo acima do calcanhar, flexione os joelhos sem tirar o quadril do banco.",
+    "muscles": [
+     "hamstrings"
+    ],
+    "exercise_id": "Lying_Leg_Curls"
+   },
+   {
+    "name": "Mesa flexora unilateral",
+    "how": "Uma perna por vez.",
+    "muscles": [
+     "hamstrings"
+    ],
+    "video": {
+     "url": "https://www.youtube.com/watch?v=Up28bKyxyvs",
+     "status": "pending"
+    }
+   },
+   {
+    "name": "2 sobem, 1 desce",
+    "how": "Sobe com as duas pernas e desce só com uma (excêntrico).",
+    "muscles": [
+     "hamstrings"
+    ],
+    "video": {
+     "url": "https://www.youtube.com/watch?v=RAf9Z0nwPhA",
+     "status": "pending"
+    }
+   }
+  ],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=8Nat6GRiEoc",
+    "title": "Mesa Flexora - Como fazer corretamente e otimizar os resultados!",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=bWOSPZfMAZg",
+    "title": "Como executar corretamente o exercício Mesa Flexora - Clube.Fitness",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=1Tq3QdYUuHs",
+    "title": "How To: Prone Leg Curl (Cybex)",
+    "status": "pending"
+   }
+  ],
+  "photos": [
+   {
+    "url": "https://upload.wikimedia.org/wikipedia/commons/9/96/Lying_leg_curl_machine_1.svg",
+    "page": "https://commons.wikimedia.org/wiki/File:Lying_leg_curl_machine_1.svg",
+    "author": "Everkinetic",
+    "license": "CC BY-SA 3.0",
+    "status": "pending"
+   }
+  ]
+ },
+ {
+  "machine_id": "mx_standing_leg_curl",
+  "name": "Flexora em pé (unilateral)",
+  "name_en": "Standing Leg Curl",
+  "category": "pernas",
+  "is_new": false,
+  "availability_br": "média",
+  "tips": [
+   "Rolo atrás da panturrilha baixa, não no tendão.",
+   "Segure nas alças e mantenha o tronco parado.",
+   "Mesma carga e repetições para as duas pernas."
+  ],
+  "why": "Isola cada perna e corrige assimetria; menos alongamento que a sentada/ajoelhada.",
+  "sources": [
+   "https://www.youtube.com/watch?v=CZVTv9T_Ml8"
+  ],
+  "brands": [
+   "Life Fitness",
+   "Matrix",
+   "Panatta",
+   "Movement"
+  ],
+  "existing_exercise_ids": [
+   "Standing_Leg_Curl"
+  ],
+  "exercises": [
+   {
+    "name": "Flexora em pé",
+    "how": "Coxa apoiada na almofada, rolo atrás do tornozelo, flexione um joelho.",
+    "muscles": [
+     "hamstrings"
+    ],
+    "exercise_id": "Standing_Leg_Curl"
+   },
+   {
+    "name": "Flexora em pé no cabo",
+    "how": "Caneleira na polia baixa, flexione o joelho em pé.",
+    "muscles": [
+     "hamstrings"
+    ]
+   }
+  ],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=CZVTv9T_Ml8",
+    "title": "STANDING LEG CURL MACHINE / TUTORIAL FOR BEGINNERS",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=C3EH5QC7pbQ",
+    "title": "Standing Single Leg Machine Hamstring Curl",
+    "status": "pending"
+   }
+  ],
+  "photos": []
+ },
+ {
+  "machine_id": "mx_abductor_machine",
+  "name": "Cadeira abdutora",
+  "name_en": "Hip Abduction Machine",
+  "category": "gluteo",
+  "is_new": false,
+  "availability_br": "comum",
+  "tips": [
+   "Controle a volta (não deixe as placas baterem).",
+   "Varie o ângulo do tronco entre séries.",
+   "Amplitude máxima que o quadril permitir."
+  ],
+  "why": "Nippard coloca a abdução na máquina no 'S-tier' para glúteo médio/superior.",
+  "sources": [
+   "https://www.mensfitness.com/news/jeff-nippard-ranks-glute-hypertrophy-exercises"
+  ],
+  "brands": [
+   "Movement",
+   "Technogym",
+   "Life Fitness",
+   "Matrix",
+   "Buckler"
+  ],
+  "existing_exercise_ids": [
+   "Thigh_Abductor",
+   "Cable_Standing_Hip_Abduction"
+  ],
+  "exercises": [
+   {
+    "name": "Abdutora sentado ereto",
+    "how": "Costas no encosto, afaste os joelhos contra as almofadas.",
+    "muscles": [
+     "abductors",
+     "glutes"
+    ],
+    "exercise_id": "Thigh_Abductor"
+   },
+   {
+    "name": "Abdutora inclinado à frente",
+    "how": "Tronco inclinado à frente para mais glúteo máximo.",
+    "muscles": [
+     "glutes",
+     "abductors"
+    ],
+    "video": {
+     "url": "https://www.youtube.com/watch?v=I4ApZY585nE",
+     "status": "pending"
+    }
+   },
+   {
+    "name": "Abdução em pé no cabo (alternativa)",
+    "how": "Caneleira na polia baixa, afaste a perna de fora.",
+    "muscles": [
+     "abductors",
+     "glutes"
+    ],
+    "exercise_id": "Cable_Standing_Hip_Abduction",
+    "video": {
+     "url": "https://www.youtube.com/watch?v=Jge8zqHf5Xs",
+     "status": "pending"
+    }
+   }
+  ],
+  "videos": [
+   {
+    "url": "https://youtube.com/watch?v=afpCTlFdyl8",
+    "title": "Hip Abductor Machine - Leaning Forward: How To",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=I4ApZY585nE",
+    "title": "Forward Leaning Seated Hip Abduction Machine (Tutorial + Tips)",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=zlqBk6xFO_8",
+    "title": "Instructional Fitness - Hip Abduction Machine",
+    "status": "pending"
+   }
+  ],
+  "photos": [
+   {
+    "url": "https://upload.wikimedia.org/wikipedia/commons/f/f9/Hip_abductor_machine.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Hip_abductor_machine.jpg",
+    "author": "Teemeah",
+    "license": "CC BY-SA 4.0",
+    "status": "pending"
+   },
+   {
+    "url": "https://upload.wikimedia.org/wikipedia/commons/2/29/Thigh-abductor-1.gif",
+    "page": "https://commons.wikimedia.org/wiki/File:Thigh-abductor-1.gif",
+    "author": "Everkinetic",
+    "license": "CC BY-SA 3.0",
+    "status": "pending"
+   }
+  ]
+ },
+ {
+  "machine_id": "mx_adductor_machine",
+  "name": "Cadeira adutora",
+  "name_en": "Hip Adduction Machine",
+  "category": "pernas",
+  "is_new": false,
+  "availability_br": "comum",
+  "tips": [
+   "Comece com abertura confortável e aumente aos poucos.",
+   "Costas no encosto e abdômen firme.",
+   "Adutores fortes ajudam no agachamento e protegem a virilha."
+  ],
+  "why": "Adutores são grandes e participam do agachamento; a máquina é a forma mais simples de treiná-los.",
+  "sources": [
+   "https://pubmed.ncbi.nlm.nih.gov/31230110/"
+  ],
+  "brands": [
+   "Movement",
+   "Technogym",
+   "Life Fitness",
+   "Matrix"
+  ],
+  "existing_exercise_ids": [
+   "Thigh_Adductor",
+   "Cable_Hip_Adduction"
+  ],
+  "exercises": [
+   {
+    "name": "Adutora padrão",
+    "how": "Almofadas na parte interna dos joelhos, junte as pernas e volte devagar.",
+    "muscles": [
+     "adductors"
+    ],
+    "exercise_id": "Thigh_Adductor"
+   },
+   {
+    "name": "Adutora com pausa aberta",
+    "how": "1 s de pausa na posição aberta (alongada).",
+    "muscles": [
+     "adductors"
+    ]
+   },
+   {
+    "name": "Adução no cabo (alternativa)",
+    "how": "Caneleira na polia baixa, traga a perna para a linha do corpo.",
+    "muscles": [
+     "adductors"
+    ],
+    "exercise_id": "Cable_Hip_Adduction"
+   }
+  ],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=CjAVezAggkI",
+    "title": "How To Use The Seated Thigh Adduction (Hip Adduction) Machine",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=6yLvaPswh7U",
+    "title": "Instructional Fitness - Hip Adduction Machine",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=_ARUxqrII3Y",
+    "title": "HOW TO USE GYM MACHINES: Adductor / Abductor",
+    "status": "pending"
+   }
+  ],
+  "photos": [
+   {
+    "url": "https://upload.wikimedia.org/wikipedia/commons/1/1c/Thigh-adductor-1.gif",
+    "page": "https://commons.wikimedia.org/wiki/File:Thigh-adductor-1.gif",
+    "author": "Everkinetic",
+    "license": "CC BY-SA 3.0",
+    "status": "pending"
+   }
+  ]
+ },
+ {
+  "machine_id": "mx_seated_calf",
+  "name": "Panturrilha sentado (gêmeos sentado)",
+  "name_en": "Seated Calf Raise",
+  "category": "pernas",
+  "is_new": false,
+  "availability_br": "comum",
+  "tips": [
+   "Amplitude completa vale mais que carga.",
+   "Joelho a 90° trabalha mais o sóleo.",
+   "Combine com panturrilha em pé (gastrocnêmio)."
+  ],
+  "why": "Treina o sóleo; mas em pé cresceu mais o gastrocnêmio que sentado (Kinoshita 2023), então use as duas.",
+  "sources": [
+   "https://www.frontiersin.org/articles/10.3389/fphys.2023.1272106/full"
+  ],
+  "brands": [
+   "Movement",
+   "Hammer Strength",
+   "Life Fitness",
+   "Powertec"
+  ],
+  "existing_exercise_ids": [
+   "Seated_Calf_Raise"
+  ],
+  "exercises": [
+   {
+    "name": "Panturrilha sentado",
+    "how": "Joelhos sob a almofada, ponta dos pés no degrau, desça o calcanhar ao máximo e suba.",
+    "muscles": [
+     "calves"
+    ],
+    "exercise_id": "Seated_Calf_Raise"
+   },
+   {
+    "name": "Com pausa no alongamento",
+    "how": "2 s com o calcanhar embaixo.",
+    "muscles": [
+     "calves"
+    ]
+   },
+   {
+    "name": "Unilateral",
+    "how": "Uma perna por vez.",
+    "muscles": [
+     "calves"
+    ]
+   }
+  ],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=nqvJ_ATDx8k",
+    "title": "Machine Seated Calf Raise",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=7qzlklmu3Pw",
+    "title": "Exercise Videos- Seated Calf Raise -- Machine",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/shorts/Vvep_tQLy84",
+    "title": "Seated Machine Calf Raise: Physio Exercise for Soleus Strength & Achilles Tendon Loading",
+    "status": "pending"
+   }
+  ],
+  "photos": [
+   {
+    "url": "https://upload.wikimedia.org/wikipedia/commons/e/e7/SeatedCalfRaiseMachineExercise.JPG",
+    "page": "https://commons.wikimedia.org/wiki/File:SeatedCalfRaiseMachineExercise.JPG",
+    "author": "George Stepanek",
+    "license": "CC BY-SA 3.0 / GFDL 1.2+",
+    "status": "pending"
+   }
+  ]
+ },
+ {
+  "machine_id": "mx_standing_calf",
+  "name": "Panturrilha em pé na máquina",
+  "name_en": "Standing Calf Raise Machine",
+  "category": "pernas",
+  "is_new": false,
+  "availability_br": "comum",
+  "tips": [
+   "Joelho estendido (sem travar) para mirar o gastrocnêmio.",
+   "Séries de 10–20 controladas.",
+   "Erro comum: 'quicar' meio movimento."
+  ],
+  "why": "Em pé (joelho estendido) cresceu muito mais o gastrocnêmio que sentado (Kinoshita et al., 2023).",
+  "sources": [
+   "https://www.frontiersin.org/articles/10.3389/fphys.2023.1272106/full"
+  ],
+  "brands": [
+   "Movement",
+   "Hammer Strength",
+   "Life Fitness",
+   "Panatta"
+  ],
+  "existing_exercise_ids": [
+   "Standing_Calf_Raises",
+   "Calf-Machine_Shoulder_Shrug"
+  ],
+  "exercises": [
+   {
+    "name": "Panturrilha em pé",
+    "how": "Ombros sob as almofadas, ponta dos pés no degrau, desça e suba com amplitude total.",
+    "muscles": [
+     "calves"
+    ],
+    "exercise_id": "Standing_Calf_Raises"
+   },
+   {
+    "name": "Pausa no alongamento",
+    "how": "2 s embaixo para tirar o efeito mola do tendão.",
+    "muscles": [
+     "calves"
+    ]
+   },
+   {
+    "name": "Unilateral",
+    "how": "Uma perna por vez.",
+    "muscles": [
+     "calves"
+    ]
+   },
+   {
+    "name": "Encolhimento na máquina de panturrilha",
+    "how": "Pés no chão, encolha os ombros contra as almofadas.",
+    "muscles": [
+     "traps"
+    ],
+    "exercise_id": "Calf-Machine_Shoulder_Shrug"
+   }
+  ],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=ucy86plaufg",
+    "title": "How to: Machine Standing Calf Raise",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=KVZ3qtJA4AU",
+    "title": "How to Use the Standing Calf Raise Machine",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=SorIB5_zO9A",
+    "title": "Standing Calf Raise Tutorial",
+    "status": "pending"
+   }
+  ],
+  "photos": []
+ },
+ {
+  "machine_id": "mx_glute_ham_developer",
+  "name": "GHD / glute ham developer",
+  "name_en": "Glute-Ham Developer (GHD)",
+  "category": "pernas",
+  "is_new": false,
+  "availability_br": "rara",
+  "tips": [
+   "Ajuste o apoio dos pés para os joelhos ficarem logo atrás da almofada.",
+   "Use as mãos para ajudar até ter força.",
+   "Abdominal no GHD exige progressão — comece com amplitude curta."
+  ],
+  "why": "Treina o posterior nas duas articulações (quadril e joelho); peça clássica de boxes e treino híbrido.",
+  "sources": [
+   "https://www.youtube.com/watch?v=TzowfEB3NqI"
+  ],
+  "brands": [
+   "Rogue",
+   "Eleiko",
+   "Matrix",
+   "Hammer Strength"
+  ],
+  "existing_exercise_ids": [
+   "Glute_Ham_Raise",
+   "Hyperextensions_Back_Extensions"
+  ],
+  "exercises": [
+   {
+    "name": "Glute ham raise",
+    "how": "Joelhos atrás da almofada, desça o tronco reto e puxe de volta com o posterior.",
+    "muscles": [
+     "hamstrings",
+     "glutes"
+    ],
+    "exercise_id": "Glute_Ham_Raise"
+   },
+   {
+    "name": "Nordic no GHD",
+    "how": "Apenas a fase excêntrica, descendo devagar.",
+    "muscles": [
+     "hamstrings"
+    ],
+    "video": {
+     "url": "https://www.youtube.com/watch?v=Lgibr8od0yA",
+     "status": "pending"
+    }
+   },
+   {
+    "name": "Extensão lombar no GHD",
+    "how": "Quadril na almofada, desça o tronco e suba até alinhar.",
+    "muscles": [
+     "lower back",
+     "glutes"
+    ],
+    "exercise_id": "Hyperextensions_Back_Extensions"
+   },
+   {
+    "name": "Abdominal no GHD (sit-up)",
+    "how": "Sentado na almofada, desça o tronco para trás e suba (avançado).",
+    "muscles": [
+     "abdominals"
+    ]
+   }
+  ],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=TzowfEB3NqI",
+    "title": "Glute Hamstring Raise (GHR) - Tutorial",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=S5rlaIdA06Q",
+    "title": "Teaching the glute ham raise",
+    "status": "pending"
+   },
+   {
+    "url": "https://youtube.com/watch?v=RtwVVDS3vAM",
+    "title": "How to Do Glute-Ham Raises",
+    "status": "pending"
+   }
+  ],
+  "photos": []
+ },
+ {
+  "machine_id": "mx_reverse_hyper",
+  "name": "Reverse hyper (hiperextensão reversa)",
+  "name_en": "Reverse Hyperextension",
+  "category": "gluteo",
+  "is_new": false,
+  "availability_br": "rara",
+  "tips": [
+   "Não use o balanço para subir; suba com o glúteo.",
+   "Pare na linha do tronco, sem hiperestender.",
+   "Segure firme nas alças."
+  ],
+  "why": "Popularizada pela Westside Barbell para glúteo/lombar sem compressão; cada vez mais presente em academias de força.",
+  "sources": [
+   "https://www.youtube.com/watch?v=aD5yxJh6v20"
+  ],
+  "brands": [
+   "Westside Barbell",
+   "Rogue",
+   "Legend Fitness",
+   "Panatta"
+  ],
+  "existing_exercise_ids": [
+   "Reverse_Hyperextension"
+  ],
+  "exercises": [
+   {
+    "name": "Reverse hyper",
+    "how": "Tronco deitado no banco, pernas penduradas; eleve as pernas até alinhar com o tronco.",
+    "muscles": [
+     "glutes",
+     "hamstrings",
+     "lower back"
+    ],
+    "exercise_id": "Reverse_Hyperextension"
+   },
+   {
+    "name": "Reverse hyper unilateral",
+    "how": "Uma perna por vez com caneleira.",
+    "muscles": [
+     "glutes"
+    ]
+   },
+   {
+    "name": "Reverse hyper leve (descompressão)",
+    "how": "Carga leve e ritmo fluido como aquecimento da lombar.",
+    "muscles": [
+     "lower back"
+    ]
+   }
+  ],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=DFH3AU1Z6LI",
+    "title": "How-To: Reverse Hyper Machine",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=NIm8rz3-P14",
+    "title": "Rogue Fitness",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=7MthYct8yxQ",
+    "title": "Equipment Demo - The Reverse Hyper",
+    "status": "pending"
+   }
+  ],
+  "photos": []
+ },
+ {
+  "machine_id": "mx_hyperextension_45",
+  "name": "Banco de hiperextensão 45° (lombar/glúteo)",
+  "name_en": "45° Hyperextension Bench",
+  "category": "gluteo",
+  "is_new": false,
+  "availability_br": "comum",
+  "tips": [
+   "Almofada logo abaixo da dobra do quadril.",
+   "Almofada muito alta = só mexe a coluna.",
+   "Bom aquecimento antes do hip thrust."
+  ],
+  "why": "Equipamento barato e comum que treina glúteo e posterior em posição alongada.",
+  "sources": [
+   "https://www.youtube.com/watch?v=hOrVNdnv84E"
+  ],
+  "brands": [
+   "Movement",
+   "Righetto",
+   "Rogue",
+   "Technogym"
+  ],
+  "existing_exercise_ids": [
+   "Hyperextensions_Back_Extensions",
+   "Weighted_Ball_Hyperextension"
+  ],
+  "exercises": [
+   {
+    "name": "Extensão 45° foco lombar",
+    "how": "Almofada abaixo do quadril, desça e suba com a coluna neutra.",
+    "muscles": [
+     "lower back",
+     "glutes"
+    ],
+    "exercise_id": "Hyperextensions_Back_Extensions"
+   },
+   {
+    "name": "Extensão 45° foco glúteo",
+    "how": "Costas levemente arredondadas, pés abertos, empurre com o quadril.",
+    "muscles": [
+     "glutes",
+     "hamstrings"
+    ],
+    "video": {
+     "url": "https://www.youtube.com/watch?v=w5QPcMaT_DQ",
+     "status": "pending"
+    }
+   },
+   {
+    "name": "Com anilha no peito",
+    "how": "Segure uma anilha para progredir.",
+    "muscles": [
+     "glutes",
+     "lower back",
+     "hamstrings"
+    ],
+    "video": {
+     "url": "https://www.youtube.com/watch?v=KA2AuDQipSQ",
+     "status": "pending"
+    }
+   },
+   {
+    "name": "Unilateral",
+    "how": "Um pé preso, outro solto.",
+    "muscles": [
+     "glutes",
+     "hamstrings"
+    ]
+   }
+  ],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=hOrVNdnv84E",
+    "title": "How To Setup The 45 Degree Back Extension Machine",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=w5QPcMaT_DQ",
+    "title": "GROW GLUTES on 45 Degree Hyper-Extension (FAVORITE BUTT EXERCISE)",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=Vq8OJJo1y9s",
+    "title": "45° Back Extension",
+    "status": "pending"
+   }
+  ],
+  "photos": []
+ },
+ {
+  "machine_id": "mx_chest_press_machine",
+  "name": "Supino máquina / articulado (chest press)",
+  "name_en": "Machine Chest Press",
+  "category": "peito",
+  "is_new": false,
+  "availability_br": "comum",
+  "tips": [
+   "Ajuste o banco: alças na altura do meio do peito.",
+   "Escápulas juntas e para baixo.",
+   "Cotovelos ~45° do tronco."
+  ],
+  "why": "Nippard coloca o supino na máquina no topo para hipertrofia de peito: estável e fácil de levar à falha.",
+  "sources": [
+   "https://barbend.com/news/jeff-nippard-ranks-chest-exercises-for-hypertrophy/",
+   "https://www.mbhfit.com/en/news/detail/Gym-Equipment-Trends-2026-971"
+  ],
+  "brands": [
+   "Hammer Strength",
+   "Movement",
+   "Technogym",
+   "Prime",
+   "Panatta",
+   "Matrix"
+  ],
+  "existing_exercise_ids": [
+   "Machine_Bench_Press",
+   "Leverage_Chest_Press",
+   "Leverage_Decline_Chest_Press",
+   "Cable_Chest_Press"
+  ],
+  "exercises": [
+   {
+    "name": "Supino articulado reto",
+    "how": "Alças na linha do meio do peito, empurre sem tirar as escápulas do encosto.",
+    "muscles": [
+     "chest",
+     "triceps",
+     "shoulders"
+    ],
+    "exercise_id": "Leverage_Chest_Press"
+   },
+   {
+    "name": "Supino articulado unilateral",
+    "how": "Um braço por vez (modelos iso-lateral).",
+    "muscles": [
+     "chest",
+     "triceps"
+    ]
+   },
+   {
+    "name": "Supino declinado na máquina",
+    "how": "Foco em peito inferior.",
+    "muscles": [
+     "chest",
+     "triceps"
+    ],
+    "exercise_id": "Leverage_Decline_Chest_Press"
+   },
+   {
+    "name": "Parciais no alongamento",
+    "how": "Meias-repetições na parte de baixo no fim da série.",
+    "muscles": [
+     "chest"
+    ]
+   }
+  ],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=H9hKFDLKnGQ",
+    "title": "Technogym Pin Loaded Chest Press - Set Up & Execution",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=0p-Sz197fC4",
+    "title": "Hammer Strength Iso-Lateral Bench Press",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=8hO7YEz3hAQ",
+    "title": "How To: Machine Flat Bench Press",
+    "status": "pending"
+   }
+  ],
+  "photos": []
+ },
+ {
+  "machine_id": "mx_incline_chest_press_machine",
+  "name": "Supino inclinado articulado",
+  "name_en": "Incline Chest Press Machine",
+  "category": "peito",
+  "is_new": false,
+  "availability_br": "comum",
+  "tips": [
+   "Assento mais baixo = mais peito alto.",
+   "Não descole a cabeça do encosto.",
+   "Controle a descida 2 s."
+  ],
+  "why": "Peito superior com estabilidade de máquina; presente em praticamente toda linha plate-loaded.",
+  "sources": [
+   "https://barbend.com/news/jeff-nippard-ranks-chest-exercises-for-hypertrophy/"
+  ],
+  "brands": [
+   "Hammer Strength",
+   "Movement",
+   "Prime",
+   "Panatta",
+   "Matrix"
+  ],
+  "existing_exercise_ids": [
+   "Leverage_Incline_Chest_Press",
+   "Smith_Machine_Incline_Bench_Press"
+  ],
+  "exercises": [
+   {
+    "name": "Supino inclinado articulado",
+    "how": "Alças na linha do peito alto, empurre para cima e à frente.",
+    "muscles": [
+     "chest",
+     "shoulders",
+     "triceps"
+    ],
+    "exercise_id": "Leverage_Incline_Chest_Press"
+   },
+   {
+    "name": "Unilateral",
+    "how": "Um braço por vez.",
+    "muscles": [
+     "chest",
+     "shoulders"
+    ]
+   },
+   {
+    "name": "Super inclinado (iso-lateral super incline)",
+    "how": "Ângulo mais alto: mais deltoide anterior.",
+    "muscles": [
+     "shoulders",
+     "chest"
+    ],
+    "video": {
+     "url": "https://www.youtube.com/watch?v=PTsi7-mhBtc",
+     "status": "pending"
+    }
+   }
+  ],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=xwK8Wd5F0Hk",
+    "title": "Hammer Strength Plate-Loaded Incline Press Instructions",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=Fpa5DI3lIqg",
+    "title": "How to do an Isolateral Incline Chest Press - Hammer Strength",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=TOkrZstn7xU",
+    "title": "How to use the Prime Plate Loaded Incline Press",
+    "status": "pending"
+   }
+  ],
+  "photos": []
+ },
+ {
+  "machine_id": "mx_pec_deck",
+  "name": "Voador / peck deck (e crucifixo invertido)",
+  "name_en": "Pec Deck / Rear Delt Fly",
+  "category": "peito",
+  "is_new": false,
+  "availability_br": "comum",
+  "tips": [
+   "Ajuste o banco para as alças ficarem na altura do peito/ombro.",
+   "No inverso, pense em levar as mãos para longe, não para trás.",
+   "Erro comum: dobrar os cotovelos e virar remada."
+  ],
+  "why": "Máquina 2-em-1 muito comum; isolamento de peito e de deltoide posterior com tensão constante.",
+  "sources": [
+   "https://barbend.com/news/jeff-nippard-ranks-chest-exercises-for-hypertrophy/",
+   "https://generationiron.com/jeff-nippard-shoulder-exercises/"
+  ],
+  "brands": [
+   "Movement",
+   "Technogym",
+   "Life Fitness",
+   "Matrix",
+   "Righetto"
+  ],
+  "existing_exercise_ids": [
+   "Butterfly",
+   "Reverse_Machine_Flyes"
+  ],
+  "exercises": [
+   {
+    "name": "Voador (peck deck)",
+    "how": "Costas no encosto, cotovelos levemente flexionados, feche os braços à frente.",
+    "muscles": [
+     "chest"
+    ],
+    "exercise_id": "Butterfly"
+   },
+   {
+    "name": "Crucifixo invertido (voador inverso)",
+    "how": "De frente para o encosto, abra os braços para trás.",
+    "muscles": [
+     "shoulders",
+     "middle back"
+    ],
+    "exercise_id": "Reverse_Machine_Flyes",
+    "video": {
+     "url": "https://www.youtube.com/watch?v=EvE4MoJaDHw",
+     "status": "pending"
+    }
+   },
+   {
+    "name": "Voador unilateral",
+    "how": "Um braço por vez para alongar mais.",
+    "muscles": [
+     "chest"
+    ]
+   },
+   {
+    "name": "Parciais no alongamento",
+    "how": "Meias-repetições na parte aberta.",
+    "muscles": [
+     "chest"
+    ]
+   }
+  ],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=JL8nHvZcAK8",
+    "title": "How-To Use the \"Rear Delt / Pec Fly\" Machine",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=dtwZQcV48vI",
+    "title": "Pec Dec Fly And Rear Delt Tutorial",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=EvE4MoJaDHw",
+    "title": "How to do Reverse Fly for Rear Delts on Pec Deck Fly",
+    "status": "pending"
+   }
+  ],
+  "photos": []
+ },
+ {
+  "machine_id": "mx_shoulder_press_machine",
+  "name": "Desenvolvimento na máquina (articulado)",
+  "name_en": "Machine Shoulder Press",
+  "category": "ombros",
+  "is_new": false,
+  "availability_br": "comum",
+  "tips": [
+   "Assento: alças começam na altura do topo dos ombros.",
+   "Costas e cabeça no encosto.",
+   "Antebraços verticais."
+  ],
+  "why": "Estável e fácil de progredir; presente em quase todas as linhas.",
+  "sources": [
+   "https://generationiron.com/jeff-nippard-shoulder-exercises/"
+  ],
+  "brands": [
+   "Hammer Strength",
+   "Movement",
+   "Technogym",
+   "Matrix",
+   "Panatta"
+  ],
+  "existing_exercise_ids": [
+   "Leverage_Shoulder_Press",
+   "Machine_Shoulder_Military_Press",
+   "Smith_Machine_Overhead_Shoulder_Press"
+  ],
+  "exercises": [
+   {
+    "name": "Desenvolvimento articulado",
+    "how": "Alças na altura dos ombros, empurre para cima sem arquear a lombar.",
+    "muscles": [
+     "shoulders",
+     "triceps"
+    ],
+    "exercise_id": "Leverage_Shoulder_Press"
+   },
+   {
+    "name": "Unilateral",
+    "how": "Um braço por vez.",
+    "muscles": [
+     "shoulders",
+     "triceps"
+    ]
+   },
+   {
+    "name": "Pegada neutra",
+    "how": "Palmas voltadas uma para outra, mais confortável para o ombro.",
+    "muscles": [
+     "shoulders",
+     "triceps"
+    ]
+   },
+   {
+    "name": "Desenvolvimento no Smith",
+    "how": "Banco sob a barra, desça até o queixo.",
+    "muscles": [
+     "shoulders",
+     "triceps"
+    ],
+    "exercise_id": "Smith_Machine_Overhead_Shoulder_Press"
+   }
+  ],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=yUPzAHvgx40",
+    "title": "Machine Shoulder Press: How To",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=tr_LDd8W3iM",
+    "title": "Hammer Strength Iso Lateral Shoulder Press",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=z1dqu_rXoOo",
+    "title": "Seated Shoulder Press Machine",
+    "status": "pending"
+   }
+  ],
+  "photos": [
+   {
+    "url": "https://upload.wikimedia.org/wikipedia/commons/2/23/Shoulder_Press.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Shoulder_Press.jpg",
+    "author": "Aliva Sahoo",
+    "license": "CC BY-SA 4.0",
+    "status": "pending"
+   }
+  ]
+ },
+ {
+  "machine_id": "mx_lateral_raise_machine",
+  "name": "Elevação lateral na máquina",
+  "name_en": "Lateral Raise Machine",
+  "category": "ombros",
+  "is_new": false,
+  "availability_br": "média",
+  "tips": [
+   "Alinhe a articulação do ombro com o pivô da máquina.",
+   "Conduza com os cotovelos, não com as mãos.",
+   "Não encolha os ombros."
+  ],
+  "why": "Tensão constante no deltoide lateral; Nippard prefere a versão no cabo/ máquina para deltoide lateral.",
+  "sources": [
+   "https://generationiron.com/jeff-nippard-shoulder-exercises/"
+  ],
+  "brands": [
+   "Technogym",
+   "Prime",
+   "Panatta",
+   "Life Fitness",
+   "Movement"
+  ],
+  "existing_exercise_ids": [
+   "Machine_Lateral_Raise",
+   "Cable_Y_Raise",
+   "Cable_Seated_Lateral_Raise"
+  ],
+  "exercises": [
+   {
+    "name": "Elevação lateral sentado",
+    "how": "Ombro alinhado ao eixo, leve os cotovelos para o lado até a linha dos ombros.",
+    "muscles": [
+     "shoulders"
+    ],
+    "exercise_id": "Machine_Lateral_Raise"
+   },
+   {
+    "name": "Unilateral",
+    "how": "Um braço por vez para focar melhor.",
+    "muscles": [
+     "shoulders"
+    ]
+   },
+   {
+    "name": "Elevação em Y no cabo (alternativa)",
+    "how": "Cabos cruzados baixos, braços sobem em Y.",
+    "muscles": [
+     "shoulders",
+     "traps"
+    ],
+    "exercise_id": "Cable_Y_Raise",
+    "video": {
+     "url": "https://youtube.com/watch?v=NBkMIWWkIKQ",
+     "status": "pending"
+    }
+   },
+   {
+    "name": "Parciais no alongamento",
+    "how": "Meias-repetições na parte de baixo.",
+    "muscles": [
+     "shoulders"
+    ]
+   }
+  ],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=uh1UO-ieTYQ",
+    "title": "Lateral Raise Machine (Tutorial + Tips)",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=B2hCfrl7JcQ",
+    "title": "Machine Lateral Raise (TechnoGym)",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=dTwa2piwU-A",
+    "title": "How To Do A SEATED MACHINE LATERAL RAISE",
+    "status": "pending"
+   }
+  ],
+  "photos": []
+ },
+ {
+  "machine_id": "mx_lat_pulldown",
+  "name": "Puxador / puxada alta (polia)",
+  "name_en": "Lat Pulldown (cable)",
+  "category": "costas",
+  "is_new": false,
+  "availability_br": "comum",
+  "tips": [
+   "Coxas bem presas na almofada.",
+   "Peito alto; não balance o tronco.",
+   "Deixe os braços estenderem totalmente em cima."
+  ],
+  "why": "Básico obrigatório de costas; a pegada média/neutra costuma ser a mais eficiente para dorsal.",
+  "sources": [
+   "https://www.youtube.com/watch?v=6YcMNrWZRyc"
+  ],
+  "brands": [
+   "Movement",
+   "Technogym",
+   "Life Fitness",
+   "Matrix",
+   "Righetto"
+  ],
+  "existing_exercise_ids": [
+   "Wide-Grip_Lat_Pulldown",
+   "Close-Grip_Front_Lat_Pulldown",
+   "V-Bar_Pulldown",
+   "Underhand_Cable_Pulldowns",
+   "One_Arm_Lat_Pulldown",
+   "Full_Range-Of-Motion_Lat_Pulldown",
+   "Straight-Arm_Pulldown"
+  ],
+  "exercises": [
+   {
+    "name": "Puxada aberta",
+    "how": "Pegada além dos ombros, puxe a barra ao peito alto levando cotovelos para baixo.",
+    "muscles": [
+     "lats",
+     "biceps"
+    ],
+    "exercise_id": "Wide-Grip_Lat_Pulldown"
+   },
+   {
+    "name": "Puxada triângulo (pegada neutra)",
+    "how": "Triângulo, puxe ao peito.",
+    "muscles": [
+     "lats",
+     "middle back",
+     "biceps"
+    ],
+    "exercise_id": "V-Bar_Pulldown"
+   },
+   {
+    "name": "Puxada supinada",
+    "how": "Palmas para você, pegada na largura dos ombros.",
+    "muscles": [
+     "lats",
+     "biceps"
+    ],
+    "exercise_id": "Underhand_Cable_Pulldowns"
+   },
+   {
+    "name": "Puxada unilateral",
+    "how": "Um braço, alongue bem em cima.",
+    "muscles": [
+     "lats"
+    ],
+    "exercise_id": "One_Arm_Lat_Pulldown"
+   },
+   {
+    "name": "Pulldown braço reto",
+    "how": "Em pé, braços estendidos, leve a barra até a coxa.",
+    "muscles": [
+     "lats"
+    ],
+    "exercise_id": "Straight-Arm_Pulldown"
+   }
+  ],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=j6KuKd_N8uU",
+    "title": "How to Do Wide Grip Lat Pulldowns Correctly",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=6YcMNrWZRyc",
+    "title": "Lat Pulldown Grip Guide: Wide vs Narrow vs Underhand (Lats, Teres Major & Biceps)",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=7UjOe_K56Do",
+    "title": "How To Lat Pulldown",
+    "status": "pending"
+   }
+  ],
+  "photos": [
+   {
+    "url": "https://upload.wikimedia.org/wikipedia/commons/6/68/Lat_pulldown_machine_20180112.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Lat_pulldown_machine_20180112.jpg",
+    "author": "Santeri Viinamäki",
+    "license": "CC BY-SA 4.0",
+    "status": "pending"
+   },
+   {
+    "url": "https://upload.wikimedia.org/wikipedia/commons/7/70/Back_Pull_down.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Back_Pull_down.jpg",
+    "author": "Aliva Sahoo",
+    "license": "CC BY-SA 4.0",
+    "status": "pending"
+   }
+  ]
+ },
+ {
+  "machine_id": "mx_lat_pulldown_machine",
+  "name": "Puxada articulada (iso-lateral / convergente)",
+  "name_en": "Iso-Lateral Front Lat Pulldown",
+  "category": "costas",
+  "is_new": false,
+  "availability_br": "média",
+  "tips": [
+   "Assento na altura em que você alcança as alças com braço estendido.",
+   "Puxe com os cotovelos, não com as mãos.",
+   "Plate-loaded: carregue os dois lados igualmente."
+  ],
+  "why": "Braços independentes e trajeto convergente imitam a barra fixa com carga ajustável; destaque de premiações 2026 (Prime Plate Loaded Lat Pulldown).",
+  "sources": [
+   "https://athletechnews.com/gym-equipment-design-awards-highlight-the-industrys-top-machines/",
+   "https://athletechnews.com/matrixs-plate-loaded-machines-help-gyms-meet-the-strength-demand/"
+  ],
+  "brands": [
+   "Hammer Strength",
+   "Prime",
+   "Hoist",
+   "Panatta",
+   "Movement"
+  ],
+  "existing_exercise_ids": [
+   "Machine_Lat_Pulldown"
+  ],
+  "exercises": [
+   {
+    "name": "Puxada articulada bilateral",
+    "how": "Coxas presas, puxe as alças em arco até o peito.",
+    "muscles": [
+     "lats",
+     "biceps"
+    ],
+    "exercise_id": "Machine_Lat_Pulldown"
+   },
+   {
+    "name": "Puxada articulada unilateral",
+    "how": "Um braço por vez com rotação do tronco mínima.",
+    "muscles": [
+     "lats"
+    ]
+   },
+   {
+    "name": "Pausa no alongamento",
+    "how": "1 s com braço estendido em cima.",
+    "muscles": [
+     "lats"
+    ]
+   }
+  ],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=TRC5LCYi6W0",
+    "title": "Hammer Strength Plate-Loaded Front Lat Pulldown Instructions",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=YSXsKvYgSyw",
+    "title": "How To Do A MACHINE FRONT LAT PULLDOWN (Hammer Strength)",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=tYYRyMYlWKA",
+    "title": "Tutorial: Plate Loaded Iso-Lateral Front Lat Pulldown (IL-PD)",
+    "status": "pending"
+   }
+  ],
+  "photos": []
+ },
+ {
+  "machine_id": "mx_assisted_pullup_dip",
+  "name": "Graviton (barra e paralela assistidas)",
+  "name_en": "Assisted Pull-Up / Dip Machine",
+  "category": "costas",
+  "is_new": false,
+  "availability_br": "comum",
+  "tips": [
+   "Quanto MAIS peso no graviton, MAIS fácil fica.",
+   "Reduza a assistência aos poucos (progressão).",
+   "Ombros longe das orelhas."
+  ],
+  "why": "Melhor caminho para chegar à barra fixa e às paralelas livres; presente em praticamente todas as redes.",
+  "sources": [
+   "https://www.youtube.com/watch?v=RX9wcgxiZGE"
+  ],
+  "brands": [
+   "Movement",
+   "Hammer Strength",
+   "Life Fitness",
+   "Technogym",
+   "Matrix"
+  ],
+  "existing_exercise_ids": [
+   "Assisted_Pull-Up_Machine",
+   "Assisted_Dip_Machine",
+   "Band_Assisted_Pull-Up"
+  ],
+  "exercises": [
+   {
+    "name": "Barra fixa assistida",
+    "how": "Joelhos na plataforma, peso de contrapeso maior = mais ajuda; suba o queixo acima da barra.",
+    "muscles": [
+     "lats",
+     "biceps"
+    ],
+    "exercise_id": "Assisted_Pull-Up_Machine"
+   },
+   {
+    "name": "Barra supinada assistida",
+    "how": "Palmas para você.",
+    "muscles": [
+     "lats",
+     "biceps"
+    ]
+   },
+   {
+    "name": "Paralela assistida",
+    "how": "Mãos nas barras paralelas, desça até o cotovelo ~90° e suba.",
+    "muscles": [
+     "triceps",
+     "chest",
+     "shoulders"
+    ],
+    "exercise_id": "Assisted_Dip_Machine",
+    "video": {
+     "url": "https://www.youtube.com/watch?v=kbmVlw-i0Vs",
+     "status": "pending"
+    }
+   },
+   {
+    "name": "Excêntrico lento",
+    "how": "Diminua a assistência e desça em 3–4 s.",
+    "muscles": [
+     "lats",
+     "biceps"
+    ]
+   }
+  ],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=RX9wcgxiZGE",
+    "title": "Kenosha YMCA - How to Use the Hammer Strength Assisted Dip/Pull-Up",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=YQiD0VQGgMg",
+    "title": "Gold's Gym Tutorials ⎮ Assisted Pull Up / Dip Machine",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=gx0RWT7WbmA",
+    "title": "How To PROPERLY Use The Assisted Pull Up Machine (DO MORE PULL UPS)",
+    "status": "pending"
+   }
+  ],
+  "photos": []
+ },
+ {
+  "machine_id": "mx_pullover_machine",
+  "name": "Pullover na máquina",
+  "name_en": "Pullover Machine",
+  "category": "costas",
+  "is_new": false,
+  "availability_br": "rara",
+  "tips": [
+   "Ajuste o assento para o ombro ficar alinhado ao eixo.",
+   "Empurre com os cotovelos, não com as mãos.",
+   "Não arqueie a lombar no alongamento."
+  ],
+  "why": "Isola o dorsal sem o bíceps limitar; clássico Nautilus que voltou com força nas linhas novas e em academias 'old school'.",
+  "sources": [
+   "https://www.youtube.com/watch?v=Ahla8Olt1eo"
+  ],
+  "brands": [
+   "Nautilus",
+   "Hammer Strength",
+   "Panatta",
+   "Atlantis",
+   "Prime"
+  ],
+  "existing_exercise_ids": [
+   "Machine_Pullover",
+   "Straight-Arm_Pulldown"
+  ],
+  "exercises": [
+   {
+    "name": "Pullover na máquina",
+    "how": "Cotovelos nas almofadas, leve os braços de trás da cabeça até a frente do corpo.",
+    "muscles": [
+     "lats"
+    ],
+    "exercise_id": "Machine_Pullover"
+   },
+   {
+    "name": "Pullover com pausa no alongamento",
+    "how": "1–2 s com os braços atrás da cabeça.",
+    "muscles": [
+     "lats",
+     "chest"
+    ]
+   },
+   {
+    "name": "Pulldown braço reto (alternativa no cabo)",
+    "how": "Em pé, braços retos, barra até as coxas.",
+    "muscles": [
+     "lats"
+    ],
+    "exercise_id": "Straight-Arm_Pulldown"
+   }
+  ],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=Ahla8Olt1eo",
+    "title": "How to use the Nautilus First Gen Super Pullover",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=M9JTBabQXQ4",
+    "title": "How to Use a Nautilus Super Pullover Machine",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=VGeETjEb-wA",
+    "title": "Proper Form for Nautilus Pullover",
+    "status": "pending"
+   }
+  ],
+  "photos": []
+ },
+ {
+  "machine_id": "mx_seated_cable_row",
+  "name": "Remada baixa (polia sentado)",
+  "name_en": "Seated Cable Row",
+  "category": "costas",
+  "is_new": false,
+  "availability_br": "comum",
+  "tips": [
+   "Deixe as escápulas irem à frente no alongamento sem curvar a lombar.",
+   "Não balance o tronco para trás.",
+   "Pausa de 1 s com as escápulas juntas."
+  ],
+  "why": "Básico de costas presente em toda academia; grande variedade de pegadas.",
+  "sources": [
+   "https://www.youtube.com/watch?v=OeLb503NZHk"
+  ],
+  "brands": [
+   "Movement",
+   "Technogym",
+   "Life Fitness",
+   "Matrix",
+   "Righetto"
+  ],
+  "existing_exercise_ids": [
+   "Seated_Cable_Rows",
+   "Wide-Grip_Seated_Cable_Row",
+   "Seated_One-arm_Cable_Pulley_Rows"
+  ],
+  "exercises": [
+   {
+    "name": "Remada baixa triângulo",
+    "how": "Pés na plataforma, coluna neutra, puxe o triângulo ao umbigo.",
+    "muscles": [
+     "middle back",
+     "lats",
+     "biceps"
+    ],
+    "exercise_id": "Seated_Cable_Rows"
+   },
+   {
+    "name": "Remada aberta com barra longa",
+    "how": "Pegada aberta, cotovelos abertos: meio das costas e posterior de ombro.",
+    "muscles": [
+     "middle back",
+     "traps",
+     "shoulders"
+    ],
+    "exercise_id": "Wide-Grip_Seated_Cable_Row",
+    "video": {
+     "url": "https://www.youtube.com/watch?v=SYZxuSSQ-hk",
+     "status": "pending"
+    }
+   },
+   {
+    "name": "Remada unilateral",
+    "how": "Um braço, leve rotação para alongar.",
+    "muscles": [
+     "lats",
+     "middle back"
+    ],
+    "exercise_id": "Seated_One-arm_Cable_Pulley_Rows",
+    "video": {
+     "url": "https://www.youtube.com/watch?v=WWAMy-J2KOo",
+     "status": "pending"
+    }
+   }
+  ],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=OeLb503NZHk",
+    "title": "Seated Cable Row Tutorial: Build a Strong Back with Proper Form",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=oFtfkSElE0s",
+    "title": "Seated Cable Row: How to",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=SYZxuSSQ-hk",
+    "title": "How to Do a Seated Wide Grip Cable Row",
+    "status": "pending"
+   }
+  ],
+  "photos": []
+ },
+ {
+  "machine_id": "mx_low_row_machine",
+  "name": "Remada baixa articulada (low row / iso row)",
+  "name_en": "Iso-Lateral Low Row",
+  "category": "costas",
+  "is_new": false,
+  "availability_br": "média",
+  "tips": [
+   "Topo da almofada no meio do esterno.",
+   "Ombros longe das orelhas.",
+   "Pausa de 1 s no fim da puxada."
+  ],
+  "why": "Peito apoiado elimina o roubo e a carga lombar; um dos best-sellers da Hammer Strength.",
+  "sources": [
+   "https://www.youtube.com/watch?v=k2S4G14cmts"
+  ],
+  "brands": [
+   "Hammer Strength",
+   "Movement",
+   "Matrix Magnum",
+   "Prime",
+   "Panatta"
+  ],
+  "existing_exercise_ids": [
+   "Leverage_Low_Row",
+   "Leverage_Iso_Row"
+  ],
+  "exercises": [
+   {
+    "name": "Low row articulada",
+    "how": "Peito na almofada, puxe as alças em direção ao quadril.",
+    "muscles": [
+     "lats",
+     "middle back"
+    ],
+    "exercise_id": "Leverage_Low_Row"
+   },
+   {
+    "name": "Remada articulada pegada horizontal",
+    "how": "Pegada pronada, cotovelos abertos: meio das costas.",
+    "muscles": [
+     "middle back",
+     "traps"
+    ],
+    "exercise_id": "Leverage_Iso_Row"
+   },
+   {
+    "name": "Unilateral",
+    "how": "Um braço por vez.",
+    "muscles": [
+     "lats"
+    ]
+   }
+  ],
+  "videos": [
+   {
+    "url": "https://youtube.com/watch?v=cbyT1_yr-4M",
+    "title": "Hammer Strength Plate-Loaded Low Row Instructions",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=k2S4G14cmts",
+    "title": "Iso-Lateral Low Row - Plate Loaded - Hammer Strength",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=th169-164Gk",
+    "title": "Hammer Strength Iso-Lateral Row Tutorial",
+    "status": "pending"
+   }
+  ],
+  "photos": []
+ },
+ {
+  "machine_id": "mx_high_row_machine",
+  "name": "Remada alta articulada (high row)",
+  "name_en": "Iso-Lateral High Row",
+  "category": "costas",
+  "is_new": false,
+  "availability_br": "média",
+  "tips": [
+   "Coxas presas na almofada.",
+   "Cotovelos descem junto ao corpo.",
+   "Não puxe com o pescoço."
+  ],
+  "why": "Mistura de puxada e remada que mira dorsal e meio das costas; presente nas linhas Hammer, Matrix Magnum e outras.",
+  "sources": [
+   "https://insider.fitt.co/press-release/for-strength-that-never-rests-matrix-unveils-the-magnum-plate-loaded-range/"
+  ],
+  "brands": [
+   "Hammer Strength",
+   "Matrix Magnum",
+   "Prime",
+   "Movement"
+  ],
+  "existing_exercise_ids": [
+   "Leverage_High_Row"
+  ],
+  "exercises": [
+   {
+    "name": "High row bilateral",
+    "how": "Puxe as alças de cima para baixo e para trás em diagonal.",
+    "muscles": [
+     "lats",
+     "middle back"
+    ],
+    "exercise_id": "Leverage_High_Row"
+   },
+   {
+    "name": "High row unilateral",
+    "how": "Um braço por vez para maior amplitude.",
+    "muscles": [
+     "lats"
+    ]
+   },
+   {
+    "name": "Pausa no alongamento",
+    "how": "Deixe a escápula subir em cima.",
+    "muscles": [
+     "lats",
+     "traps"
+    ]
+   }
+  ],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=wWLSErG8qGk",
+    "title": "Hammer Strength Plate-Loaded High Row Instructions",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=doXb_lcK93M",
+    "title": "Hammer Strength High Row Full Demo",
+    "status": "pending"
+   },
+   {
+    "url": "https://youtube.com/watch?v=beKbbq6NhWY",
+    "title": "How To Do A MACHINE HIGH ROW (Hammer Strength)",
+    "status": "pending"
+   }
+  ],
+  "photos": []
+ },
+ {
+  "machine_id": "mx_t_bar_row",
+  "name": "Remada cavalinho (T-bar) / apoiada no peito",
+  "name_en": "T-Bar Row (free-standing / chest-supported)",
+  "category": "costas",
+  "is_new": false,
+  "availability_br": "comum",
+  "tips": [
+   "Na versão livre, mantenha a coluna neutra — se arredondar, reduza a carga.",
+   "Prefira a versão apoiada se tiver dor lombar.",
+   "Puxe com os cotovelos."
+  ],
+  "why": "Remada pesada e muito comum no Brasil; a versão apoiada (Matrix Magnum T-bar 2025, Gymleco) tira a lombar da equação.",
+  "sources": [
+   "https://insider.fitt.co/press-release/for-strength-that-never-rests-matrix-unveils-the-magnum-plate-loaded-range/",
+   "https://www.youtube.com/watch?v=hr5ma7i2ggE"
+  ],
+  "brands": [
+   "Movement",
+   "Hammer Strength",
+   "Matrix Magnum",
+   "Gymleco",
+   "Righetto"
+  ],
+  "existing_exercise_ids": [
+   "Lying_T-Bar_Row",
+   "T-Bar_Row_with_Handle"
+  ],
+  "exercises": [
+   {
+    "name": "Cavalinho com peito apoiado",
+    "how": "Peito na almofada, pés firmes, puxe as alças ao abdômen.",
+    "muscles": [
+     "middle back",
+     "lats"
+    ],
+    "exercise_id": "Lying_T-Bar_Row"
+   },
+   {
+    "name": "Cavalinho livre (barra no canto/landmine)",
+    "how": "Tronco inclinado com coluna neutra, puxe o triângulo ao abdômen.",
+    "muscles": [
+     "middle back",
+     "lats",
+     "lower back"
+    ],
+    "exercise_id": "T-Bar_Row_with_Handle"
+   },
+   {
+    "name": "Pegada aberta",
+    "how": "Alças abertas: meio das costas e posterior de ombro.",
+    "muscles": [
+     "middle back",
+     "traps",
+     "shoulders"
+    ],
+    "video": {
+     "url": "https://www.youtube.com/watch?v=_1YANc2e3qw",
+     "status": "pending"
+    }
+   },
+   {
+    "name": "Pegada fechada",
+    "how": "Alças fechadas: mais dorsal.",
+    "muscles": [
+     "lats"
+    ],
+    "video": {
+     "url": "https://www.youtube.com/watch?v=e1znHjFGdHA",
+     "status": "pending"
+    }
+   }
+  ],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=hr5ma7i2ggE",
+    "title": "Remada Cavalinho: Como fazer, músculos e técnica drop-set",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=SvdgLDdUq0o",
+    "title": "Gym Leco T Bar Row - Set Up & Execution",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=DhX4bCB5kAc",
+    "title": "What to Know about the Chest Supported T-Bar Row!",
+    "status": "pending"
+   }
+  ],
+  "photos": [
+   {
+    "url": "https://upload.wikimedia.org/wikipedia/commons/d/dd/T-bar-row-1.png",
+    "page": "https://commons.wikimedia.org/wiki/File:T-bar-row-1.png",
+    "author": "Everkinetic",
+    "license": "CC BY-SA 3.0",
+    "status": "pending"
+   }
+  ]
+ },
+ {
+  "machine_id": "mx_cable_crossover",
+  "name": "Crossover / polia dupla (cabo)",
+  "name_en": "Cable Crossover / Dual Cable Station",
+  "category": "funcional",
+  "is_new": false,
+  "availability_br": "comum",
+  "tips": [
+   "Ajuste a altura das polias conforme o alvo (alto→peito baixo, baixo→peito alto).",
+   "Base firme (pé à frente) para não ser puxado.",
+   "Tensão contínua: não deixe as placas encostarem."
+  ],
+  "why": "Estação mais versátil depois do Smith; os cabos mantêm tensão no alongamento — base de vários favoritos atuais (bayesiana, katana, Y-raise, crucifixo).",
+  "sources": [
+   "https://barbend.com/news/jeff-nippard-ranks-chest-exercises-for-hypertrophy/",
+   "https://generationiron.com/jeff-nippard-shoulder-exercises/",
+   "https://barbend.com/news/jeff-nippard-ranks-best-and-worst-triceps-exercises/"
+  ],
+  "brands": [
+   "Movement",
+   "Technogym (Kinesis)",
+   "Freemotion",
+   "Life Fitness",
+   "Matrix"
+  ],
+  "existing_exercise_ids": [
+   "Cable_Crossover",
+   "Low_Cable_Crossover",
+   "Cable_Y_Raise",
+   "Bayesian_Cable_Curl",
+   "Cable_Cross-Body_Triceps_Extension",
+   "Cable_Triceps_Kickback",
+   "Cable_Standing_Hip_Abduction",
+   "Triceps_Pushdown",
+   "Face_Pull",
+   "Pallof_Press",
+   "Cable_Crunch",
+   "Pull_Through"
+  ],
+  "exercises": [
+   {
+    "name": "Crucifixo no crossover",
+    "how": "Polias altas, passo à frente, feche os braços em arco à frente do peito.",
+    "muscles": [
+     "chest"
+    ],
+    "exercise_id": "Cable_Crossover",
+    "video": {
+     "url": "https://youtube.com/watch?v=Hh7UC-I3k_U",
+     "status": "pending"
+    }
+   },
+   {
+    "name": "Rosca bayesiana",
+    "how": "De costas para a polia baixa, braço para trás, flexione o cotovelo.",
+    "muscles": [
+     "biceps"
+    ],
+    "exercise_id": "Bayesian_Cable_Curl",
+    "video": {
+     "url": "https://www.youtube.com/watch?v=aeS38n_Ht6A",
+     "status": "pending"
+    }
+   },
+   {
+    "name": "Tríceps cruzado (katana)",
+    "how": "Polia baixa do lado oposto, estenda o cotovelo cruzando o corpo.",
+    "muscles": [
+     "triceps"
+    ],
+    "exercise_id": "Cable_Cross-Body_Triceps_Extension",
+    "video": {
+     "url": "https://www.youtube.com/watch?v=nVv1fZ0eL4E",
+     "status": "pending"
+    }
+   },
+   {
+    "name": "Tríceps coice no cabo",
+    "how": "Tronco inclinado, braço junto ao corpo, estenda o cotovelo para trás.",
+    "muscles": [
+     "triceps"
+    ],
+    "exercise_id": "Cable_Triceps_Kickback",
+    "video": {
+     "url": "https://www.youtube.com/watch?v=ZvF4Oi_6Vtg",
+     "status": "pending"
+    }
+   },
+   {
+    "name": "Elevação em Y",
+    "how": "Cabos cruzados baixos, braços sobem em Y.",
+    "muscles": [
+     "shoulders",
+     "traps"
+    ],
+    "exercise_id": "Cable_Y_Raise",
+    "video": {
+     "url": "https://www.youtube.com/watch?v=z5lB5z5C0d0",
+     "status": "pending"
+    }
+   },
+   {
+    "name": "Face pull",
+    "how": "Corda na altura dos olhos, puxe abrindo as mãos ao lado do rosto.",
+    "muscles": [
+     "shoulders",
+     "middle back",
+     "traps"
+    ],
+    "exercise_id": "Face_Pull"
+   }
+  ],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=50BDseX8lTY",
+    "title": "Cable Crossover - Technique, Benefits, Rep Ranges, and Common Mistakes",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=hhruLxo9yZU",
+    "title": "How To Do A High to Low Cable Fly/ Cable Crossover",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=aeS38n_Ht6A",
+    "title": "How To Bayesian Cable Curl",
+    "status": "pending"
+   }
+  ],
+  "photos": []
+ },
+ {
+  "machine_id": "mx_preacher_curl_machine",
+  "name": "Rosca Scott na máquina",
+  "name_en": "Machine Preacher Curl",
+  "category": "bracos",
+  "is_new": false,
+  "availability_br": "comum",
+  "tips": [
+   "Assento: parte de trás do braço inteira no estofado.",
+   "Punho neutro.",
+   "Desça controlando — a parte de baixo é a mais importante."
+  ],
+  "why": "Treina o bíceps em posição alongada com segurança; Scott é um dos melhores para bíceps nos rankings de evidência.",
+  "sources": [
+   "https://www.youtube.com/watch?v=dnJ1vNlhzHY"
+  ],
+  "brands": [
+   "Movement",
+   "Technogym",
+   "Life Fitness",
+   "Panatta",
+   "Matrix Magnum (elevated curl)"
+  ],
+  "existing_exercise_ids": [
+   "Machine_Preacher_Curls",
+   "Machine_Bicep_Curl",
+   "Cable_Preacher_Curl"
+  ],
+  "exercises": [
+   {
+    "name": "Scott máquina bilateral",
+    "how": "Axilas no apoio, braços no estofado, flexione até o topo e desça até quase estender.",
+    "muscles": [
+     "biceps"
+    ],
+    "exercise_id": "Machine_Preacher_Curls"
+   },
+   {
+    "name": "Scott máquina unilateral",
+    "how": "Um braço por vez.",
+    "muscles": [
+     "biceps"
+    ],
+    "video": {
+     "url": "https://www.youtube.com/watch?v=bqVzoix4PXI",
+     "status": "pending"
+    }
+   },
+   {
+    "name": "Parciais no alongamento",
+    "how": "Meias-repetições na parte de baixo.",
+    "muscles": [
+     "biceps"
+    ]
+   },
+   {
+    "name": "Rosca máquina (sem apoio Scott)",
+    "how": "Braços na frente do corpo em máquina de rosca.",
+    "muscles": [
+     "biceps",
+     "forearms"
+    ],
+    "exercise_id": "Machine_Bicep_Curl"
+   }
+  ],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=to3m8zws1n8",
+    "title": "Machine Bicep Preacher Curl: How To",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=dnJ1vNlhzHY",
+    "title": "How to CORRECTLY use the preacher curl machine",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=g7hiWfUH6i8",
+    "title": "How To Do A MACHINE SEATED PREACHER CURL",
+    "status": "pending"
+   }
+  ],
+  "photos": []
+ },
+ {
+  "machine_id": "mx_dip_machine",
+  "name": "Tríceps máquina / paralela sentado (seated dip)",
+  "name_en": "Seated Dip / Triceps Machine",
+  "category": "bracos",
+  "is_new": false,
+  "availability_br": "comum",
+  "tips": [
+   "Cotovelos junto ao corpo para focar no tríceps.",
+   "Ombros para baixo; não encolha.",
+   "Controle a subida."
+  ],
+  "why": "Nippard dá nota B para paralela na máquina: carga alta para tríceps sem o equilíbrio das paralelas livres.",
+  "sources": [
+   "https://barbend.com/news/jeff-nippard-ranks-best-and-worst-triceps-exercises/"
+  ],
+  "brands": [
+   "Hammer Strength",
+   "Movement",
+   "Life Fitness",
+   "Technogym"
+  ],
+  "existing_exercise_ids": [
+   "Dip_Machine",
+   "Machine_Triceps_Extension"
+  ],
+  "exercises": [
+   {
+    "name": "Paralela sentado (seated dip)",
+    "how": "Sentado, empurre as alças para baixo até estender os cotovelos.",
+    "muscles": [
+     "triceps",
+     "chest"
+    ],
+    "exercise_id": "Dip_Machine"
+   },
+   {
+    "name": "Extensão de tríceps na máquina",
+    "how": "Cotovelos no apoio, estenda os braços.",
+    "muscles": [
+     "triceps"
+    ],
+    "exercise_id": "Machine_Triceps_Extension"
+   },
+   {
+    "name": "Seated dip invertido (foco peito)",
+    "how": "Em alguns modelos, sentar ao contrário enfatiza o peito inferior.",
+    "muscles": [
+     "chest",
+     "triceps"
+    ]
+   }
+  ],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=Zg0tT27iYuY",
+    "title": "How To: Seated Dip Machine",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=iun8lDqWUTI",
+    "title": "Hammer Strength Seated Triceps Dips",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=RM2GbnKdvYA",
+    "title": "Hammer Strength Plate Loaded Seated Dip Chest & Tricep",
+    "status": "pending"
+   }
+  ],
+  "photos": []
+ },
+ {
+  "machine_id": "mx_ab_crunch_machine",
+  "name": "Abdominal na máquina (crunch)",
+  "name_en": "Ab Crunch Machine",
+  "category": "core",
+  "is_new": false,
+  "availability_br": "comum",
+  "tips": [
+   "Comece leve e ajuste o banco para começar o movimento correto.",
+   "Flexione a coluna — não puxe com os braços.",
+   "Expire ao contrair."
+  ],
+  "why": "Permite progredir carga no abdômen (hipertrofia), o que o abdominal de solo não faz bem.",
+  "sources": [
+   "https://www.youtube.com/watch?v=rha2lXRJau8"
+  ],
+  "brands": [
+   "Technogym",
+   "Matrix",
+   "Life Fitness",
+   "Movement",
+   "Hammer Strength"
+  ],
+  "existing_exercise_ids": [
+   "Ab_Crunch_Machine",
+   "Cable_Crunch"
+  ],
+  "exercises": [
+   {
+    "name": "Abdominal máquina",
+    "how": "Pés presos, segure as alças e enrole o tronco aproximando costelas da pelve.",
+    "muscles": [
+     "abdominals"
+    ],
+    "exercise_id": "Ab_Crunch_Machine"
+   },
+   {
+    "name": "Com pausa de 2 s contraído",
+    "how": "Segure embaixo apertando o abdômen.",
+    "muscles": [
+     "abdominals"
+    ]
+   },
+   {
+    "name": "Abdominal no cabo ajoelhado (alternativa)",
+    "how": "Corda na polia alta, enrole o tronco.",
+    "muscles": [
+     "abdominals"
+    ],
+    "exercise_id": "Cable_Crunch"
+   }
+  ],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=rha2lXRJau8",
+    "title": "How To Use The Technogym Abdominal Crunch Machine",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=CNHS2OoUi30",
+    "title": "How To Use The SEATED ABDOMINAL CRUNCH MACHINE (Matrix)",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=NpjB_rp756Y",
+    "title": "Life Fitness Circuit Series Ab Crunch Instructions",
+    "status": "pending"
+   }
+  ],
+  "photos": []
+ },
+ {
+  "machine_id": "mx_captains_chair",
+  "name": "Cadeira romana / paralelas (captain's chair)",
+  "name_en": "Captain's Chair / Power Tower",
+  "category": "core",
+  "is_new": false,
+  "availability_br": "comum",
+  "tips": [
+   "Não balance as pernas.",
+   "Ombros longe das orelhas.",
+   "Mantenha o abdômen ativo entre repetições."
+  ],
+  "why": "Equipamento simples e comum para abdominal infra com progressão (joelhos → pernas retas → carga).",
+  "sources": [
+   "https://www.youtube.com/watch?v=7KDDZtaUaxw"
+  ],
+  "brands": [
+   "Movement",
+   "Righetto",
+   "Life Fitness",
+   "Technogym"
+  ],
+  "existing_exercise_ids": [
+   "Captains_Chair_Knee_Raise",
+   "Knee_Hip_Raise_On_Parallel_Bars"
+  ],
+  "exercises": [
+   {
+    "name": "Elevação de joelhos",
+    "how": "Antebraços nos apoios, costas no encosto, suba os joelhos enrolando a pelve.",
+    "muscles": [
+     "abdominals"
+    ],
+    "exercise_id": "Captains_Chair_Knee_Raise"
+   },
+   {
+    "name": "Elevação de pernas estendidas",
+    "how": "Mesma posição com pernas retas (mais difícil).",
+    "muscles": [
+     "abdominals"
+    ],
+    "video": {
+     "url": "https://www.youtube.com/watch?v=nBsP27-x7LU",
+     "status": "pending"
+    }
+   },
+   {
+    "name": "Oblíquo na cadeira romana",
+    "how": "Suba os joelhos em direção a um lado e depois ao outro.",
+    "muscles": [
+     "abdominals"
+    ],
+    "video": {
+     "url": "https://www.youtube.com/watch?v=5r6IFjl8tUY",
+     "status": "pending"
+    }
+   },
+   {
+    "name": "Paralelas (dips)",
+    "how": "Na mesma torre, use as barras para mergulho.",
+    "muscles": [
+     "triceps",
+     "chest",
+     "shoulders"
+    ]
+   }
+  ],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=7KDDZtaUaxw",
+    "title": "How To Do A CAPTAIN'S CHAIR KNEE RAISE",
+    "status": "pending"
+   },
+   {
+    "url": "https://youtube.com/watch?v=9APysM090aI",
+    "title": "Captains Chair Knee Raises - Proper Form",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/shorts/0AQ4j5vu2Cw",
+    "title": "CAPTAIN'S CHAIR FOR KNEE RAISES & LEG RAISES TUTORIAL // Try this out. #abworkout #planetfitness",
+    "status": "pending"
+   }
+  ],
+  "photos": []
+ }
+]

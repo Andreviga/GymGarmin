@@ -53,14 +53,14 @@ def _videos(m: dict) -> list[dict]:
     vids = []
     for v in m.get("videos") or []:
         vid = v.get("id") or yt_id(v.get("url", ""))
-        if not vid or v.get("status") in ("missing",):
+        if not vid or v.get("status") in ("missing", "pending", "unknown"):
             continue
         vids.append({**v, "id": vid, "embed": v.get("status") != "no_embed"})
     return vids
 
 
 def _photos(m: dict) -> list[dict]:
-    return [p for p in (m.get("photos") or []) if p.get("url") and p.get("status") != "missing"]
+    return [p for p in (m.get("photos") or []) if p.get("url") and p.get("status") == "ok"]
 
 
 def summary(m: dict) -> dict:
@@ -74,8 +74,17 @@ def summary(m: dict) -> dict:
 
 
 def detail(m: dict) -> dict:
-    out = {k: v for k, v in m.items() if k not in ("videos", "photos")}
+    out = {k: v for k, v in m.items() if k not in ("videos", "photos", "exercises")}
     out["videos"], out["photos"] = _videos(m), _photos(m)
+    exs = []
+    for e in m.get("exercises") or []:
+        x = {k: v for k, v in e.items() if k != "video"}
+        v = e.get("video") or {}
+        vid = yt_id(v.get("url", ""))
+        if vid and v.get("status") not in ("missing", "pending", "unknown"):
+            x["video"] = {"id": vid, "embed": v.get("status") != "no_embed", "channel": v.get("channel"), "title": v.get("title")}
+        exs.append(x)
+    out["exercises"] = exs
     out["id"] = m["machine_id"]
     return out
 

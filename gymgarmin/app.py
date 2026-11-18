@@ -728,7 +728,9 @@ def media_check(start: int = 0, count: int = Query(25, le=40)):
     hit = _MEDIA_CHECK.get(key)
     if hit and _t.time() - hit[0] < 3600:
         return hit[1]
-    cands = [{"machine_id": m["machine_id"], "videos": [v.get("url") for v in m.get("videos") or [] if v.get("url")],
+    cands = [{"machine_id": m["machine_id"],
+              "videos": list(dict.fromkeys([v.get("url") for v in m.get("videos") or [] if v.get("url")]
+                                           + [(e.get("video") or {}).get("url") for e in m.get("exercises") or [] if (e.get("video") or {}).get("url")])),
               "photos": [p.get("url") for p in m.get("photos") or [] if p.get("url")]} for m in gallery.load()[start:start + count]]
     res = {"start": start, "count": len(cands), "total": len(gallery.load()), "results": gallery.check_media(cands)}
     _MEDIA_CHECK[key] = (_t.time(), res)

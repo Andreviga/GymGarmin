@@ -849,5 +849,695 @@
   ],
   "image_like": "Knee_Hip_Raise_On_Parallel_Bars",
   "picto": null
+ },
+ {
+  "id": "KneelingLegCurl_Machine",
+  "name": "Flexora ajoelhada (kneeling leg curl)",
+  "name_en": "Kneeling Leg Curl",
+  "equipment": "machine",
+  "category": "strength",
+  "force": "pull",
+  "mechanic": "isolation",
+  "level": "intermediate",
+  "primaryMuscles": [
+   "hamstrings"
+  ],
+  "secondaryMuscles": [
+   "calves"
+  ],
+  "pattern": "leg_curl",
+  "lengthened": false,
+  "instructions": [
+   "Joelho no apoio, coxa contra a almofada, flexione um joelho de cada vez trazendo o calcanhar ao glúteo.",
+   "Ajuste a almofada logo acima do tendão de Aquiles e alinhe o joelho com o eixo da máquina.",
+   "Apoie o tronco no peitoral/antebraços e não arqueie a lombar para 'roubar' a subida.",
+   "Erro comum: encurtar a descida — o trecho com a perna estendida é o que mais estimula."
+  ],
+  "garmin": {
+   "category": "LEG_CURL",
+   "exercise": "LEG_CURL",
+   "garmin_name": "Leg Curl",
+   "confidence": "media"
+  },
+  "availability_br": "rara",
+  "evidence": "Unilateral e com o quadril parcialmente flexionado, coloca o posterior em posição mais alongada que a mesa flexora; voltou à moda em linhas novas como a Matrix Magnum (2025) e é clássico da Hammer Strength.",
+  "sources": [
+   "https://insider.fitt.co/press-release/for-strength-that-never-rests-matrix-unveils-the-magnum-plate-loaded-range/",
+   "https://www.lifefitness.com/en-us/catalog/strength-training/plate-loaded/plate-loaded-iso-lateral-kneeling-leg-curl",
+   "https://pubmed.ncbi.nlm.nih.gov/?term=Maeo+seated+prone+leg+curl+hamstrings+hypertrophy+2021"
+  ],
+  "image_like": null,
+  "picto": "squat"
+ },
+ {
+  "id": "VSquat_Machine",
+  "name": "Agachamento V-squat (máquina V)",
+  "name_en": "V-Squat Machine",
+  "equipment": "machine",
+  "category": "strength",
+  "force": "push",
+  "mechanic": "compound",
+  "level": "intermediate",
+  "primaryMuscles": [
+   "quadriceps",
+   "glutes"
+  ],
+  "secondaryMuscles": [
+   "adductors",
+   "hamstrings"
+  ],
+  "pattern": "squat",
+  "lengthened": false,
+  "instructions": [
+   "Ombros sob as almofadas, costas no encosto, desça fundo e suba empurrando o pé inteiro.",
+   "Trave as costas no encosto antes de destravar a máquina.",
+   "Desça controlando 2–3 s; não 'quique' no fundo.",
+   "Encosto não regula na maioria dos modelos: pessoas muito baixas ou altas podem não encaixar bem."
+  ],
+  "garmin": {
+   "category": "SQUAT",
+   "exercise": "SQUAT",
+   "garmin_name": "Squat",
+   "confidence": "media"
+  },
+  "availability_br": "rara",
+  "evidence": "Trilho em arco que dá agachamento profundo com a coluna apoiada; muito usado em academias de hipertrofia como alternativa ao hack/pêndulo.",
+  "sources": [
+   "https://www.youtube.com/watch?v=u_GSjH58s0g",
+   "https://pubmed.ncbi.nlm.nih.gov/31230110/",
+   "https://www.mbhfit.com/en/news/detail/Gym-Equipment-Trends-2026-971"
+  ],
+  "image_like": null,
+  "picto": "squat"
+ },
+ {
+  "id": "VerticalLegPress_Machine",
+  "name": "Leg press vertical",
+  "name_en": "Vertical Leg Press",
+  "equipment": "machine",
+  "category": "strength",
+  "force": "push",
+  "mechanic": "compound",
+  "level": "intermediate",
+  "primaryMuscles": [
+   "quadriceps",
+   "glutes"
+  ],
+  "secondaryMuscles": [
+   "hamstrings",
+   "calves"
+  ],
+  "pattern": "squat",
+  "lengthened": false,
+  "instructions": [
+   "Deitado com o quadril sob a plataforma, desça os joelhos em direção ao peito e empurre para cima.",
+   "Mantenha o quadril e a lombar colados no banco — se o quadril 'enrolar', diminua a amplitude.",
+   "Use as travas de segurança sempre; é carga diretamente sobre você.",
+   "Erro comum: travar os joelhos no topo."
+  ],
+  "garmin": {
+   "category": "SQUAT",
+   "exercise": "LEG_PRESS",
+   "garmin_name": "Leg Press",
+   "confidence": "media"
+  },
+  "availability_br": "rara",
+  "evidence": "Máquina rara mas compacta que dá muita flexão de joelho com pouca carga; tem versão improvisada no Smith (Smith_Machine_Leg_Press) já existente no app.",
+  "sources": [
+   "https://www.youtube.com/watch?v=Nxl8X6zjsrc"
+  ],
+  "image_like": null,
+  "picto": "squat"
+ },
+ {
+  "id": "SissySquatBench",
+  "name": "Banco de sissy squat",
+  "name_en": "Sissy Squat Bench / Machine",
+  "equipment": "machine",
+  "category": "strength",
+  "force": "push",
+  "mechanic": "isolation",
+  "level": "intermediate",
+  "primaryMuscles": [
+   "quadriceps"
+  ],
+  "secondaryMuscles": [
+   "abdominals"
+  ],
+  "pattern": "leg_ext",
+  "lengthened": false,
+  "instructions": [
+   "Calcanhares presos e canelas no rolo; incline o corpo para trás levando os joelhos à frente.",
+   "Comece sem carga e com amplitude curta: é exigente para o tendão patelar.",
+   "Quadril e tronco em linha reta (não sente para trás).",
+   "Erro comum: transformar em agachamento comum jogando o quadril para trás."
+  ],
+  "garmin": {
+   "category": "SQUAT",
+   "exercise": "SQUAT",
+   "garmin_name": "Squat",
+   "confidence": "media"
+  },
+  "availability_br": "rara",
+  "evidence": "Estímulo muito alongado do quadríceps (inclusive reto femoral) com equipamento barato; virou tendência em academias 'old school' e de hipertrofia.",
+  "sources": [
+   "https://youtube.com/watch?v=W6osqAEKHJs",
+   "https://doi.org/10.51224/SRXIV.407"
+  ],
+  "image_like": null,
+  "picto": "squat"
+ },
+ {
+  "id": "NordicBench",
+  "name": "Banco nórdico (nordic curl)",
+  "name_en": "Nordic Hamstring Curl Bench",
+  "equipment": "other",
+  "category": "strength",
+  "force": "pull",
+  "mechanic": "isolation",
+  "level": "advanced",
+  "primaryMuscles": [
+   "hamstrings"
+  ],
+  "secondaryMuscles": [
+   "glutes",
+   "calves"
+  ],
+  "pattern": "leg_curl",
+  "lengthened": false,
+  "instructions": [
+   "Tornozelos presos, desça o corpo reto o mais lento possível (3–5 s) e apoie as mãos no fim.",
+   "Quadril estendido: corpo em linha reta dos joelhos à cabeça.",
+   "Coloque uma almofada sob os joelhos.",
+   "Erro comum: dobrar o quadril para fugir da carga."
+  ],
+  "garmin": {
+   "category": "LEG_CURL",
+   "exercise": "LEG_CURL",
+   "garmin_name": "Leg Curl",
+   "confidence": "media"
+  },
+  "availability_br": "rara",
+  "evidence": "Exercício com forte evidência na prevenção de lesão de posterior; bancos dedicados (ATG/'Knees Over Toes') popularizaram o equipamento.",
+  "sources": [
+   "https://www.youtube.com/watch?v=amN_5WUfuCI",
+   "https://www.youtube.com/watch?v=YVwz3oFBFrs"
+  ],
+  "image_like": null,
+  "picto": "squat"
+ },
+ {
+  "id": "TibialisMachine",
+  "name": "Máquina de tibial (dorsiflexão)",
+  "name_en": "Tibia Dorsi-Flexion Machine / Tib Bar",
+  "equipment": "machine",
+  "category": "strength",
+  "force": "pull",
+  "mechanic": "isolation",
+  "level": "beginner",
+  "primaryMuscles": [
+   "calves"
+  ],
+  "secondaryMuscles": [],
+  "pattern": "calf",
+  "lengthened": false,
+  "instructions": [
+   "Peito do pé sob o rolo, puxe a ponta dos pés em direção à canela e desça devagar.",
+   "Amplitude completa: ponta do pé bem para baixo e bem para cima.",
+   "Séries de 15–25 repetições funcionam bem.",
+   "Obs.: o app não tem músculo 'tibial'; registramos em 'calves' (perna)."
+  ],
+  "garmin": {
+   "category": "CALF_RAISE",
+   "exercise": "CALF_RAISE",
+   "garmin_name": "Calf Raise",
+   "confidence": "baixa (Garmin não tem tibial)"
+  },
+  "availability_br": "rara",
+  "evidence": "Tendência 'Knees Over Toes' para saúde de joelho/canela de corredores; a Life Fitness/Hammer tem modelo próprio para ficar atrás da panturrilha sentada.",
+  "sources": [
+   "https://www.lifefitness.com/en-us/catalog/strength-training/plate-loaded/plate-loaded-tibia-dorsi-flexion",
+   "https://www.scienceforsport.com/best-tib-bars/"
+  ],
+  "image_like": null,
+  "picto": "squat"
+ },
+ {
+  "id": "ReclinedLegExtension_Machine",
+  "name": "Cadeira extensora reclinada (encosto deitado)",
+  "name_en": "Reclining Leg Extension",
+  "equipment": "machine",
+  "category": "strength",
+  "force": "push",
+  "mechanic": "isolation",
+  "level": "beginner",
+  "primaryMuscles": [
+   "quadriceps"
+  ],
+  "secondaryMuscles": [],
+  "pattern": "leg_ext",
+  "lengthened": false,
+  "instructions": [
+   "Encosto inclinado para trás (quadril mais estendido) e extensão completa do joelho.",
+   "Alinhe o joelho com o eixo da máquina e o rolo sobre o peito do pé.",
+   "Na extensora comum, dá para imitar inclinando o encosto ao máximo ou deitando o tronco para trás.",
+   "Erro comum: levantar o quadril do banco para subir mais carga."
+  ],
+  "garmin": {
+   "category": "CRUNCH",
+   "exercise": "LEG_EXTENSIONS",
+   "garmin_name": "Leg Extensions",
+   "confidence": "mesma escolha do app para Leg_Extensions"
+  },
+  "availability_br": "rara",
+  "evidence": "Com o quadril menos flexionado (~40°) o reto femoral fica alongado e cresceu mais que a 90° num estudo de 10 semanas (Larsen et al., 2025); a Matrix Magnum lançou uma 'reclining leg extension' em 2025.",
+  "sources": [
+   "https://doi.org/10.51224/SRXIV.407",
+   "https://insider.fitt.co/press-release/for-strength-that-never-rests-matrix-unveils-the-magnum-plate-loaded-range/",
+   "https://biolayne.com/reps/issue-15/perfecting-the-leg-extension-for-maximum-quad-growth/"
+  ],
+  "image_like": null,
+  "picto": "squat"
+ },
+ {
+  "id": "LeverSquat_Machine",
+  "name": "Agachamento alavanca (super squat / ground base)",
+  "name_en": "Lever / Ground-Base Squat (Super Squat)",
+  "equipment": "machine",
+  "category": "strength",
+  "force": "push",
+  "mechanic": "compound",
+  "level": "intermediate",
+  "primaryMuscles": [
+   "quadriceps",
+   "glutes"
+  ],
+  "secondaryMuscles": [
+   "hamstrings",
+   "adductors",
+   "lower back"
+  ],
+  "pattern": "squat",
+  "lengthened": false,
+  "instructions": [
+   "Ombros sob as almofadas, pés na plataforma, desça até a coxa paralela ou abaixo.",
+   "Tronco firme: a alavanca guia o arco, mas a coluna não fica totalmente apoiada.",
+   "Pés à frente do corpo aliviam o joelho e aumentam o glúteo.",
+   "Erro comum: deixar os joelhos caírem para dentro."
+  ],
+  "garmin": {
+   "category": "SQUAT",
+   "exercise": "SQUAT",
+   "garmin_name": "Squat",
+   "confidence": "media"
+  },
+  "availability_br": "rara",
+  "evidence": "Carga pesada de agachamento sem barra nas costas e sem equilíbrio; boa opção para quem não se dá bem com agachamento livre.",
+  "sources": [
+   "https://www.youtube.com/watch?v=RMpIZ5NAWQA"
+  ],
+  "image_like": null,
+  "picto": "squat"
+ },
+ {
+  "id": "StandingHipThrust_Machine",
+  "name": "Hip thrust em pé (standing hip thrust)",
+  "name_en": "Standing Hip Thrust Machine",
+  "equipment": "machine",
+  "category": "strength",
+  "force": "push",
+  "mechanic": "isolation",
+  "level": "beginner",
+  "primaryMuscles": [
+   "glutes"
+  ],
+  "secondaryMuscles": [
+   "hamstrings",
+   "adductors"
+  ],
+  "pattern": "glute",
+  "lengthened": false,
+  "instructions": [
+   "Almofada no quadril, empurre o quadril à frente até a extensão total e contraia o glúteo.",
+   "Ajuste a almofada na altura do osso do quadril, não na barriga.",
+   "Movimento vem do quadril — não arqueie a lombar no topo.",
+   "Joelhos levemente flexionados o tempo todo."
+  ],
+  "garmin": {
+   "category": "HIP_RAISE",
+   "exercise": "HIP_RAISE",
+   "garmin_name": "Hip Raise",
+   "confidence": "media"
+  },
+  "availability_br": "rara",
+  "evidence": "Novo formato 2024–2025 (Matrix Magnum, Panatta) que tira o atrito de montar banco e barra; segue a onda de máquinas de glúteo que dominam as feiras (Arnold/Fitness Brasil Expo).",
+  "sources": [
+   "https://insider.fitt.co/press-release/for-strength-that-never-rests-matrix-unveils-the-magnum-plate-loaded-range/",
+   "https://www.youtube.com/watch?v=55M9ofHMkSw",
+   "https://www.mbhfit.com/en/news/detail/Gym-Equipment-Trends-2026-971"
+  ],
+  "image_like": null,
+  "picto": "abduct"
+ },
+ {
+  "id": "BackExtensionMachine",
+  "name": "Extensão lombar na máquina (sentado)",
+  "name_en": "Selectorized Back Extension",
+  "equipment": "machine",
+  "category": "strength",
+  "force": "pull",
+  "mechanic": "isolation",
+  "level": "beginner",
+  "primaryMuscles": [
+   "lower back"
+  ],
+  "secondaryMuscles": [
+   "glutes",
+   "hamstrings"
+  ],
+  "pattern": "hinge",
+  "lengthened": false,
+  "instructions": [
+   "Costas no rolo, quadril fixo; estenda o tronco para trás de forma controlada.",
+   "Comece leve; carga alta com coluna hiperestendida não é o objetivo.",
+   "Ajuste o rolo na região das escápulas e o cinto/apoio das coxas firme.",
+   "Quem tem dor lombar deve liberar com fisioterapeuta antes."
+  ],
+  "garmin": {
+   "category": "HYPEREXTENSION",
+   "exercise": "HYPEREXTENSION",
+   "garmin_name": "Hyperextension",
+   "confidence": "media"
+  },
+  "availability_br": "média",
+  "evidence": "Versão guiada e de carga fácil de ajustar para fortalecer a lombar; comum em linhas selectorized e circuito.",
+  "sources": [
+   "https://www.youtube.com/watch?v=w6KkLw_gFk8"
+  ],
+  "image_like": null,
+  "picto": "kettlebell"
+ },
+ {
+  "id": "RotaryTorso_Machine",
+  "name": "Rotação de tronco na máquina (rotary torso)",
+  "name_en": "Rotary Torso Machine",
+  "equipment": "machine",
+  "category": "strength",
+  "force": "pull",
+  "mechanic": "isolation",
+  "level": "beginner",
+  "primaryMuscles": [
+   "abdominals"
+  ],
+  "secondaryMuscles": [
+   "lower back"
+  ],
+  "pattern": "core",
+  "lengthened": false,
+  "instructions": [
+   "Quadril travado, gire o tronco para um lado de forma lenta e volte; repita do outro lado.",
+   "Amplitude moderada; não force a coluna no fim do giro.",
+   "Mesmas repetições para os dois lados.",
+   "Erro comum: girar rápido usando o embalo da placa de peso."
+  ],
+  "garmin": {
+   "category": "CORE",
+   "exercise": "RUSSIAN_TWIST",
+   "garmin_name": "Russian Twist",
+   "confidence": "aproximada"
+  },
+  "availability_br": "média",
+  "evidence": "Trabalha oblíquos com carga graduada e segura, presente em quase todas as linhas de circuito (Life Fitness, Technogym, Movement).",
+  "sources": [
+   "https://www.youtube.com/watch?v=V6K9bt4zbjc"
+  ],
+  "image_like": null,
+  "picto": "dumbbell"
+ },
+ {
+  "id": "AbCoaster_Machine",
+  "name": "Ab coaster (abdominal no trilho)",
+  "name_en": "Ab Coaster",
+  "equipment": "machine",
+  "category": "strength",
+  "force": "pull",
+  "mechanic": "isolation",
+  "level": "beginner",
+  "primaryMuscles": [
+   "abdominals"
+  ],
+  "secondaryMuscles": [],
+  "pattern": "core",
+  "lengthened": false,
+  "instructions": [
+   "Joelhos no carrinho, enrole o quadril trazendo os joelhos ao peito.",
+   "O movimento é enrolar a pelve, não só dobrar o quadril.",
+   "Desça devagar até quase encostar no batente.",
+   "Erro comum: puxar com os braços."
+  ],
+  "garmin": {
+   "category": "CRUNCH",
+   "exercise": "REVERSE_CRUNCH",
+   "garmin_name": "Reverse Crunch",
+   "confidence": "media"
+  },
+  "availability_br": "média",
+  "evidence": "Versão guiada do abdominal infra (reverse crunch) fácil para iniciantes; comum em redes como Planet Fitness e algumas academias brasileiras.",
+  "sources": [
+   "https://www.youtube.com/watch?v=2FTBFO7IDVs"
+  ],
+  "image_like": null,
+  "picto": "dumbbell"
+ },
+ {
+  "id": "DyRow_Machine",
+  "name": "Remada DY (Iso-Lateral D.Y. Row)",
+  "name_en": "Iso-Lateral D.Y. Row",
+  "equipment": "machine",
+  "category": "strength",
+  "force": "pull",
+  "mechanic": "compound",
+  "level": "intermediate",
+  "primaryMuscles": [
+   "lats",
+   "middle back"
+  ],
+  "secondaryMuscles": [
+   "biceps",
+   "traps"
+  ],
+  "pattern": "h_pull",
+  "lengthened": false,
+  "instructions": [
+   "Pegada por baixo, puxe as alças em arco em direção ao quadril, cotovelos junto ao corpo.",
+   "Assento na altura em que a alça fica acima do ombro no início.",
+   "Peito firme na almofada.",
+   "Erro comum: puxar com o bíceps e encolher os ombros."
+  ],
+  "garmin": {
+   "category": "ROW",
+   "exercise": "ROW",
+   "garmin_name": "Row",
+   "confidence": "media"
+  },
+  "availability_br": "rara",
+  "evidence": "Máquina da Hammer Strength inspirada na remada de Dorian Yates: o pivô alto e a pegada supinada dão arco natural que mira o dorsal.",
+  "sources": [
+   "https://www.youtube.com/watch?v=xH7afHVeuEQ"
+  ],
+  "image_like": null,
+  "picto": "row"
+ },
+ {
+  "id": "SealRowBench",
+  "name": "Banco de remada seal (seal row / remada apoiada)",
+  "name_en": "Seal Row Bench / Chest-Supported Row",
+  "equipment": "other",
+  "category": "strength",
+  "force": "pull",
+  "mechanic": "compound",
+  "level": "intermediate",
+  "primaryMuscles": [
+   "middle back",
+   "lats"
+  ],
+  "secondaryMuscles": [
+   "biceps",
+   "traps",
+   "shoulders"
+  ],
+  "pattern": "h_pull",
+  "lengthened": false,
+  "instructions": [
+   "Deitado de bruços no banco alto, puxe a barra até o banco sem tirar o peito.",
+   "Peito sempre colado no banco — se descolar, a carga está alta.",
+   "Pausa breve no topo apertando as escápulas.",
+   "Erro comum: encolher os ombros em vez de puxar com as costas."
+  ],
+  "garmin": {
+   "category": "ROW",
+   "exercise": "CHEST_SUPPORTED_DUMBBELL_ROW",
+   "garmin_name": "Chest Supported Dumbbell Row",
+   "confidence": "media"
+  },
+  "availability_br": "rara",
+  "evidence": "Remada sem carga na lombar e sem 'roubo', muito recomendada por coaches de hipertrofia (Nippard, Israetel) para dorsal e meio das costas.",
+  "sources": [
+   "https://www.youtube.com/watch?v=NRHiNw-xGSA"
+  ],
+  "image_like": null,
+  "picto": "row"
+ },
+ {
+  "id": "InclineFlyMachine",
+  "name": "Voador inclinado (incline chest fly)",
+  "name_en": "Incline Chest Fly Machine",
+  "equipment": "machine",
+  "category": "strength",
+  "force": "push",
+  "mechanic": "isolation",
+  "level": "beginner",
+  "primaryMuscles": [
+   "chest"
+  ],
+  "secondaryMuscles": [
+   "shoulders"
+  ],
+  "pattern": "chest_fly",
+  "lengthened": false,
+  "instructions": [
+   "Encosto inclinado, braços levemente flexionados; feche à frente do peito alto.",
+   "Ombros para trás e para baixo, peito alto.",
+   "Cotovelo fixo — não vire supino.",
+   "Abra até sentir alongamento sem dor no ombro."
+  ],
+  "garmin": {
+   "category": "FLYE",
+   "exercise": "FLYE",
+   "garmin_name": "Fly",
+   "confidence": "media"
+  },
+  "availability_br": "rara",
+  "evidence": "Isolamento da porção clavicular (peito superior) com alongamento sob tensão; aparece nas linhas plate-loaded novas de marcas premium.",
+  "sources": [
+   "https://www.youtube.com/watch?v=PAi3IgRjD2I",
+   "https://barbend.com/news/jeff-nippard-ranks-chest-exercises-for-hypertrophy/"
+  ],
+  "image_like": null,
+  "picto": "dumbbell"
+ },
+ {
+  "id": "OverheadTricepsMachine",
+  "name": "Tríceps acima da cabeça na máquina (francês máquina)",
+  "name_en": "Overhead Triceps Extension Machine",
+  "equipment": "machine",
+  "category": "strength",
+  "force": "push",
+  "mechanic": "isolation",
+  "level": "beginner",
+  "primaryMuscles": [
+   "triceps"
+  ],
+  "secondaryMuscles": [],
+  "pattern": "triceps",
+  "lengthened": false,
+  "instructions": [
+   "Braços acima da cabeça apoiados, estenda os cotovelos sem mexer os ombros.",
+   "Ajuste o banco para o cotovelo ficar alinhado ao eixo.",
+   "Desça até o tríceps alongar bem (cotovelo bem dobrado).",
+   "Erro comum: abrir os cotovelos e transformar em desenvolvimento."
+  ],
+  "garmin": {
+   "category": "TRICEPS_EXTENSION",
+   "exercise": "CABLE_OVERHEAD_TRICEPS_EXTENSION",
+   "garmin_name": "Cable Overhead Triceps Extension",
+   "confidence": "media"
+  },
+  "availability_br": "rara",
+  "evidence": "Com o braço acima da cabeça a cabeça longa do tríceps fica alongada e cresceu ~1,4x mais que no pulley em 12 semanas (Maeo et al., 2023).",
+  "sources": [
+   "https://sci-sport.com/en/articles/Triceps-hypertrophy-impact-of-arm-position-225.php",
+   "https://barbend.com/news/jeff-nippard-ranks-best-and-worst-triceps-exercises/"
+  ],
+  "image_like": null,
+  "picto": "dumbbell"
+ },
+ {
+  "id": "VikingPress_Machine",
+  "name": "Viking press (desenvolvimento em alavanca)",
+  "name_en": "Viking Press",
+  "equipment": "machine",
+  "category": "strength",
+  "force": "push",
+  "mechanic": "compound",
+  "level": "intermediate",
+  "primaryMuscles": [
+   "shoulders"
+  ],
+  "secondaryMuscles": [
+   "triceps",
+   "traps",
+   "abdominals"
+  ],
+  "pattern": "v_push",
+  "lengthened": false,
+  "instructions": [
+   "Pegada neutra nas alças, empurre acima da cabeça em arco até estender os braços.",
+   "Abdômen e glúteo contraídos para não arquear a lombar.",
+   "Pegada neutra costuma ser mais confortável para ombros sensíveis.",
+   "Erro comum: inclinar o tronco para trás para completar."
+  ],
+  "garmin": {
+   "category": "SHOULDER_PRESS",
+   "exercise": "SHOULDER_PRESS",
+   "garmin_name": "Shoulder Press",
+   "confidence": "media"
+  },
+  "availability_br": "rara",
+  "evidence": "Desenvolvimento pesado com pegada neutra e trajeto em arco, amigável para o ombro; popular em academias de força/strongman e como acessório de racks.",
+  "sources": [
+   "https://www.youtube.com/watch?v=11cdAXyFhl4"
+  ],
+  "image_like": null,
+  "picto": "yraise"
+ },
+ {
+  "id": "LandmineStation",
+  "name": "Estação landmine (barra articulada no chão)",
+  "name_en": "Landmine Station",
+  "equipment": "other",
+  "category": "strength",
+  "force": "push",
+  "mechanic": "compound",
+  "level": "beginner",
+  "primaryMuscles": [
+   "shoulders",
+   "chest"
+  ],
+  "secondaryMuscles": [
+   "triceps",
+   "abdominals"
+  ],
+  "pattern": "incline_push",
+  "lengthened": false,
+  "instructions": [
+   "Segure a ponta da barra no ombro e empurre para cima e à frente.",
+   "Trave bem a base (ou use um canto com anilha) para a barra não escorregar.",
+   "No press, mantenha costelas para baixo e glúteo contraído.",
+   "Comece leve — a alavanca engana sobre a carga real."
+  ],
+  "garmin": {
+   "category": "SHOULDER_PRESS",
+   "exercise": "SHOULDER_PRESS",
+   "garmin_name": "Shoulder Press",
+   "confidence": "landmine press (Garmin não tem landmine)"
+  },
+  "availability_br": "média",
+  "evidence": "Equipamento barato e muito versátil (empurrar, remar, rotação, agachar), queridinho do treino híbrido e de academias funcionais; o press é amigável para ombros.",
+  "sources": [
+   "https://www.youtube.com/watch?v=J2M-trq1L9A"
+  ],
+  "image_like": null,
+  "picto": "dumbbell"
  }
 ]

@@ -1739,7 +1739,9 @@ async function showMachine(id) {
     ${embeds.length ? ytEmbed(embeds[0]) : ""}
     ${ph ? `<figure class="mx-photo"><img loading="lazy" src="${esc(ph.url)}" alt="Foto do aparelho ${esc(m.name)}"><figcaption class="small muted">Foto: ${esc(ph.author || "Wikimedia Commons")}${ph.license ? ` · ${esc(ph.license)}` : ""}${ph.page ? ` · <a href="${esc(ph.page)}" target="_blank" rel="noopener">fonte</a>` : ""}</figcaption></figure>` : ""}
     ${m.why ? `<div class="evidence"><b>Por que vale a pena</b><p class="small">${esc(m.why)}</p></div>` : ""}
-    ${(m.exercises || []).length ? `<h3>O que dá para fazer</h3><ul class="exlist mx-ex">${m.exercises.map((x) => `<li><span class="grow"><b>${esc(x.name)}</b><span class="small muted">${esc(x.how || "")}</span></span></li>`).join("")}</ul>` : ""}
+    ${(m.exercises || []).length ? `<h3>O que dá para fazer</h3><ul class="exlist mx-ex">${m.exercises.map((x) => `<li><span class="grow"><b>${esc(x.name)}</b><span class="small muted">${esc(x.how || "")}</span></span>
+      ${x.video ? (x.video.embed ? `<button class="act" data-ytx="${esc(x.video.id)}" aria-label="Ver vídeo: ${esc(x.name)}">▶ vídeo</button>` : `<a class="act" href="https://www.youtube.com/watch?v=${esc(x.video.id)}" target="_blank" rel="noopener">▶ YouTube</a>`) : ""}
+      ${x.exercise_id ? `<button class="act" data-exl="${esc(x.exercise_id)}" aria-label="Detalhes do exercício">›</button>` : ""}</li>`).join("")}</ul>` : ""}
     ${(m.linked || []).length ? `<div class="chips" style="margin:8px 0 4px">${m.linked.map((x) => `<button class="chip" data-exl="${esc(x.id)}">${esc(x.name)} ›</button>`).join("")}</div>` : ""}
     ${(m.tips || []).length ? `<h3>Dicas</h3><ul class="plain small">${m.tips.map((t) => `<li>${esc(t)}</li>`).join("")}</ul>` : ""}
     ${embeds.length > 1 || links.length ? `<h3>Mais vídeos</h3><ul class="plain small">${[...embeds.slice(1), ...links].map((v) => `<li><a href="https://www.youtube.com/watch?v=${esc(v.id)}" target="_blank" rel="noopener">${esc(v.title || "Vídeo")}</a>${v.channel ? ` · ${esc(v.channel)}` : ""}</li>`).join("")}</ul>` : ""}
@@ -1748,6 +1750,13 @@ async function showMachine(id) {
     const y = e.target.closest("[data-yt]");
     if (y) { y.outerHTML = `<div class="yt on"><iframe src="https://www.youtube-nocookie.com/embed/${esc(y.dataset.yt)}?autoplay=1&playsinline=1&rel=0" title="Vídeo do exercício" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe></div>`; return; }
     const ex = e.target.closest("[data-exl]"); if (ex) return showExercise(ex.dataset.exl);
+    const yx = e.target.closest("[data-ytx]");
+    if (yx) {
+      // troca o vídeo de cima pelo da variação e sobe até ele
+      const top = $(".yt", body); const html = `<div class="yt on"><iframe src="https://www.youtube-nocookie.com/embed/${esc(yx.dataset.ytx)}?autoplay=1&playsinline=1&rel=0" title="Vídeo da variação" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe></div>`;
+      if (top) top.outerHTML = html; else body.querySelector("p").insertAdjacentHTML("afterend", html);
+      $(".modal-card").scrollTo({ top: 0, behavior: "smooth" });
+    }
   };
   body.onkeydown = (e) => { if (e.key === "Enter" && e.target.dataset.yt) e.target.click(); };
 }
