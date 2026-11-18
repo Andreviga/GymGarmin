@@ -663,7 +663,8 @@ def exercises(q: str = "", muscle: str | None = None, equipment: str | None = No
 
 PICTO = [(("corrida", "esteira_corrida"), "run"), (("ciclismo", "bike", "spinning"), "bike"), (("natacao",), "swim"),
          (("remo",), "row"), (("trilha",), "hike"), (("caminhada",), "walk"), (("ski",), "ski"), (("eliptico",), "elliptical"),
-         (("escada",), "stairs"), (("corda",), "rope"), (("kettlebell",), "kettlebell")]
+         (("escada",), "stairs"), (("corda",), "rope"), (("kettlebell",), "kettlebell"), (("esteira_curva",), "run"),
+         (("treno",), "sled"), (("ergometro_braco",), "armerg"), (("versaclimber",), "climber")]
 
 
 @app.get("/api/media")
@@ -678,7 +679,7 @@ def media_index():
             folder = im[0][len(base):].rsplit("/", 1)[0]
             out["f"][ex["id"]] = "" if folder == ex["id"] else folder  # "" = mesma pasta do id
         lid = ex["id"].lower()
-        pic = next((k for keys, k in PICTO if any(x in lid for x in keys)), None)
+        pic = ex.get("picto") or next((k for keys, k in PICTO if any(x in lid for x in keys)), None)
         if pic and not im:
             out["p"][ex["id"]] = pic
         elif not im:

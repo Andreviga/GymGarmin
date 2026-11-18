@@ -816,5 +816,164 @@
   "params": [],
   "tips": "Subidas contam muito: some ~10 min para cada 100 m de desnível.",
   "endurance": true
+ },
+ {
+  "id": "cardio_esteira_curva",
+  "name": "Esteira curva (não motorizada)",
+  "name_en": "Curved non-motorized treadmill",
+  "impact": "alto",
+  "primaryMuscles": [
+   "quadriceps",
+   "glutes",
+   "calves",
+   "hamstrings"
+  ],
+  "secondaryMuscles": [
+   "abdominals"
+  ],
+  "met": {
+   "leve": 5.0,
+   "moderado": 10.5,
+   "vigoroso": 13.5
+  },
+  "garmin_step": {
+   "category": "RUN_INDOOR",
+   "exercise": "TREADMILL"
+  },
+  "fit_step": {
+   "category": "run_indoor",
+   "exercise": "treadmill"
+  },
+  "fit_sport": {
+   "sport": "running",
+   "sub_sport": "treadmill"
+  },
+  "connect_sport": "running",
+  "params": [
+   "velocidade_kmh"
+  ],
+  "tips": "Sem motor: a velocidade vem da sua passada (tronco à frente acelera). Gasta ~17–37% mais que a esteira comum na mesma velocidade — ótima para tiros de 10–60 s; comum em boxes e academias premium."
+ },
+ {
+  "id": "cardio_treno",
+  "name": "Trenó (sled push / pull)",
+  "name_en": "Sled push",
+  "impact": "baixo",
+  "primaryMuscles": [
+   "quadriceps",
+   "glutes",
+   "calves"
+  ],
+  "secondaryMuscles": [
+   "hamstrings",
+   "shoulders",
+   "triceps",
+   "chest",
+   "abdominals"
+  ],
+  "met": {
+   "leve": 6.0,
+   "moderado": 8.0,
+   "vigoroso": 10.0
+  },
+  "garmin_step": {
+   "category": "SLED",
+   "exercise": "PUSH"
+  },
+  "fit_step": {
+   "category": "sled",
+   "exercise": "push"
+  },
+  "fit_sport": {
+   "sport": "fitness_equipment",
+   "sub_sport": "cardio_training"
+  },
+  "connect_sport": "cardio_training",
+  "params": [
+   "carga_kg",
+   "distancia_m"
+  ],
+  "tips": "Estação do HYROX (4×12,5 m). Quase sem fase excêntrica: condiciona pernas com pouca dor muscular no dia seguinte. Braços estendidos, tronco a ~45°, passos curtos e contínuos."
+ },
+ {
+  "id": "cardio_ergometro_braco",
+  "name": "Cicloergômetro de braço (arm bike)",
+  "name_en": "Arm ergometer (UBE)",
+  "impact": "baixo",
+  "primaryMuscles": [
+   "shoulders",
+   "triceps",
+   "biceps"
+  ],
+  "secondaryMuscles": [
+   "forearms",
+   "lats",
+   "chest",
+   "abdominals"
+  ],
+  "met": {
+   "leve": 2.8,
+   "moderado": 3.5,
+   "vigoroso": 5.0
+  },
+  "garmin_step": {
+   "category": "CARDIO",
+   "exercise": "CARDIO"
+  },
+  "fit_step": {
+   "category": "cardio",
+   "exercise": null
+  },
+  "fit_sport": {
+   "sport": "fitness_equipment",
+   "sub_sport": "cardio_training"
+  },
+  "connect_sport": "cardio_training",
+  "params": [
+   "watts",
+   "rpm"
+  ],
+  "tips": "Mantém o condicionamento quando perna, joelho ou tornozelo estão lesionados. A FC máxima nos braços é menor que pedalando — use zonas ~10 bpm mais baixas."
+ },
+ {
+  "id": "cardio_versaclimber",
+  "name": "VersaClimber (escalada vertical)",
+  "name_en": "VersaClimber",
+  "impact": "baixo",
+  "primaryMuscles": [
+   "quadriceps",
+   "glutes",
+   "shoulders",
+   "lats"
+  ],
+  "secondaryMuscles": [
+   "calves",
+   "hamstrings",
+   "biceps",
+   "abdominals"
+  ],
+  "met": {
+   "leve": 6.0,
+   "moderado": 9.0,
+   "vigoroso": 12.0
+  },
+  "garmin_step": {
+   "category": "CARDIO",
+   "exercise": "CARDIO"
+  },
+  "fit_step": {
+   "category": "cardio",
+   "exercise": null
+  },
+  "fit_sport": {
+   "sport": "fitness_equipment",
+   "sub_sport": "cardio_training"
+  },
+  "connect_sport": "cardio_training",
+  "params": [
+   "passos_min",
+   "altura_passo"
+  ],
+  "tips": "Corpo inteiro, sem impacto, com FC muito alta em pouco tempo; ótimo para intervalados curtos. Raro no Brasil (estúdios e academias premium)."
  }
 ]

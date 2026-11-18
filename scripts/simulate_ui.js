@@ -188,7 +188,7 @@ async function flows(page, base, persona, tag) {
     const el = page.locator(sel).first();
     if (!(await el.count())) { issue("botão esperado não encontrado", W(`${what} (${sel})`)); return false; }
     await el.scrollIntoViewIfNeeded().catch(() => {});
-    try { await el.click({ timeout: 4000 }); } catch (e) { issue("não deu para tocar no botão", W(`${what}: ${String(e.message).split("\n")[0].slice(0, 140)}`)); return false; }
+    try { await el.click({ timeout: 4000 }); } catch (e) { issue("não deu para tocar no botão", W(`${what}: ${String(e.message).replace(/\s+/g, " ").slice(0, 900)}`)); return false; }
     await page.waitForLoadState("networkidle").catch(() => {});
     await page.waitForTimeout(250);
     return true;
@@ -210,6 +210,7 @@ async function flows(page, base, persona, tag) {
 
   if (persona === "novo") {
     await go(page, "#hoje", W("hoje (novo)"));
+    await page.evaluate(() => { const d = document.querySelector("#gen-open") && document.querySelector("#gen-open").closest("details"); if (d) d.open = true; });
     if (await click("#gen-open", "Gerar meu treino")) {
       await modalCheck("gerador");
       await click("#gm-prev", "Pré-visualizar");
@@ -226,22 +227,22 @@ async function flows(page, base, persona, tag) {
 
   // Hoje: ver treino, mover, não vou treinar + desfazer
   await go(page, "#hoje", W("hoje"));
-  const openDay = async (sel) => { const s = page.locator(`details.day:has(${sel}):not([open]) > summary`).first(); if (await s.count()) { await s.scrollIntoViewIfNeeded(); await s.click(); await page.waitForTimeout(100); } };
-  const sum = page.locator("details.day:not(.dim) > summary").first();
+  // semana em tira: toca nos dias até o cartão do dia mostrar o botão procurado
+  const openDay = async (sel) => { if (await page.locator(`#day-panel ${sel}`).count()) return; const n = await page.locator(".wd").count(); for (let i = 0; i < n; i++) { await page.locator(".wd").nth(i).click(); await page.waitForTimeout(80); if (await page.locator(`#day-panel ${sel}`).count()) return; } };
+  const sum = page.locator("#day-panel details.sub > summary").first();
   if (await sum.count()) { await sum.scrollIntoViewIfNeeded(); await sum.click(); await page.waitForTimeout(100); await audit(page, W("hoje com treino aberto")); }
-  if (await page.locator("[data-move]").count()) {
-    await openDay("[data-move]");
-    await click(".day[open] [data-move]", "Mover");
+  await openDay("[data-move]");
+  if (await page.locator("#day-panel [data-move]").count()) {
+    await click("#day-panel [data-move]", "Mover");
     await modalCheck("mover");
     await page.click(".modal-close").catch(() => issue("não fechou o modal", W("mover")));
   }
-  const skipBtn = page.locator(".day [data-skip]").first();
-  if (await skipBtn.count()) {
-    await openDay("[data-skip]");
-    await click(".day[open] [data-skip]", "Não vou treinar");
+  await openDay("[data-skip]");
+  if (await page.locator("#day-panel [data-skip]").count()) {
+    await click("#day-panel [data-skip]", "Não vou treinar");
     await modalCheck("reajuste");
     await click("#ok-close", "Ok do reajuste");
-    if (await page.locator("[data-undo]").count()) { await openDay("[data-undo]"); } if (await page.locator("[data-undo]").count()) await click(".day[open] [data-undo]", "Desfazer ajuste");
+    if (await page.locator("[data-undo]").count()) { await openDay("[data-undo]"); } if (await page.locator("[data-undo]").count()) await click("#day-panel [data-undo]", "Desfazer ajuste");
   }
   if (await page.locator("#rd-apply").count()) await audit(page, W("cartão de prontidão"));
 

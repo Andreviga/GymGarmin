@@ -112,6 +112,19 @@ PATTERNS = {
     "core": ["Cable_Crunch", "Plank", "Dead_Bug", "Pallof_Press", "Hanging_Leg_Raise", "Ab_Crunch_Machine", "Reverse_Crunch", "Side_Bridge"],
 }
 
+# aparelhos pesquisados (data/machines.json): entram no rodízio de cada padrão; os raros ficam só para escolha manual
+def _add_researched_machines() -> None:
+    import json
+    from pathlib import Path
+    for m in json.loads((Path(__file__).resolve().parent / "data" / "machines.json").read_text()):
+        if m.get("availability_br") == "rara" or m["pattern"] not in PATTERNS:
+            continue
+        if m["id"] not in PATTERNS[m["pattern"]]:
+            PATTERNS[m["pattern"]].append(m["id"])
+
+
+_add_researched_machines()
+
 DAY_TEMPLATES = {
     "FB_A": ("Full body A", [("squat", "main"), ("h_push", "main"), ("h_pull", "main"), ("hinge", "sec"), ("lateral", "acc"), ("biceps", "acc"), ("core", "acc")]),
     "FB_B": ("Full body B", [("hinge", "main"), ("v_pull", "main"), ("incline_push", "main"), ("single_leg", "sec"), ("rear_delt", "acc"), ("triceps", "acc"), ("calf", "acc")]),
@@ -405,7 +418,8 @@ RIR = {
     "elite": {"main": "1–2", "sec": "1–2", "acc": "0–1 (última até a falha técnica)"},
 }
 # Exercícios que carregam o músculo alongado (Maeo 2021/2023, Pedrosa 2022, Kassiano 2023): preferidos nos acessórios
-LENGTHENED = {"Seated_Leg_Curl", "Cable_Rope_Overhead_Triceps_Extension", "Standing_Dumbbell_Triceps_Extension",
+LENGTHENED = {"Pendulum_Squat", "Reverse_Hack_Squat", "Hack_Machine_Calf_Raise", "Bayesian_Cable_Curl",
+              "Cable_Cross-Body_Triceps_Extension", "Cable_Y_Raise", "Glute_Kickback_Machine", "Seated_Leg_Curl", "Cable_Rope_Overhead_Triceps_Extension", "Standing_Dumbbell_Triceps_Extension",
               "Incline_Dumbbell_Curl", "Standing_Calf_Raises", "Standing_Dumbbell_Calf_Raise", "Dumbbell_Flyes",
               "Low_Cable_Crossover", "Romanian_Deadlift"}
 LENGTHENED_PATTERNS = {"leg_curl", "triceps", "biceps", "calf", "chest_fly"}

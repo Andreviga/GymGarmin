@@ -262,22 +262,20 @@ def _race_taper(wp: dict | None, profile: dict, ws: date) -> dict | None:
 def _taper_strength(items: list[dict], taper: dict, day: dict, wd: int) -> list[dict]:
     """Polimento: mantém a carga e corta ~1/3 das séries (a força não cai em 2–3 semanas, a fadiga sim).
     Semana da prova: volume de deload e, nos 2 dias antes da prova, nada pesado de perna."""
-    from .generator import HEAVY_LEGS
-
     out = copy.deepcopy(items)
     race_week = taper["phase"] == "prova"
     near_race = race_week and taper.get("race_wd") is not None and 0 <= taper["race_wd"] - wd <= 2
-    legs_heavy = day.get("template") in HEAVY_LEGS
     keep = []
     for it in out:
         if it.get("phase") not in (None, "principal") or not it.get("sets"):
             keep.append(it)
             continue
-        if near_race and legs_heavy and taper["sport"] in ("corrida", "ciclismo", "multi", "trilha", "caminhada"):
+        # 2 dias antes da prova: nenhum exercício de perna, em qualquer treino (perna, corpo inteiro ou acessório)
+        if near_race and taper["sport"] in ("corrida", "ciclismo", "multi", "trilha", "caminhada"):
             prim = (catalog.get(it.get("exercise_id")) or {}).get("primaryMuscles") or []
             if any(m in ("quadriceps", "hamstrings", "glutes", "calves", "adductors", "abductors") for m in prim):
                 continue  # pernas descansadas para a prova
-        f = 0.55 if race_week else 0.7
+        f = 0.5 if race_week else 0.7  # polimento: volume −30%; semana da prova −50% (Bosquet 2007: cortar 41–60%)
         it["sets"] = max(1, round(it["sets"] * f))
         it["taper"] = True
         it["notes"] = ((it.get("notes") or "") + (" · semana da prova: menos séries, mesma carga, sem ir à falha" if race_week

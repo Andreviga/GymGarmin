@@ -8,9 +8,25 @@ const view = $("#view");
 const state = { meta: null, profile: null, draftPlan: null, planTab: 0, session: null };
 
 function actAs() { try { return JSON.parse(sessionStorage.getItem("gg_act") || "null"); } catch (_) { return null; } }
+/* Cache "mostra já, atualiza depois": cada tela abre na hora com os últimos dados e se atualiza sozinha em seguida.
+   Só leituras (GET) entram; qualquer gravação limpa o cache para nunca mostrar dado velho depois de uma mudança. */
+const SWR = { mode: null, used: null, mem: new Map(), key: "gg_cache_v1", skip: /^\/api\/(auth|garmin\/status|schedule\/\d+\/prefill)/ };
+try { for (const [k, v] of Object.entries(JSON.parse(localStorage.getItem(SWR.key) || "{}"))) SWR.mem.set(k, v); } catch (_) { /* sem cache */ }
+function swrSave() {
+  clearTimeout(swrSave.t);
+  swrSave.t = setTimeout(() => {
+    const entries = [...SWR.mem.entries()].slice(-40);
+    try { localStorage.setItem(SWR.key, JSON.stringify(Object.fromEntries(entries))); } catch (_) { try { localStorage.removeItem(SWR.key); } catch (_e) { /* */ } }
+  }, 400);
+}
+function swrClear() { SWR.mem.clear(); try { localStorage.removeItem(SWR.key); } catch (_) { /* */ } }
+const clone = (v) => (v && typeof v === "object" ? JSON.parse(JSON.stringify(v)) : v);
 async function api(path, opts = {}) {
   const act = actAs();
-  const o = { ...opts, headers: { "Content-Type": "application/json", ...(act ? { "X-GG-Athlete": String(act.id) } : {}), ...(opts.headers || {}) } };
+  const isGet = !opts.method || opts.method === "GET";
+  const ck = `${act ? act.id : "me"}|${path}`;
+  if (isGet && SWR.mode && !SWR.skip.test(path) && SWR.mem.has(ck)) { SWR.used.add(path); return clone(SWR.mem.get(ck)); }
+  const o = { ...opts, signal: opts.signal, headers: { "Content-Type": "application/json", ...(act ? { "X-GG-Athlete": String(act.id) } : {}), ...(opts.headers || {}) } };
   if (o.body && typeof o.body !== "string") o.body = JSON.stringify(o.body);
   let r;
   try { r = await fetch(path, o); } catch (_) {
@@ -24,7 +40,10 @@ async function api(path, opts = {}) {
     throw new Error(msg);
   }
   const ct = r.headers.get("content-type") || "";
-  return ct.includes("json") ? r.json() : r.text();
+  const out = ct.includes("json") ? await r.json() : await r.text();
+  if (!isGet) { if (SWR.mem.size) swrClear(); }
+  else if (ct.includes("json") && !SWR.skip.test(path)) { SWR.mem.delete(ck); SWR.mem.set(ck, clone(out)); swrSave(); }
+  return out;
 }
 
 function toast(msg, ms = 2600) {
@@ -116,13 +135,19 @@ const PICTO_SVG = {
   rope: '<circle cx="12" cy="4.5" r="2"/><path d="M12 7.5v7M12 10l-4 2M12 10l4 2M12 14.5l-2 6M12 14.5l2 6M8 12c-5 3-5 10 4 10s9-7 4-10"/>',
   kettlebell: '<path d="M8.5 9a3.5 3.5 0 117 0"/><path d="M6.5 11h11l1 6a4 4 0 01-4 4h-5a4 4 0 01-4-4z"/>',
   dumbbell: '<path d="M3 10v4M6 8v8M18 8v8M21 10v4M6 12h12"/>',
+  squat: '<circle cx="12" cy="4" r="2"/><path d="M6 9h12M12 6v5l-3 4 3 5M12 11l3 4-1 5M5 20h14"/><path d="M6 9v3M18 9v3"/>',
+  abduct: '<circle cx="12" cy="4" r="2"/><path d="M12 6v8M12 9l-3 3M12 9l3 3M12 14l-2 7M12 14l6 5M18 19l3-1M21 18V6"/>',
+  yraise: '<circle cx="12" cy="7" r="2"/><path d="M12 9v7M12 10l-6-6M12 10l6-6M12 16l-2 5M12 16l2 5M3 3h3M18 3h3"/>',
+  sled: '<circle cx="7" cy="5" r="2"/><path d="M7 7l3 5-4 3-1 5M10 12l5-1M13 15l-2 5M14 9h6v8h-6zM13 20h9"/>',
+  armerg: '<circle cx="8" cy="6" r="2"/><path d="M8 8v7l4 5M8 11l5 1M15 12a3 3 0 1 0 0-.1M15 12v9M11 21h8"/>',
+  climber: '<circle cx="12" cy="5" r="2"/><path d="M17 2v20M12 7v6l-3 4v4M12 13l3 3h2M12 9l5-3M12 9l-4 2"/>',
 };
 let MEDIA = null;
 async function loadMedia() {
   if (MEDIA) return MEDIA;
-  try { MEDIA = store("gg_media_v1"); } catch (_) { MEDIA = null; }
+  try { MEDIA = store("gg_media_v2"); } catch (_) { MEDIA = null; }
   if (!MEDIA || !MEDIA.f) {
-    try { MEDIA = await api("/api/media"); store("gg_media_v1", MEDIA); } catch (_) { MEDIA = { base: "", f: {}, p: {} }; }
+    try { MEDIA = await api("/api/media"); store("gg_media_v2", MEDIA); } catch (_) { MEDIA = { base: "", f: {}, p: {} }; }
   }
   return MEDIA;
 }
@@ -170,66 +195,71 @@ function meter(label, done, target, unit = "") {
 }
 
 async function viewHoje(weekDate) {
+  const athletePromise = weekDate ? Promise.resolve("") : athleteCards().catch(() => "");
   const [sch, rd] = await Promise.all([api(`/api/schedule${weekDate ? `?date=${weekDate}` : ""}`),
     weekDate ? Promise.resolve(null) : api("/api/readiness").catch(() => null)]);
   if (!sch.plan) {
-    view.innerHTML = `<section class="hero rest"><div class="hero-txt"><div class="kick">Bem-vindo ao Hybrid Lab</div>
-      <div class="ttl">Monte seu treino</div>
-      <div class="meta">Diga há quanto tempo treina, os dias e o tempo que tem. O app monta musculação e corrida juntas, respeita suas limitações e reorganiza a semana quando você faltar.</div>
-      <div class="row gap wrap" style="margin-top:12px"><button class="btn light" id="gen-open">Gerar meu treino</button><a class="btn ghost-light" href="#planilhas">Montar manualmente</a></div></div></section>`;
+    view.innerHTML = `${pageHead("Hoje")}<section class="today-card">
+      <div class="eyebrow">Comece por aqui</div><div class="tc-title">Monte seu treino</div>
+      <p class="muted">Diga há quanto tempo treina, os dias e o tempo que tem. O app monta musculação e corrida juntas, respeita suas limitações e reorganiza a semana quando você faltar.</p>
+      <button class="btn block" id="gen-open">Gerar meu treino</button>
+      <a class="btn ghost block" href="#planilhas" style="margin-top:8px">Montar manualmente</a></section>`;
     $("#gen-open").onclick = () => openGenerator();
     return;
   }
   const g = sch.goals;
   const missed = sch.entries.filter((e) => e.status === "perdido");
-  const outdated = sch.entries.some((e) => e.garmin_outdated && e.status === "planejado");
   const cyc = sch.cycle;
-  const athleteHtml = weekDate ? "" : await athleteCards();
-  const todays = weekDate ? [] : sch.entries.filter((e) => e.date === sch.today);
-  const plannedToday = todays.filter((e) => e.status === "planejado");
-  const doneToday = todays.filter((e) => e.status === "feito");
-  // treino de hoje já feito (ou dia livre): o destaque passa para o próximo treino, juntando o que cai no mesmo dia
-  let heroList = plannedToday;
-  if (!heroList.length && !weekDate) {
+  const athleteHtml = await athletePromise;
+  const plannedToday = sch.entries.filter((e) => e.date === sch.today && e.status === "planejado");
+  // dia aberto: hoje; se hoje já foi feito ou é descanso, o próximo treino
+  let sel = weekDate ? (sch.entries.find((e) => e.status === "planejado") || sch.entries[0] || {}).date || sch.week_start : sch.today;
+  if (!weekDate && !plannedToday.length) {
     const nx = sch.entries.find((x) => x.date > sch.today && x.status === "planejado");
-    if (nx) heroList = sch.entries.filter((x) => x.date === nx.date && x.status === "planejado");
+    if (nx && !sch.entries.some((e) => e.date === sch.today && e.status !== "planejado")) sel = nx.date;
   }
+  sch._sel = sel;
   const adjusted = plannedToday.some((e) => e.readiness_backup);
-  view.innerHTML = `${weekDate ? "" : heroHtml(heroList, sch, doneToday) + statsHtml(rd, g, adjusted, plannedToday.length > 0)}${athleteHtml}
+  view.innerHTML = `${weekDate ? pageHead(`Semana de ${ddmm(sch.week_start)}`) : pageHead("Hoje", true, sch.today)}
+  ${weekDate ? "" : statsHtml(rd, g, adjusted, plannedToday.length > 0)}${athleteHtml}
   ${missed.length ? `<div class="rec alerta"><b>Treino perdido:</b> ${missed.map((e) => `${e.weekday} ${ddmm(e.date)} – ${esc(e.day_name)}`).join(", ")}.
      <div class="row gap wrap" style="margin-top:6px">${missed.map((e) => `<button class="btn sm" data-skip="${e.id}">Ajustar a semana (${e.weekday})</button>`).join("")}</div></div>` : ""}
-  ${(sch.time_warnings || []).length ? `<details class="rec atencao small"><summary><b>⏱ ${sch.time_warnings.length} ${sch.time_warnings.length > 1 ? "dias passam" : "dia passa"} do seu tempo de treino</b></summary><ul class="plain">${sch.time_warnings.map((w) => `<li>${esc(w)}</li>`).join("")}</ul></details>` : ""}
-  ${heroList.length ? todayListHtml(heroList, sch) : ""}
-  <section class="sec">
-    <div class="sec-head"><button class="icon-btn" data-week="${addDays(sch.week_start, -7)}" title="Semana anterior" aria-label="Semana anterior">‹</button>
-      <div class="grow" style="text-align:center"><h2>Semana de ${ddmm(sch.week_start)}</h2>
-        <div class="small muted">${esc(sch.plan.name)}${cyc ? ` · ciclo ${cyc.cycle}, semana ${cyc.week}/${cyc.length}${cyc.deload ? " — <b>DELOAD</b>" : ""}` : ""}</div></div>
-      <button class="icon-btn" data-week="${addDays(sch.week_start, 7)}" title="Próxima semana" aria-label="Próxima semana">›</button></div>
-    ${cyc && cyc.deload ? `<p class="small rec">Semana de deload: menos séries, carga −10% e RPE ~6 para o corpo assimilar o ciclo.</p>` : ""}
-    <div class="days">${sch.entries.length ? sch.entries.map((e) => dayCard(e, sch.today)).join("") : `<p class="empty">Nenhum treino nesta semana.</p>`}</div>
-    <div class="row gap wrap" style="margin-top:12px">
-      <button class="btn sm ${outdated ? "" : "ghost"}" id="push-week">${outdated ? "Reenviar alterações ao Garmin" : "Enviar semana ao Garmin"}</button>
-      <button class="btn sm ghost" id="gen-open">Regerar treino</button>
-      <button class="btn sm ghost" id="rebuild">Refazer pela planilha</button>
-    </div>
+  <section class="week">
+    <div class="week-head"><button class="icon-btn sm" data-week="${addDays(sch.week_start, -7)}" aria-label="Semana anterior">‹</button>
+      <div class="grow"><b>${weekDate ? esc(sch.plan.name) : `Semana de ${ddmm(sch.week_start)}`}</b>
+        <span class="small muted">${cyc ? `ciclo ${cyc.cycle} · semana ${cyc.week}/${cyc.length}${cyc.deload ? " · deload" : ""}` : esc(sch.plan.name)}</span></div>
+      <button class="icon-btn sm" data-week="${addDays(sch.week_start, 7)}" aria-label="Próxima semana">›</button></div>
+    <div class="wstrip" role="tablist">${weekStrip(sch, sel)}</div>
   </section>
-  <section class="card"><h2>Metas da semana</h2><div class="stack">
+  <div id="day-panel">${dayPanel(sch, sel)}</div>
+  ${(sch.time_warnings || []).length ? `<details class="rec atencao small"><summary><b>⏱ ${sch.time_warnings.length} ${sch.time_warnings.length > 1 ? "dias passam" : "dia passa"} do seu tempo de treino</b></summary><ul class="plain">${sch.time_warnings.map((w) => `<li>${esc(w)}</li>`).join("")}</ul></details>` : ""}
+  ${cyc && cyc.deload ? `<p class="small rec">Semana de deload: menos séries, carga −10% e RPE ~6 para o corpo assimilar o ciclo.</p>` : ""}
+  <section class="card goals"><div class="row between"><h2>Metas da semana</h2><a class="small" href="#analise">Progresso ›</a></div><div class="stack">
     ${meter("Treinos", g.sessions.done, g.sessions.planned)}
-    ${meter("Cardio (min equivalentes OMS)", g.cardio.done, g.cardio.target)}
     ${meter("Séries de força", g.sets.done, g.sets.planned)}
-    ${meter("Tempo treinado", g.minutes.done, g.minutes.planned, " min")}
-    ${Object.entries(g.endurance || {}).map(([k, x]) => meter(`${SPORT_ICON[k] || ""} ${esc(x.name)}`, x.done, x.planned, " " + x.unit)).join("")}
+    ${meter("Cardio (min equivalentes)", g.cardio.done, g.cardio.target)}
+    ${Object.entries(g.endurance || {}).map(([k, x]) => meter(`${esc(x.name)}`, x.done, x.planned, " " + x.unit)).join("")}
   </div></section>
-  <section class="card" id="hoje-recs"><h2>O que ajustar</h2><p class="muted small">Carregando…</p></section>`;
+  <details class="card more"><summary><b>Opções da semana</b></summary><div class="stack" style="padding-bottom:4px">
+    <button class="btn ghost block" id="push-week">${sch.entries.some((e) => e.garmin_outdated && e.status === "planejado") ? "Reenviar alterações ao Garmin" : "Enviar semana ao Garmin"}</button>
+    <button class="btn ghost block" id="gen-open">Regerar treino</button>
+    <button class="btn ghost block" id="rebuild">Refazer a semana pela planilha</button></div></details>`;
   sch._rd = rd;
   bindAgenda(sch);
-  api("/api/report/weekly").then((rep) => { const b = $("#hoje-recs"); if (b) b.innerHTML = `<h2>O que ajustar</h2>${recsHtml(rep.recommendations.slice(0, 6))}`; }).catch(() => {});
 }
 
-/* ------------------------------------------------- HOJE: foto, números e lista -- */
+/* ------------------------------------------------- HOJE: semana em tira + cartão do dia -- */
 const SPORT_PICTO = { corrida: "run", ciclismo: "bike", natacao: "swim", remo: "row", caminhada: "walk", trilha: "hike" };
 const SPORT_WORD = { corrida: "corrida", ciclismo: "bike", natacao: "natação", remo: "remo", caminhada: "caminhada", trilha: "trilha" };
 const WD_LONG = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"];
+const WD_SHORT = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SÁB"];
+const MONTHS = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
+function pageHead(title, greet = false, today = null) {
+  const d = today ? new Date(today + "T12:00:00") : new Date();
+  const name = state.me && state.me.user && state.me.user.name ? String(state.me.user.name).split(" ")[0] : "";
+  const sub = `${WD_LONG[d.getDay()]}, ${d.getDate()} de ${MONTHS[d.getMonth()]}`;
+  return `<header class="page-head"><div class="eyebrow">${greet ? sub : ""}</div><h1 class="page-title">${greet && name && name !== "Eu" ? `Olá, ${esc(name)}` : esc(title)}</h1></header>`;
+}
 function mainIds(e) {
   return (e.items || []).filter((i) => (i.phase || "principal") === "principal").map((i) => i.exercise_id);
 }
@@ -239,33 +269,70 @@ function dayKind(e) {
   if (end.length && str) return `musculação + ${SPORT_WORD[end[0].endurance.sport] || "cardio"}`;
   return end.length ? (SPORT_WORD[end[0].endurance.sport] || "cardio") : "musculação";
 }
+function shortName(e) { return e.sport ? String(e.day_name).replace(/^[^:]+:\s*/, "") : e.day_name; }
 function dayLabel(date, sch) {
   const d = new Date(date + "T12:00:00");
-  const when = date === sch.today ? "Hoje" : date === addDays(sch.today, 1) ? "Amanhã" : WD_LONG[d.getDay()][0].toUpperCase() + WD_LONG[d.getDay()].slice(1);
-  return { when, full: `${when} · ${WD_LONG[d.getDay()]}, ${ddmm(date)}` };
+  return date === sch.today ? "Hoje" : date === addDays(sch.today, 1) ? "Amanhã" : WD_LONG[d.getDay()][0].toUpperCase() + WD_LONG[d.getDay()].slice(1);
 }
-function shortName(e) { return e.sport ? String(e.day_name).replace(/^[^:]+:\s*/, "") : e.day_name; }
-function heroHtml(list, sch, doneToday = []) {
-  const doneTxt = doneToday.length ? `<div class="hero-done">✔ Treino de hoje feito</div>` : "";
-  if (!list.length) {
-    const d = new Date(sch.today + "T12:00:00");
-    return `<section class="hero rest"><div class="hero-txt">${doneTxt}<div class="kick">Hoje · ${WD_LONG[d.getDay()]}, ${ddmm(sch.today)}</div>
-      <div class="ttl">${doneToday.length ? "Semana concluída" : "Descanso"}</div>
-      <div class="meta">Caminhar, alongar e dormir bem também contam.</div></div></section>`;
+function weekStrip(sch, sel) {
+  return [0, 1, 2, 3, 4, 5, 6].map((i) => {
+    const date = addDays(sch.week_start, i); const d = new Date(date + "T12:00:00");
+    const es = sch.entries.filter((e) => e.date === date);
+    const st = !es.length ? "rest" : es.every((e) => e.status === "feito") ? "done" : es.some((e) => e.status === "perdido") ? "missed"
+      : es.some((e) => e.status === "planejado") ? "planned" : "skipped";
+    return `<button class="wd ${st} ${date === sch.today ? "is-today" : ""} ${date === sel ? "sel" : ""}" data-day="${date}" role="tab" aria-selected="${date === sel}"
+      aria-label="${WD_LONG[d.getDay()]} ${ddmm(date)}: ${es.length ? es.map((e) => esc(e.day_name)).join(" + ") : "descanso"}">
+      <small>${WD_SHORT[d.getDay()]}</small><b>${d.getDate()}</b><i></i></button>`;
+  }).join("");
+}
+function dayPanel(sch, date) {
+  const es = sch.entries.filter((e) => e.date === date);
+  const lbl = dayLabel(date, sch);
+  if (!es.length) {
+    const nx = sch.entries.find((x) => x.date > date && x.status === "planejado");
+    return `<section class="today-card rest"><div class="eyebrow">${lbl} · ${ddmm(date)}</div><div class="tc-title">Descanso</div>
+      <p class="muted">Caminhar, alongar e dormir bem também contam.</p>
+      ${nx ? `<button class="btn ghost block" data-day="${nx.date}">Próximo: ${esc(dayLabel(nx.date, sch))} · ${esc(shortName(nx))}</button>` : ""}</section>`;
   }
-  const date = list[0].date, lb = dayLabel(date, sch);
-  const strength = list.find((e) => !e.sport);
-  const id = strength ? mainIds(strength).find((x) => frames(x)) : null;
-  const f = id ? frames(id) : null;
-  const mins = list.reduce((t, e) => t + (e.time ? e.time.total : 0), 0);
-  const kinds = [...new Set(list.map(dayKind).join(" + ").split(" + "))].join(" + ");
-  const sport = list.find((e) => e.sport);
-  return `<section class="hero ${f ? "photo" : "rest"}">
-    ${f ? `<img class="hero-img" src="${esc(f[0])}" alt="">` : `<span class="hero-picto">${pictoHtml(SPORT_PICTO[(sport || {}).sport] || "dumbbell", "hp")}</span>`}
-    <div class="hero-txt">${doneTxt}<div class="kick">${lb.full}${mins ? ` · ~${Math.round(mins)} min` : ""}</div>
-      <div class="ttl">${list.map((e) => esc(shortName(e))).join(" + ")}</div>
-      <div class="meta">${esc(kinds)}${list.some((e) => e.race) ? " · PROVA" : ""}</div>
-      <div class="row gap wrap" style="margin-top:12px"><a class="btn ${date === sch.today ? "light" : "ghost-light"}" href="#treinar/agenda/${list[0].id}">${date === sch.today ? "Começar treino" : "Treinar agora"}</a></div></div></section>`;
+  const planned = es.filter((e) => e.status === "planejado");
+  const first = planned[0] || es[0];
+  const mins = es.reduce((t, e) => t + (e.time ? e.time.total : 0), 0);
+  const all = es.flatMap((e) => (e.items || []).map((it) => ({ ...it, _entry: e })));
+  const main = all.filter((i) => (i.phase || "principal") === "principal");
+  const extra = all.filter((i) => (i.phase || "principal") !== "principal");
+  const nStr = main.filter((i) => !i.endurance).length;
+  const runs = main.filter((i) => i.endurance);
+  const status = es.every((e) => e.status === "feito") ? ["Feito ✔", "ok"] : es.some((e) => e.status === "perdido") ? ["Perdido", "bad"]
+    : es.every((e) => e.status === "pulado") ? ["Não treinou", "warn"] : null;
+  const strength = es.find((e) => !e.sport);
+  const thumbId = strength ? mainIds(strength).find((x) => frames(x)) : null;
+  return `<section class="today-card ${status ? "st-" + status[1] : ""}">
+    <div class="tc-top"><div class="grow"><div class="eyebrow">${lbl} · ${ddmm(date)}${mins ? ` · ~${Math.round(mins)} min` : ""}</div>
+      <div class="tc-title">${es.map((e) => esc(shortName(e))).join(" + ")}</div>
+      <div class="tc-chips">${nStr ? `<span>${nStr} exercícios</span>` : ""}${runs.map((r) => `<span>${esc(SPORT_WORD[r.endurance.sport] || "cardio")} ${esc(endSummary(r.endurance).split(" · ")[0])}</span>`).join("")}
+        ${es.some((e) => e.race) ? `<span class="bad">prova</span>` : ""}${status ? `<span class="${status[1]}">${status[0]}</span>` : ""}
+        ${es.some((e) => e.garmin_outdated) ? `<span class="warn">Garmin desatualizado</span>` : es.some((e) => e.garmin_workout_id) ? `<span class="ok">no relógio</span>` : ""}</div></div>
+      ${thumbId ? `<span class="tc-thumb">${mediaHtml(thumbId, "m")}</span>` : runs.length ? `<span class="tc-thumb">${pictoHtml(SPORT_PICTO[runs[0].endurance.sport] || "run", "m")}</span>` : ""}</div>
+    ${planned.length ? `<a class="btn block go" href="#treinar/agenda/${first.id}">${date === sch.today ? "Começar treino" : date < sch.today ? "Registrar treino" : "Treinar agora"}</a>` : ""}
+    ${es.some((e) => e.status === "perdido") ? `<button class="btn block" data-skip="${es.find((e) => e.status === "perdido").id}">Ajustar a semana</button>` : ""}
+    <ul class="exlist">${main.map((it) => {
+      const en = it.endurance;
+      const name = en ? en.title : (it._name || it._ex?.name || it.exercise_id);
+      const sub = en ? endSummary(en) : `${it.sets ? `${it.sets} × ${it.reps || (it.duration_s ? it.duration_s + "s" : "")}` : it.duration_min ? `${it.duration_min} min` : ""}${it.rir && !it.deload ? ` · sobrar ${String(it.rir).split(" ")[0]}` : ""}`;
+      return `<li data-ex="${esc(it.exercise_id)}">${mediaHtml(it.exercise_id, "s", en ? SPORT_PICTO[en.sport] : null)}
+        <span class="grow" data-ex="${esc(it.exercise_id)}"><b data-ex="${esc(it.exercise_id)}">${esc(name)}</b><span class="small muted" data-ex="${esc(it.exercise_id)}">${esc(sub)}</span></span>
+        ${it.superset ? `<span class="tag">bi-set ${it.superset}</span>` : en && en.hard ? `<span class="tag warn">forte</span>` : ""}</li>`;
+    }).join("")}</ul>
+    ${extra.length ? `<details class="small sub"><summary>Aquecimento e alongamento · ${extra.length}</summary>${itemsByPhase(extra)}</details>` : ""}
+    ${es.some((e) => (e.changes || []).length || e.skip_result) ? `<details class="small sub"><summary>O que mudou neste dia</summary><ul class="small changes">${es.flatMap((e) => [...(e.changes || []), ...((e.skip_result || {}).changes || [])]).map((c) => `<li>${esc(c)}</li>`).join("")}</ul></details>` : ""}
+    <div class="tc-actions">
+      ${planned.length ? `<button class="act" data-move="${first.id}" data-date="${date}">Mover</button>
+        <button class="act" data-skip="${first.id}">Não vou treinar</button>
+        <button class="act" data-push="${first.id}">Enviar ao relógio</button>
+        <a class="act" href="/api/schedule/${first.id}/fit">.FIT</a>` : ""}
+      ${es.filter((e) => e.status === "pulado" && e.can_undo).map((e) => `<button class="act" data-undo="${e.id}">Desfazer ajuste</button>`).join("")}
+      ${es.filter((e) => e.readiness_backup && e.status === "planejado").map((e) => `<button class="act" data-rundo="${e.id}">Desfazer ajuste de prontidão</button>`).join("")}
+    </div></section>`;
 }
 function ringSvg(score, cls) {
   const v = Math.max(0, Math.min(100, +score || 0)), c = 2 * Math.PI * 15.5;
@@ -284,29 +351,12 @@ function statsHtml(rd, g, adjusted, hasToday) {
       <span class="ring-box">${ringSvg(has ? rd.score : 0, cls)}<b>${has ? rd.score : "—"}</b></span>
       <span class="stat-txt"><span class="lbl">Prontidão</span><b class="${cls}">${has ? esc(RD_LEVEL[rd.level] || rd.level) : "sem dados"}</b></span></button>
     <a class="stat" href="#saude"><b>${sleep}</b><span class="lbl">Sono</span></a>
-    <a class="stat" href="#analise"><b>${s}</b><span class="lbl">Semana</span></a>
+    <a class="stat" href="#analise"><b>${s}</b><span class="lbl">Treinos</span></a>
   </section>
   ${act ? `<div class="rec ${cls === "bad" ? "alerta" : "atencao"} small row between gap"><span class="grow">${esc(rd.text)}</span>
     ${adjusted ? `<span class="pill ok">ajustado</span>` : `<button class="btn sm" id="rd-apply">Ajustar hoje</button>`}</div>` : ""}`;
 }
-function todayListHtml(list, sch) {
-  const all = list.flatMap((e) => e.items || []);
-  const main = all.filter((i) => (i.phase || "principal") === "principal");
-  if (!main.length) return "";
-  const extra = all.filter((i) => (i.phase || "principal") !== "principal");
-  const lb = dayLabel(list[0].date, sch);
-  return `<section class="sec"><h2 class="sec-title">${lb.when === "Hoje" ? "Treino de hoje" : `Próximo treino · ${lb.when.toLowerCase()}`}</h2>
-    <ul class="exlist">${main.map((it) => {
-      const en = it.endurance;
-      const name = en ? en.title : (it._name || it._ex?.name || it.exercise_id);
-      const sub = en ? endSummary(en) : `${it.sets ? `${it.sets} × ${it.reps || (it.duration_s ? it.duration_s + "s" : "")}` : it.duration_min ? `${it.duration_min} min` : ""}${it.rir && !it.deload ? ` · sobrar ${String(it.rir).split(" ")[0]}` : ""}`;
-      return `<li data-ex="${esc(it.exercise_id)}">${mediaHtml(it.exercise_id, "s", en ? SPORT_PICTO[en.sport] : null)}
-        <span class="grow" data-ex="${esc(it.exercise_id)}"><b data-ex="${esc(it.exercise_id)}">${esc(name)}</b><span class="small muted" data-ex="${esc(it.exercise_id)}">${esc(sub)}</span></span>
-        ${it.superset ? `<span class="pill small">bi-set ${it.superset}</span>` : en && en.hard ? `<span class="pill warn small">forte</span>` : ""}</li>`;
-    }).join("")}</ul>
-    ${extra.length ? `<details class="small"><summary>Aquecimento e alongamento (${extra.length})</summary>${itemsByPhase(extra)}</details>` : ""}</section>`;
-}
-async function openReadiness(rd, sch) {
+async function openReadiness(rd) {
   const body = openModal(rd && rd.score != null ? readinessCard(rd, true, false).replace('class="card readiness', 'class="readiness-modal')
     : `<h2>Prontidão de hoje</h2><p class="muted">Ainda sem dados do relógio para hoje. Ela usa sono, variabilidade da FC e FC de repouso.</p>
        ${state.garmin && state.garmin.connected ? `<button class="btn" id="rd-refresh">Buscar no Garmin</button>` : `<a class="btn" href="#perfil">Conectar relógio</a>`}`);
@@ -320,41 +370,20 @@ async function openReadiness(rd, sch) {
   };
 }
 
-function dayCard(e, today) {
-  const [label, cls] = STATUS_INFO[e.status] || [e.status, ""];
-  const active = e.status === "planejado" || e.status === "perdido";
-  const d = new Date(e.date + "T12:00:00");
-  return `<details class="day ${e.date === today ? "today" : ""} ${active ? "" : "dim"}">
-    <summary class="day-sum"><span class="dnum"><small>${esc(e.weekday)}</small><b>${d.getDate()}</b></span>
-      <span class="grow"><b>${esc(e.day_name)}</b>${e.race ? ` <span class="pill bad">PROVA</span>` : ""}
-        <span class="small muted">${e.time ? `~${Math.round(e.time.total)} min · ` : ""}${esc(dayKind(e))}</span></span>
-      ${e.status === "planejado" ? (e.over_budget_min ? `<span class="pill warn">+${e.over_budget_min} min</span>` : "") : `<span class="pill ${cls}">${label}</span>`}
-      <span class="chev" aria-hidden="true">›</span></summary>
-    <div class="day-body">
-    ${active ? timeBar(e.time) : ""}
-    ${e.changes && e.changes.length ? `<ul class="small changes">${e.changes.map((c) => `<li>${esc(c)}</li>`).join("")}</ul>` : ""}
-    ${e.skip_result ? `<ul class="small changes">${e.skip_result.changes.map((c) => `<li>${esc(c)}</li>`).join("")}</ul>` : ""}
-    ${e.over_budget_min ? `<div class="small over">Passa ${e.over_budget_min} min do seu tempo de sessão — reserve ~${Math.round(e.time.total / 5) * 5} min</div>` : ""}
-    ${e.garmin_outdated ? `<span class="pill warn">Garmin desatualizado</span>` : e.garmin_workout_id ? `<span class="pill ok">no Garmin</span>` : ""}
-    ${itemsByPhase(e.items)}
-    <div class="row gap wrap" style="margin-top:6px">
-      ${e.status === "planejado" ? `<a class="btn sm" href="#treinar/agenda/${e.id}">Treinar</a>
-        <button class="btn sm ghost" data-skip="${e.id}">Não vou treinar</button>
-        <button class="btn sm ghost" data-move="${e.id}" data-date="${e.date}">Mover</button>
-        <button class="btn sm ghost" data-push="${e.id}">Garmin</button>
-        <a class="btn sm ghost" href="/api/schedule/${e.id}/fit">.FIT</a>` : ""}
-      ${e.status === "perdido" ? `<button class="btn sm" data-skip="${e.id}">Ajustar a semana</button><a class="btn sm ghost" href="#treinar/agenda/${e.id}">Registrar mesmo assim</a>` : ""}
-      ${e.status === "pulado" && e.can_undo ? `<button class="btn sm ghost" data-undo="${e.id}">Desfazer ajuste</button>` : ""}
-      ${e.readiness_backup && e.status === "planejado" ? `<button class="btn sm ghost" data-rundo="${e.id}">Desfazer ajuste de prontidão</button>` : ""}
-    </div></div></details>`;
-}
-
 function bindAgenda(sch) {
   bindAthleteCards();
   view.onclick = async (ev) => {
     const t = ev.target.closest("button, [data-ex]"); if (!t) return;
     const d = t.dataset;
     try {
+      if (d.day) {
+        sch._sel = d.day;
+        $$(".wd", view).forEach((w) => { const on = w.dataset.day === d.day; w.classList.toggle("sel", on); w.setAttribute("aria-selected", on); });
+        const panel = $("#day-panel"); panel.innerHTML = dayPanel(sch, d.day);
+        panel.classList.remove("enter"); void panel.offsetWidth; panel.classList.add("enter");
+        if (!t.classList.contains("wd")) panel.scrollIntoView({ behavior: "smooth", block: "start" });
+        return;
+      }
       if (d.ex) return showExercise(d.ex);
       if (d.week) { location.hash = `#hoje/${d.week}`; return; }
       if (d.skip) {
@@ -369,7 +398,7 @@ function bindAgenda(sch) {
       }
       if (d.undo) { await api(`/api/schedule/${d.undo}/undo`, { method: "POST" }); toast("Ajuste desfeito"); return viewHoje(sch.week_start); }
       if (d.rundo) { await api(`/api/readiness/undo/${d.rundo}`, { method: "POST" }); toast("Treino original de volta"); return viewHoje(sch.week_start); }
-      if (t.id === "rd-open") return openReadiness(sch._rd, sch);
+      if (t.id === "rd-open") return openReadiness(sch._rd);
       if (t.id === "rd-apply") { t.disabled = true; const r = await api("/api/readiness/apply", { method: "POST", body: {} }); toast(r.changed.length ? `Ajustado: ${r.changed.join(", ")}` : "Nada para ajustar hoje", 5000); return viewHoje(); }
       if (t.id === "rd-refresh") { t.disabled = true; await api("/api/readiness/refresh", { method: "POST" }); return viewHoje(); }
       if (d.move) {
@@ -681,6 +710,7 @@ async function showAuth(mode, code) {
 }
 function clearLocalDrafts() {
   // rascunhos de treino ficam no aparelho: não passam de uma conta para outra
+  SWR.mem.clear();
   try { Object.keys(localStorage).filter((k) => k.startsWith("gg_")).forEach((k) => localStorage.removeItem(k)); } catch (_) { /* */ }
 }
 async function accountCard() {
@@ -1037,6 +1067,10 @@ async function showExercise(id) {
   const body = openModal(`<h2>${esc(ex.name)}</h2>
     ${ex.name !== ex.name_en ? `<p class="small muted">${esc(ex.name_en)}</p>` : ""}
     <div class="ex-hero">${mediaHtml(ex.id, "l")}</div>
+    ${ex.image_like ? `<p class="small muted img-note">Foto de um movimento parecido (${esc(ex.image_like)}): o aparelho da sua academia pode ser diferente.</p>` : ""}
+    ${ex.top_machine ? `<div class="evidence"><b>Por que está entre os melhores</b><p class="small">${esc(ex.evidence)}</p>
+      <p class="small muted">${ex.availability_br === "comum" ? "Comum nas academias brasileiras." : ex.availability_br === "média" ? "Aparece em academias médias e grandes." : "Mais raro: academias grandes e premium."}${ex.lengthened ? " Trabalha o músculo alongado." : ""}</p>
+      ${(ex.sources || []).length ? `<p class="small">${ex.sources.map((u, i) => `<a href="${esc(u)}" target="_blank" rel="noopener">fonte ${i + 1}</a>`).join(" · ")}</p>` : ""}</div>` : ""}
     ${ex.images.length > 1 ? `<div class="imgs">${ex.images.map((s, i) => `<figure><img loading="lazy" src="${esc(s)}" alt=""><figcaption class="small muted">${i ? "fim do movimento" : "início"}</figcaption></figure>`).join("")}</div>` : ""}
     <p><span class="pill">${esc(ex.category_pt)}</span> <span class="pill muted">${esc(ex.equipment_pt || "")}</span> <span class="pill muted">${esc(ex.level_pt || "")}</span>
       ${ex.mechanic_pt && ex.mechanic_pt !== "—" ? `<span class="pill muted">${esc(ex.mechanic_pt)}</span>` : ""} ${ex.impact ? `<span class="pill muted">impacto ${esc(ex.impact)}</span>` : ""}</p>
@@ -1077,11 +1111,18 @@ async function viewTreinar(planId, idx) {
   }
   if (planId === undefined) {
     const draft = store("gg_session");
-    const plans = (await api("/api/plans")).filter((p) => p.active);
-    view.innerHTML = `${draft ? `<div class="card"><h2>Treino em andamento</h2><p>${esc(draft.day_name || "Treino livre")} — ${fmtDate(draft.date)}</p>
-      <div class="row gap"><button class="btn" id="resume">Continuar</button><button class="btn danger" id="discard">Descartar</button></div></div>` : ""}
-      <div class="card"><h2>Escolha o treino</h2>${plans.map((p) => `<p class="small muted">${esc(p.name)}</p><div class="chips">${p.days.map((d, i) => `<a class="btn sm ghost" href="#treinar/${p.id}/${i}">${esc(d.name)}</a>`).join("")}</div>`).join("") || `<p class="muted">Sem planilhas ativas.</p>`}
-      <div class="hr"></div><button class="btn ghost" id="free">Treino livre</button></div>`;
+    const [plansAll, sch] = await Promise.all([api("/api/plans"), api("/api/schedule").catch(() => null)]);
+    const plans = plansAll.filter((p) => p.active);
+    const agenda = sch && sch.entries ? sch.entries.filter((e) => e.status === "planejado" && e.date >= sch.today) : [];
+    const row = (href, title, sub, hl) => `<a class="pick ${hl ? "hl" : ""}" href="${href}"><span class="grow"><b>${esc(title)}</b><span class="small muted">${esc(sub)}</span></span><span class="chev" aria-hidden="true">›</span></a>`;
+    view.innerHTML = `${draft ? `<section class="today-card"><div class="eyebrow">Treino em andamento</div><div class="tc-title">${esc(draft.day_name || "Treino livre")}</div>
+      <p class="muted small" style="margin:0 0 12px">${fmtDate(draft.date)}</p>
+      <button class="btn block" id="resume">Continuar</button><button class="act" id="discard" style="margin-top:8px">Descartar</button></section>` : ""}
+      ${agenda.length ? `<h2 class="sec-title">Da sua agenda</h2><div class="picks">${agenda.slice(0, 7).map((e) => row(`#treinar/agenda/${e.id}`, `${dayLabel(e.date, sch)} · ${shortName(e)}`,
+        `${e.time ? `~${Math.round(e.time.total)} min · ` : ""}${dayKind(e)}`, e.date === sch.today)).join("")}</div>` : ""}
+      ${plans.map((p) => `<h2 class="sec-title">${esc(p.name)}</h2><div class="picks">${p.days.map((d, i) => row(`#treinar/${p.id}/${i}`, d.name, `${(d.items || []).length || ""} ${(d.items || []).length ? "exercícios" : "da planilha"}`)).join("")}</div>`).join("")
+        || (agenda.length ? "" : `<p class="muted">Sem planilhas ativas.</p>`)}
+      <button class="btn ghost block" id="free" style="margin-top:14px">Treino livre</button>`;
     const r = $("#resume"); if (r) r.onclick = () => { state.session = draft; renderSession(); };
     const d = $("#discard"); if (d) d.onclick = () => { store("gg_session", null); viewTreinar(); };
     $("#free").onclick = () => { state.session = { date: localISO(), day_name: "Treino livre", items: [] }; renderSession(); };
@@ -1249,10 +1290,9 @@ $("#timer").addEventListener("click", (e) => {
 
 /* ------------------------------------------------------------- ANÁLISE -- */
 async function viewAnalise() {
-  const [rep, sessions] = await Promise.all([api("/api/report/weekly"), api("/api/sessions?limit=30")]);
+  const [rep, sessions, hist, ld] = await Promise.all([api("/api/report/weekly"), api("/api/sessions?limit=30"),
+    api("/api/history").catch(() => ({ exercises: [], recent_prs: [] })), api("/api/load?days=90").catch(() => null)]);
   const c = rep.cardio;
-  const [hist, ld] = await Promise.all([api("/api/history").catch(() => ({ exercises: [], recent_prs: [] })),
-    api("/api/load?days=90").catch(() => null)]);
   view.innerHTML = `
   <a class="card link-card row between gap" href="#saude"><span><b>😴 Saúde e sono</b><br><span class="small muted">Sono, recuperação, FC de repouso, HRV, VO2máx e o efeito dos treinos — pelo relógio</span></span><span class="chev">›</span></a>
   ${loadCard(ld)}
@@ -1559,30 +1599,45 @@ async function viewEsportes() {
 }
 
 /* ---------------------------------------------------------- EXERCÍCIOS -- */
+const EX_CHIPS = [["", "", "Todos"], ["machine", "", "Aparelhos"], ["cable", "", "Polia"], ["dumbbell", "", "Halteres"], ["barbell", "", "Barra"],
+  ["body only", "", "Peso do corpo"], ["", "cardio", "Cardio"], ["", "stretching", "Alongamento"]];
 async function viewExercicios() {
-  view.innerHTML = `<div class="card"><div class="stack">
-    <input id="ex-q" placeholder="Buscar: supino, agachamento, remada, esteira…">
-    <div class="row gap wrap">
-      <select id="ex-m" style="width:auto"><option value="">Todos os músculos</option>${state.meta.muscles.map((m) => `<option value="${m.key}">${esc(m.pt)}</option>`).join("")}</select>
-      <select id="ex-e" style="width:auto"><option value="">Todo equipamento</option>${state.meta.equipment.map((e) => `<option value="${esc(e.key)}">${esc(e.pt)}</option>`).join("")}</select>
-      <select id="ex-k" style="width:auto"><option value="">Tudo</option><option value="strength">Musculação</option><option value="cardio">Cardio</option><option value="stretching">Alongamento</option></select>
-      <label class="row gap small" style="margin:0"><input type="checkbox" id="ex-hide"> ocultar “evitar”</label>
-    </div></div></div>
-    <div class="card"><ul class="list" id="ex-list"></ul></div>`;
+  const last = store("gg_ex_filter") || {};
+  view.innerHTML = `<div class="ex-search">
+    <input id="ex-q" type="search" placeholder="Buscar: supino, hack, remada, esteira…" value="${esc(last.q || "")}" autocomplete="off">
+    <div class="chip-row" id="ex-chips">${EX_CHIPS.map(([e, k, t], i) => `<button type="button" class="fchip ${(last.e || "") === e && (last.k || "") === k ? "on" : ""}" data-i="${i}">${t}</button>`).join("")}</div>
+    <div class="row gap">
+      <select id="ex-m" class="grow"><option value="">Todos os músculos</option>${state.meta.muscles.map((m) => `<option value="${m.key}" ${last.m === m.key ? "selected" : ""}>${esc(m.pt)}</option>`).join("")}</select>
+      <label class="row gap small hide-av" style="margin:0"><input type="checkbox" id="ex-hide" ${last.h ? "checked" : ""}> ocultar “evitar”</label>
+    </div>
+    <input type="hidden" id="ex-e" value="${esc(last.e || "")}"><input type="hidden" id="ex-k" value="${esc(last.k || "")}">
+  </div>
+  <p class="small muted" id="ex-count"></p>
+  <ul class="ex-grid" id="ex-list"></ul>`;
   let t;
   const load = async () => {
-    const qs = new URLSearchParams({ q: $("#ex-q").value, limit: 80, hide_avoid: $("#ex-hide").checked });
-    [["muscle", "#ex-m"], ["equipment", "#ex-e"], ["kind", "#ex-k"]].forEach(([k, s]) => { if ($(s).value) qs.set(k, $(s).value); });
+    const f = { q: $("#ex-q").value, m: $("#ex-m").value, e: $("#ex-e").value, k: $("#ex-k").value, h: $("#ex-hide").checked };
+    store("gg_ex_filter", f);
+    const qs = new URLSearchParams({ q: f.q, limit: 120, hide_avoid: f.h });
+    if (f.m) qs.set("muscle", f.m); if (f.e) qs.set("equipment", f.e); if (f.k) qs.set("kind", f.k);
     const res = await api(`/api/exercises?${qs}`);
     const list = $("#ex-list"); if (!list) return;  // saiu da tela antes da resposta chegar (4G lento)
-    list.classList.add("ex-grid");
+    $("#ex-count").textContent = res.length ? `${res.length}${res.length >= 120 ? "+" : ""} exercícios` : "";
     list.innerHTML = res.map((ex) => `<li class="tile" data-ex="${esc(ex.id)}" title="${esc(ex.name)}">
       ${mediaHtml(ex.id, "tile")}${ex.limitation && ex.limitation.status !== "ok" ? `<span class="tile-lim ${ex.limitation.status}" data-ex="${esc(ex.id)}">${ex.limitation.status === "evitar" ? "evitar" : "cuidado"}</span>` : ""}
+      ${ex.top_machine ? `<span class="tile-new" data-ex="${esc(ex.id)}">top</span>` : ""}
       <span class="tile-cap" data-ex="${esc(ex.id)}"><b data-ex="${esc(ex.id)}">${esc(ex.name)}</b><span data-ex="${esc(ex.id)}">${esc(ex.primary_pt.slice(0, 2).join(", "))}</span></span></li>`).join("") || `<li class="empty">Nada encontrado.</li>`;
   };
   view.oninput = () => { clearTimeout(t); t = setTimeout(load, 200); };
   view.onchange = view.oninput;
-  view.onclick = (e) => { const li = e.target.closest("[data-ex]"); if (li) showExercise(li.dataset.ex); };
+  view.onclick = (e) => {
+    const c = e.target.closest(".fchip");
+    if (c) {
+      const [eq, k] = EX_CHIPS[+c.dataset.i]; $("#ex-e").value = eq; $("#ex-k").value = k;
+      $$(".fchip", view).forEach((x) => x.classList.toggle("on", x === c)); return load();
+    }
+    const li = e.target.closest("[data-ex]"); if (li) showExercise(li.dataset.ex);
+  };
   load();
 }
 
@@ -1851,10 +1906,21 @@ async function autoSync() {
 /* --------------------------------------------------------------- router -- */
 async function route() {
   const [name, a, b] = (location.hash.slice(1) || "hoje").split("/");
-  $$(".tabbar a").forEach((el) => el.classList.toggle("active", el.dataset.tab === ({ plano: "planilhas", evolucao: "analise", saude: "analise", esportes: "perfil" }[name] || name)));
+  $$(".tabbar a").forEach((el) => el.classList.toggle("active", el.dataset.tab === ({ plano: "planilhas", exercicios: "planilhas", evolucao: "analise", saude: "analise", esportes: "perfil", coach: "perfil" }[name] || name)));
+  const TITLES = { planilhas: "Planos", exercicios: "Planos", plano: "Planilha", treinar: "Treinar", analise: "Progresso", evolucao: "Evolução", saude: "Saúde e sono", perfil: "Perfil", esportes: "Esportes", coach: "Coach" };
+  const pt = $("#page-title"); pt.textContent = TITLES[name] || ""; pt.hidden = !TITLES[name] || (name === "treinar" && a);
+  const sn = $("#subnav"); sn.hidden = !["planilhas", "exercicios"].includes(name);
+  $$("#subnav a").forEach((x) => x.classList.toggle("on", x.dataset.sub === name));
+  const av = $("#avatar"); const nm = state.me && state.me.user && state.me.user.name;
+  if (av) av.innerHTML = nm && nm !== "Eu" ? esc(nm.trim().split(/\s+/).slice(0, 2).map((w) => w[0]).join("").toUpperCase())
+    : `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg>`;
   coachChrome();
   view.oninput = view.onchange = view.onclick = null;
-  view.innerHTML = `<p class="muted">Carregando…</p>`;
+  prefetchStop();
+  const seq = route.seq = (route.seq || 0) + 1;
+  const live = ["treinar", "plano"].includes(name);  // telas com edição em andamento: sempre direto da rede
+  const skel = setTimeout(() => { if (route.seq === seq) view.innerHTML = skeletonHtml(name); }, 90);
+  SWR.mode = live ? null : "cache"; SWR.used = new Set();
   try {
     await loadMedia();
     if (!state.meta) {
@@ -1864,15 +1930,67 @@ async function route() {
       }
     }
     const routes = { hoje: () => viewHoje(a), planilhas: viewPlanilhas, plano: () => viewPlano(a), treinar: () => viewTreinar(a, b), analise: viewAnalise, evolucao: () => viewEvolucao(decodeURIComponent(a || "")), esportes: viewEsportes, saude: viewSaude, exercicios: viewExercicios, perfil: viewPerfil, coach: viewCoach };
-    await (routes[name] || viewHoje)();
-    if (!view.onclick) view.onclick = (e) => { const id = e.target.dataset && e.target.dataset.ex; if (id) showExercise(id); };
+    const render = async () => {
+      await (routes[name] || viewHoje)();
+      if (!view.onclick) view.onclick = (e) => { const id = e.target.dataset && e.target.dataset.ex; if (id) showExercise(id); };
+    };
+    await render();
+    clearTimeout(skel); SWR.mode = null;
+    view.classList.remove("enter"); void view.offsetWidth; view.classList.add("enter");
+    window.scrollTo(0, 0);
+    if (SWR.used.size) refreshInBackground(seq, [...SWR.used], render);
+    else prefetchSoon();
+    return;
   } catch (e) {
+    clearTimeout(skel); SWR.mode = null;
     view.innerHTML = e.offline
       ? `<div class="card"><h2>Sem internet</h2><p>${esc(e.message)}</p><p class="small muted">Um treino em andamento continua salvo no celular (aba Treinar).</p><button class="btn" id="retry">Tentar de novo</button></div>`
       : `<div class="card"><p class="pill bad">Erro: ${esc(e.message)}</p><p><button class="btn ghost" id="retry">Tentar de novo</button></p></div>`;
     const rb = $("#retry"); if (rb) rb.onclick = route;
   }
   window.scrollTo(0, 0);
+}
+// a tela abriu com dados guardados: busca os atuais e só redesenha se algo mudou (e se a pessoa não começou a digitar)
+async function refreshInBackground(seq, paths, render) {
+  let typed = false;
+  const mark = () => { typed = true; };
+  view.addEventListener("input", mark, { once: true });
+  const act = actAs(); const k = (p) => `${act ? act.id : "me"}|${p}`;
+  const before = paths.map((p) => JSON.stringify(SWR.mem.get(k(p))));
+  try { await Promise.all(paths.map((p) => api(p).catch(() => null))); } catch (_) { return; }
+  view.removeEventListener("input", mark);
+  const changed = paths.some((p, i) => JSON.stringify(SWR.mem.get(k(p))) !== before[i]);
+  if (!changed || typed || route.seq !== seq || !$("#modal").hidden) return prefetchSoon();
+  const y = window.scrollY;
+  SWR.mode = "cache"; SWR.used = new Set();
+  try { await render(); } finally { SWR.mode = null; }
+  window.scrollTo(0, y);
+  prefetchSoon();
+}
+// com o app parado, deixa as outras abas prontas para abrir na hora
+const PREFETCH = ["/api/schedule", "/api/readiness", "/api/report/weekly", "/api/sessions?limit=30", "/api/history", "/api/load?days=90", "/api/plans", "/api/profile"];
+function prefetchSoon() {
+  const c = navigator.connection || {};
+  if (prefetchSoon.done || !navigator.onLine || c.saveData || /(^|-)2g|3g/.test(c.effectiveType || "")) return;
+  clearTimeout(prefetchSoon.t);
+  prefetchSoon.t = setTimeout(async () => {
+    const ctl = prefetchSoon.ctl = new AbortController(); const seq = route.seq;
+    for (const p of PREFETCH) {
+      if (ctl.signal.aborted || route.seq !== seq) return;
+      const act = actAs(); if (SWR.mem.has(`${act ? act.id : "me"}|${p}`)) continue;
+      const t0 = performance.now();
+      await api(p, { signal: ctl.signal }).catch(() => null);
+      if (performance.now() - t0 > 1500) return;  // rede lenta: para e deixa a banda para o que a pessoa abrir
+    }
+    if (!ctl.signal.aborted && route.seq === seq) prefetchSoon.done = true;
+  }, 2500);
+}
+function prefetchStop() { clearTimeout(prefetchSoon.t); if (prefetchSoon.ctl) prefetchSoon.ctl.abort(); }
+function skeletonHtml(name) {
+  const line = (w) => `<span class="sk-line" style="width:${w}%"></span>`;
+  const card = (h) => `<div class="sk-card" style="height:${h}px"></div>`;
+  if (name === "hoje" || !name) return `<div class="sk">${line(40)}${card(64)}${card(150)}${card(220)}</div>`;
+  return `<div class="sk">${line(50)}${card(120)}${card(200)}${card(160)}</div>`;
 }
 window.addEventListener("hashchange", route);
 async function flushOutbox() {

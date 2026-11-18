@@ -1,0 +1,853 @@
+[
+ {
+  "id": "Pendulum_Squat",
+  "name": "Agachamento pêndulo (pendulum squat)",
+  "name_en": "Pendulum Squat",
+  "equipment": "machine",
+  "category": "strength",
+  "force": "push",
+  "mechanic": "compound",
+  "level": "intermediate",
+  "primaryMuscles": [
+   "quadriceps"
+  ],
+  "secondaryMuscles": [
+   "glutes",
+   "adductors"
+  ],
+  "pattern": "squat",
+  "lengthened": true,
+  "instructions": [
+   "Encaixe os ombros sob as almofadas, costas inteiras no encosto e pés no meio da plataforma, na largura dos ombros.",
+   "Destrave e desça devagar (2–3 s) até a maior flexão de joelho que conseguir sem o quadril descolar do encosto.",
+   "Suba empurrando com o pé inteiro, sem travar os joelhos no topo.",
+   "Erro comum: encurtar a descida para colocar mais carga — o trecho mais fundo é o que mais estimula."
+  ],
+  "garmin": {
+   "category": "SQUAT",
+   "exercise": "SQUAT",
+   "garmin_name": "Squat",
+   "confidence": "media"
+  },
+  "availability_br": "média",
+  "evidence": "Trajeto em arco com costas apoiadas permite flexão de joelho muito profunda e estável: treinar o quadríceps alongado tende a dar hipertrofia igual ou maior (Wolf 2023) e agachar fundo cresce mais glúteo e adutores que meia amplitude (Kubo 2019); é um dos favoritos de Jeff Nippard.",
+  "sources": [
+   "https://doaj.org/article/99e86b317bec40f5abc2f0008358737e",
+   "https://pubmed.ncbi.nlm.nih.gov/31230110/",
+   "https://hackmd.io/@dastratman/B1w4jGoDJx",
+   "https://lifefitness.com/pt-br/catalog/forca/plate-loaded/pendulum-x-squat"
+  ],
+  "image_like": "Hack_Squat",
+  "picto": null
+ },
+ {
+  "id": "Belt_Squat",
+  "name": "Agachamento com cinto (belt squat)",
+  "name_en": "Belt Squat",
+  "equipment": "machine",
+  "category": "strength",
+  "force": "push",
+  "mechanic": "compound",
+  "level": "intermediate",
+  "primaryMuscles": [
+   "quadriceps",
+   "glutes"
+  ],
+  "secondaryMuscles": [
+   "adductors",
+   "hamstrings",
+   "calves"
+  ],
+  "pattern": "squat",
+  "lengthened": true,
+  "instructions": [
+   "Prenda o cinto no quadril e suba na plataforma com os pés um pouco além da largura dos ombros.",
+   "Segure as alças só para equilíbrio, tronco ereto, e desça até as coxas ficarem paralelas ou abaixo.",
+   "Suba empurrando o chão, com os joelhos acompanhando a direção da ponta dos pés.",
+   "Erro comum: puxar as alças com os braços para ajudar a subir."
+  ],
+  "garmin": {
+   "category": "SQUAT",
+   "exercise": "WEIGHTED_SQUAT",
+   "garmin_name": "Weighted Squat",
+   "confidence": "media"
+  },
+  "availability_br": "rara",
+  "evidence": "A carga vai no quadril, não na coluna: EMG mostra exigência de quadríceps semelhante ao agachamento livre com bem menos trabalho de lombar e estabilizadores — opção principal para quem tem dor lombar ou quer poupar a coluna em fases de corrida.",
+  "sources": [
+   "https://pmc.ncbi.nlm.nih.gov/articles/PMC7126258/",
+   "https://pubmed.ncbi.nlm.nih.gov/31230110/"
+  ],
+  "image_like": null,
+  "picto": "squat"
+ },
+ {
+  "id": "Horizontal_Leg_Press",
+  "name": "Leg press horizontal (sentado)",
+  "name_en": "Seated Horizontal Leg Press",
+  "equipment": "machine",
+  "category": "strength",
+  "force": "push",
+  "mechanic": "compound",
+  "level": "beginner",
+  "primaryMuscles": [
+   "quadriceps"
+  ],
+  "secondaryMuscles": [
+   "glutes",
+   "hamstrings",
+   "adductors"
+  ],
+  "pattern": "squat",
+  "lengthened": false,
+  "instructions": [
+   "Sente com lombar e quadril encostados e coloque os pés no centro da plataforma, na largura do quadril.",
+   "Destrave e flexione os joelhos até ~90° ou até onde o quadril não sair do banco.",
+   "Empurre com o calcanhar e o meio do pé até quase estender as pernas.",
+   "Erro comum: deixar a pelve sair do banco (lombar arredondada) no fundo ou travar os joelhos em cima."
+  ],
+  "garmin": {
+   "category": "SQUAT",
+   "exercise": "LEG_PRESS",
+   "garmin_name": "Leg Press",
+   "confidence": "alta"
+  },
+  "availability_br": "comum",
+  "evidence": "Versão sentada do leg press, presente em praticamente todas as redes (Smart Fit, Bluefit, Selfit); com o mesmo volume, máquinas e pesos livres dão hipertrofia equivalente (meta-análise Haugen 2023) e o aprendizado é rápido para iniciantes.",
+  "sources": [
+   "https://doaj.org/article/a7282dba5e674176bde2a8239832d2f7",
+   "https://www.smartfit.com.br/estrutura-smart-fit",
+   "https://pubmed.ncbi.nlm.nih.gov/27735888/"
+  ],
+  "image_like": "Leg_Press",
+  "picto": null
+ },
+ {
+  "id": "Reverse_Hack_Squat",
+  "name": "Hack invertido (de frente para o encosto)",
+  "name_en": "Reverse Hack Squat",
+  "equipment": "machine",
+  "category": "strength",
+  "force": "push",
+  "mechanic": "compound",
+  "level": "intermediate",
+  "primaryMuscles": [
+   "glutes",
+   "quadriceps"
+  ],
+  "secondaryMuscles": [
+   "hamstrings",
+   "adductors"
+  ],
+  "pattern": "squat",
+  "lengthened": true,
+  "instructions": [
+   "Fique de frente para o encosto, peito na almofada e ombros sob os apoios; pés no meio ou na parte alta da plataforma.",
+   "Desça levando o quadril para trás até as coxas passarem da paralela.",
+   "Suba empurrando com o calcanhar e contraindo os glúteos.",
+   "Erro comum: arredondar a lombar no fundo ou tirar os calcanhares da plataforma."
+  ],
+  "garmin": {
+   "category": "SQUAT",
+   "exercise": "SQUAT",
+   "garmin_name": "Squat",
+   "confidence": "media"
+  },
+  "availability_br": "média",
+  "evidence": "De frente para o encosto o tronco inclina e o quadril flexiona mais, levando a ênfase para glúteos e adutores, que crescem mais com agachamento profundo (Kubo 2019); usa o mesmo hack comum nas academias.",
+  "sources": [
+   "https://pubmed.ncbi.nlm.nih.gov/31230110/",
+   "https://hackmd.io/@dastratman/B1w4jGoDJx"
+  ],
+  "image_like": "Hack_Squat",
+  "picto": null
+ },
+ {
+  "id": "Single-Leg_Leg_Press",
+  "name": "Leg press 45° unilateral",
+  "name_en": "Single-Leg Leg Press",
+  "equipment": "machine",
+  "category": "strength",
+  "force": "push",
+  "mechanic": "compound",
+  "level": "intermediate",
+  "primaryMuscles": [
+   "quadriceps",
+   "glutes"
+  ],
+  "secondaryMuscles": [
+   "hamstrings",
+   "adductors"
+  ],
+  "pattern": "single_leg",
+  "lengthened": false,
+  "instructions": [
+   "Sente no leg press 45° e apoie um pé no centro da plataforma; o outro fica no chão ou no apoio lateral.",
+   "Use cerca de 40–60% da carga bilateral e desça até ~90° de joelho sem a pelve sair do banco.",
+   "Empurre até quase estender, mantendo o joelho alinhado com a ponta do pé.",
+   "Erro comum: deixar o joelho cair para dentro na subida."
+  ],
+  "garmin": {
+   "category": "SQUAT",
+   "exercise": "LEG_PRESS",
+   "garmin_name": "Leg Press",
+   "confidence": "media"
+  },
+  "availability_br": "comum",
+  "evidence": "Treino unilateral sem exigir equilíbrio: corrige assimetrias e substitui afundo/búlgaro para quem tem limitação de equilíbrio ou de tornozelo; o leg press 45° existe em praticamente toda academia.",
+  "sources": [
+   "https://doaj.org/article/a7282dba5e674176bde2a8239832d2f7",
+   "https://www.smartfit.com.br/estrutura-smart-fit"
+  ],
+  "image_like": "Leg_Press",
+  "picto": null
+ },
+ {
+  "id": "Hip_Thrust_Machine",
+  "name": "Elevação pélvica na máquina (hip thrust / glute drive)",
+  "name_en": "Machine Hip Thrust",
+  "equipment": "machine",
+  "category": "strength",
+  "force": "push",
+  "mechanic": "compound",
+  "level": "beginner",
+  "primaryMuscles": [
+   "glutes"
+  ],
+  "secondaryMuscles": [
+   "hamstrings",
+   "quadriceps",
+   "adductors"
+  ],
+  "pattern": "glute",
+  "lengthened": false,
+  "instructions": [
+   "Apoie a parte alta das costas no encosto e posicione a almofada/cinto sobre o quadril.",
+   "Pés na largura do quadril; no topo as canelas devem ficar verticais.",
+   "Empurre o quadril para cima até alinhar tronco e coxas, segure 1 s contraindo os glúteos e desça controlando.",
+   "Erro comum: arquear a lombar no topo em vez de estender o quadril (mantenha queixo baixo e costelas fechadas)."
+  ],
+  "garmin": {
+   "category": "HIP_RAISE",
+   "exercise": "BARBELL_HIP_THRUST_WITH_BENCH",
+   "garmin_name": "Barbell Hip Thrust with Bench",
+   "confidence": "media"
+  },
+  "availability_br": "média",
+  "evidence": "Em ensaio com ressonância, hip thrust e agachamento cresceram o glúteo máximo de forma semelhante (Plotkin 2023); a máquina elimina o setup da barra e o desconforto no quadril — fabricantes nacionais (Movement) já lançaram linhas articuladas de glúteo.",
+  "sources": [
+   "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC10593473/",
+   "https://www.gazetasp.com.br/esportes/movement-amplia-linha-next-com-aparelhos-articulados-de-gluteos-de/"
+  ],
+  "image_like": "Barbell_Hip_Thrust",
+  "picto": null
+ },
+ {
+  "id": "Smith_Machine_Hip_Thrust",
+  "name": "Elevação pélvica no Smith",
+  "name_en": "Smith Machine Hip Thrust",
+  "equipment": "machine",
+  "category": "strength",
+  "force": "push",
+  "mechanic": "compound",
+  "level": "beginner",
+  "primaryMuscles": [
+   "glutes"
+  ],
+  "secondaryMuscles": [
+   "hamstrings",
+   "quadriceps",
+   "adductors"
+  ],
+  "pattern": "glute",
+  "lengthened": false,
+  "instructions": [
+   "Coloque um banco perpendicular dentro do Smith e apoie as escápulas nele; barra com protetor sobre o quadril.",
+   "Pés na largura do quadril, destrave a barra girando-a e suba até alinhar tronco e coxas.",
+   "Segure 1 s em cima e desça até quase encostar o quadril no chão.",
+   "Erro comum: banco longe demais ou barra fora do vinco do quadril, transferindo a carga para a lombar."
+  ],
+  "garmin": {
+   "category": "HIP_RAISE",
+   "exercise": "BARBELL_HIP_THRUST_WITH_BENCH",
+   "garmin_name": "Barbell Hip Thrust with Bench",
+   "confidence": "alta"
+  },
+  "availability_br": "comum",
+  "evidence": "Mesmo estímulo do hip thrust com barra (glúteo semelhante ao agachamento — Plotkin 2023), com trajeto guiado e trava de segurança; usa o Smith, presente em quase toda academia.",
+  "sources": [
+   "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC10593473/",
+   "https://www.smartfit.com.br/estrutura-smart-fit"
+  ],
+  "image_like": "Smith_Machine_Hip_Raise",
+  "picto": null
+ },
+ {
+  "id": "Glute_Kickback_Machine",
+  "name": "Glúteo na máquina (coice / multi-hip)",
+  "name_en": "Machine Glute Kickback",
+  "equipment": "machine",
+  "category": "strength",
+  "force": "push",
+  "mechanic": "isolation",
+  "level": "beginner",
+  "primaryMuscles": [
+   "glutes"
+  ],
+  "secondaryMuscles": [
+   "hamstrings"
+  ],
+  "pattern": "glute",
+  "lengthened": true,
+  "instructions": [
+   "Apoie peito/antebraços no suporte e coloque um pé na plataforma (ou a almofada atrás do joelho, no multi-hip).",
+   "Partindo com o quadril flexionado, leve a coxa para trás até estender completamente o quadril.",
+   "Volte devagar, deixando o quadril flexionar bem para alongar o glúteo.",
+   "Erro comum: arquear a lombar para \"subir mais\" — o movimento é só do quadril."
+  ],
+  "garmin": {
+   "category": "HIP_STABILITY",
+   "exercise": "WEIGHTED_STANDING_REAR_LEG_RAISE",
+   "garmin_name": "Weighted Standing Rear-leg Raise",
+   "confidence": "media"
+  },
+  "availability_br": "comum",
+  "evidence": "Extensão de quadril isolada, muito comum nas academias brasileiras; começa com o quadril flexionado (glúteo alongado), mas a evidência direta de hipertrofia é limitada — use como acessório depois de hip thrust ou agachamento.",
+  "sources": [
+   "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC10593473/",
+   "https://doaj.org/article/99e86b317bec40f5abc2f0008358737e"
+  ],
+  "image_like": "One-Legged_Cable_Kickback",
+  "picto": null
+ },
+ {
+  "id": "Cable_Standing_Hip_Abduction",
+  "name": "Abdução de quadril em pé no cabo (caneleira)",
+  "name_en": "Standing Cable Hip Abduction",
+  "equipment": "cable",
+  "category": "strength",
+  "force": "push",
+  "mechanic": "isolation",
+  "level": "beginner",
+  "primaryMuscles": [
+   "abductors",
+   "glutes"
+  ],
+  "secondaryMuscles": [],
+  "pattern": "glute",
+  "lengthened": true,
+  "instructions": [
+   "Prenda a caneleira no tornozelo de fora, polia baixa, e fique de lado para a máquina segurando no apoio.",
+   "Comece com a perna levemente cruzada à frente da outra.",
+   "Afaste a perna para o lado até ~30–40° sem inclinar o tronco e volte devagar.",
+   "Erro comum: girar o pé para fora ou inclinar o tronco para ganhar amplitude."
+  ],
+  "garmin": {
+   "category": "HIP_STABILITY",
+   "exercise": "STANDING_CABLE_HIP_ABDUCTION",
+   "garmin_name": "Standing Cable Hip Abduction",
+   "confidence": "alta"
+  },
+  "availability_br": "comum",
+  "evidence": "Trabalha glúteo médio/mínimo, que hip thrust e agachamento praticamente não crescem (Plotkin 2023); no cabo a tensão já existe com a perna cruzada (posição alongada) e o glúteo médio é bem recrutado em EMG.",
+  "sources": [
+   "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC10593473/",
+   "https://www.researchsquare.com/article/rs-8523653/v1"
+  ],
+  "image_like": null,
+  "picto": "abduct"
+ },
+ {
+  "id": "Hack_Machine_Calf_Raise",
+  "name": "Panturrilha em pé no hack machine",
+  "name_en": "Hack Machine Calf Raise",
+  "equipment": "machine",
+  "category": "strength",
+  "force": "push",
+  "mechanic": "isolation",
+  "level": "beginner",
+  "primaryMuscles": [
+   "calves"
+  ],
+  "secondaryMuscles": [],
+  "pattern": "calf",
+  "lengthened": true,
+  "instructions": [
+   "Posicione-se no hack com ombros sob as almofadas e só a ponta dos pés na borda baixa da plataforma.",
+   "Joelhos estendidos (sem travar): desça o calcanhar até alongar bem e segure 1–2 s.",
+   "Suba na ponta dos pés o mais alto possível.",
+   "Erro comum: quicar no fundo e usar os joelhos para empurrar."
+  ],
+  "garmin": {
+   "category": "CALF_RAISE",
+   "exercise": "WEIGHTED_STANDING_CALF_RAISE",
+   "garmin_name": "Weighted Standing Calf Raise",
+   "confidence": "media"
+  },
+  "availability_br": "comum",
+  "evidence": "Com o joelho estendido os gastrocnêmios cresceram muito mais que na panturrilha sentada (Kinoshita 2023); o hack permite carga alta e descida profunda do calcanhar, posição alongada que favorece a hipertrofia.",
+  "sources": [
+   "https://doaj.org/article/c3436466267f419f98d7f20fd1bd319b",
+   "https://doaj.org/article/99e86b317bec40f5abc2f0008358737e"
+  ],
+  "image_like": "Standing_Calf_Raises",
+  "picto": null
+ },
+ {
+  "id": "Machine_Lateral_Raise",
+  "name": "Elevação lateral na máquina",
+  "name_en": "Machine Lateral Raise",
+  "equipment": "machine",
+  "category": "strength",
+  "force": "push",
+  "mechanic": "isolation",
+  "level": "beginner",
+  "primaryMuscles": [
+   "shoulders"
+  ],
+  "secondaryMuscles": [
+   "traps"
+  ],
+  "pattern": "lateral",
+  "lengthened": false,
+  "instructions": [
+   "Ajuste o banco para o eixo da máquina ficar alinhado com o ombro e apoie os braços nas almofadas.",
+   "Eleve os braços liderando com os cotovelos até a linha dos ombros.",
+   "Desça em 2–3 s sem deixar o peso encostar.",
+   "Erro comum: encolher os ombros (trapézio) ou balançar o tronco."
+  ],
+  "garmin": {
+   "category": "LATERAL_RAISE",
+   "exercise": "SEATED_LATERAL_RAISE",
+   "garmin_name": "Seated Lateral Raise",
+   "confidence": "media"
+  },
+  "availability_br": "média",
+  "evidence": "Mantém tensão no deltoide lateral desde o início e é fácil de progredir; cabo e halter deram hipertrofia igual (Larsen 2025), então a máquina é alternativa equivalente e mais estável para iniciantes.",
+  "sources": [
+   "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC12277279/",
+   "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC7503819/"
+  ],
+  "image_like": "Seated_Side_Lateral_Raise",
+  "picto": null
+ },
+ {
+  "id": "Cable_Y_Raise",
+  "name": "Elevação em Y no crossover (cabos cruzados)",
+  "name_en": "Cable Y-Raise",
+  "equipment": "cable",
+  "category": "strength",
+  "force": "push",
+  "mechanic": "isolation",
+  "level": "intermediate",
+  "primaryMuscles": [
+   "shoulders"
+  ],
+  "secondaryMuscles": [
+   "traps"
+  ],
+  "pattern": "lateral",
+  "lengthened": true,
+  "instructions": [
+   "Polias baixas: segure o cabo esquerdo com a mão direita e o direito com a esquerda, e dê um passo à frente.",
+   "Eleve os braços em diagonal (formando um Y, ~30° à frente da lateral) até a altura da cabeça.",
+   "Desça controlando até as mãos se cruzarem à frente do quadril.",
+   "Erro comum: carga alta demais, que faz o trapézio assumir o movimento."
+  ],
+  "garmin": {
+   "category": "LATERAL_RAISE",
+   "exercise": "CABLE_DIAGONAL_RAISE",
+   "garmin_name": "Cable Diagonal Raise",
+   "confidence": "media"
+  },
+  "availability_br": "comum",
+  "evidence": "Com os cabos cruzados a resistência é maior com o deltoide alongado (braço junto ao corpo); treinar em comprimento longo é ao menos tão eficaz (Larsen 2025; Wolf 2023) e o plano em Y é mais confortável para o ombro.",
+  "sources": [
+   "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC12277279/",
+   "https://doaj.org/article/99e86b317bec40f5abc2f0008358737e"
+  ],
+  "image_like": null,
+  "picto": "yraise"
+ },
+ {
+  "id": "Assisted_Pull-Up_Machine",
+  "name": "Barra fixa no graviton (assistida)",
+  "name_en": "Machine Assisted Pull-Up",
+  "equipment": "machine",
+  "category": "strength",
+  "force": "pull",
+  "mechanic": "compound",
+  "level": "beginner",
+  "primaryMuscles": [
+   "lats"
+  ],
+  "secondaryMuscles": [
+   "biceps",
+   "middle back",
+   "forearms"
+  ],
+  "pattern": "v_pull",
+  "lengthened": false,
+  "instructions": [
+   "Escolha o contrapeso (quanto mais peso, mais ajuda) e apoie os joelhos na plataforma.",
+   "Pegada pronada um pouco mais aberta que os ombros, braços estendidos.",
+   "Puxe até o queixo passar a barra, levando o peito em direção a ela, e desça até quase estender os braços.",
+   "Erro comum: soltar o corpo rápido na descida; reduza a assistência aos poucos ao longo das semanas."
+  ],
+  "garmin": {
+   "category": "PULL_UP",
+   "exercise": "BAND_ASSISTED_PULL_UP",
+   "garmin_name": "Band-assisted Pull-up",
+   "confidence": "media"
+  },
+  "availability_br": "comum",
+  "evidence": "Desconta parte do peso corporal e permite aprender e progredir a barra fixa — ponte entre puxada no pulley e barra livre; o graviton é comum nas academias brasileiras.",
+  "sources": [
+   "https://www.mundoboaforma.com.br/barra-fixa-pull-up-assistido-como-fazer-e-erros-comuns/"
+  ],
+  "image_like": "Band_Assisted_Pull-Up",
+  "picto": null
+ },
+ {
+  "id": "Assisted_Dip_Machine",
+  "name": "Paralelas no graviton (mergulho assistido)",
+  "name_en": "Machine Assisted Dip",
+  "equipment": "machine",
+  "category": "strength",
+  "force": "push",
+  "mechanic": "compound",
+  "level": "beginner",
+  "primaryMuscles": [
+   "triceps",
+   "chest"
+  ],
+  "secondaryMuscles": [
+   "shoulders"
+  ],
+  "pattern": "triceps",
+  "lengthened": false,
+  "instructions": [
+   "Escolha o contrapeso, ajoelhe na plataforma e segure as barras paralelas com os braços estendidos.",
+   "Desça flexionando os cotovelos até ~90° (ombros na altura dos cotovelos), com leve inclinação do tronco à frente.",
+   "Empurre até estender os braços sem travar.",
+   "Erro comum: descer demais com o ombro projetado para frente — pare antes se sentir dor no ombro."
+  ],
+  "garmin": {
+   "category": "TRICEPS_EXTENSION",
+   "exercise": "BODY_WEIGHT_DIP",
+   "garmin_name": "Body-weight Dip",
+   "confidence": "media"
+  },
+  "availability_br": "comum",
+  "evidence": "Versão assistida das paralelas, que Nippard coloca entre as boas opções de peito/tríceps; o contrapeso deixa iniciantes fazerem o movimento completo com técnica.",
+  "sources": [
+   "https://hackmd.io/@dastratman/B1w4jGoDJx",
+   "https://www.mundoboaforma.com.br/barra-fixa-pull-up-assistido-como-fazer-e-erros-comuns/"
+  ],
+  "image_like": "Dip_Machine",
+  "picto": null
+ },
+ {
+  "id": "Machine_Lat_Pulldown",
+  "name": "Puxada articulada (máquina convergente)",
+  "name_en": "Machine Front Lat Pulldown",
+  "equipment": "machine",
+  "category": "strength",
+  "force": "pull",
+  "mechanic": "compound",
+  "level": "beginner",
+  "primaryMuscles": [
+   "lats"
+  ],
+  "secondaryMuscles": [
+   "biceps",
+   "middle back"
+  ],
+  "pattern": "v_pull",
+  "lengthened": false,
+  "instructions": [
+   "Ajuste o banco e o apoio de coxas; segure as alças com os braços estendidos, sentindo o dorsal alongar.",
+   "Puxe os cotovelos para baixo e para trás até as mãos chegarem perto dos ombros.",
+   "Volte controlando até alongar de novo.",
+   "Erro comum: jogar o tronco para trás para mover a carga."
+  ],
+  "garmin": {
+   "category": "PULL_UP",
+   "exercise": "LAT_PULLDOWN",
+   "garmin_name": "Lat Pull-down",
+   "confidence": "alta"
+  },
+  "availability_br": "média",
+  "evidence": "Trajeto convergente, opção unilateral e carga estável; máquinas e pesos livres geram hipertrofia equivalente (Haugen 2023), então é uma boa puxada vertical principal.",
+  "sources": [
+   "https://doaj.org/article/a7282dba5e674176bde2a8239832d2f7",
+   "https://hackmd.io/@dastratman/B1w4jGoDJx"
+  ],
+  "image_like": "Wide-Grip_Lat_Pulldown",
+  "picto": null
+ },
+ {
+  "id": "Machine_Pullover",
+  "name": "Pullover na máquina",
+  "name_en": "Machine Pullover",
+  "equipment": "machine",
+  "category": "strength",
+  "force": "pull",
+  "mechanic": "isolation",
+  "level": "intermediate",
+  "primaryMuscles": [
+   "lats"
+  ],
+  "secondaryMuscles": [
+   "chest",
+   "triceps",
+   "abdominals"
+  ],
+  "pattern": "v_pull",
+  "lengthened": true,
+  "instructions": [
+   "Ajuste o banco para o ombro ficar alinhado ao eixo da máquina e apoie os cotovelos nas almofadas.",
+   "Comece com os braços acima da cabeça, sentindo o dorsal alongar.",
+   "Leve os cotovelos para baixo em arco até a linha do quadril e volte devagar.",
+   "Erro comum: arquear a lombar ou puxar com as mãos em vez dos cotovelos."
+  ],
+  "garmin": {
+   "category": "PULL_UP",
+   "exercise": "STRAIGHT_ARM_PULLDOWN",
+   "garmin_name": "Straight-arm Pull-down",
+   "confidence": "media"
+  },
+  "availability_br": "rara",
+  "evidence": "Isola o dorsal sem depender da força do bíceps e carrega o músculo alongado (braços acima da cabeça) — tipo de estímulo que tende a favorecer hipertrofia (Wolf 2023). Pouco comum no Brasil.",
+  "sources": [
+   "https://doaj.org/article/99e86b317bec40f5abc2f0008358737e",
+   "https://onlinelibrary.wiley.com/doi/10.1111/sms.14121"
+  ],
+  "image_like": "Straight-Arm_Pulldown",
+  "picto": null
+ },
+ {
+  "id": "Leverage_Low_Row",
+  "name": "Remada baixa articulada (low row)",
+  "name_en": "Leverage Low Row",
+  "equipment": "machine",
+  "category": "strength",
+  "force": "pull",
+  "mechanic": "compound",
+  "level": "beginner",
+  "primaryMuscles": [
+   "lats",
+   "middle back"
+  ],
+  "secondaryMuscles": [
+   "biceps",
+   "traps"
+  ],
+  "pattern": "h_pull",
+  "lengthened": false,
+  "instructions": [
+   "Apoie o peito na almofada e firme os pés; pegada neutra com os braços estendidos e escápulas afastadas.",
+   "Puxe os cotovelos junto ao corpo em direção ao quadril.",
+   "Volte devagar até alongar as costas.",
+   "Erro comum: tirar o peito do apoio para \"roubar\" com o tronco."
+  ],
+  "garmin": {
+   "category": "ROW",
+   "exercise": "ROW",
+   "garmin_name": "Row",
+   "confidence": "media"
+  },
+  "availability_br": "média",
+  "evidence": "O apoio no peito tira a carga da lombar em relação à remada curvada e o vetor baixo enfatiza o dorsal; máquinas ≈ pesos livres para hipertrofia (Haugen 2023).",
+  "sources": [
+   "https://doaj.org/article/a7282dba5e674176bde2a8239832d2f7",
+   "https://breakingmuscle.com/chest-supported-row-vs-bent-over-row/"
+  ],
+  "image_like": "Leverage_Iso_Row",
+  "picto": null
+ },
+ {
+  "id": "Wide-Grip_Seated_Cable_Row",
+  "name": "Remada baixa aberta no cabo (barra longa)",
+  "name_en": "Wide-Grip Seated Cable Row",
+  "equipment": "cable",
+  "category": "strength",
+  "force": "pull",
+  "mechanic": "compound",
+  "level": "beginner",
+  "primaryMuscles": [
+   "middle back",
+   "traps"
+  ],
+  "secondaryMuscles": [
+   "lats",
+   "shoulders",
+   "biceps"
+  ],
+  "pattern": "h_pull",
+  "lengthened": false,
+  "instructions": [
+   "Sente na remada baixa com a barra longa, joelhos levemente flexionados e tronco ereto.",
+   "Pegada pronada bem mais aberta que os ombros, braços estendidos.",
+   "Puxe a barra até a parte baixa do peito com os cotovelos a ~45–60° do tronco, juntando as escápulas.",
+   "Erro comum: balançar o tronco para trás ou encolher os ombros até as orelhas."
+  ],
+  "garmin": {
+   "category": "ROW",
+   "exercise": "WIDE_GRIP_SEATED_CABLE_ROW",
+   "garmin_name": "Wide-grip Seated Cable Row",
+   "confidence": "alta"
+  },
+  "availability_br": "comum",
+  "evidence": "Em EMG de alta densidade a pegada aberta ativou mais trapézio (superior, médio e inferior) e deltoide, enquanto a fechada favoreceu o dorsal (Journal of Human Kinetics 2025) — complementa a remada baixa fechada usando o mesmo cabo.",
+  "sources": [
+   "https://jhk.termedia.pl/High-Density-Surface-Electromyography-Excitation-of-Prime-Movers-in-the-Narrow-vs,209550,0,2.html",
+   "https://doaj.org/article/a7282dba5e674176bde2a8239832d2f7"
+  ],
+  "image_like": "Seated_Cable_Rows",
+  "picto": null
+ },
+ {
+  "id": "Bayesian_Cable_Curl",
+  "name": "Rosca bayesiana no cabo (de costas para a polia)",
+  "name_en": "Bayesian Cable Curl",
+  "equipment": "cable",
+  "category": "strength",
+  "force": "pull",
+  "mechanic": "isolation",
+  "level": "intermediate",
+  "primaryMuscles": [
+   "biceps"
+  ],
+  "secondaryMuscles": [
+   "forearms"
+  ],
+  "pattern": "biceps",
+  "lengthened": true,
+  "instructions": [
+   "Polia baixa: fique de costas para a máquina, um passo à frente, com o braço estendido atrás do tronco.",
+   "Flexione o cotovelo sem levar o cotovelo para frente.",
+   "Volte até estender totalmente, sentindo o alongamento.",
+   "Erro comum: deixar o ombro avançar e transformar em rosca comum."
+  ],
+  "garmin": {
+   "category": "CURL",
+   "exercise": "BEHIND_THE_BACK_ONE_ARM_CABLE_CURL",
+   "garmin_name": "Behind-the-Back One-arm Cable Curl",
+   "confidence": "alta"
+  },
+  "availability_br": "comum",
+  "evidence": "Com o braço atrás do corpo o bíceps trabalha alongado; em estudo de 2025 (European Journal of Sport Science) deu hipertrofia semelhante à rosca Scott — duas das melhores opções para bíceps, e só exige um cabo.",
+  "sources": [
+   "https://www.strengthlog.com/preacher-curl-vs-bayesian-curl/",
+   "https://doaj.org/article/99e86b317bec40f5abc2f0008358737e"
+  ],
+  "image_like": "Standing_One-Arm_Cable_Curl",
+  "picto": null
+ },
+ {
+  "id": "Cable_Cross-Body_Triceps_Extension",
+  "name": "Tríceps unilateral cruzado no cabo (katana)",
+  "name_en": "Cable Cross-Body (Katana) Triceps Extension",
+  "equipment": "cable",
+  "category": "strength",
+  "force": "push",
+  "mechanic": "isolation",
+  "level": "intermediate",
+  "primaryMuscles": [
+   "triceps"
+  ],
+  "secondaryMuscles": [],
+  "pattern": "triceps",
+  "lengthened": true,
+  "instructions": [
+   "Polia na altura do ombro, de lado para a máquina; segure o puxador com a mão oposta.",
+   "Cotovelo alto apontando para frente e mão perto da orelha do outro lado.",
+   "Estenda o cotovelo em diagonal para cima/fora e volte devagar até alongar.",
+   "Erro comum: mexer o cotovelo durante a extensão."
+  ],
+  "garmin": {
+   "category": "TRICEPS_EXTENSION",
+   "exercise": "CABLE_OVERHEAD_TRICEPS_EXTENSION",
+   "garmin_name": "Cable Overhead Triceps Extension",
+   "confidence": "media"
+  },
+  "availability_br": "comum",
+  "evidence": "Com o braço elevado a cabeça longa do tríceps fica alongada: extensões acima da cabeça cresceram o tríceps ~40% mais que o pushdown (Maeo 2023); a versão cruzada é confortável para o cotovelo.",
+  "sources": [
+   "https://onlinelibrary.wiley.com/doi/10.1080/17461391.2022.2100279"
+  ],
+  "image_like": "Cable_One_Arm_Tricep_Extension",
+  "picto": null
+ },
+ {
+  "id": "Cable_Triceps_Kickback",
+  "name": "Tríceps coice no cabo",
+  "name_en": "Cable Triceps Kickback",
+  "equipment": "cable",
+  "category": "strength",
+  "force": "push",
+  "mechanic": "isolation",
+  "level": "beginner",
+  "primaryMuscles": [
+   "triceps"
+  ],
+  "secondaryMuscles": [],
+  "pattern": "triceps",
+  "lengthened": false,
+  "instructions": [
+   "Polia baixa, tronco inclinado à frente com apoio da mão livre, braço colado ao corpo e cotovelo a 90°.",
+   "Estenda o cotovelo levando a mão para trás até o braço ficar reto.",
+   "Volte controlando até ~90°.",
+   "Erro comum: balançar o braço (ombro) em vez de mexer só o cotovelo."
+  ],
+  "garmin": {
+   "category": "TRICEPS_EXTENSION",
+   "exercise": "CABLE_KICKBACK",
+   "garmin_name": "Cable Tricep Kick-back",
+   "confidence": "alta"
+  },
+  "availability_br": "comum",
+  "evidence": "O cabo mantém tensão no fim da extensão, onde o halter quase não carrega; baixo estresse no cotovelo — bom complemento, mas prefira versões acima da cabeça como principal (Maeo 2023).",
+  "sources": [
+   "https://onlinelibrary.wiley.com/doi/10.1080/17461391.2022.2100279"
+  ],
+  "image_like": "Tricep_Dumbbell_Kickback",
+  "picto": null
+ },
+ {
+  "id": "Captains_Chair_Knee_Raise",
+  "name": "Elevação de joelhos na cadeira romana (paralelas)",
+  "name_en": "Captain's Chair Knee Raise",
+  "equipment": "machine",
+  "category": "strength",
+  "force": "pull",
+  "mechanic": "isolation",
+  "level": "beginner",
+  "primaryMuscles": [
+   "abdominals"
+  ],
+  "secondaryMuscles": [],
+  "pattern": "core",
+  "lengthened": false,
+  "instructions": [
+   "Apoie costas e antebraços na cadeira e deixe as pernas soltas.",
+   "Eleve os joelhos em direção ao peito enrolando a pelve (retroversão).",
+   "Desça controlando, sem balançar.",
+   "Erro comum: só levantar as coxas sem enrolar a pelve, ou usar o embalo."
+  ],
+  "garmin": {
+   "category": "LEG_RAISE",
+   "exercise": "HANGING_KNEE_RAISE",
+   "garmin_name": "Hanging Knee Raise",
+   "confidence": "media"
+  },
+  "availability_br": "comum",
+  "evidence": "No estudo EMG do ACE (San Diego State) a cadeira romana ficou em 2º para o reto abdominal (~212% do abdominal tradicional) e em 1º para oblíquos (~310%).",
+  "sources": [
+   "https://www.acefitness.org/getfit/studies/BestWorstAbExercises.pdf"
+  ],
+  "image_like": "Knee_Hip_Raise_On_Parallel_Bars",
+  "picto": null
+ }
+]

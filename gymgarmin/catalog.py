@@ -189,6 +189,8 @@ NAMES_PT = {
     "Glute_Kickback": "Coice de glúteo (4 apoios)",
     "One-Legged_Cable_Kickback": "Coice de glúteo na polia",
     "Thigh_Abductor": "Cadeira abdutora",
+    "Lying_T-Bar_Row": "Remada cavalinho apoiada (T-bar)",
+    "Dip_Machine": "Paralelas na máquina (dip sentado)",
     "Thigh_Adductor": "Cadeira adutora",
     "Cable_Hip_Adduction": "Adução na polia",
     "Standing_Calf_Raises": "Panturrilha em pé (máquina)",
@@ -251,6 +253,16 @@ MUSCLE_SEARCH_PT = {
 
 def strip_accents(s: str) -> str:
     return "".join(c for c in unicodedata.normalize("NFD", s) if unicodedata.category(c) != "Mn").lower()
+
+
+# palavras que o povo usa na academia para cada músculo (a busca acha "abdução" na cadeira abdutora etc.)
+MUSCLE_ALIASES = {
+    "abductors": "abducao abdutora abdutor gluteo medio", "adductors": "aducao adutora adutor",
+    "glutes": "gluteo bumbum", "calves": "panturrilha gemeos", "hamstrings": "posterior flexora",
+    "quadriceps": "quadriceps coxa perna", "lats": "costas dorsal", "middle back": "costas", "chest": "peito peitoral",
+    "shoulders": "ombro deltoide", "biceps": "biceps rosca", "triceps": "triceps", "abdominals": "abdomen abdominal barriga",
+    "lower back": "lombar", "traps": "trapezio", "forearms": "antebraco",
+}
 
 
 def _is_timed(ex: dict) -> bool:
@@ -334,11 +346,31 @@ def _load() -> tuple[list[dict], dict[str, dict]]:
             "endurance": bool(c.get("endurance")),
         })
 
+    # aparelhos selecionados por evidência (data/machines.json): foto de movimento equivalente quando existe
+    for m in json.loads((DATA / "machines.json").read_text()):
+        like = by_raw.get(m.get("image_like") or "")
+        items.append({
+            "id": m["id"], "name": m["name"], "name_en": m["name_en"], "kind": "strength",
+            "category": "strength", "category_pt": CATEGORY_PT.get("strength", "Musculação"),
+            "equipment": m["equipment"], "equipment_pt": EQUIPMENT_PT.get(m["equipment"], m["equipment"]),
+            "level": m["level"], "level_pt": LEVEL_PT.get(m["level"], m["level"]),
+            "force": m["force"], "force_pt": FORCE_PT.get(m["force"]),
+            "mechanic": m["mechanic"], "mechanic_pt": MECHANIC_PT.get(m["mechanic"]),
+            "primaryMuscles": m["primaryMuscles"], "secondaryMuscles": m["secondaryMuscles"],
+            "instructions": m["instructions"],
+            "images": [IMAGE_BASE + i for i in like.get("images", [])] if like else [],
+            "image_like": NAMES_PT.get(like["id"], like["name"]) if like else None,
+            "garmin": m["garmin"], "timed": False, "popular": True,
+            "top_machine": True, "evidence": m["evidence"], "sources": m.get("sources", []),
+            "availability_br": m.get("availability_br"), "lengthened": m.get("lengthened", False), "picto": m.get("picto"),
+        })
+
     for it in items:
         it["primary_pt"] = [muscle_pt(m) for m in it["primaryMuscles"]]
         it["secondary_pt"] = [muscle_pt(m) for m in it["secondaryMuscles"]]
         it["_search"] = strip_accents(" ".join([it["name"], it["name_en"], it["equipment_pt"] or "",
-                                                 " ".join(it["primary_pt"])]))
+                                                 " ".join(it["primary_pt"]),
+                                                 " ".join(MUSCLE_ALIASES.get(m, "") for m in it["primaryMuscles"])]))
     return items, {i["id"]: i for i in items}
 
 
