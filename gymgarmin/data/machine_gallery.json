@@ -4696,5 +4696,1882 @@
    }
   ],
   "photos": []
+ },
+ {
+  "machine_id": "mx_treadmill",
+  "name": "Esteira (caminhada inclinada e corrida)",
+  "name_en": "Treadmill",
+  "category": "cardio",
+  "is_new": false,
+  "availability_br": "comum",
+  "tips": [
+   "Prenda a chave de segurança (clip) na roupa e suba com a esteira parada ou bem devagar.",
+   "Segurar o corrimão na caminhada inclinada reduz muito o gasto — use só para equilíbrio.",
+   "Zona 2 (≈60–70% da FC máx.): ritmo em que você ainda conversa; tiros ficam em zona 4–5.",
+   "Aumente volume ou inclinação aos poucos (≈10% por semana) para poupar canela e tendão de Aquiles."
+  ],
+  "why": "Equipamento cardio mais presente nas academias brasileiras; serve de caminhada de baixo impacto (inclinada) até treino intervalado de corrida.",
+  "sources": [
+   "https://health.clevelandclinic.org/12-3-30-workout",
+   "https://www.garmin.com/en-US/blog/fitness/how-you-can-train-by-heart-rate-zones-using-garmin/",
+   "https://www.youtube.com/watch?v=knDDV76wOxc"
+  ],
+  "brands": [
+   "Life Fitness",
+   "Technogym",
+   "Matrix",
+   "Precor",
+   "Movement",
+   "Embreex"
+  ],
+  "existing_exercise_ids": [
+   "cardio_esteira_caminhada",
+   "cardio_esteira_corrida",
+   "Walking_Treadmill",
+   "Jogging_Treadmill",
+   "Running_Treadmill"
+  ],
+  "exercises": [
+   {
+    "name": "Caminhada inclinada 12-3-30",
+    "how": "Inclinação 12%, ~5 km/h (3 mph), 30 min. Comece com 6–8% e menos tempo; solte o corrimão quando der.",
+    "muscles": [
+     "glutes",
+     "hamstrings",
+     "calves",
+     "quadriceps"
+    ],
+    "exercise_id": "cardio_esteira_caminhada",
+    "video": {
+     "url": "https://www.youtube.com/watch?v=NAsObfFJXvE",
+     "status": "pending"
+    }
+   },
+   {
+    "name": "Caminhada inclinada zona 2",
+    "how": "8–12% a 5–6 km/h por 30–60 min, mantendo FC em zona 2 (consegue conversar).",
+    "muscles": [
+     "glutes",
+     "calves",
+     "hamstrings"
+    ],
+    "exercise_id": "Walking_Treadmill"
+   },
+   {
+    "name": "Corrida contínua (rodagem)",
+    "how": "Ritmo confortável com 1% de inclinação para compensar a falta de vento; 20–45 min.",
+    "muscles": [
+     "quadriceps",
+     "hamstrings",
+     "glutes",
+     "calves"
+    ],
+    "exercise_id": "cardio_esteira_corrida"
+   },
+   {
+    "name": "Intervalado (tiros)",
+    "how": "Ex.: 6–10 × 1 min forte / 1–2 min trote ou caminhada; use os botões de velocidade rápida.",
+    "muscles": [
+     "quadriceps",
+     "hamstrings",
+     "glutes",
+     "calves"
+    ],
+    "exercise_id": "Running_Treadmill",
+    "video": {
+     "url": "https://www.youtube.com/watch?v=B2REFSuHOHU",
+     "status": "pending"
+    }
+   },
+   {
+    "name": "Subidas (hill repeats)",
+    "how": "Ex.: 6 × 2 min a 6–8% em ritmo forte, recuperando 2 min no plano.",
+    "muscles": [
+     "glutes",
+     "hamstrings",
+     "calves"
+    ]
+   }
+  ],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=knDDV76wOxc",
+    "title": "Treadmill Quick Start Tutorial - LifeFitness",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=NAsObfFJXvE",
+    "title": "How To: Incline Treadmill Walk (12-3-30 Workout)",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=B2REFSuHOHU",
+    "title": "Interval Based Workout on Life Fitness Treadmill",
+    "status": "pending"
+   }
+  ],
+  "photos": []
+ },
+ {
+  "machine_id": "mx_upright_bike",
+  "name": "Bicicleta ergométrica vertical",
+  "name_en": "Upright Stationary Bike",
+  "category": "cardio",
+  "is_new": false,
+  "availability_br": "comum",
+  "tips": [
+   "Banco na altura do quadril: no ponto mais baixo do pedal o joelho fica levemente flexionado (≈25–35°).",
+   "Use as alças/pedais com firma-pé para puxar na subida do pedal e não só empurrar.",
+   "Cadência muito baixa com carga alta sobrecarrega o joelho; prefira 80–100 rpm."
+  ],
+  "why": "Cardio de baixo impacto, fácil de usar e presente em quase toda academia; boa porta de entrada para iniciantes e para dias de recuperação.",
+  "sources": [
+   "https://www.johnsonfitness.com/blog/training-tips-routines/how-to-set-up-an-exercise-bike-cycle-stationary/",
+   "https://www.garmin.com/en-US/blog/fitness/how-you-can-train-by-heart-rate-zones-using-garmin/"
+  ],
+  "brands": [
+   "Life Fitness",
+   "Technogym",
+   "Matrix",
+   "Precor",
+   "Movement"
+  ],
+  "existing_exercise_ids": [
+   "cardio_bike_vertical",
+   "Bicycling_Stationary"
+  ],
+  "exercises": [
+   {
+    "name": "Pedal contínuo zona 2",
+    "how": "Carga leve-moderada, 80–95 rpm por 30–60 min com FC em zona 2.",
+    "muscles": [
+     "quadriceps",
+     "glutes"
+    ],
+    "exercise_id": "cardio_bike_vertical"
+   },
+   {
+    "name": "Intervalado 30/30",
+    "how": "10–15 × 30 s forte (carga alta, 90+ rpm) / 30 s leve.",
+    "muscles": [
+     "quadriceps",
+     "glutes",
+     "hamstrings"
+    ]
+   },
+   {
+    "name": "Pirâmide de carga",
+    "how": "Suba 1 nível a cada 2 min até ficar difícil e depois desça na mesma ordem.",
+    "muscles": [
+     "quadriceps",
+     "glutes",
+     "calves"
+    ]
+   },
+   {
+    "name": "Aquecimento pré-treino de pernas",
+    "how": "5–10 min leves antes do treino de força para aquecer joelhos e quadril.",
+    "muscles": [
+     "quadriceps",
+     "glutes"
+    ]
+   }
+  ],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=VJpAj936QEo",
+    "title": "Exercise Tutorial: Technogym Upright Cycle",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=sWg1s9l2tz0",
+    "title": "Life Fitness Club Series+ Upright Bike",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=PydbrYllLzU",
+    "title": "How To Use the Precor UBK 635 Upright Bike",
+    "status": "pending"
+   }
+  ],
+  "photos": []
+ },
+ {
+  "machine_id": "mx_recumbent_bike",
+  "name": "Bicicleta horizontal (reclinada)",
+  "name_en": "Recumbent Bike",
+  "category": "cardio",
+  "is_new": false,
+  "availability_br": "comum",
+  "tips": [
+   "Ajuste o banco para a perna quase estender no pedal mais distante, com o joelho levemente flexionado.",
+   "Ótima opção para dor lombar, sobrepeso ou idosos: o encosto tira a carga da coluna.",
+   "Glúteo trabalha mais com o banco mais afastado; não deixe o quadril escorregar para frente."
+  ],
+  "why": "Versão mais confortável e segura da bike ergométrica, comum em academias e reabilitação; boa para quem não tolera a vertical.",
+  "sources": [
+   "https://silversneakers.com/?p=5160",
+   "https://www.garmin.com/en-US/blog/fitness/how-you-can-train-by-heart-rate-zones-using-garmin/"
+  ],
+  "brands": [
+   "Life Fitness",
+   "Technogym",
+   "Matrix",
+   "Precor",
+   "Cybex"
+  ],
+  "existing_exercise_ids": [
+   "cardio_bike_horizontal",
+   "Recumbent_Bike"
+  ],
+  "exercises": [
+   {
+    "name": "Pedal contínuo com encosto",
+    "how": "Costas apoiadas, carga leve-moderada por 20–45 min em zona 2.",
+    "muscles": [
+     "quadriceps",
+     "glutes"
+    ],
+    "exercise_id": "cardio_bike_horizontal"
+   },
+   {
+    "name": "Intervalado leve para iniciantes",
+    "how": "8 × 1 min mais forte / 2 min leve, mantendo as costas no encosto.",
+    "muscles": [
+     "quadriceps",
+     "glutes",
+     "hamstrings"
+    ]
+   },
+   {
+    "name": "Recuperação ativa",
+    "how": "10–20 min bem leves (zona 1) no dia seguinte a treino pesado de pernas.",
+    "muscles": [
+     "quadriceps",
+     "glutes"
+    ]
+   }
+  ],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=xmbDumiVYQo",
+    "title": "Exercise Tutorial: Technogym Recumbent Bike",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=H9ubExvXVUo",
+    "title": "How To Use the Precor RBK 635 Recumbent Bike",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=XugMoMDxyhM",
+    "title": "Beginner's Guide: Recumbent Bike",
+    "status": "pending"
+   }
+  ],
+  "photos": []
+ },
+ {
+  "machine_id": "mx_spin_bike",
+  "name": "Bike de spinning (indoor cycling)",
+  "name_en": "Spin Bike / Indoor Cycle",
+  "category": "cardio",
+  "is_new": false,
+  "availability_br": "comum",
+  "tips": [
+   "Ajuste altura do selim (quadril), recuo (joelho sobre o pedal) e guidão antes de começar; trave os pinos.",
+   "Nunca pedale sem carga em alta cadência — a roda de inércia pode 'puxar' a perna. Freio de emergência: pressione a alavanca de carga.",
+   "Monitore a FC: aulas de spinning passam muito tempo em zona 4–5; equilibre com treinos leves."
+  ],
+  "why": "Base das aulas coletivas de ciclismo indoor, presentes na maioria das redes brasileiras; permite treinos intensos com baixo impacto.",
+  "sources": [
+   "https://www.youtube.com/watch?v=hTT-j-vnv-A",
+   "https://www.garmin.com/en-US/blog/fitness/how-you-can-train-by-heart-rate-zones-using-garmin/"
+  ],
+  "brands": [
+   "Keiser (M3i)",
+   "Technogym (Group Cycle)",
+   "Matrix",
+   "Life Fitness (ICG)",
+   "Schwinn",
+   "Movement"
+  ],
+  "existing_exercise_ids": [
+   "cardio_spinning",
+   "Bicycling_Stationary"
+  ],
+  "exercises": [
+   {
+    "name": "Rodagem sentado (zona 2)",
+    "how": "Carga moderada, 85–95 rpm, tronco relaxado, 30–60 min.",
+    "muscles": [
+     "quadriceps",
+     "glutes",
+     "calves"
+    ],
+    "exercise_id": "cardio_spinning"
+   },
+   {
+    "name": "Subida em pé (escalada)",
+    "how": "Carga alta, 60–75 rpm, em pé com quadril sobre o selim; blocos de 1–3 min.",
+    "muscles": [
+     "quadriceps",
+     "glutes",
+     "calves",
+     "hamstrings"
+    ]
+   },
+   {
+    "name": "Sprints sentado",
+    "how": "6–10 × 15–30 s em cadência máxima com carga média / 1–2 min leve.",
+    "muscles": [
+     "quadriceps",
+     "glutes",
+     "hamstrings"
+    ]
+   },
+   {
+    "name": "Alternância sentado/em pé (jumps)",
+    "how": "Alterne 8–16 tempos sentado e em pé mantendo a cadência, sem pular sem carga.",
+    "muscles": [
+     "quadriceps",
+     "glutes",
+     "abdominals"
+    ]
+   }
+  ],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=FzXp6OsfzLw",
+    "title": "Keiser M3i Indoor Bike Setup",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=QWbXEpHis4E",
+    "title": "Technogym - Bike Setup Guide",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=mOHVv-q5ubE",
+    "title": "How to correctly set up a spin bike / indoor cycle",
+    "status": "pending"
+   }
+  ],
+  "photos": []
+ },
+ {
+  "machine_id": "mx_air_bike",
+  "name": "Air bike / Assault bike",
+  "name_en": "Air Bike (Fan Bike)",
+  "category": "cardio",
+  "is_new": false,
+  "availability_br": "média",
+  "tips": [
+   "A resistência vem do ventilador: quanto mais rápido, mais pesado — controle a intensidade pelos watts/RPM.",
+   "Empurre e puxe as alças em sincronia com as pernas; coluna neutra, sem curvar sobre o guidão.",
+   "Em tiros, a FC demora a subir: avalie o esforço pela potência e a recuperação pela queda da FC.",
+   "Cuidado com as alças em movimento ao subir e descer da bike."
+  ],
+  "why": "Cardio de corpo inteiro e alta intensidade muito usado em boxes de CrossFit e áreas funcionais; ótimo para HIIT curto.",
+  "sources": [
+   "https://www.assaultfitness.com/blogs/university/assaultwod-assaultbike-power",
+   "https://www.acefitness.org/education-and-resources/professional/prosource/june-2014/4858/get-it-done-20-minute-tabata-workout-options/",
+   "https://www.garmin.com/en-US/blog/fitness/how-you-can-train-by-heart-rate-zones-using-garmin/"
+  ],
+  "brands": [
+   "Assault Fitness",
+   "Rogue Echo",
+   "Concept2 BikeErg (sem braços)",
+   "Schwinn Airdyne",
+   "Technogym Skill Bike"
+  ],
+  "existing_exercise_ids": [
+   "cardio_air_bike"
+  ],
+  "exercises": [
+   {
+    "name": "Tiros 20/10 (Tabata)",
+    "how": "8 × 20 s máximo / 10 s parado (4 min). O console da AssaultBike tem preset 20/10.",
+    "muscles": [
+     "quadriceps",
+     "glutes",
+     "shoulders",
+     "chest",
+     "lats"
+    ],
+    "video": {
+     "url": "https://www.youtube.com/watch?v=_fRsgSb-XB4",
+     "status": "pending"
+    }
+   },
+   {
+    "name": "EMOM de calorias",
+    "how": "A cada minuto, faça X calorias (ex.: 10–15) e descanse o restante; 10–20 min.",
+    "muscles": [
+     "quadriceps",
+     "glutes",
+     "shoulders",
+     "triceps"
+    ]
+   },
+   {
+    "name": "Rodagem zona 2 com braços",
+    "how": "20–40 min em ritmo de conversa usando braços e pernas juntos.",
+    "muscles": [
+     "quadriceps",
+     "glutes",
+     "shoulders",
+     "lats"
+    ]
+   },
+   {
+    "name": "Só pernas / só braços",
+    "how": "Pés nos apoios para treinar só braços (empurra-puxa), ou mãos no apoio central para só pernas.",
+    "muscles": [
+     "shoulders",
+     "chest",
+     "triceps",
+     "lats",
+     "quadriceps"
+    ]
+   }
+  ],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=y7_ODbEIixY",
+    "title": "Assault University: AirBike Classic Technique - Pedaling",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=_fRsgSb-XB4",
+    "title": "Sprint vs. Sustain on the Assault Bike, Mentality & Technique",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=RPY7HTGfOiU",
+    "title": "How to Use an Assault Bike",
+    "status": "pending"
+   }
+  ],
+  "photos": []
+ },
+ {
+  "machine_id": "mx_elliptical",
+  "name": "Elíptico / Transport",
+  "name_en": "Elliptical Cross-Trainer",
+  "category": "cardio",
+  "is_new": false,
+  "availability_br": "comum",
+  "tips": [
+   "Mantenha os pés inteiros nos pedais; formigamento indica pressão excessiva — mexa os dedos ou reposicione.",
+   "Tronco ereto e sem se apoiar no console; a carga deve sair das pernas.",
+   "Sem impacto: substituto da corrida em fase de lesão, mantendo a FC em zona 2–3."
+  ],
+  "why": "Cardio de impacto zero com braços e pernas, muito comum nas academias; preferido por quem tem dor nos joelhos ou está voltando de lesão.",
+  "sources": [
+   "https://www.youtube.com/watch?v=-KNl9Kl1CJM",
+   "https://www.garmin.com/en-US/blog/fitness/how-you-can-train-by-heart-rate-zones-using-garmin/"
+  ],
+  "brands": [
+   "Life Fitness",
+   "Technogym (Synchro)",
+   "Matrix",
+   "Precor (EFX)",
+   "Movement"
+  ],
+  "existing_exercise_ids": [
+   "cardio_eliptico",
+   "Elliptical_Trainer"
+  ],
+  "exercises": [
+   {
+    "name": "Contínuo zona 2 com braços",
+    "how": "30–45 min empurrando e puxando as alças móveis, postura ereta.",
+    "muscles": [
+     "quadriceps",
+     "glutes",
+     "chest",
+     "shoulders"
+    ],
+    "exercise_id": "cardio_eliptico"
+   },
+   {
+    "name": "Pedalada para trás",
+    "how": "Blocos de 2–3 min invertendo o movimento: mais quadríceps e posterior.",
+    "muscles": [
+     "quadriceps",
+     "hamstrings",
+     "glutes"
+    ]
+   },
+   {
+    "name": "Só pernas (mãos fixas)",
+    "how": "Mãos nos apoios fixos e quadril para trás para enfatizar glúteo; não apoie o peso no braço.",
+    "muscles": [
+     "glutes",
+     "hamstrings",
+     "quadriceps"
+    ]
+   },
+   {
+    "name": "Intervalado de carga",
+    "how": "8–10 × 1 min com carga/inclinação alta / 1–2 min leve.",
+    "muscles": [
+     "quadriceps",
+     "glutes",
+     "calves"
+    ]
+   }
+  ],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=-KNl9Kl1CJM",
+    "title": "Exercise Tutorial: Technogym Cross Trainer / Elliptical",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=0qXAG_ljuKc",
+    "title": "Elliptical Technique (Life Fitness)",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=8si2IPYDaxU",
+    "title": "Precor Elliptical Fitness Crosstrainer Instruction Video",
+    "status": "pending"
+   }
+  ],
+  "photos": []
+ },
+ {
+  "machine_id": "mx_rowing_erg",
+  "name": "Remo ergômetro (Concept2 RowErg)",
+  "name_en": "Rowing Machine (Concept2 RowErg)",
+  "category": "cardio",
+  "is_new": false,
+  "availability_br": "média",
+  "tips": [
+   "Damper 3–5 é o ponto de partida; damper 10 não é 'mais treino', só cansa mais cedo.",
+   "Ritmo 1:2 — puxada rápida, volta duas vezes mais lenta; não corra o carrinho em direção ao pé.",
+   "Cerca de 60% da força vem das pernas: se a lombar dói, você está puxando com as costas.",
+   "Use o split/500 m e a FC: rodagem em zona 2, tiros em zona 4–5."
+  ],
+  "why": "Cardio de corpo inteiro e baixo impacto; o Concept2 é padrão em boxes, HYROX e academias premium no Brasil.",
+  "sources": [
+   "https://www.concept2.com/training/rowing-technique",
+   "https://www.concept2.com/training/articles/rowing-muscles-used",
+   "https://www.concept2.com/blog/what-is-the-best-damper-setting-for-me"
+  ],
+  "brands": [
+   "Concept2",
+   "Technogym (Skillrow)",
+   "WaterRower",
+   "Matrix",
+   "Life Fitness"
+  ],
+  "existing_exercise_ids": [
+   "cardio_remo",
+   "Rowing_Stationary"
+  ],
+  "exercises": [
+   {
+    "name": "Técnica pernas → tronco → braços",
+    "how": "Na puxada: empurre com as pernas, abra o tronco e só então puxe com os braços; na volta, ordem inversa (braços, tronco, pernas).",
+    "muscles": [
+     "quadriceps",
+     "glutes",
+     "hamstrings",
+     "lats",
+     "middle back",
+     "biceps"
+    ],
+    "exercise_id": "Rowing_Stationary",
+    "video": {
+     "url": "https://www.youtube.com/watch?v=JunqWhTXTJs",
+     "status": "pending"
+    }
+   },
+   {
+    "name": "Rodagem (steady state)",
+    "how": "20–40 min a 18–22 remadas/min em zona 2, ritmo constante no split de 500 m.",
+    "muscles": [
+     "quadriceps",
+     "glutes",
+     "lats",
+     "middle back"
+    ],
+    "exercise_id": "cardio_remo"
+   },
+   {
+    "name": "Tiros de 500 m",
+    "how": "Ex.: 6–8 × 500 m forte com 1:30–2 min de descanso; programe intervalos no PM5.",
+    "muscles": [
+     "quadriceps",
+     "glutes",
+     "hamstrings",
+     "lats",
+     "middle back"
+    ],
+    "video": {
+     "url": "https://www.youtube.com/watch?v=ZCdY-874WlM",
+     "status": "pending"
+    }
+   },
+   {
+    "name": "Pirâmide por tempo",
+    "how": "1-2-3-4-3-2-1 min forte com 1 min leve entre blocos.",
+    "muscles": [
+     "quadriceps",
+     "glutes",
+     "lats",
+     "lower back"
+    ]
+   },
+   {
+    "name": "Drill só braços e tronco",
+    "how": "Pernas estendidas, faça braços e balanço do tronco para aprender a sequência.",
+    "muscles": [
+     "lats",
+     "middle back",
+     "biceps",
+     "abdominals"
+    ]
+   }
+  ],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=JunqWhTXTJs",
+    "title": "Basics of the Concept2 Rowing Technique",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=QPvYrfyGHi8",
+    "title": "Concept2 Technique Video on the Indoor Rower",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=ZCdY-874WlM",
+    "title": "Setting Up a Distance Interval Workout on a Concept2 Indoor Rower or SkiErg",
+    "status": "pending"
+   }
+  ],
+  "photos": []
+ },
+ {
+  "machine_id": "mx_stair_climber",
+  "name": "Escada / Stair climber (StepMill)",
+  "name_en": "Stair Climber (StepMill)",
+  "category": "cardio",
+  "is_new": false,
+  "availability_br": "média",
+  "tips": [
+   "Não se pendure no corrimão nem incline o tronco sobre o console — reduz muito o esforço real.",
+   "Pise com o pé inteiro no degrau, empurrando pelo calcanhar para ativar mais glúteo.",
+   "A FC sobe rápido: comece em nível baixo e use zona 2–3 para treinos longos."
+  ],
+  "why": "Escada rolante de degraus que simula subir escadas; cardio intenso e de baixo impacto, muito procurado para glúteo.",
+  "sources": [
+   "https://stairmaster.com/benefits-of-climbing/benefits-of-stairclimbing",
+   "https://www.garmin.com/en-US/blog/fitness/how-you-can-train-by-heart-rate-zones-using-garmin/"
+  ],
+  "brands": [
+   "StairMaster",
+   "Matrix (ClimbMill)",
+   "Life Fitness (PowerMill)",
+   "Technogym (Climb)"
+  ],
+  "existing_exercise_ids": [
+   "cardio_escada",
+   "Stairmaster",
+   "Step_Mill"
+  ],
+  "exercises": [
+   {
+    "name": "Subida contínua zona 2–3",
+    "how": "Ritmo constante por 15–30 min, mãos só de leve no corrimão.",
+    "muscles": [
+     "glutes",
+     "quadriceps",
+     "calves",
+     "hamstrings"
+    ],
+    "exercise_id": "Step_Mill"
+   },
+   {
+    "name": "Pular um degrau",
+    "how": "Suba de dois em dois degraus em ritmo lento: mais amplitude de quadril e glúteo.",
+    "muscles": [
+     "glutes",
+     "quadriceps",
+     "hamstrings"
+    ]
+   },
+   {
+    "name": "Subida lateral",
+    "how": "De lado, cruze a passada em blocos de 30–60 s por lado com velocidade baixa.",
+    "muscles": [
+     "glutes",
+     "abductors",
+     "adductors",
+     "quadriceps"
+    ]
+   },
+   {
+    "name": "Intervalado de velocidade",
+    "how": "8–10 × 1 min em nível alto / 1 min em nível baixo.",
+    "muscles": [
+     "glutes",
+     "quadriceps",
+     "calves"
+    ]
+   }
+  ],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=gNeyNOs-p4Q",
+    "title": "StairMaster Stepmills Getting Started",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=8Y7yTrSJwWU",
+    "title": "How to Use the Stairmaster Stepmill Safely and Effectively",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=6eMPlQ95gXI",
+    "title": "How To Properly Use The Stepmill And Stair Climber",
+    "status": "pending"
+   }
+  ],
+  "photos": []
+ },
+ {
+  "machine_id": "mx_ski_erg",
+  "name": "Ski erg (Concept2 SkiErg)",
+  "name_en": "Concept2 SkiErg",
+  "category": "cardio",
+  "is_new": false,
+  "availability_br": "rara",
+  "tips": [
+   "Distância de ~45–60 cm do equipamento, pés na largura do quadril.",
+   "Não afaste os braços em 'borboleta' na volta: suba as alças em linha reta.",
+   "Ritmo 1:2 (puxada rápida, volta lenta); monitore watts e FC no PM5."
+  ],
+  "why": "Mesmo monitor PM5 do remo e da BikeErg; obrigatório no HYROX, ganhando espaço em boxes e academias premium.",
+  "sources": [
+   "https://www.concept2.com/training/skierg-technique",
+   "https://www.concept2.com/training/articles/skiing-muscles-used",
+   "https://www.concept2.com/blog/concept2-erg-hyrox-tips-and-tricks"
+  ],
+  "brands": [
+   "Concept2"
+  ],
+  "existing_exercise_ids": [
+   "cardio_ski_erg"
+  ],
+  "exercises": [
+   {
+    "name": "Técnica de bastão duplo",
+    "how": "Alças na altura dos olhos, puxe com tronco e dorsais flexionando quadril e joelhos, terminando perto das coxas.",
+    "muscles": [
+     "lats",
+     "triceps",
+     "abdominals",
+     "shoulders",
+     "glutes"
+    ],
+    "exercise_id": "cardio_ski_erg",
+    "video": {
+     "url": "https://www.youtube.com/watch?v=tJU6VGbGEaI",
+     "status": "pending"
+    }
+   },
+   {
+    "name": "Rodagem",
+    "how": "15–30 min em zona 2, ~35–45 puxadas/min.",
+    "muscles": [
+     "lats",
+     "triceps",
+     "abdominals"
+    ]
+   },
+   {
+    "name": "Tiros 250–500 m",
+    "how": "Ex.: 8 × 250 m forte / 1 min de descanso.",
+    "muscles": [
+     "lats",
+     "triceps",
+     "abdominals",
+     "shoulders"
+    ]
+   },
+   {
+    "name": "Alternado (braço a braço)",
+    "how": "Puxe uma alça de cada vez em ritmo contínuo, sem girar o tronco em excesso.",
+    "muscles": [
+     "lats",
+     "triceps",
+     "abdominals"
+    ]
+   },
+   {
+    "name": "Sentado",
+    "how": "De joelhos ou sentado em banco à frente do SkiErg: treino de membros superiores quando a perna está lesionada.",
+    "muscles": [
+     "lats",
+     "triceps",
+     "abdominals"
+    ]
+   }
+  ],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=B0lIgT5PHc8",
+    "title": "SkiErg Technique",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=tJU6VGbGEaI",
+    "title": "Master the Concept2 SkiErg: Technique, Setup, & Mistakes",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=dav069t7_N0",
+    "title": "Ski-Erg - Setup - Points of Contact",
+    "status": "pending"
+   }
+  ],
+  "photos": []
+ },
+ {
+  "machine_id": "mx_curved_treadmill",
+  "name": "Esteira curva (não motorizada)",
+  "name_en": "Curved Non-Motorized Treadmill",
+  "category": "cardio",
+  "is_new": false,
+  "availability_br": "rara",
+  "tips": [
+   "Suba e desça pela parte de trás; a lona pode girar rápido se você pisar muito à frente.",
+   "Custa mais energia que a esteira comum na mesma velocidade — reduza o ritmo-alvo.",
+   "Ótima para tiros: a FC sobe rápido; use zona 5 só em blocos curtos."
+  ],
+  "why": "Movida pelo próprio corredor, sem motor; ensina passada mais eficiente e é padrão em treino de velocidade e boxes.",
+  "sources": [
+   "https://www.woodway.com/treadmills/curve/",
+   "https://www.woodway.com/manual-treadmills/"
+  ],
+  "brands": [
+   "Woodway (Curve)",
+   "Assault (AirRunner)",
+   "TrueForm"
+  ],
+  "existing_exercise_ids": [
+   "cardio_esteira_curva"
+  ],
+  "exercises": [
+   {
+    "name": "Caminhada / trote livre",
+    "how": "Fique no meio da curva para andar; avance o pé para a frente da curva para acelerar e recue para frear.",
+    "muscles": [
+     "glutes",
+     "hamstrings",
+     "calves",
+     "quadriceps"
+    ],
+    "exercise_id": "cardio_esteira_curva",
+    "video": {
+     "url": "https://www.youtube.com/watch?v=3u7DNbC0U9o",
+     "status": "pending"
+    }
+   },
+   {
+    "name": "Tiros 20–30 s",
+    "how": "8–10 sprints curtos com 60–90 s caminhando; a esteira responde instantaneamente.",
+    "muscles": [
+     "hamstrings",
+     "glutes",
+     "quadriceps",
+     "calves"
+    ]
+   },
+   {
+    "name": "Empurrar com resistência (sled push)",
+    "how": "Em modelos com freio (Curve FTG/AirRunner), aumente a resistência e empurre o corrimão como um trenó.",
+    "muscles": [
+     "quadriceps",
+     "glutes",
+     "calves"
+    ]
+   },
+   {
+    "name": "Técnica de passada",
+    "how": "Corrida com pisada no médio-pé sob o quadril, tronco levemente inclinado à frente.",
+    "muscles": [
+     "hamstrings",
+     "glutes",
+     "calves"
+    ]
+   }
+  ],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=dA3jihPw7c8",
+    "title": "How to Use the WOODWAY Curve Manual Treadmill",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=3u7DNbC0U9o",
+    "title": "Assault University: AirRunner Technique - Standing, Walking, and Running",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=k7BQuCy34_I",
+    "title": "Born To Run: Air Runner 101",
+    "status": "pending"
+   }
+  ],
+  "photos": []
+ },
+ {
+  "machine_id": "mx_sled",
+  "name": "Trenó (sled push / pull)",
+  "name_en": "Push/Pull Sled (Prowler)",
+  "category": "cardio",
+  "is_new": false,
+  "availability_br": "média",
+  "tips": [
+   "Quase não tem fase excêntrica: pouca dor muscular no dia seguinte, ótimo para fim de treino.",
+   "Mantenha a coluna neutra e empurre com a perna da frente até estender o quadril.",
+   "Tiros de 20–30 m levam a FC à zona 4–5; descanse até ela cair para zona 2–3 antes do próximo."
+  ],
+  "why": "Base do condicionamento em boxes, HYROX e áreas funcionais; treina força e cardio com baixo risco técnico.",
+  "sources": [
+   "https://www.youtube.com/watch?v=QgOdsQDKbHw",
+   "https://www.garmin.com/en-US/blog/fitness/how-you-can-train-by-heart-rate-zones-using-garmin/"
+  ],
+  "brands": [
+   "Rogue (Prowler)",
+   "Torque (TANK)",
+   "Rae Crowther"
+  ],
+  "existing_exercise_ids": [
+   "cardio_treno",
+   "Sled_Push",
+   "Prowler_Sprint",
+   "Sled_Drag_-_Harness",
+   "Sled_Row",
+   "Sled_Reverse_Flye",
+   "Sled_Overhead_Backward_Walk"
+  ],
+  "exercises": [
+   {
+    "name": "Empurrar com pegada alta",
+    "how": "Braços estendidos nas hastes altas, passadas rápidas e curtas por 15–30 m.",
+    "muscles": [
+     "quadriceps",
+     "glutes",
+     "calves"
+    ],
+    "exercise_id": "Sled_Push",
+    "video": {
+     "url": "https://www.youtube.com/watch?v=QgOdsQDKbHw",
+     "status": "pending"
+    }
+   },
+   {
+    "name": "Empurrar com pegada baixa (pesado)",
+    "how": "Tronco quase paralelo ao chão, empurre forte com o pé inteiro; mais quadríceps e potência.",
+    "muscles": [
+     "quadriceps",
+     "glutes",
+     "calves",
+     "hamstrings"
+    ],
+    "exercise_id": "Prowler_Sprint",
+    "video": {
+     "url": "https://www.youtube.com/watch?v=5ZPBWawl9bE",
+     "status": "pending"
+    }
+   },
+   {
+    "name": "Arrasto para trás (backward drag)",
+    "how": "De frente para o trenó com as alças, caminhe para trás em semi-agachamento; ótimo para joelho.",
+    "muscles": [
+     "quadriceps"
+    ],
+    "exercise_id": "Sled_Drag_-_Harness",
+    "video": {
+     "url": "https://www.youtube.com/watch?v=hbCeJFBFyYk",
+     "status": "pending"
+    }
+   },
+   {
+    "name": "Puxada com corda (rope pull)",
+    "how": "Fique parado e puxe o trenó com a corda mão sobre mão.",
+    "muscles": [
+     "lats",
+     "middle back",
+     "biceps",
+     "forearms"
+    ]
+   },
+   {
+    "name": "Remada no trenó",
+    "how": "Alças na corda/fita, caminhe para trás puxando como uma remada.",
+    "muscles": [
+     "middle back",
+     "lats",
+     "biceps"
+    ],
+    "exercise_id": "Sled_Row"
+   }
+  ],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=QgOdsQDKbHw",
+    "title": "Prowler (Sled) Push - high position",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=5ZPBWawl9bE",
+    "title": "Prowler (Sled) Push - low hand position",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=hbCeJFBFyYk",
+    "title": "Backward Sled Drag Tutorial",
+    "status": "pending"
+   }
+  ],
+  "photos": []
+ },
+ {
+  "machine_id": "mx_arm_ergometer",
+  "name": "Cicloergômetro de braço (UBE / arm bike)",
+  "name_en": "Upper Body Ergometer (Arm Bike)",
+  "category": "cardio",
+  "is_new": false,
+  "availability_br": "rara",
+  "tips": [
+   "O eixo deve ficar na altura do ombro e com braço quase estendido no ponto mais longe.",
+   "A FC sobe mais que na bike de perna para o mesmo esforço: use carga moderada e a percepção de esforço.",
+   "Usado em reabilitação de ombro e para cadeirantes; com lesão, siga orientação do fisioterapeuta."
+  ],
+  "why": "Única opção de cardio para quem está com lesão em membros inferiores ou usa cadeira de rodas; comum em clínicas e academias grandes.",
+  "sources": [
+   "https://uhra.herts.ac.uk/id/eprint/14609/1/BASES_expert_statement.pdf",
+   "https://www.spiritfitness.com/rehab/85ue-upper-body-ergometer"
+  ],
+  "brands": [
+   "Technogym (Top)",
+   "SciFit",
+   "Monark",
+   "Spirit",
+   "Biodex"
+  ],
+  "existing_exercise_ids": [
+   "cardio_ergometro_braco"
+  ],
+  "exercises": [
+   {
+    "name": "Pedal para frente contínuo",
+    "how": "Sentado ereto, alças na altura do ombro, gire por 5–15 min em ritmo moderado.",
+    "muscles": [
+     "shoulders",
+     "triceps",
+     "chest",
+     "biceps"
+    ],
+    "exercise_id": "cardio_ergometro_braco",
+    "video": {
+     "url": "https://www.youtube.com/watch?v=BLVu198om5g",
+     "status": "pending"
+    }
+   },
+   {
+    "name": "Pedal para trás",
+    "how": "Inverta o sentido: mais costas e posterior de ombro.",
+    "muscles": [
+     "middle back",
+     "shoulders",
+     "biceps"
+    ]
+   },
+   {
+    "name": "Intervalado de braços",
+    "how": "8–10 × 30 s forte / 60 s leve — cardio para quem não pode usar as pernas.",
+    "muscles": [
+     "shoulders",
+     "triceps",
+     "chest",
+     "lats"
+    ]
+   },
+   {
+    "name": "Em pé (modelos que permitem)",
+    "how": "Pés afastados, tronco firme, para envolver mais o core.",
+    "muscles": [
+     "shoulders",
+     "abdominals",
+     "triceps"
+    ]
+   }
+  ],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=BLVu198om5g",
+    "title": "Exercise Tutorial: Technogym Arm Ergometer",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=Kt3PwXFuCgI",
+    "title": "How to Use the Arm Ergometer",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=u-79qnFnY98",
+    "title": "How to Use the Arm Bike Machine for Cardio Exercise",
+    "status": "pending"
+   }
+  ],
+  "photos": []
+ },
+ {
+  "machine_id": "mx_versaclimber",
+  "name": "VersaClimber (escalada vertical)",
+  "name_en": "VersaClimber",
+  "category": "cardio",
+  "is_new": false,
+  "availability_br": "rara",
+  "tips": [
+   "Ajuste pedais e alças para joelhos e cotovelos ficarem levemente flexionados no topo.",
+   "Mão e pé do mesmo lado sobem juntos (ou cruzado, conforme o modelo); comece devagar para pegar a coordenação.",
+   "Altíssimo gasto: em poucos minutos chega à zona 4–5 — use blocos curtos no início."
+  ],
+  "why": "Cardio vertical de corpo inteiro e sem impacto; raro no Brasil, presente em academias premium e estúdios.",
+  "sources": [
+   "https://versaclimber.com/faqs/",
+   "https://versaclimber.com/research-shows-versaclimber-beats-treadmill-running-and-rowing/"
+  ],
+  "brands": [
+   "VersaClimber",
+   "Maxi Climber (doméstico)",
+   "Jacobs Ladder (similar)"
+  ],
+  "existing_exercise_ids": [
+   "cardio_versaclimber"
+  ],
+  "exercises": [
+   {
+    "name": "Escalada longa (passo longo)",
+    "how": "Curso completo, ritmo moderado de 60–100 pés/min por 10–20 min.",
+    "muscles": [
+     "quadriceps",
+     "glutes",
+     "shoulders",
+     "lats",
+     "calves"
+    ],
+    "exercise_id": "cardio_versaclimber",
+    "video": {
+     "url": "https://www.youtube.com/watch?v=n8YVmOmTZn8",
+     "status": "pending"
+    }
+   },
+   {
+    "name": "Passos curtos e rápidos",
+    "how": "Curso curto em alta frequência por 20–30 s: dispara a FC.",
+    "muscles": [
+     "quadriceps",
+     "calves",
+     "shoulders"
+    ]
+   },
+   {
+    "name": "Protocolo 3-2-1",
+    "how": "Blocos decrescentes (ex.: 3 min, 2 min, 1 min) de esforço crescente com pausa curta.",
+    "muscles": [
+     "quadriceps",
+     "glutes",
+     "lats",
+     "shoulders"
+    ],
+    "video": {
+     "url": "https://www.youtube.com/watch?v=l35TvgBsHWg",
+     "status": "pending"
+    }
+   },
+   {
+    "name": "Só pernas",
+    "how": "Mãos nas alças fixas e só pernas subindo — foco em glúteo e quadríceps.",
+    "muscles": [
+     "glutes",
+     "quadriceps",
+     "calves"
+    ]
+   }
+  ],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=7NwbzrU4Kvg",
+    "title": "A Beginner's Guide to Using the Versaclimber",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=n8YVmOmTZn8",
+    "title": "Climb Technique (VersaClimber)",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=l35TvgBsHWg",
+    "title": "VersaClimber: The 321 Workout Protocol",
+    "status": "pending"
+   }
+  ],
+  "photos": []
+ },
+ {
+  "machine_id": "mx_shrug_machine",
+  "name": "Encolhimento na máquina (shrug / Hammer shrug)",
+  "name_en": "Shrug Machine (Seated/Standing)",
+  "category": "costas",
+  "is_new": false,
+  "availability_br": "rara",
+  "tips": [
+   "Suba reto, sem rolar os ombros para trás.",
+   "Pausa de 1–2 s no topo vale mais que carga alta com amplitude curta.",
+   "Use cinta/strap se a pegada cansar antes do trapézio."
+  ],
+  "why": "Alavanca guiada com pegada neutra permite carga alta no trapézio sem a barra raspando nas coxas; clássico da Hammer Strength.",
+  "sources": [
+   "https://www.lifefitness.com/en-us/catalog/strength-training/plate-loaded/plate-loaded-seated-standing-shrug"
+  ],
+  "brands": [
+   "Hammer Strength",
+   "Panatta",
+   "Nautilus",
+   "Matrix"
+  ],
+  "existing_exercise_ids": [
+   "Leverage_Shrug"
+  ],
+  "exercises": [
+   {
+    "name": "Encolhimento em pé",
+    "how": "Entre as alças, braços estendidos, suba os ombros em direção às orelhas e segure 1 s.",
+    "muscles": [
+     "traps"
+    ],
+    "exercise_id": "Leverage_Shrug",
+    "video": {
+     "url": "https://www.youtube.com/watch?v=-1OvdMeCuU0",
+     "status": "pending"
+    }
+   },
+   {
+    "name": "Encolhimento sentado",
+    "how": "Use o banco para isolar o trapézio sem ajuda das pernas.",
+    "muscles": [
+     "traps"
+    ]
+   },
+   {
+    "name": "Kelso shrug (peito apoiado)",
+    "how": "Inclinado à frente, retraia as escápulas (aproxime) em vez de subir: trapézio médio e romboides.",
+    "muscles": [
+     "traps",
+     "middle back"
+    ],
+    "video": {
+     "url": "https://www.youtube.com/shorts/5UmZ9JV-ppI",
+     "status": "pending"
+    }
+   },
+   {
+    "name": "Unilateral",
+    "how": "Um lado de cada vez para corrigir assimetria.",
+    "muscles": [
+     "traps",
+     "forearms"
+    ]
+   }
+  ],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=-1OvdMeCuU0",
+    "title": "ABC How To: Hammer Strength Seated/Standing Shrug",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=H8FLAy4A56g",
+    "title": "Hammer Strength - Plate Loaded - Seated Standing Shrug",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/shorts/5UmZ9JV-ppI",
+    "title": "How to: Hammer Strength Kelso Shrugs",
+    "status": "pending"
+   }
+  ],
+  "photos": []
+ },
+ {
+  "machine_id": "mx_decline_press_machine",
+  "name": "Supino declinado na máquina (articulado)",
+  "name_en": "Decline Chest Press Machine",
+  "category": "peito",
+  "is_new": false,
+  "availability_br": "média",
+  "tips": [
+   "Sente ereto e use o cinto/apoio de pé se houver; ombros para trás e para baixo.",
+   "Não trave os cotovelos no final nem deixe as placas baterem.",
+   "Foco no peitoral inferior; se o ombro incomoda no supino reto, costuma ser bem tolerado."
+  ],
+  "why": "Imita o supino declinado sentado em posição confortável e segura, sem banco declinado e sem precisar de parceiro.",
+  "sources": [
+   "https://www.lifefitness.com/en-us/catalog/strength-training/plate-loaded/iso-lateral-decline-chest-press",
+   "https://www.lifefitness.com/en-us/catalog/strength-training/selectorized/hammer-strength-mts-iso-lateral-decline-press"
+  ],
+  "brands": [
+   "Hammer Strength",
+   "Panatta",
+   "Matrix",
+   "Nautilus",
+   "Gym80"
+  ],
+  "existing_exercise_ids": [
+   "Leverage_Decline_Chest_Press"
+  ],
+  "exercises": [
+   {
+    "name": "Supino declinado bilateral",
+    "how": "Banco ajustado para as pegadas ficarem na linha do peito baixo; empurre para baixo e à frente.",
+    "muscles": [
+     "chest",
+     "triceps",
+     "shoulders"
+    ],
+    "exercise_id": "Leverage_Decline_Chest_Press",
+    "video": {
+     "url": "https://www.youtube.com/watch?v=1YrEp_Dh7fE",
+     "status": "pending"
+    }
+   },
+   {
+    "name": "Unilateral (iso-lateral)",
+    "how": "Um braço de cada vez, segurando o outro em posição; corrige assimetria.",
+    "muscles": [
+     "chest",
+     "triceps"
+    ],
+    "video": {
+     "url": "https://www.youtube.com/watch?v=cciyTolE93k",
+     "status": "pending"
+    }
+   },
+   {
+    "name": "Pausa no alongamento",
+    "how": "Pare 1–2 s com as pegadas perto do peito antes de empurrar.",
+    "muscles": [
+     "chest"
+    ]
+   },
+   {
+    "name": "Parciais no fim da série",
+    "how": "Após a falha, meias repetições na metade de baixo.",
+    "muscles": [
+     "chest",
+     "triceps"
+    ]
+   }
+  ],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=1YrEp_Dh7fE",
+    "title": "Hammer Strength Plate-Loaded Decline Press Instructions",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=m5lw3woF8h4",
+    "title": "Hammer Strength - Plate Loaded - Iso-Lateral Decline Chest Press (IL-DCP)",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=cciyTolE93k",
+    "title": "Unilateral Decline Hammer Strength Chest Press",
+    "status": "pending"
+   }
+  ],
+  "photos": []
+ },
+ {
+  "machine_id": "mx_power_rack",
+  "name": "Gaiola / power rack + banco ajustável",
+  "name_en": "Power Rack + Adjustable Bench",
+  "category": "funcional",
+  "is_new": false,
+  "availability_br": "comum",
+  "tips": [
+   "Ajuste os J-hooks na altura do meio do peito e as travas de segurança logo abaixo do ponto mais baixo do movimento.",
+   "Teste a altura das travas com a barra vazia antes de colocar carga.",
+   "Use presilhas nas anilhas e devolva a barra andando até tocar as colunas."
+  ],
+  "why": "A estação mais versátil da musculação livre: agachamento, supino, remada e barra com segurança para treinar sozinho.",
+  "sources": [
+   "https://www.youtube.com/watch?v=yEBa1V0Ksg8",
+   "https://www.youtube.com/watch?v=hlTthXUxSZw"
+  ],
+  "brands": [
+   "Rogue",
+   "Eleiko",
+   "Life Fitness (Hammer Strength HD Elite)",
+   "Movement",
+   "Righetto",
+   "Matrix Magnum"
+  ],
+  "existing_exercise_ids": [
+   "Barbell_Squat",
+   "Barbell_Full_Squat",
+   "Front_Barbell_Squat",
+   "Barbell_Bench_Press_-_Medium_Grip",
+   "Barbell_Incline_Bench_Press_-_Medium_Grip",
+   "Bent_Over_Barbell_Row",
+   "Standing_Military_Press",
+   "Romanian_Deadlift",
+   "Pullups",
+   "Inverted_Row",
+   "Pin_Presses"
+  ],
+  "exercises": [
+   {
+    "name": "Agachamento livre com barra",
+    "how": "Barra no trapézio, saia do suporte com 1–2 passos e agache com as travas de segurança logo abaixo da sua profundidade.",
+    "muscles": [
+     "quadriceps",
+     "glutes",
+     "adductors",
+     "lower back"
+    ],
+    "exercise_id": "Barbell_Squat",
+    "video": {
+     "url": "https://www.youtube.com/watch?v=yEBa1V0Ksg8",
+     "status": "pending"
+    }
+   },
+   {
+    "name": "Supino reto/inclinado no banco",
+    "how": "Banco centralizado na gaiola, travas um pouco abaixo da altura do peito para treinar sozinho.",
+    "muscles": [
+     "chest",
+     "triceps",
+     "shoulders"
+    ],
+    "exercise_id": "Barbell_Bench_Press_-_Medium_Grip",
+    "video": {
+     "url": "https://www.youtube.com/watch?v=hlTthXUxSZw",
+     "status": "pending"
+    }
+   },
+   {
+    "name": "Remada curvada",
+    "how": "Barra sobre as travas na altura do joelho, quadril para trás, puxe até o umbigo.",
+    "muscles": [
+     "middle back",
+     "lats",
+     "biceps",
+     "lower back"
+    ],
+    "exercise_id": "Bent_Over_Barbell_Row"
+   },
+   {
+    "name": "Barra fixa no topo da gaiola",
+    "how": "Pegada pronada na barra superior; desça até estender os braços.",
+    "muscles": [
+     "lats",
+     "biceps",
+     "middle back"
+    ],
+    "exercise_id": "Pullups"
+   },
+   {
+    "name": "Remada invertida",
+    "how": "Barra nas travas na altura do quadril, corpo reto por baixo e puxe o peito até a barra.",
+    "muscles": [
+     "middle back",
+     "lats",
+     "biceps"
+    ],
+    "exercise_id": "Inverted_Row"
+   },
+   {
+    "name": "Desenvolvimento em pé",
+    "how": "Barra no suporte na altura do peito, empurre acima da cabeça com glúteo e abdômen contraídos.",
+    "muscles": [
+     "shoulders",
+     "triceps"
+    ],
+    "exercise_id": "Standing_Military_Press"
+   }
+  ],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=yEBa1V0Ksg8",
+    "title": "How To Use Safety Pins: Squatting and Benching Without a Spotter",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=hlTthXUxSZw",
+    "title": "Stay Safe When You Bench Press - How to Set the Safety Pins with Mark Rippetoe",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=0KL49_n8kxw",
+    "title": "How to Set Up a Power Rack for Bench Press",
+    "status": "pending"
+   }
+  ],
+  "photos": []
+ },
+ {
+  "machine_id": "mx_pullup_dip_station",
+  "name": "Estação de barra fixa e paralelas (power tower)",
+  "name_en": "Pull-Up / Dip Station (Power Tower)",
+  "category": "costas",
+  "is_new": false,
+  "availability_br": "comum",
+  "tips": [
+   "Sem conseguir a barra completa? Use elástico, negativas lentas (5 s) ou a Graviton.",
+   "Na paralela, não desça além do conforto do ombro; ombros longe das orelhas.",
+   "Progrida com cinto de carga quando fizer 3 × 10–12 limpas."
+  ],
+  "why": "Estrutura simples e barata de barra e paralelas presente em quase toda academia e condomínio; base do treino com peso corporal.",
+  "sources": [
+   "https://www.youtube.com/watch?v=Qg43FVd6NM8",
+   "https://www.trxtraining.com/blogs/news/bodyweight-workout-plan"
+  ],
+  "brands": [
+   "Body-Solid",
+   "Powertec",
+   "Movement",
+   "Righetto",
+   "Life Fitness",
+   "Kikos"
+  ],
+  "existing_exercise_ids": [
+   "Pullups",
+   "Chin-Up",
+   "Parallel_Bar_Dip",
+   "Dips_-_Chest_Version",
+   "Dips_-_Triceps_Version",
+   "Hanging_Leg_Raise",
+   "Scapular_Pull-Up"
+  ],
+  "exercises": [
+   {
+    "name": "Barra fixa pronada",
+    "how": "Pegada um pouco mais larga que os ombros, puxe até o queixo passar a barra e desça até estender.",
+    "muscles": [
+     "lats",
+     "biceps",
+     "middle back"
+    ],
+    "exercise_id": "Pullups",
+    "video": {
+     "url": "https://www.youtube.com/watch?v=MVwHWtoYeW8",
+     "status": "pending"
+    }
+   },
+   {
+    "name": "Barra supinada (chin-up)",
+    "how": "Palmas para você, pegada na largura dos ombros: mais bíceps.",
+    "muscles": [
+     "lats",
+     "biceps"
+    ],
+    "exercise_id": "Chin-Up"
+   },
+   {
+    "name": "Paralelas para tríceps",
+    "how": "Tronco vertical, cotovelos para trás, desça até ~90°.",
+    "muscles": [
+     "triceps",
+     "chest",
+     "shoulders"
+    ],
+    "exercise_id": "Dips_-_Triceps_Version",
+    "video": {
+     "url": "https://www.youtube.com/watch?v=hS8xGNriW6Q",
+     "status": "pending"
+    }
+   },
+   {
+    "name": "Paralelas para peito",
+    "how": "Incline o tronco à frente e abra levemente os cotovelos.",
+    "muscles": [
+     "chest",
+     "triceps",
+     "shoulders"
+    ],
+    "exercise_id": "Dips_-_Chest_Version"
+   },
+   {
+    "name": "Elevação de pernas pendurado",
+    "how": "Na barra, suba joelhos ou pernas retas sem balançar.",
+    "muscles": [
+     "abdominals"
+    ],
+    "exercise_id": "Hanging_Leg_Raise"
+   },
+   {
+    "name": "Barra escapular",
+    "how": "Pendurado com braços estendidos, só deprima e aproxime as escápulas — base para a barra completa.",
+    "muscles": [
+     "traps",
+     "lats"
+    ],
+    "exercise_id": "Scapular_Pull-Up"
+   }
+  ],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=MVwHWtoYeW8",
+    "title": "Pull-ups, chin-ups and dips on the Body-Solid VKR Knee Raise and Dip Station (Elite Fitness TV)",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=Qg43FVd6NM8",
+    "title": "Master the VKR Machine! The Best Exercises for Body-Solid's SVKR1000B Vertical Knee Raise Chin Dip",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=hS8xGNriW6Q",
+    "title": "Dip Station Basics - How To Use",
+    "status": "pending"
+   }
+  ],
+  "photos": []
+ },
+ {
+  "machine_id": "mx_suspension_trainer",
+  "name": "Treino suspenso (TRX / fita de suspensão)",
+  "name_en": "Suspension Trainer (TRX)",
+  "category": "funcional",
+  "is_new": false,
+  "availability_br": "comum",
+  "tips": [
+   "Ajuste a dificuldade pelo ângulo do corpo: pés mais perto da ancoragem = mais difícil.",
+   "Mantenha as fitas sempre tensionadas e o corpo em prancha (sem quadril caído).",
+   "Confira a ancoragem (barra/suporte firme) antes de usar."
+  ],
+  "why": "Equipamento portátil e barato usado em áreas funcionais e personal training; dá para treinar corpo inteiro com o peso corporal.",
+  "sources": [
+   "https://www.trxtraining.com/blogs/news/trx-exercises",
+   "https://www.trxtraining.com/blogs/news/how-to-get-started-with-your-trx-suspension-trainer"
+  ],
+  "brands": [
+   "TRX",
+   "Movement",
+   "Kikos",
+   "Rogue",
+   "Acte Sports"
+  ],
+  "existing_exercise_ids": [
+   "Suspended_Row",
+   "Suspended_Push-Up",
+   "Suspended_Split_Squat",
+   "Suspended_Fallout",
+   "Suspended_Reverse_Crunch",
+   "Inverted_Row_with_Straps"
+  ],
+  "exercises": [
+   {
+    "name": "Remada no TRX",
+    "how": "De frente para a ancoragem, corpo reto inclinado para trás, puxe o peito até as mãos aproximando as escápulas.",
+    "muscles": [
+     "middle back",
+     "lats",
+     "biceps"
+    ],
+    "exercise_id": "Suspended_Row",
+    "video": {
+     "url": "https://www.youtube.com/watch?v=N_14s8zFOms",
+     "status": "pending"
+    }
+   },
+   {
+    "name": "Flexão / supino no TRX",
+    "how": "De costas para a ancoragem, corpo em prancha, desça o peito entre as alças.",
+    "muscles": [
+     "chest",
+     "triceps",
+     "shoulders",
+     "abdominals"
+    ],
+    "exercise_id": "Suspended_Push-Up",
+    "video": {
+     "url": "https://www.youtube.com/watch?v=5i1KvPelw4c",
+     "status": "pending"
+    }
+   },
+   {
+    "name": "Agachamento com apoio",
+    "how": "Segure as alças e agache fundo usando a fita só para equilíbrio.",
+    "muscles": [
+     "quadriceps",
+     "glutes"
+    ]
+   },
+   {
+    "name": "Afundo búlgaro suspenso",
+    "how": "Pé de trás no estribo, desça o joelho de trás em direção ao chão.",
+    "muscles": [
+     "quadriceps",
+     "glutes"
+    ],
+    "exercise_id": "Suspended_Split_Squat"
+   },
+   {
+    "name": "Flexora de posterior",
+    "how": "Deitado, calcanhares nos estribos, eleve o quadril e puxe os calcanhares ao glúteo.",
+    "muscles": [
+     "hamstrings",
+     "glutes"
+    ]
+   },
+   {
+    "name": "Fallout / pike",
+    "how": "Abdômen: role os braços à frente (fallout) ou, com pés nos estribos, eleve o quadril (pike).",
+    "muscles": [
+     "abdominals",
+     "shoulders"
+    ],
+    "exercise_id": "Suspended_Fallout"
+   }
+  ],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=N_14s8zFOms",
+    "title": "Exercise Tutorial: TRX Row",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=5i1KvPelw4c",
+    "title": "TRX Push-up Progression - Exercise Demo",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=UcmR54TsS7I",
+    "title": "Fundamentals of TRX Suspension Trainer",
+    "status": "pending"
+   }
+  ],
+  "photos": []
+ },
+ {
+  "machine_id": "mx_multi_station",
+  "name": "Multiestação (estação de musculação)",
+  "name_en": "Multi-Station Home Gym",
+  "category": "funcional",
+  "is_new": false,
+  "availability_br": "comum",
+  "tips": [
+   "Troque o pino da pilha de peso com as placas paradas e confira se encaixou totalmente.",
+   "Muitos modelos compactos atendem bem pessoas até ~1,80 m; ajuste banco e rolos antes de cada exercício.",
+   "Em condomínio, combine com halteres e barra para cobrir agachamento e levantamentos que a estação não faz."
+  ],
+  "why": "Uma única máquina com várias estações (supino, voador, puxador, remada, cadeira de pernas); muito comum em academias de condomínio e hotéis no Brasil.",
+  "sources": [
+   "https://www.buscape.com.br/musculacao-ginastica/conteudo/melhor-estacao-de-musculacao",
+   "https://www.kabum.com.br/produto/159143/estacao-de-musculacao-kikos-gx2i"
+  ],
+  "brands": [
+   "Kikos",
+   "Polimet",
+   "Movement",
+   "Life Fitness (G-series)",
+   "Matrix (multi-station)"
+  ],
+  "existing_exercise_ids": [
+   "Machine_Bench_Press",
+   "Butterfly",
+   "Wide-Grip_Lat_Pulldown",
+   "Seated_Cable_Rows",
+   "Leg_Extensions",
+   "Triceps_Pushdown"
+  ],
+  "exercises": [
+   {
+    "name": "Supino sentado",
+    "how": "Ajuste o banco para as pegadas ficarem na linha do peito e empurre sem travar o cotovelo.",
+    "muscles": [
+     "chest",
+     "triceps",
+     "shoulders"
+    ],
+    "exercise_id": "Machine_Bench_Press"
+   },
+   {
+    "name": "Voador (peck deck)",
+    "how": "Braços em leve flexão, junte as alças à frente do peito.",
+    "muscles": [
+     "chest"
+    ],
+    "exercise_id": "Butterfly"
+   },
+   {
+    "name": "Puxada alta na torre",
+    "how": "Barra longa no cabo alto, puxe até o queixo com o peito aberto.",
+    "muscles": [
+     "lats",
+     "biceps",
+     "middle back"
+    ],
+    "exercise_id": "Wide-Grip_Lat_Pulldown"
+   },
+   {
+    "name": "Remada baixa no cabo",
+    "how": "Use a polia baixa sentado no chão ou banco, puxe até o abdômen.",
+    "muscles": [
+     "middle back",
+     "lats",
+     "biceps"
+    ],
+    "exercise_id": "Seated_Cable_Rows"
+   },
+   {
+    "name": "Extensora / flexora",
+    "how": "Na estação de pernas, estenda os joelhos (extensora) ou flexione (flexora em pé ou sentada, conforme modelo).",
+    "muscles": [
+     "quadriceps",
+     "hamstrings"
+    ],
+    "exercise_id": "Leg_Extensions"
+   },
+   {
+    "name": "Tríceps na polia alta",
+    "how": "Cotovelos colados ao tronco, estenda os braços para baixo.",
+    "muscles": [
+     "triceps"
+    ],
+    "exercise_id": "Triceps_Pushdown"
+   }
+  ],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=STryzOTESmY",
+    "title": "HOW TO USE GYM MACHINES: Four Station Multi Gym",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=qlwD4PK9DhY",
+    "title": "How to Use: 8 Stack Multi-Station",
+    "status": "pending"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=02IDoXwEnuM",
+    "title": "Reeplex HG2900 Multi Station Home Gym Exercise Video",
+    "status": "pending"
+   }
+  ],
+  "photos": []
  }
 ]
