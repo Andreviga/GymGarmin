@@ -1,8 +1,8 @@
-# Hybrid Lab Sync (Android)
+# HAX Sync (Android)
 
 App pequeno que lê o **Health Connect** (Xiaomi Mi Fitness, Samsung Health, Amazfit/Zepp, Google Fit, Fitbit…)
 e envia treinos, sono, FC de repouso, VFC, passos, VO2máx e peso para `/api/ingest` com o código pessoal
-da conta (Hybrid Lab → Perfil → Outros relógios). Depois do primeiro envio, sincroniza a cada ~6 h (WorkManager).
+da conta (HAX → Perfil → Outros relógios). Depois do primeiro envio, sincroniza a cada ~6 h (WorkManager).
 
 ## Gerar o APK
 

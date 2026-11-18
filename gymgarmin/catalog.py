@@ -346,8 +346,9 @@ def _load() -> tuple[list[dict], dict[str, dict]]:
             "endurance": bool(c.get("endurance")),
         })
 
-    # aparelhos selecionados por evidência (data/machines.json): foto de movimento equivalente quando existe
-    for m in json.loads((DATA / "machines.json").read_text()):
+    # aparelhos selecionados por evidência (data/machines.json) + exercícios extras (estações da prova híbrida)
+    extra = json.loads((DATA / "extra_exercises.json").read_text()) if (DATA / "extra_exercises.json").exists() else []
+    for m in json.loads((DATA / "machines.json").read_text()) + [{**e, "top_machine": False} for e in extra]:
         like = by_raw.get(m.get("image_like") or "")
         items.append({
             "id": m["id"], "name": m["name"], "name_en": m["name_en"], "kind": "strength",
@@ -361,7 +362,7 @@ def _load() -> tuple[list[dict], dict[str, dict]]:
             "images": [IMAGE_BASE + i for i in like.get("images", [])] if like else [],
             "image_like": NAMES_PT.get(like["id"], like["name"]) if like else None,
             "garmin": m["garmin"], "timed": False, "popular": True,
-            "top_machine": True, "evidence": m["evidence"], "sources": m.get("sources", []),
+            "top_machine": m.get("top_machine", True), "evidence": m.get("evidence", ""), "sources": m.get("sources", []),
             "availability_br": m.get("availability_br"), "lengthened": m.get("lengthened", False), "picto": m.get("picto"),
         })
 

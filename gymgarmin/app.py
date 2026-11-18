@@ -1,4 +1,4 @@
-"""API HTTP + app web (PWA) do Hybrid Lab."""
+"""API HTTP + app web (PWA) do HAX."""
 
 from __future__ import annotations
 
@@ -33,7 +33,7 @@ async def lifespan(_app):
     yield
 
 
-app = FastAPI(title="Hybrid Lab", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="HAX", version="0.1.0", lifespan=lifespan)
 
 # ------------------------------------------------------------------ login ----
 # Rotas abertas: login/cadastro, cron (tem segredo próprio) e envio de dados por token pessoal.

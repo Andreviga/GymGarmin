@@ -196,6 +196,10 @@ def build_week(plan: dict, profile: dict, ws: date, from_date: date | None = Non
                             budget_min=session_budget(profile, plan), allowance=allowance)
         if taper and _kind(day) == "forca":
             items = _taper_strength(items, taper, day, wd)
+        elif _kind(day) == "forca" and _hybrid_station_day(profile, wp, idx, days):
+            from . import hybrid_race
+            items = items + hybrid_race.station_block(pos.get("week") or 0, profile,
+                                                      ((profile.get("endurance") or {}).get("event") or {}))
         name = _clean_name(day.get("name") or f"Treino {idx + 1}")
         extra = {}
         if day.get("endurance_slot") and wp:
@@ -244,6 +248,18 @@ def fit_same_session(entries: list[dict], days: list[dict], budget: float) -> No
                 _fit_time([d], target, protect_post=True)
                 e["items"] = d["items"]
                 e.setdefault("changes", []).append(f"ajustado para caber com o esporte do dia ({int(budget)} min no total)")
+
+
+def _hybrid_station_day(profile: dict, wp: dict | None, idx: int, days: list[dict]) -> bool:
+    """Prova híbrida: as estações entram no 1º treino de força da semana (e no 2º no pico)."""
+    ev = ((profile or {}).get("endurance") or {}).get("event") or {}
+    if ev.get("type") != "hibrida" or not wp:
+        return False
+    phase = ((wp.get("sports") or {}).get("corrida") or {}).get("phase")
+    if phase not in ("base", "construcao", "pico"):
+        return False
+    strength_idx = [i for i, d in enumerate(days) if _kind(d) == "forca"]
+    return idx in strength_idx[:2 if phase == "pico" else 1]
 
 
 def _race_taper(wp: dict | None, profile: dict, ws: date) -> dict | None:

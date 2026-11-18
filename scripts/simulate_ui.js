@@ -81,7 +81,7 @@ async function audit(page, where) {
       return rc.width > 0 && rc.height > 0 && !el.closest("[hidden]") && !el.closest("details:not([open]) > :not(summary)");
     };
     const clippedX = (el) => { for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) { if (/(auto|scroll|hidden|clip)/.test(getComputedStyle(p).overflowX)) return true; } return false; };
-    const out = { hscroll: document.documentElement.scrollWidth - vw, offscreen: [], small: [], zoom: [], tiny: [], contrast: [], blank: false, loading: false, behindTab: false };
+    const out = { hscroll: Math.max(document.documentElement.scrollWidth - vw, Math.round(vw - (window.visualViewport ? visualViewport.width : vw))), offscreen: [], small: [], zoom: [], tiny: [], contrast: [], blank: false, loading: false, behindTab: false };
     const all = [...document.querySelectorAll("body *")].filter(visible);
     for (const el of all) {
       const rc = el.getBoundingClientRect();
@@ -191,7 +191,7 @@ async function flows(page, base, persona, tag) {
     const el = page.locator(sel).first();
     if (!(await el.count())) { issue("botão esperado não encontrado", W(`${what} (${sel})`)); return false; }
     await el.scrollIntoViewIfNeeded().catch(() => {});
-    try { await el.click({ timeout: 4000 }); } catch (e) { issue("não deu para tocar no botão", W(`${what}: ${String(e.message).replace(/\s+/g, " ").slice(0, 900)}`)); return false; }
+    try { await el.click({ timeout: 4000 }); } catch (e) { issue("não deu para tocar no botão", W(`${what}: ${String(e.message).replace(/\s+/g, " ").slice(-600)}`)); return false; }
     await page.waitForLoadState("networkidle").catch(() => {});
     await page.waitForTimeout(250);
     return true;
@@ -371,7 +371,7 @@ async function offline(context, page, base, tag) {
             }
           }
           if (theme === "light" && !dname.includes("iPad")) {
-            await flows(page, base, persona, tag).catch((e) => issue("fluxo interrompido", `${tag} ${String(e.message).split("\n")[0].slice(0, 200)}`));
+            await flows(page, base, persona, tag).catch((e) => issue("fluxo interrompido", `${tag} ${String(e.message).replace(/\s+/g, " ").slice(-700)}`));
             if (persona === "musculacao" && dname === "iPhone SE") await offline(context, page, base, tag);
           }
           await context.close();

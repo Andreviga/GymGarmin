@@ -1,4 +1,4 @@
-"""Inicia o Hybrid Lab:  python -m gymgarmin  [--host 0.0.0.0] [--port 8000]
+"""Inicia o HAX:  python -m gymgarmin  [--host 0.0.0.0] [--port 8000]
 
 Com --host 0.0.0.0 o celular na mesma rede Wi-Fi acessa http://IP-DO-COMPUTADOR:8000
 """
@@ -9,7 +9,7 @@ import uvicorn
 
 
 def main() -> None:
-    ap = argparse.ArgumentParser(description="Hybrid Lab – servidor local")
+    ap = argparse.ArgumentParser(description="HAX – servidor local")
     ap.add_argument("--host", default="0.0.0.0")
     ap.add_argument("--port", type=int, default=8000)
     a = ap.parse_args()

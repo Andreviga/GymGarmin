@@ -24,7 +24,7 @@
     <application
         android:allowBackup="false"
         android:icon="@drawable/ic_launcher"
-        android:label="Hybrid Lab Sync"
+        android:label="HAX Sync"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
 
         <activity

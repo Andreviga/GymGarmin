@@ -1,4 +1,4 @@
-# Hybrid Lab (antigo GymGarmin)
+# HAX · Hybrid Athlete eXperience (antigo GymGarmin / Hybrid Lab)
 
 App de academia (pessoal primeiro, multiusuário depois) que junta:
 

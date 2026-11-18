@@ -28,7 +28,7 @@ object Sync {
         val p = prefs(ctx)
         val token = p.getString("token", "")?.trim().orEmpty()
         val server = (p.getString("server", DEFAULT_SERVER) ?: DEFAULT_SERVER).trim().trimEnd('/')
-        if (token.isEmpty()) throw IllegalStateException("Cole o código pessoal (Hybrid Lab → Perfil → Outros relógios).")
+        if (token.isEmpty()) throw IllegalStateException("Cole o código pessoal (HAX → Perfil → Outros relógios).")
         val since = p.getLong("last_ok", 0L)
         // primeira vez: 30 dias; depois, desde o último envio (com folga de 2 dias para dados atrasados)
         val n = days ?: if (since == 0L) 30L else (((System.currentTimeMillis() - since) / 86_400_000L) + 2).coerceIn(2, 30)

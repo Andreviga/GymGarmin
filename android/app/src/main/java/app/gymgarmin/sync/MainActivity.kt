@@ -45,14 +45,14 @@ class MainActivity : ComponentActivity() {
         }
         fun button(s: String, onClick: () -> Unit) = Button(this).apply { text = s; setOnClickListener { onClick() } }
 
-        col.addView(text("Hybrid Lab Sync", 24f, true))
-        col.addView(text("Manda treinos, sono, FC de repouso e passos do Health Connect (Xiaomi, Samsung, Amazfit, Google…) para a sua conta do Hybrid Lab."))
+        col.addView(text("HAX Sync", 24f, true))
+        col.addView(text("Manda treinos, sono, FC de repouso e passos do Health Connect (Xiaomi, Samsung, Amazfit, Google…) para a sua conta do HAX."))
         if (intent?.action == "androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" || intent?.action == "android.intent.action.VIEW_PERMISSION_USAGE") {
-            col.addView(text("Por que o app pede essas permissões: ele só LÊ seus treinos e dados de saúde e envia para a sua própria conta do Hybrid Lab, para montar seus treinos e acompanhar sua recuperação. Nada é compartilhado com outras pessoas.", 15f))
+            col.addView(text("Por que o app pede essas permissões: ele só LÊ seus treinos e dados de saúde e envia para a sua própria conta do HAX, para montar seus treinos e acompanhar sua recuperação. Nada é compartilhado com outras pessoas.", 15f))
         }
         col.addView(text("Código pessoal", 14f, true))
         token = EditText(this).apply {
-            hint = "gg_…  (Hybrid Lab → Perfil → Outros relógios)"
+            hint = "gg_…  (HAX → Perfil → Outros relógios)"
             setText(p.getString("token", ""))
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
         }

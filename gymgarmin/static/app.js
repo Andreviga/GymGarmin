@@ -1,4 +1,4 @@
-/* Hybrid Lab – app web (vanilla JS, sem build). */
+/* HAX (Hybrid Athlete eXperience) – app web (vanilla JS, sem build). */
 "use strict";
 
 const $ = (s, el = document) => el.querySelector(s);
@@ -718,7 +718,7 @@ async function showAuth(mode, code) {
   const isReg = mode === "convite" && inv && inv.valid;
   view.innerHTML = `<div class="card auth-card"><h2>${isReg ? "Criar sua conta" : "Entrar"}</h2>
     ${mode === "convite" && !isReg ? `<p class="pill bad">Convite inválido ou já usado. Peça um novo a quem te convidou.</p>` : ""}
-    ${isReg ? `<p class="small muted">Você foi convidado${inv.note ? ` (${esc(inv.note)})` : ""} para o Hybrid Lab. Seus treinos, planilhas e Garmin ficam só na sua conta.</p>` : ""}
+    ${isReg ? `<p class="small muted">Você foi convidado${inv.note ? ` (${esc(inv.note)})` : ""} para o HAX. Seus treinos, planilhas e Garmin ficam só na sua conta.</p>` : ""}
     <form id="auth-form" class="stack">
       ${isReg ? `<div class="field"><label>Seu nome</label><input name="name" autocomplete="name" required></div>` : ""}
       <div class="field"><label>E-mail</label><input name="email" type="email" autocomplete="email" required></div>
@@ -791,7 +791,7 @@ async function devicesCard() {
     <p class="small ${last ? "" : "muted"}">${last ? `Último envio: <b>${fmtDate(last.at)}</b> (${last.source === "android" ? "Android" : "iPhone"}) · ${last.days.length} dia(s) de saúde · ${last.workouts} treino(s) novo(s)${last.skipped ? ` · ${last.skipped} ignorado(s) (tipo não usado, ex.: ioga)` : ""}` : "Nenhum envio recebido ainda."}</p>
     <details><summary><b>iPhone (Apple Saúde) — app Atalhos</b></summary><div class="small">
       <ol>
-        <li>Abra o app <b>Atalhos</b> → <b>+</b> (novo atalho) → nome "Hybrid Lab".</li>
+        <li>Abra o app <b>Atalhos</b> → <b>+</b> (novo atalho) → nome "HAX".</li>
         <li>Adicione <b>Encontrar Amostras de Saúde</b>: Tipo <b>Análise do Sono</b>, Data de Início <b>nas últimas 24 horas</b>. Depois <b>Obter Detalhes das Amostras de Saúde → Duração</b> e <b>Calcular Estatísticas → Soma</b> (resultado em horas).</li>
         <li>Repita para <b>Frequência Cardíaca em Repouso</b> (estatística <b>Média</b>), <b>Variabilidade da Frequência Cardíaca</b> (Média) e <b>Passos</b> (Soma, hoje).</li>
         <li>Adicione <b>Dicionário</b> com as chaves: <code>source</code> = apple · <code>date</code> = Data Atual formatada como <b>ISO 8601</b> (só a data) · <code>sleep_h</code> · <code>rhr</code> · <code>hrv</code> · <code>hrv_kind</code> = sdnn · <code>steps</code> (cada uma com o resultado do passo correspondente).</li>
@@ -802,7 +802,7 @@ async function devicesCard() {
       <p class="muted">Rode uma vez à mão e confira aqui em "Último envio". Os nomes dos menus mudam um pouco entre versões do iOS. Xiaomi (Mi Fitness) e Amazfit (Zepp) no iPhone: ligue a opção <b>Apple Saúde</b> no app do relógio, e o atalho leva os dados junto.</p></div></details>
     <details><summary><b>Android (Health Connect)</b></summary><div class="small">
       <p>Xiaomi (Mi Fitness), Samsung Health, Google Fit, Amazfit (Zepp), Fitbit…: no app do relógio, ligue o compartilhamento com o <b>Health Connect</b>.
-        Depois instale o app <b>Hybrid Lab Sync</b> (Android), cole o código pessoal e toque em Sincronizar. Ele envia sozinho a cada poucas horas.</p>
+        Depois instale o app <b>HAX Sync</b> (Android), cole o código pessoal e toque em Sincronizar. Ele envia sozinho a cada poucas horas.</p>
       <p><a class="btn sm ghost" href="/static/gymgarmin-sync.apk" download>Baixar app Android (APK)</a></p>
       <p class="muted">Como o app não está na Play Store, o Android pede para permitir "instalar apps desta fonte".</p></div></details>
   </div>`;
@@ -1535,6 +1535,16 @@ function loadCard(ld) {
     <p class="small muted">Cada treino vira uma carga (100 = 1 h no limiar), por potência, ritmo, FC ou RPE da musculação. <a href="#esportes">Esportes e zonas</a></p></div>`;
 }
 
+function hybridCard(p) {
+  const sp = p.splits;
+  return `<div class="card"><h2>Prova híbrida · ${p.division === "pro" ? "Pro" : "Open"} ${p.sex === "F" ? "feminino" : "masculino"}</h2>
+    <p>${p.predicted ? `Previsão hoje: <b>${esc(p.predicted)}</b>${p.target ? ` · alvo ${esc(p.target)}` : ""}` : "Registre um teste de corrida para ver a previsão."}
+      ${p.run_km ? `<br><span class="small muted">Corrida ~${esc(p.run_km)} por km com a fadiga das estações · roxzone ~${esc(p.transitions)}</span>` : ""}</p>
+    ${sp ? `<p class="small"><b>Para fazer ${esc(p.target)}:</b> cada km em ~${esc(sp.run_km)} (corrida ${esc(sp.run_total)}), estações ${esc(sp.stations_total)}, roxzone ${esc(sp.roxzone)}.</p>` : ""}
+    <ul class="exlist hy-list">${p.stations.map((s, i) => `<li><span class="st-ic" aria-hidden="true">${i + 1}</span><span class="grow"><b>${esc(s.name)}</b><span class="small muted">${esc([s.standard, s.load].filter(Boolean).join(" · "))}</span></span>
+      <span class="hy-times"><b>${esc(sp ? sp.stations[i].time : s.time)}</b><span class="small muted">${sp ? `previsão ${esc(s.time)}` : "previsão"}</span></span></li>`).join("")}</ul>
+    <p class="small muted">Pesos da temporada 2025/26 — confira no regulamento oficial da sua prova. HYROX é marca da HYROX World GmbH; o HAX não tem afiliação, só prepara para o formato.</p></div>`;
+}
 async function viewEsportes() {
   const [opts, ov] = await Promise.all([api("/api/endurance/options"), api("/api/endurance/overview")]);
   const cfg = ov.config || {}; const sc = cfg.sports || {}; const ev = cfg.event || {};
@@ -1571,8 +1581,10 @@ async function viewEsportes() {
   <div class="card"><h2>Prova multiesporte</h2><div class="grid2">
     <div class="field"><label>Evento</label><select id="ev-type"><option value="">Nenhum</option>${opts.events.map((e) => `<option value="${e.id}" ${ev.type === e.id ? "selected" : ""}>${esc(e.name)}</option>`).join("")}</select></div>
     <div class="field"><label>Data</label><input type="date" id="ev-date" value="${esc(ev.date || "")}"></div>
-    <div class="field"><label>Tempo alvo (h:mm:ss)</label><input id="ev-target" value="${esc(ev.target || "")}" placeholder="ex.: 2:45:00"></div></div>
-    <p class="small muted">O evento define as metas de natação, bike e corrida, a fase de cada semana e o brick (corrida logo após o pedal).</p></div>
+    <div class="field"><label>Tempo alvo (h:mm:ss)</label><input id="ev-target" value="${esc(ev.target || "")}" placeholder="ex.: 2:45:00"></div>
+    <div class="field" id="ev-div-wrap" ${ev.type === "hibrida" ? "" : "hidden"}><label>Categoria</label><select id="ev-div">${[["open", "Open"], ["pro", "Pro"], ["doubles", "Duplas"]].map(([v, t]) => `<option value="${v}" ${(ev.division || "open") === v ? "selected" : ""}>${t}</option>`).join("")}</select></div></div>
+    <p class="small muted">O evento define as metas de natação, bike e corrida, a fase de cada semana e o brick (corrida logo após o pedal). <b>Prova híbrida</b> (formato HYROX): 8 × 1 km + 8 estações — o app troca a sessão forte por corrida comprometida, põe estações no treino de força e marca simulados a 6 e 3 semanas da prova.</p></div>
+    ${evp && evp.stations ? hybridCard(evp) : ""}
   <div class="card"><h2>Opções</h2>
     <label class="row gap"><input type="checkbox" id="opt-tests" ${cfg.tests !== false ? "checked" : ""}> Agendar testes para calibrar as zonas (a cada ~8 semanas)</label>
     <label class="row gap"><input type="checkbox" id="opt-ready" ${cfg.readiness_auto ? "checked" : ""}> Ajustar o treino do dia sozinho pela prontidão do relógio (dá para desfazer)</label>
@@ -1612,10 +1624,10 @@ async function viewEsportes() {
         long_day: v("long_day") === "" ? null : +v("long_day"), goal, ...(sp.id === "natacao" ? { pool_m: num(v("pool_m")) } : {}) };
     });
     const et = $("#ev-type").value;
-    return { sports: sportsOut, event: et ? { type: et, date: $("#ev-date").value || null, target: $("#ev-target").value || null } : null,
+    return { sports: sportsOut, event: et ? { type: et, date: $("#ev-date").value || null, target: $("#ev-target").value || null, ...(et === "hibrida" ? { division: $("#ev-div").value } : {}) } : null,
       tests: $("#opt-tests").checked, readiness_auto: $("#opt-ready").checked };
   };
-  view.onchange = (e) => { if (e.target.dataset.k === "goal_type") toggleGoals(); };
+  view.onchange = (e) => { if (e.target.dataset.k === "goal_type") toggleGoals(); if (e.target.id === "ev-type") $("#ev-div-wrap").hidden = e.target.value !== "hibrida"; };
   view.onclick = async (e) => {
     const t = e.target.closest("button"); if (!t) return;
     try {
@@ -2073,6 +2085,7 @@ function route() {
 }
 async function doRoute(ctl) {
   const [name, a, b] = (location.hash.slice(1) || "hoje").split("/");
+  if (!$("#modal").hidden) closeModal();  // trocar de tela fecha a janela aberta (não fica por cima da tela nova)
   $$(".tabbar a").forEach((el) => el.classList.toggle("active", el.dataset.tab === ({ plano: "planilhas", exercicios: "planilhas", aparelhos: "planilhas", evolucao: "analise", saude: "analise", esportes: "perfil", coach: "perfil" }[name] || name)));
   const TITLES = { planilhas: "Planos", exercicios: "Planos", aparelhos: "Planos", plano: "Planilha", treinar: "Treinar", analise: "Progresso", evolucao: "Evolução", saude: "Saúde e sono", perfil: "Perfil", esportes: "Esportes", coach: "Coach" };
   const pt = $("#page-title"); pt.textContent = TITLES[name] || ""; pt.hidden = !TITLES[name] || (name === "treinar" && a);

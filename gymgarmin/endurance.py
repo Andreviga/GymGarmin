@@ -92,6 +92,9 @@ EVENTS = {
                         "peak": {"ciclismo": 4.5, "corrida": 30}, "fatigue": 1.07, "taper": 1},
     "aquathlon": {"name": "Aquathlon", "legs": [("natacao", 1000), ("corrida", 5)],
                   "peak": {"natacao": 5000, "corrida": 20}, "fatigue": 1.04, "taper": 1},
+    # 8 × (1 km + estação); a parte de corrida é planejada aqui e as estações em hybrid_race
+    "hibrida": {"name": "Prova híbrida (formato HYROX): 8 × 1 km + 8 estações", "legs": [("corrida", 8)],
+                "peak": {"corrida": 32}, "fatigue": 1.25, "taper": 1},
 }
 EVENT_SESSIONS = {"tri_supersprint": {"natacao": 2, "ciclismo": 2, "corrida": 2},
                   "tri_sprint": {"natacao": 2, "ciclismo": 2, "corrida": 3},
@@ -99,7 +102,7 @@ EVENT_SESSIONS = {"tri_supersprint": {"natacao": 2, "ciclismo": 2, "corrida": 2}
                   "tri_meio": {"natacao": 3, "ciclismo": 3, "corrida": 3},
                   "tri_ironman": {"natacao": 3, "ciclismo": 3, "corrida": 3},
                   "duathlon_sprint": {"ciclismo": 2, "corrida": 3}, "duathlon_padrao": {"ciclismo": 2, "corrida": 3},
-                  "aquathlon": {"natacao": 2, "corrida": 3}}
+                  "aquathlon": {"natacao": 2, "corrida": 3}, "hibrida": {"corrida": 3}}
 
 QUALITY_ROTATION = {"corrida": ["intervalado", "ritmo", "noruegues"], "ciclismo": ["sweet_spot", "limiar", "vo2"],
                     "natacao": ["css", "velocidade"], "remo": ["intervalos_1000", "intervalos_500"],
@@ -742,7 +745,14 @@ def week_plan(profile: dict, ws: date, start: date, tier_key: str = "intermediar
         if built and built < wv["volume"] * 0.85:
             # poucas sessões para o volume (o longo tem teto pela distância da prova): a semana mostra o que cabe
             wv = {**wv, "volume": built}
+        ev_cfg = end_cfg.get("event") or {}
+        if sport == "corrida" and ev_cfg.get("type") == "hibrida":
+            from . import hybrid_race
+            sessions = hybrid_race.adapt_run_week(sessions, wv, anchors, profile, ev_cfg)
+            roles = roles[:len(sessions)]
         for r, s in zip(roles, sessions):
+            if s["endurance"].get("role") == "longo":
+                continue
             s["endurance"]["role"] = "longo" if s["endurance"]["type"] == "longo" else ("qualidade" if s["endurance"]["hard"] else "leve")
         if wv.get("adjusted"):
             unit = VOLUME[sport]["unit"]
@@ -963,6 +973,9 @@ def _goal_check(pred: float, tgt: float | None, g: dict, vd: float, dist: float)
 
 
 def event_prediction(profile: dict, ev: dict) -> dict:
+    if ev["type"] == "hibrida":
+        from . import hybrid_race
+        return hybrid_race.predict(profile, ev)
     e = EVENTS[ev["type"]]
     a = sp.anchors_of(profile)
     w = float((profile or {}).get("weight_kg") or 75)
