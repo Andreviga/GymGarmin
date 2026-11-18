@@ -48,10 +48,48 @@ def by_exercise() -> dict[str, str]:
     return out
 
 
+# resultado da conferência no ar (YouTube/Commons), guardado no banco para todas as contas (user -1)
+GLOBAL_USER = -1
+_STATUS: dict = {"at": 0.0, "map": {}}
+
+
+def status_map() -> dict:
+    import time
+    if time.time() - _STATUS["at"] > 600:
+        try:
+            from . import db
+            _STATUS["map"] = json.loads(db.kv_get("media_status", user_id=GLOBAL_USER) or "{}")
+        except Exception:  # noqa: BLE001 - sem banco: usa o que está no arquivo
+            _STATUS["map"] = {}
+        _STATUS["at"] = time.time()
+    return _STATUS["map"]
+
+
+def save_status(results: dict) -> int:
+    """Junta a conferência nova ao que já está no banco (chave = URL)."""
+    from . import db
+    cur = json.loads(db.kv_get("media_status", user_id=GLOBAL_USER) or "{}")
+    n = 0
+    for r in results.values():
+        for item in (r.get("videos") or []) + (r.get("photos") or []):
+            if item.get("status") in ("ok", "no_embed", "missing"):
+                cur[item["url"]] = {k: item.get(k) for k in ("status", "title", "channel") if item.get(k)}
+                n += 1
+    db.kv_set("media_status", json.dumps(cur, ensure_ascii=False), user_id=GLOBAL_USER)
+    _STATUS["at"] = 0.0
+    return n
+
+
+def _st(item: dict) -> dict:
+    """Item com o status conferido (banco) por cima do que veio no arquivo."""
+    return {**item, **status_map().get(item.get("url", ""), {})}
+
+
 def _videos(m: dict) -> list[dict]:
     """Vídeos conferidos (ok) primeiro; os que não aceitam incorporação viram só link."""
     vids = []
     for v in m.get("videos") or []:
+        v = _st(v)
         vid = v.get("id") or yt_id(v.get("url", ""))
         if not vid or v.get("status") in ("missing", "pending", "unknown"):
             continue
@@ -60,7 +98,7 @@ def _videos(m: dict) -> list[dict]:
 
 
 def _photos(m: dict) -> list[dict]:
-    return [p for p in (m.get("photos") or []) if p.get("url") and p.get("status") == "ok"]
+    return [p for p in (_st(p) for p in m.get("photos") or []) if p.get("url") and p.get("status") == "ok"]
 
 
 def summary(m: dict) -> dict:
@@ -79,7 +117,7 @@ def detail(m: dict) -> dict:
     exs = []
     for e in m.get("exercises") or []:
         x = {k: v for k, v in e.items() if k != "video"}
-        v = e.get("video") or {}
+        v = _st(e.get("video") or {})
         vid = yt_id(v.get("url", ""))
         if vid and v.get("status") not in ("missing", "pending", "unknown"):
             x["video"] = {"id": vid, "embed": v.get("status") != "no_embed", "channel": v.get("channel"), "title": v.get("title")}

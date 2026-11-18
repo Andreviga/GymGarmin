@@ -84,3 +84,25 @@ def test_media_check_classifies_responses(monkeypatch):
     assert [v["status"] for v in r["videos"]] == ["ok", "no_embed", "missing"]
     assert r["videos"][0]["channel"] == "Canal"
     assert [p["status"] for p in r["photos"]] == ["ok", "missing"]
+
+
+def test_check_saves_status_and_unhides_media(tmp_path, monkeypatch):
+    """Vídeo/foto 'pending' ficam ocultos até a conferência; depois aparecem com canal e título."""
+    f = tmp_path / "g.json"
+    f.write_text(json.dumps([{"machine_id": "mx_a", "name": "A", "category": "pernas", "exercises": [],
+                              "videos": [{"url": "https://youtu.be/aaaaaaaaaaa", "status": "pending"}],
+                              "photos": [{"url": "https://upload.wikimedia.org/ok.jpg", "status": "pending"}]}]))
+    monkeypatch.setattr(gallery, "DATA", f)
+    gallery.load.cache_clear(); gallery.by_exercise.cache_clear(); gallery._STATUS["at"] = 0.0
+    monkeypatch.setattr(gallery, "_fetch", lambda url, method="GET", timeout=6.0:
+                        (200, json.dumps({"title": "T", "author_name": "Canal"}).encode()) if "oembed" in url else (200, b""))
+    monkeypatch.setenv("GYMGARMIN_HOME", str(tmp_path))
+    monkeypatch.setenv("GYMGARMIN_DB", str(tmp_path / "t.sqlite3"))
+    from gymgarmin.app import app
+    with TestClient(app) as c:
+        assert c.get("/api/machines/mx_a").json()["videos"] == []
+        r = c.get("/api/public/media-check?start=0&count=5").json()
+        assert r["saved"] == 2 and r["summary"]["mx_a"] == {"videos": ["ok"], "photos": ["ok"]}
+        d = c.get("/api/machines/mx_a").json()
+        assert d["videos"][0]["channel"] == "Canal" and d["photos"][0]["status"] == "ok"
+    gallery.load.cache_clear(); gallery._STATUS["at"] = 0.0
