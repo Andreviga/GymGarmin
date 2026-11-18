@@ -161,7 +161,17 @@ def _require_admin() -> dict:
 
 @app.get("/api/auth/me")
 def auth_me():
-    return _me_payload(auth.current_account())
+    acc = auth.current_account()
+    if acc:
+        # "última vez que abriu o app" (no máx. 1 gravação a cada 10 min): ajuda a conferir se o app abriu e sincronizou
+        try:
+            now = clock.now()
+            last = db.kv_get("last_seen")
+            if not last or (now - datetime.fromisoformat(last)).total_seconds() > 600:
+                db.kv_set("last_seen", now.isoformat(timespec="seconds"))
+        except Exception:  # noqa: BLE001 - nunca atrapalha o login
+            pass
+    return _me_payload(acc)
 
 
 @app.post("/api/auth/setup")
