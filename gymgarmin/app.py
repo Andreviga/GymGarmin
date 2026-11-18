@@ -1581,9 +1581,22 @@ def restore(body: dict = Body(...)):
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
 
+def _asset_version() -> str:
+    """Versão dos arquivos do app = hash do conteúdo: cada publicação nova troca o ?v= e o celular baixa a versão nova."""
+    import hashlib
+    h = hashlib.sha1()
+    for name in ("app.js", "style.css", "index.html"):
+        h.update((STATIC / name).read_bytes())
+    return h.hexdigest()[:10]
+
+
+ASSET_V = _asset_version()
+
+
 @app.get("/")
 def index():
-    return FileResponse(STATIC / "index.html")
+    html = (STATIC / "index.html").read_text().replace("?v=hl6", f"?v={ASSET_V}")
+    return Response(html, media_type="text/html; charset=utf-8", headers={"Cache-Control": "no-cache"})
 
 
 @app.get("/manifest.webmanifest")
@@ -1593,4 +1606,5 @@ def manifest():
 
 @app.get("/sw.js")
 def sw():
-    return FileResponse(STATIC / "sw.js", media_type="application/javascript")
+    js = (STATIC / "sw.js").read_text().replace("?v=hl6", f"?v={ASSET_V}").replace('"hybridlab-v6"', f'"hybridlab-{ASSET_V}"')
+    return Response(js, media_type="application/javascript", headers={"Cache-Control": "no-cache"})

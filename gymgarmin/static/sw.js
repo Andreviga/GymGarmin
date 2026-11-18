@@ -1,7 +1,7 @@
 // Service worker: a casca do app (HTML) vem da rede quando há sinal; arquivos estáticos (versionados com ?v=)
 // abrem na hora do cache e são atualizados em segundo plano. Dados (/api) nunca passam por aqui.
-const CACHE = "hybridlab-v5";
-const SHELL = ["/", "/static/style.css?v=hl5", "/static/app.js?v=hl5", "/static/icon.svg", "/manifest.webmanifest"];
+const CACHE = "hybridlab-v6";
+const SHELL = ["/", "/static/style.css?v=hl6", "/static/app.js?v=hl6", "/static/icon.svg", "/manifest.webmanifest"];
 self.addEventListener("install", (e) => e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting())));
 self.addEventListener("activate", (e) => e.waitUntil(
   caches.keys().then((ks) => Promise.all(ks.filter((k) => k !== CACHE).map((k) => caches.delete(k)))).then(() => self.clients.claim())));

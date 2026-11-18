@@ -2009,6 +2009,8 @@ function skeletonHtml(name) {
   return `<div class="sk">${line(50)}${card(120)}${card(200)}${card(160)}</div>`;
 }
 window.addEventListener("hashchange", route);
+// leituras canceladas por troca de tela não são erro
+window.addEventListener("unhandledrejection", (e) => { if (e.reason && e.reason.name === "AbortError") e.preventDefault(); });
 async function flushOutbox() {
   if (flushOutbox.busy) return;  // "online" pode disparar mais de uma vez: um envio por vez
   const box = store("gg_outbox") || []; if (!box.length) return;
