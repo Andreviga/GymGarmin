@@ -128,7 +128,7 @@ async function audit(page, where) {
     }
     // sobreposição: texto/campo/botão em cima de outro (fora os fixos: abas, cronômetro, aviso, modal)
     // fotos dos exercícios (.demo) são mídia de fundo: a legenda por cima é proposital
-    const fixedish = (el) => el.closest(".tabbar, #timer, #toast, .topbar, .modal") || (el.tagName === "IMG" && el.closest(".demo, .hero"));
+    const fixedish = (el) => el.closest(".tabbar, #timer, #toast, .topbar, .modal, .savebar") || (el.tagName === "IMG" && el.closest(".demo, .hero"));
     const leaves = all.filter((el) => !fixedish(el) && (/^(INPUT|SELECT|TEXTAREA|BUTTON|IMG)$/.test(el.tagName) ||
       ([...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim()) && !el.querySelector("input,select,button,textarea"))));
     // texto em linha que quebra: usa as caixas de cada linha (getClientRects), não o retângulo total
@@ -296,6 +296,8 @@ async function flows(page, base, persona, tag) {
 
   // Perfil: editar e salvar
   await go(page, "#perfil", W("perfil"));
+  await page.evaluate(() => { const d = document.querySelector("#sec-dados"); if (d) d.open = true; });
+  await page.waitForTimeout(100);
   const save = page.locator("#view button", { hasText: /Salvar/ }).first();
   if (await save.count()) { await save.scrollIntoViewIfNeeded(); await save.click(); await page.waitForTimeout(300);
     const t = await page.evaluate(() => { const t = document.getElementById("toast"); return t && !t.hidden ? t.innerText : null; });
