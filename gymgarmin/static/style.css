@@ -509,3 +509,4 @@ details.rec { padding: 2px 12px; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --ok-ink: #05220f; } }
 :root[data-theme="dark"] { --ok-ink: #05220f; }
 .wd.done b, .wd.sel.done b { color: var(--ok-ink); }
+.auth-mode #avatar, .auth-mode #page-title, .auth-mode #subnav { display: none !important; }

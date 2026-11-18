@@ -1682,7 +1682,7 @@ function healthChart(series, key, { label, unit = "", band = null, ref = null, b
 
 async function viewSaude() {
   const h = await api("/api/health");
-  const head = `<div class="card"><div class="row between gap wrap"><h2 style="margin:0">Saúde e sono</h2>
+  const head = `<div class="card"><div class="row between gap wrap"><h2 style="margin:0">Do seu relógio</h2>
       ${h.garmin.connected ? `<button class="btn sm ghost" id="h-refresh">Atualizar do relógio</button>` : ""}</div>
     <p class="small muted">Sono, recuperação e condicionamento lidos do seu relógio Garmin — e como o treino está mexendo com eles.
       Não substitui avaliação médica: sintomas ou valores fora do normal por vários dias, procure um médico.</p></div>`;
