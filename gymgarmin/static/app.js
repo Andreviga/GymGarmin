@@ -1099,6 +1099,7 @@ async function showExercise(id) {
   const body = openModal(`<h2>${esc(ex.name)}</h2>
     ${ex.name !== ex.name_en ? `<p class="small muted">${esc(ex.name_en)}</p>` : ""}
     <div class="ex-hero">${mediaHtml(ex.id, "l")}</div>
+    ${ex.machine_id ? `<button class="btn ghost block" data-machine="${esc(ex.machine_id)}" style="margin:-2px 0 10px">▶ Ver o aparelho em vídeo</button>` : ""}
     ${ex.image_like ? `<p class="small muted img-note">Foto de um movimento parecido (${esc(ex.image_like)}): o aparelho da sua academia pode ser diferente.</p>` : ""}
     ${ex.top_machine ? `<div class="evidence"><b>Por que está entre os melhores</b><p class="small">${esc(ex.evidence)}</p>
       <p class="small muted">${ex.availability_br === "comum" ? "Comum nas academias brasileiras." : ex.availability_br === "média" ? "Aparece em academias médias e grandes." : "Mais raro: academias grandes e premium."}${ex.lengthened ? " Trabalha o músculo alongado." : ""}</p>
@@ -1117,6 +1118,7 @@ async function showExercise(id) {
       ${ex.machine ? "" : `<button class="btn sm ghost" id="g-edit">Alterar</button>`}</div>
     <div id="g-box"></div>`);
   const evo = $("[data-close]", body); if (evo) evo.onclick = () => closeModal();
+  const mb = $("[data-machine]", body); if (mb) mb.onclick = () => showMachine(mb.dataset.machine);
   const ge = $("#g-edit", body);
   if (ge) ge.onclick = () => {
     $("#g-box", body).innerHTML = `<input id="g-q" placeholder="Buscar no catálogo do Garmin (inglês)" value="${esc(ex.name_en.split(" ").slice(0, 2).join(" "))}"><ul class="list small" id="g-list"></ul>`;
@@ -1689,6 +1691,67 @@ async function viewExercicios() {
   load();
 }
 
+/* ----------------------------------------------------------- APARELHOS -- */
+const CAT_PICTO = { pernas: "squat", gluteo: "abduct", costas: "row", peito: "dumbbell", ombros: "yraise", bracos: "dumbbell", core: "dumbbell", cardio: "run", funcional: "sled" };
+async function viewAparelhos(openId) {
+  const last = store("gg_mx_filter") || {};
+  const data = await api(`/api/machines`);
+  view.innerHTML = `<div class="ex-search">
+    <input id="mx-q" type="search" placeholder="Buscar: leg press, pêndulo, remada, glúteo…" value="${esc(last.q || "")}" autocomplete="off">
+    <div class="chip-row" id="mx-chips"><button type="button" class="fchip ${!last.c ? "on" : ""}" data-c="">Todos</button>${data.categories.map((c) => `<button type="button" class="fchip ${last.c === c.key ? "on" : ""}" data-c="${c.key}">${esc(c.pt)}</button>`).join("")}</div>
+  </div>
+  <p class="small muted" id="mx-count"></p>
+  <ul class="mx-grid" id="mx-list"></ul>
+  <p class="small muted" style="margin-top:14px">Vídeos do YouTube, tocados pelo player oficial, com o crédito de cada canal. Fotos de licença aberta (Wikimedia Commons).</p>`;
+  const draw = () => {
+    const q = $("#mx-q").value.trim(); const c = ($(".fchip.on", view) || {}).dataset ? $(".fchip.on", view).dataset.c : "";
+    store("gg_mx_filter", { q, c });
+    const norm = (x) => x.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+    const items = data.items.filter((m) => (!c || m.category === c) && (!q || norm(`${m.name} ${m.name_en || ""}`).includes(norm(q))));
+    $("#mx-count").textContent = `${items.length} aparelho${items.length === 1 ? "" : "s"}`;
+    $("#mx-list").innerHTML = items.map((m) => `<li class="mx-card" data-machine="${esc(m.id)}">
+      <span class="mx-img" data-machine="${esc(m.id)}">${m.thumb ? `<img loading="lazy" src="${esc(m.thumb)}" alt="" data-machine="${esc(m.id)}">` : pictoHtml(CAT_PICTO[m.category] || "dumbbell", "tile")}
+        ${m.has_video ? `<span class="mx-play" aria-hidden="true">▶</span>` : ""}${m.is_new ? `<span class="tile-new">novo</span>` : ""}</span>
+      <span class="mx-cap" data-machine="${esc(m.id)}"><b data-machine="${esc(m.id)}">${esc(m.name)}</b><span class="small muted" data-machine="${esc(m.id)}">${m.n_exercises} ${m.n_exercises === 1 ? "exercício" : "exercícios"}${m.availability_br === "rara" ? " · academias grandes" : ""}</span></span></li>`).join("")
+      || `<li class="empty">Nada encontrado.</li>`;
+  };
+  view.oninput = draw;
+  view.onclick = (e) => {
+    const chip = e.target.closest(".fchip");
+    if (chip) { $$(".fchip", view).forEach((x) => x.classList.toggle("on", x === chip)); return draw(); }
+    const card = e.target.closest("[data-machine]"); if (card) showMachine(card.dataset.machine);
+  };
+  draw();
+  if (openId) showMachine(decodeURIComponent(openId));
+}
+function ytEmbed(v) {
+  // "lite embed": mostra a capa e só carrega o player do YouTube quando a pessoa toca (economiza dados e bateria)
+  return `<div class="yt" data-yt="${esc(v.id)}" role="button" tabindex="0" aria-label="Tocar vídeo: ${esc(v.title || "demonstração")}">
+    <img loading="lazy" src="https://i.ytimg.com/vi/${esc(v.id)}/hqdefault.jpg" alt=""><span class="yt-play" aria-hidden="true">▶</span></div>
+    <p class="small muted yt-credit">${v.channel ? `Vídeo: ${esc(v.channel)}` : "Vídeo do YouTube"}${v.title ? ` · ${esc(v.title)}` : ""} · <a href="https://www.youtube.com/watch?v=${esc(v.id)}" target="_blank" rel="noopener">abrir no YouTube</a></p>`;
+}
+async function showMachine(id) {
+  const m = await api(`/api/machines/${encodeURIComponent(id)}`);
+  const vids = m.videos || []; const embeds = vids.filter((v) => v.embed); const links = vids.filter((v) => !v.embed);
+  const ph = (m.photos || [])[0];
+  const body = openModal(`<h2>${esc(m.name)}</h2>${m.name_en && m.name_en !== m.name ? `<p class="small muted">${esc(m.name_en)}</p>` : ""}
+    <p><span class="pill">${esc(m.category_pt || "")}</span> ${m.availability_br ? `<span class="pill muted">${m.availability_br === "comum" ? "comum no Brasil" : m.availability_br === "média" ? "academias médias e grandes" : "academias grandes e premium"}</span>` : ""}</p>
+    ${embeds.length ? ytEmbed(embeds[0]) : ""}
+    ${ph ? `<figure class="mx-photo"><img loading="lazy" src="${esc(ph.url)}" alt="Foto do aparelho ${esc(m.name)}"><figcaption class="small muted">Foto: ${esc(ph.author || "Wikimedia Commons")}${ph.license ? ` · ${esc(ph.license)}` : ""}${ph.page ? ` · <a href="${esc(ph.page)}" target="_blank" rel="noopener">fonte</a>` : ""}</figcaption></figure>` : ""}
+    ${m.why ? `<div class="evidence"><b>Por que vale a pena</b><p class="small">${esc(m.why)}</p></div>` : ""}
+    ${(m.exercises || []).length ? `<h3>O que dá para fazer</h3><ul class="exlist mx-ex">${m.exercises.map((x) => `<li><span class="grow"><b>${esc(x.name)}</b><span class="small muted">${esc(x.how || "")}</span></span></li>`).join("")}</ul>` : ""}
+    ${(m.linked || []).length ? `<div class="chips" style="margin:8px 0 4px">${m.linked.map((x) => `<button class="chip" data-exl="${esc(x.id)}">${esc(x.name)} ›</button>`).join("")}</div>` : ""}
+    ${(m.tips || []).length ? `<h3>Dicas</h3><ul class="plain small">${m.tips.map((t) => `<li>${esc(t)}</li>`).join("")}</ul>` : ""}
+    ${embeds.length > 1 || links.length ? `<h3>Mais vídeos</h3><ul class="plain small">${[...embeds.slice(1), ...links].map((v) => `<li><a href="https://www.youtube.com/watch?v=${esc(v.id)}" target="_blank" rel="noopener">${esc(v.title || "Vídeo")}</a>${v.channel ? ` · ${esc(v.channel)}` : ""}</li>`).join("")}</ul>` : ""}
+    ${(m.brands || []).length ? `<p class="small muted">Fabricantes: ${m.brands.map(esc).join(", ")}</p>` : ""}`);
+  body.onclick = (e) => {
+    const y = e.target.closest("[data-yt]");
+    if (y) { y.outerHTML = `<div class="yt on"><iframe src="https://www.youtube-nocookie.com/embed/${esc(y.dataset.yt)}?autoplay=1&playsinline=1&rel=0" title="Vídeo do exercício" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe></div>`; return; }
+    const ex = e.target.closest("[data-exl]"); if (ex) return showExercise(ex.dataset.exl);
+  };
+  body.onkeydown = (e) => { if (e.key === "Enter" && e.target.dataset.yt) e.target.click(); };
+}
+
 /* --------------------------------------------------------------- SAÚDE -- */
 const LEVEL_PILL = { ok: ["bom", "ok"], atencao: ["atenção", "warn"], alerta: ["alerta", "bad"] };
 const NIGHT_PILL = { bom: "ok", regular: "warn", ruim: "bad", sem_dados: "muted" };
@@ -2001,10 +2064,10 @@ function route() {
 }
 async function doRoute(ctl) {
   const [name, a, b] = (location.hash.slice(1) || "hoje").split("/");
-  $$(".tabbar a").forEach((el) => el.classList.toggle("active", el.dataset.tab === ({ plano: "planilhas", exercicios: "planilhas", evolucao: "analise", saude: "analise", esportes: "perfil", coach: "perfil" }[name] || name)));
-  const TITLES = { planilhas: "Planos", exercicios: "Planos", plano: "Planilha", treinar: "Treinar", analise: "Progresso", evolucao: "Evolução", saude: "Saúde e sono", perfil: "Perfil", esportes: "Esportes", coach: "Coach" };
+  $$(".tabbar a").forEach((el) => el.classList.toggle("active", el.dataset.tab === ({ plano: "planilhas", exercicios: "planilhas", aparelhos: "planilhas", evolucao: "analise", saude: "analise", esportes: "perfil", coach: "perfil" }[name] || name)));
+  const TITLES = { planilhas: "Planos", exercicios: "Planos", aparelhos: "Planos", plano: "Planilha", treinar: "Treinar", analise: "Progresso", evolucao: "Evolução", saude: "Saúde e sono", perfil: "Perfil", esportes: "Esportes", coach: "Coach" };
   const pt = $("#page-title"); pt.textContent = TITLES[name] || ""; pt.hidden = !TITLES[name] || (name === "treinar" && a);
-  const sn = $("#subnav"); sn.hidden = !["planilhas", "exercicios"].includes(name);
+  const sn = $("#subnav"); sn.hidden = !["planilhas", "exercicios", "aparelhos"].includes(name);
   $$("#subnav a").forEach((x) => x.classList.toggle("on", x.dataset.sub === name));
   const av = $("#avatar"); const nm = state.me && state.me.user && state.me.user.name;
   if (av) av.innerHTML = nm && nm !== "Eu" ? esc(nm.trim().split(/\s+/).slice(0, 2).map((w) => w[0]).join("").toUpperCase())
@@ -2025,7 +2088,7 @@ async function doRoute(ctl) {
         document.querySelector(".topbar").insertAdjacentHTML("afterend", `<div id="eph" class="rec atencao small" style="margin:8px 16px 0">Versão de teste online: os dados podem ser apagados pelo servidor. Use <a href="#perfil">Perfil → Backup</a> para salvar e restaurar.</div>`);
       }
     }
-    const routes = { hoje: () => viewHoje(a), planilhas: viewPlanilhas, plano: () => viewPlano(a), treinar: () => viewTreinar(a, b), analise: viewAnalise, evolucao: () => viewEvolucao(decodeURIComponent(a || "")), esportes: viewEsportes, saude: viewSaude, exercicios: viewExercicios, perfil: () => viewPerfil(a), coach: viewCoach };
+    const routes = { hoje: () => viewHoje(a), planilhas: viewPlanilhas, plano: () => viewPlano(a), treinar: () => viewTreinar(a, b), analise: viewAnalise, evolucao: () => viewEvolucao(decodeURIComponent(a || "")), esportes: viewEsportes, saude: viewSaude, exercicios: viewExercicios, aparelhos: () => viewAparelhos(a), perfil: () => viewPerfil(a), coach: viewCoach };
     const render = async () => {
       await (routes[name] || viewHoje)();
       if (!view.onclick) view.onclick = (e) => { const id = e.target.dataset && e.target.dataset.ex; if (id) showExercise(id); };

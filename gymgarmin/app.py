@@ -16,7 +16,7 @@ from fastapi.staticfiles import StaticFiles
 
 from datetime import date, timedelta
 
-from . import auth, coach, ingest
+from . import auth, coach, gallery, ingest
 from . import (analysis, calibration, catalog, clock, db, dedupe, health, endurance, garmin_export, garmin_sync, generator, history, limitations,
                load, plans_io, progression, readiness, schedule, sports, templates)
 from .muscles import EQUIPMENT_PT, HR_ZONES, MUSCLES, hr_max, zone_bpm
@@ -37,7 +37,7 @@ app = FastAPI(title="Hybrid Lab", version="0.1.0", lifespan=lifespan)
 
 # ------------------------------------------------------------------ login ----
 # Rotas abertas: login/cadastro, cron (tem segredo próprio) e envio de dados por token pessoal.
-OPEN_PREFIXES = ("/api/auth/", "/api/cron/", "/api/ingest")
+OPEN_PREFIXES = ("/api/auth/", "/api/cron/", "/api/ingest", "/api/public/")
 
 
 # O coach abre o app "como" o atleta (cabeçalho X-GG-Athlete). Isto ele não pode: login/senha,
@@ -697,6 +697,44 @@ def media_index():
     return JSONResponse(out, headers={"Cache-Control": "public, max-age=86400"})
 
 
+# ------------------------------------------------------------ aparelhos ----
+
+@app.get("/api/machines")
+def machines(q: str = "", category: str | None = None):
+    return {"categories": [{"key": k, "pt": t} for k, t in gallery.CATEGORIES], "items": gallery.search(q, category)}
+
+
+@app.get("/api/machines/{machine_id}")
+def machine_detail(machine_id: str):
+    m = gallery.get(machine_id)
+    if not m:
+        raise HTTPException(404, "Aparelho não encontrado")
+    out = gallery.detail(m)
+    out["category_pt"] = gallery.category_name(m.get("category") or "")
+    out["linked"] = [{"id": eid, "name": (catalog.get(eid) or {}).get("name", eid)} for eid in m.get("existing_exercise_ids") or []
+                     if catalog.get(eid)]
+    return out
+
+
+_MEDIA_CHECK: dict = {}
+
+
+@app.get("/api/public/media-check")
+def media_check(start: int = 0, count: int = Query(25, le=40)):
+    """Confere no ar os vídeos (YouTube oEmbed) e fotos (Commons) da galeria. Só as URLs do nosso arquivo; resultado
+    guardado por 1 h para não virar fonte de tráfego."""
+    import time as _t
+    key = (start, count)
+    hit = _MEDIA_CHECK.get(key)
+    if hit and _t.time() - hit[0] < 3600:
+        return hit[1]
+    cands = [{"machine_id": m["machine_id"], "videos": [v.get("url") for v in m.get("videos") or [] if v.get("url")],
+              "photos": [p.get("url") for p in m.get("photos") or [] if p.get("url")]} for m in gallery.load()[start:start + count]]
+    res = {"start": start, "count": len(cands), "total": len(gallery.load()), "results": gallery.check_media(cands)}
+    _MEDIA_CHECK[key] = (_t.time(), res)
+    return res
+
+
 @app.get("/api/exercises/{exercise_id}")
 def exercise_detail(exercise_id: str):
     ex = catalog.get(exercise_id)
@@ -704,6 +742,7 @@ def exercise_detail(exercise_id: str):
         raise HTTPException(404, "Exercício não encontrado")
     out = _with_status(ex, _profile().get("limitations") or [], db.garmin_overrides())
     out["last"] = db.last_performance(exercise_id)
+    out["machine_id"] = gallery.by_exercise().get(exercise_id)
     return out
 
 
