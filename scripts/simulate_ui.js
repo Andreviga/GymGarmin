@@ -128,7 +128,7 @@ async function audit(page, where) {
     }
     // sobreposição: texto/campo/botão em cima de outro (fora os fixos: abas, cronômetro, aviso, modal)
     // fotos dos exercícios (.demo) são mídia de fundo: a legenda por cima é proposital
-    const fixedish = (el) => el.closest(".tabbar, #timer, #toast, .topbar, .modal") || (el.tagName === "IMG" && el.closest(".demo"));
+    const fixedish = (el) => el.closest(".tabbar, #timer, #toast, .topbar, .modal") || (el.tagName === "IMG" && el.closest(".demo, .hero"));
     const leaves = all.filter((el) => !fixedish(el) && (/^(INPUT|SELECT|TEXTAREA|BUTTON|IMG)$/.test(el.tagName) ||
       ([...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim()) && !el.querySelector("input,select,button,textarea"))));
     // texto em linha que quebra: usa as caixas de cada linha (getClientRects), não o retângulo total
@@ -226,19 +226,22 @@ async function flows(page, base, persona, tag) {
 
   // Hoje: ver treino, mover, não vou treinar + desfazer
   await go(page, "#hoje", W("hoje"));
-  const sum = page.locator(".day:not(.dim) details summary").first();
+  const openDay = async (sel) => { const s = page.locator(`details.day:has(${sel}):not([open]) > summary`).first(); if (await s.count()) { await s.scrollIntoViewIfNeeded(); await s.click(); await page.waitForTimeout(100); } };
+  const sum = page.locator("details.day:not(.dim) > summary").first();
   if (await sum.count()) { await sum.scrollIntoViewIfNeeded(); await sum.click(); await page.waitForTimeout(100); await audit(page, W("hoje com treino aberto")); }
   if (await page.locator("[data-move]").count()) {
-    await click("[data-move]", "Mover");
+    await openDay("[data-move]");
+    await click(".day[open] [data-move]", "Mover");
     await modalCheck("mover");
     await page.click(".modal-close").catch(() => issue("não fechou o modal", W("mover")));
   }
   const skipBtn = page.locator(".day [data-skip]").first();
   if (await skipBtn.count()) {
-    await click(".day [data-skip]", "Não vou treinar");
+    await openDay("[data-skip]");
+    await click(".day[open] [data-skip]", "Não vou treinar");
     await modalCheck("reajuste");
     await click("#ok-close", "Ok do reajuste");
-    if (await page.locator("[data-undo]").count()) await click("[data-undo]", "Desfazer ajuste");
+    if (await page.locator("[data-undo]").count()) { await openDay("[data-undo]"); } if (await page.locator("[data-undo]").count()) await click(".day[open] [data-undo]", "Desfazer ajuste");
   }
   if (await page.locator("#rd-apply").count()) await audit(page, W("cartão de prontidão"));
 

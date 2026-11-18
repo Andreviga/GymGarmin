@@ -1,4 +1,4 @@
-/* GymGarmin – app web (vanilla JS, sem build). */
+/* Hybrid Lab – app web (vanilla JS, sem build). */
 "use strict";
 
 const $ = (s, el = document) => el.querySelector(s);
@@ -173,9 +173,10 @@ async function viewHoje(weekDate) {
   const [sch, rd] = await Promise.all([api(`/api/schedule${weekDate ? `?date=${weekDate}` : ""}`),
     weekDate ? Promise.resolve(null) : api("/api/readiness").catch(() => null)]);
   if (!sch.plan) {
-    view.innerHTML = `<div class="card"><h2>Monte seu treino automático</h2>
-      <p>Diga há quanto tempo treina, quais dias pode ir e quanto tempo tem — o app monta a divisão, escolhe os exercícios respeitando suas limitações, calcula o tempo de cada sessão (aquecimento, séries, descanso, cardio e alongamento) e reorganiza a semana quando você faltar.</p>
-      <button class="btn" id="gen-open">Gerar meu treino</button> <a class="btn ghost" href="#planilhas">Montar manualmente</a></div>`;
+    view.innerHTML = `<section class="hero rest"><div class="hero-txt"><div class="kick">Bem-vindo ao Hybrid Lab</div>
+      <div class="ttl">Monte seu treino</div>
+      <div class="meta">Diga há quanto tempo treina, os dias e o tempo que tem. O app monta musculação e corrida juntas, respeita suas limitações e reorganiza a semana quando você faltar.</div>
+      <div class="row gap wrap" style="margin-top:12px"><button class="btn light" id="gen-open">Gerar meu treino</button><a class="btn ghost-light" href="#planilhas">Montar manualmente</a></div></div></section>`;
     $("#gen-open").onclick = () => openGenerator();
     return;
   }
@@ -184,158 +185,142 @@ async function viewHoje(weekDate) {
   const outdated = sch.entries.some((e) => e.garmin_outdated && e.status === "planejado");
   const cyc = sch.cycle;
   const athleteHtml = weekDate ? "" : await athleteCards();
-  view.innerHTML = `${weekDate ? "" : `<div id="stories" class="stories" aria-label="Resumo do dia"></div>`}${athleteHtml}
-  ${readinessCard(rd, sch.entries.some((e) => e.date === sch.today && e.status === "planejado"),
-    sch.entries.some((e) => e.date === sch.today && e.status === "planejado" && e.readiness_backup))}
+  const todays = weekDate ? [] : sch.entries.filter((e) => e.date === sch.today);
+  const heroE = todays.find((e) => e.status === "planejado") || todays[0] || null;
+  const adjusted = todays.some((e) => e.status === "planejado" && e.readiness_backup);
+  view.innerHTML = `${weekDate ? "" : heroHtml(heroE, sch) + statsHtml(rd, g, adjusted, !!(heroE && heroE.status === "planejado"))}${athleteHtml}
   ${missed.length ? `<div class="rec alerta"><b>Treino perdido:</b> ${missed.map((e) => `${e.weekday} ${ddmm(e.date)} – ${esc(e.day_name)}`).join(", ")}.
      <div class="row gap wrap" style="margin-top:6px">${missed.map((e) => `<button class="btn sm" data-skip="${e.id}">Ajustar a semana (${e.weekday})</button>`).join("")}</div></div>` : ""}
-  ${(sch.time_warnings || []).length ? `<div class="rec atencao small"><b>Tempo acima do normal nesta semana</b><ul class="plain">${sch.time_warnings.map((w) => `<li>${esc(w)}</li>`).join("")}</ul></div>` : ""}
-  <div class="card">
-    <div class="row between gap"><button class="icon-btn" data-week="${addDays(sch.week_start, -7)}" title="Semana anterior">‹</button>
-      <div class="grow" style="text-align:center"><h2 style="margin:0">Semana de ${ddmm(sch.week_start)}</h2>
+  ${(sch.time_warnings || []).length ? `<details class="rec atencao small"><summary><b>⏱ ${sch.time_warnings.length} ${sch.time_warnings.length > 1 ? "dias passam" : "dia passa"} do seu tempo de treino</b></summary><ul class="plain">${sch.time_warnings.map((w) => `<li>${esc(w)}</li>`).join("")}</ul></details>` : ""}
+  ${heroE && heroE.status !== "pulado" ? todayListHtml(heroE) : ""}
+  <section class="sec">
+    <div class="sec-head"><button class="icon-btn" data-week="${addDays(sch.week_start, -7)}" title="Semana anterior" aria-label="Semana anterior">‹</button>
+      <div class="grow" style="text-align:center"><h2>Semana de ${ddmm(sch.week_start)}</h2>
         <div class="small muted">${esc(sch.plan.name)}${cyc ? ` · ciclo ${cyc.cycle}, semana ${cyc.week}/${cyc.length}${cyc.deload ? " — <b>DELOAD</b>" : ""}` : ""}</div></div>
-      <button class="icon-btn" data-week="${addDays(sch.week_start, 7)}" title="Próxima semana">›</button></div>
+      <button class="icon-btn" data-week="${addDays(sch.week_start, 7)}" title="Próxima semana" aria-label="Próxima semana">›</button></div>
     ${cyc && cyc.deload ? `<p class="small rec">Semana de deload: menos séries, carga −10% e RPE ~6 para o corpo assimilar o ciclo.</p>` : ""}
-    <div class="stack" style="margin-top:10px">
-      ${sch.entries.length ? sch.entries.map((e) => dayCard(e, sch.today)).join("") : `<p class="empty">Nenhum treino nesta semana.</p>`}
-    </div>
-    <div class="row gap wrap" style="margin-top:10px">
+    <div class="days">${sch.entries.length ? sch.entries.map((e) => dayCard(e, sch.today)).join("") : `<p class="empty">Nenhum treino nesta semana.</p>`}</div>
+    <div class="row gap wrap" style="margin-top:12px">
       <button class="btn sm ${outdated ? "" : "ghost"}" id="push-week">${outdated ? "Reenviar alterações ao Garmin" : "Enviar semana ao Garmin"}</button>
       <button class="btn sm ghost" id="gen-open">Regerar treino</button>
-      <button class="btn sm ghost" id="rebuild">Refazer semana pela planilha</button>
+      <button class="btn sm ghost" id="rebuild">Refazer pela planilha</button>
     </div>
-  </div>
-  <div class="card"><h2>Metas da semana</h2><div class="stack">
+  </section>
+  <section class="card"><h2>Metas da semana</h2><div class="stack">
     ${meter("Treinos", g.sessions.done, g.sessions.planned)}
     ${meter("Cardio (min equivalentes OMS)", g.cardio.done, g.cardio.target)}
     ${meter("Séries de força", g.sets.done, g.sets.planned)}
     ${meter("Tempo treinado", g.minutes.done, g.minutes.planned, " min")}
     ${Object.entries(g.endurance || {}).map(([k, x]) => meter(`${SPORT_ICON[k] || ""} ${esc(x.name)}`, x.done, x.planned, " " + x.unit)).join("")}
-  </div></div>
-  <div class="card" id="hoje-recs"><h2>O que ajustar</h2><p class="muted small">Carregando…</p></div>`;
+  </div></section>
+  <section class="card" id="hoje-recs"><h2>O que ajustar</h2><p class="muted small">Carregando…</p></section>`;
   sch._rd = rd;
   bindAgenda(sch);
   api("/api/report/weekly").then((rep) => { const b = $("#hoje-recs"); if (b) b.innerHTML = `<h2>O que ajustar</h2>${recsHtml(rep.recommendations.slice(0, 6))}`; }).catch(() => {});
 }
 
-/* ---------------------------------------------------------- STORIES -- */
+/* ------------------------------------------------- HOJE: foto, números e lista -- */
 const SPORT_PICTO = { corrida: "run", ciclismo: "bike", natacao: "swim", remo: "row", caminhada: "walk", trilha: "hike" };
+const SPORT_WORD = { corrida: "corrida", ciclismo: "bike", natacao: "natação", remo: "remo", caminhada: "caminhada", trilha: "trilha" };
+const WD_LONG = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"];
 function mainIds(e) {
   return (e.items || []).filter((i) => (i.phase || "principal") === "principal").map((i) => i.exercise_id);
 }
-function avatarHtml(e) {
-  const id = mainIds(e)[0];
-  return id ? mediaHtml(id, "av", SPORT_PICTO[e.sport]) : pictoHtml(SPORT_PICTO[e.sport] || "dumbbell", "av");
+function dayKind(e) {
+  const end = (e.items || []).filter((i) => i.endurance);
+  const str = (e.items || []).some((i) => (i.phase || "principal") === "principal" && !i.endurance);
+  if (end.length && str) return `musculação + ${SPORT_WORD[end[0].endurance.sport] || "cardio"}`;
+  return end.length ? end.map((i) => i.endurance.title).join(" + ") : "musculação";
 }
-async function fillStories(sch, rd) {
-  const bar = $("#stories"); if (!bar) return;
-  const [hl, hist] = await Promise.all([api("/api/health").catch(() => null), api("/api/history").catch(() => null)]);
-  if (!$("#stories")) return;
-  const today = sch.today;
-  const todays = sch.entries.filter((e) => e.date === today);
-  const items = [];
-  const fmt1 = (v) => (+v).toLocaleString("pt-BR", { maximumFractionDigits: 1 });
-  // 1. treino de hoje
-  const plannedToday = todays.filter((e) => e.status === "planejado");
-  items.push({ key: "hoje", label: "Hoje", seen: !plannedToday.length, avatar: todays[0] ? avatarHtml(todays[0]) : pictoHtml("dumbbell", "av"),
-    slides: todays.length ? todays.map((e) => ({ kicker: `${e.weekday} ${ddmm(e.date)} · ${STATUS_INFO[e.status] ? STATUS_INFO[e.status][0] : e.status}`, big: e.day_name,
-      text: e.time ? `~${Math.round(e.time.total)} min` : "", ids: mainIds(e).slice(0, 4), cta: e.status === "planejado" ? { href: `#treinar/agenda/${e.id}`, label: "Treinar agora" } : null }))
-      : [{ kicker: "Hoje", big: "Descanso", text: "Dia livre no plano: caminhar, alongar e dormir bem também é treino." }] });
-  // 2. prontidão
-  if (rd && rd.score != null) {
-    items.push({ key: "pront", label: "Prontidão", inner: `<b class="sv">${rd.score}</b>`, seen: false,
-      slides: [{ kicker: "Prontidão de hoje", big: `${rd.score}`, unit: "/100", text: rd.text || "", sub: rd.night ? rd.night.text : "" }] });
+function heroHtml(e, sch) {
+  const d = new Date(sch.today + "T12:00:00");
+  const dateTxt = `${WD_LONG[d.getDay()]}, ${ddmm(sch.today)}`;
+  if (!e) {
+    const nx = sch.entries.find((x) => x.date > sch.today && x.status === "planejado");
+    return `<section class="hero rest"><div class="hero-txt"><div class="kick">Hoje · ${dateTxt}</div><div class="ttl">Descanso</div>
+      <div class="meta">${nx ? `Próximo: ${esc(nx.weekday)} · ${esc(nx.day_name)}` : "Caminhar, alongar e dormir bem também contam."}</div></div></section>`;
   }
-  // 3. sono
-  if (hl && hl.last_night) {
-    const n = hl.last_night;
-    items.push({ key: "sono", label: "Sono", inner: `<b class="sv">${fmt1(n.duration_h)}h</b>`, seen: false,
-      slides: [{ kicker: `Noite de ${ddmm(n.date)}`, big: `${fmt1(n.duration_h)} h`, text: (n.reasons || []).slice(0, 2).join(" · "), sub: (n.tips || [])[0] || "" }] });
-  }
-  // 4. semana
-  const g = sch.goals || {};
-  if (g.sessions) {
-    const pct = g.sessions.planned ? Math.round(100 * g.sessions.done / g.sessions.planned) : 0;
-    const end = Object.values((g.endurance) || {})[0];
-    items.push({ key: "semana", label: "Semana", inner: `<b class="sv">${pct}%</b>`, seen: false,
-      slides: [{ kicker: "Sua semana", big: `${g.sessions.done}/${g.sessions.planned}`, unit: "treinos", text: `${g.sets.done} de ${g.sets.planned} séries · ${g.cardio.done} de ${g.cardio.target} min de cardio`,
-        sub: end ? `${end.name}: ${fmt1(end.done)} de ${fmt1(end.planned)} ${end.unit}` : "" }] });
-  }
-  // 5. recordes recentes
-  const prs = ((hist && hist.recent_prs) || []).filter((p) => p.date >= addDays(today, -7));
-  if (prs.length) {
-    items.push({ key: "prs", label: "Recordes", avatar: mediaHtml(prs[0].exercise_id, "av"), seen: false,
-      slides: prs.slice(0, 5).map((p) => ({ kicker: `Recorde · ${ddmm(p.date)}`, big: p.name, text: prText(p), ids: [p.exercise_id], trophy: true })) });
-  }
-  // 6. check-in
-  if ($("#checkin")) items.push({ key: "checkin", label: "Check-in", inner: `<b class="sv">+</b>`, seen: false, jump: "#checkin" });
-  const seen = store("gg_story_seen") || {};
-  bar.innerHTML = items.map((it, i) => {
-    const sk = `${today}:${it.key}`; const isSeen = it.seen || seen[sk];
-    return `<button class="story-item" data-story="${i}" aria-label="${esc(it.label)}"><span class="ring ${isSeen ? "seen" : ""}"><span class="hole">${it.avatar || `<span class="picto av">${it.inner || ""}</span>`}</span></span><span class="slabel">${esc(it.label)}</span></button>`;
-  }).join("");
-  bar.onclick = (ev) => {
-    const b = ev.target.closest("[data-story]"); if (!b) return;
-    const it = items[+b.dataset.story];
-    if (it.jump) { const el = $(it.jump); if (el) el.scrollIntoView({ behavior: "smooth", block: "center" }); return; }
-    seen[`${today}:${it.key}`] = 1; store("gg_story_seen", seen);
-    b.querySelector(".ring").classList.add("seen");
-    openStory(items, +b.dataset.story);
-  };
+  const id = e.sport ? null : mainIds(e).find((x) => frames(x));
+  const f = id ? frames(id) : null;
+  const st = STATUS_INFO[e.status] || [e.status, ""];
+  const mins = e.time ? `~${Math.round(e.time.total)} min` : "";
+  return `<section class="hero ${f ? "photo" : "rest"} ${e.status === "planejado" ? "" : "done"}">
+    ${f ? `<img class="hero-img" src="${esc(f[0])}" alt="">` : `<span class="hero-picto">${pictoHtml(SPORT_PICTO[e.sport] || "dumbbell", "hp")}</span>`}
+    <div class="hero-txt"><div class="kick">Hoje · ${dateTxt}${mins ? ` · ${mins}` : ""}</div>
+      <div class="ttl">${esc(e.day_name)}</div>
+      <div class="meta">${esc(dayKind(e))}${e.endurance_phase ? ` · ${esc(e.endurance_phase)}` : ""}${e.race ? " · PROVA" : ""}</div>
+      <div class="row gap wrap" style="margin-top:12px">${e.status === "planejado"
+        ? `<a class="btn light" href="#treinar/agenda/${e.id}">Começar treino</a>`
+        : `<span class="pill ${st[1]}">${esc(st[0])}</span>`}</div></div></section>`;
 }
-function openStory(items, start) {
-  const box = $("#story"); let si = start, k = 0, timer = null;
-  const close = () => { clearTimeout(timer); box.hidden = true; box.innerHTML = ""; document.body.classList.remove("no-scroll"); };
-  const show = () => {
-    clearTimeout(timer);
-    const it = items[si]; if (!it || it.jump) return close();
-    const sl = it.slides[k];
-    box.innerHTML = `<div class="story-card s-${esc(it.key)}">
-      <div class="sbars">${it.slides.map((_, j) => `<span class="${j < k ? "done" : j === k ? "run" : ""}"><i></i></span>`).join("")}</div>
-      <div class="story-head"><span class="ring small"><span class="hole">${it.avatar || `<span class="picto av">${it.inner || ""}</span>`}</span></span><b>${esc(it.label)}</b>
-        <button class="story-x" aria-label="Fechar">×</button></div>
-      <div class="story-body">
-        <div class="kicker">${esc(sl.kicker || "")}</div>
-        <div class="big">${sl.trophy ? "🏆 " : ""}${esc(sl.big || "")}${sl.unit ? `<small> ${esc(sl.unit)}</small>` : ""}</div>
-        ${sl.text ? `<p>${esc(sl.text)}</p>` : ""}${sl.sub ? `<p class="sub">${esc(sl.sub)}</p>` : ""}
-        ${sl.ids && sl.ids.length ? `<div class="story-media">${sl.ids.map((id) => mediaHtml(id, "st")).join("")}</div>` : ""}
-        ${sl.cta ? `<a class="btn story-cta" href="${sl.cta.href}">${esc(sl.cta.label)}</a>` : ""}
-      </div><div class="tap prev" aria-hidden="true"></div><div class="tap next" aria-hidden="true"></div></div>`;
-    box.hidden = false; document.body.classList.add("no-scroll");
-    timer = setTimeout(next, 5000);
+function ringSvg(score, cls) {
+  const v = Math.max(0, Math.min(100, +score || 0)), c = 2 * Math.PI * 15.5;
+  return `<svg class="ring-svg ${cls}" viewBox="0 0 36 36" aria-hidden="true"><circle cx="18" cy="18" r="15.5" class="ring-bg"/>
+    <circle cx="18" cy="18" r="15.5" class="ring-fg" stroke-dasharray="${(c * v / 100).toFixed(1)} ${c.toFixed(1)}"/></svg>`;
+}
+const RD_LEVEL = { alta: "Alta", moderada: "Moderada", baixa: "Baixa", muito_baixa: "Muito baixa" };
+function statsHtml(rd, g, adjusted, hasToday) {
+  const has = rd && rd.score != null;
+  const cls = has ? ({ seguir: "ok", moderar: "warn", trocar: "warn", descanso: "bad" }[rd.action] || "ok") : "";
+  const sleep = rd && rd.sleep_h ? `${String(Math.floor(rd.sleep_h))}h${String(Math.round((rd.sleep_h % 1) * 60)).padStart(2, "0")}` : "—";
+  const s = g && g.sessions ? `${g.sessions.done}/${g.sessions.planned}` : "—";
+  const act = has && rd.action !== "seguir" && hasToday;
+  return `<section class="stats">
+    <button class="stat ready" id="rd-open" aria-label="Prontidão: ver detalhes">
+      <span class="ring-box">${ringSvg(has ? rd.score : 0, cls)}<b>${has ? rd.score : "—"}</b></span>
+      <span class="stat-txt"><span class="lbl">Prontidão</span><b class="${cls}">${has ? esc(RD_LEVEL[rd.level] || rd.level) : "sem dados"}</b></span></button>
+    <a class="stat" href="#saude"><b>${sleep}</b><span class="lbl">Sono</span></a>
+    <a class="stat" href="#analise"><b>${s}</b><span class="lbl">Semana</span></a>
+  </section>
+  ${act ? `<div class="rec ${cls === "bad" ? "alerta" : "atencao"} small row between gap"><span class="grow">${esc(rd.text)}</span>
+    ${adjusted ? `<span class="pill ok">ajustado</span>` : `<button class="btn sm" id="rd-apply">Ajustar hoje</button>`}</div>` : ""}`;
+}
+function todayListHtml(e) {
+  const main = (e.items || []).filter((i) => (i.phase || "principal") === "principal");
+  if (!main.length) return "";
+  const extra = (e.items || []).filter((i) => (i.phase || "principal") !== "principal");
+  return `<section class="sec"><h2 class="sec-title">Treino de hoje</h2>
+    <ul class="exlist">${main.map((it) => {
+      const en = it.endurance;
+      const name = en ? en.title : (it._name || it._ex?.name || it.exercise_id);
+      const sub = en ? endSummary(en) : `${it.sets ? `${it.sets} × ${it.reps || (it.duration_s ? it.duration_s + "s" : "")}` : it.duration_min ? `${it.duration_min} min` : ""}${it.rir && !it.deload ? ` · sobrar ${String(it.rir).split(" ")[0]}` : ""}`;
+      return `<li data-ex="${esc(it.exercise_id)}">${mediaHtml(it.exercise_id, "s", en ? SPORT_PICTO[en.sport] : null)}
+        <span class="grow" data-ex="${esc(it.exercise_id)}"><b data-ex="${esc(it.exercise_id)}">${esc(name)}</b><span class="small muted" data-ex="${esc(it.exercise_id)}">${esc(sub)}</span></span>
+        ${it.superset ? `<span class="pill small">bi-set ${it.superset}</span>` : en && en.hard ? `<span class="pill warn small">forte</span>` : ""}</li>`;
+    }).join("")}</ul>
+    ${extra.length ? `<details class="small"><summary>Aquecimento e alongamento (${extra.length})</summary>${itemsByPhase(extra)}</details>` : ""}</section>`;
+}
+async function openReadiness(rd, sch) {
+  const body = openModal(rd && rd.score != null ? readinessCard(rd, true, false).replace('class="card readiness', 'class="readiness-modal')
+    : `<h2>Prontidão de hoje</h2><p class="muted">Ainda sem dados do relógio para hoje. Ela usa sono, variabilidade da FC e FC de repouso.</p>
+       ${state.garmin && state.garmin.connected ? `<button class="btn" id="rd-refresh">Buscar no Garmin</button>` : `<a class="btn" href="#perfil">Conectar relógio</a>`}`);
+  body.onclick = async (ev) => {
+    const t = ev.target.closest("button, a"); if (!t) return;
+    if (t.tagName === "A") return closeModal();
+    try {
+      if (t.id === "rd-apply") { t.disabled = true; const r = await api("/api/readiness/apply", { method: "POST", body: {} }); closeModal(); toast(r.changed.length ? `Ajustado: ${r.changed.join(", ")}` : "Nada para ajustar hoje", 5000); return viewHoje(); }
+      if (t.id === "rd-refresh") { t.disabled = true; await api("/api/readiness/refresh", { method: "POST" }); closeModal(); return viewHoje(); }
+    } catch (err) { t.disabled = false; toast(err.message, 5000); }
   };
-  const next = () => { if (k + 1 < items[si].slides.length) k++; else { si++; k = 0; while (items[si] && items[si].jump) si++; } if (!items[si]) return close(); show(); };
-  const prev = () => { if (k > 0) k--; else if (si > 0) { si--; k = 0; } show(); };
-  box.onclick = (ev) => {
-    if (ev.target.closest(".story-x")) return close();
-    if (ev.target.closest(".story-cta")) return close();
-    if (ev.target.closest(".tap.next")) return next();
-    if (ev.target.closest(".tap.prev")) return prev();
-  };
-  let y0 = null;
-  box.ontouchstart = (ev) => { y0 = ev.touches[0].clientY; };
-  box.ontouchend = (ev) => { if (y0 !== null && ev.changedTouches[0].clientY - y0 > 80) close(); y0 = null; };
-  document.onkeydown = (ev) => { if (box.hidden) return; if (ev.key === "Escape") close(); if (ev.key === "ArrowRight") next(); if (ev.key === "ArrowLeft") prev(); };
-  show();
 }
 
 function dayCard(e, today) {
   const [label, cls] = STATUS_INFO[e.status] || [e.status, ""];
   const active = e.status === "planejado" || e.status === "perdido";
-  const ids = mainIds(e);
-  return `<div class="day post ${e.date === today ? "today" : ""} ${active ? "" : "dim"}">
-    <div class="post-head"><span class="ring ${e.date === today && e.status === "planejado" ? "" : "seen"} small"><span class="hole">${avatarHtml(e)}</span></span>
-      <div class="grow"><b>${esc(e.day_name)}</b>${e.race ? ` <span class="pill bad">PROVA</span>` : ""}
-        <div class="small muted">${e.weekday} ${ddmm(e.date)}${e.time ? ` · ~${Math.round(e.time.total)} min` : ""}${e.endurance_phase ? ` · ${esc(e.endurance_phase)}` : ""}</div></div>
-      <span class="pill ${cls}">${label}</span></div>
-    ${active && ids.length && !e.sport ? `<div class="carousel">${(e.items || []).filter((i) => (i.phase || "principal") === "principal").slice(0, 10).map((i) => `<figure data-ex="${esc(i.exercise_id)}">${mediaHtml(i.exercise_id, "car")}<figcaption><b class="nm">${esc(i._name || i._ex?.name || "")}</b><span>${i.sets ? `${i.sets}×${esc(i.reps || (i.duration_s ? i.duration_s + "s" : ""))}` : ""}</span></figcaption></figure>`).join("")}</div>` : ""}
-    ${active && e.sport ? `<div class="post-sport">${pictoHtml(SPORT_PICTO[e.sport] || "run", "xl")}<div>${(e.items || []).filter((i) => i.endurance).map((i) => `<b>${esc(i.endurance.title)}</b><br><span class="small">${esc(endSummary(i.endurance))}</span>`).join("<br>")}</div></div>` : ""}
+  const d = new Date(e.date + "T12:00:00");
+  return `<details class="day ${e.date === today ? "today" : ""} ${active ? "" : "dim"}">
+    <summary class="day-sum"><span class="dnum"><small>${esc(e.weekday)}</small><b>${d.getDate()}</b></span>
+      <span class="grow"><b>${esc(e.day_name)}</b>${e.race ? ` <span class="pill bad">PROVA</span>` : ""}
+        <span class="small muted">${e.time ? `~${Math.round(e.time.total)} min · ` : ""}${esc(dayKind(e))}</span></span>
+      ${e.status === "planejado" ? (e.over_budget_min ? `<span class="pill warn">+${e.over_budget_min} min</span>` : "") : `<span class="pill ${cls}">${label}</span>`}
+      <span class="chev" aria-hidden="true">›</span></summary>
+    <div class="day-body">
     ${active ? timeBar(e.time) : ""}
     ${e.changes && e.changes.length ? `<ul class="small changes">${e.changes.map((c) => `<li>${esc(c)}</li>`).join("")}</ul>` : ""}
     ${e.skip_result ? `<ul class="small changes">${e.skip_result.changes.map((c) => `<li>${esc(c)}</li>`).join("")}</ul>` : ""}
-    ${e.over_budget_min ? `<div class="small over"><span class="pill warn">⏱ +${e.over_budget_min} min</span> passa do seu tempo de sessão — reserve ~${Math.round(e.time.total / 5) * 5} min</div>` : ""}
+    ${e.over_budget_min ? `<div class="small over">Passa ${e.over_budget_min} min do seu tempo de sessão — reserve ~${Math.round(e.time.total / 5) * 5} min</div>` : ""}
     ${e.garmin_outdated ? `<span class="pill warn">Garmin desatualizado</span>` : e.garmin_workout_id ? `<span class="pill ok">no Garmin</span>` : ""}
-    <details><summary class="small">Ver treino</summary>${itemsByPhase(e.items)}</details>
+    ${itemsByPhase(e.items)}
     <div class="row gap wrap" style="margin-top:6px">
       ${e.status === "planejado" ? `<a class="btn sm" href="#treinar/agenda/${e.id}">Treinar</a>
         <button class="btn sm ghost" data-skip="${e.id}">Não vou treinar</button>
@@ -345,12 +330,11 @@ function dayCard(e, today) {
       ${e.status === "perdido" ? `<button class="btn sm" data-skip="${e.id}">Ajustar a semana</button><a class="btn sm ghost" href="#treinar/agenda/${e.id}">Registrar mesmo assim</a>` : ""}
       ${e.status === "pulado" && e.can_undo ? `<button class="btn sm ghost" data-undo="${e.id}">Desfazer ajuste</button>` : ""}
       ${e.readiness_backup && e.status === "planejado" ? `<button class="btn sm ghost" data-rundo="${e.id}">Desfazer ajuste de prontidão</button>` : ""}
-    </div></div>`;
+    </div></div></details>`;
 }
 
 function bindAgenda(sch) {
   bindAthleteCards();
-  if ($("#stories")) fillStories(sch, sch._rd).catch(() => {});
   view.onclick = async (ev) => {
     const t = ev.target.closest("button, [data-ex]"); if (!t) return;
     const d = t.dataset;
@@ -369,6 +353,7 @@ function bindAgenda(sch) {
       }
       if (d.undo) { await api(`/api/schedule/${d.undo}/undo`, { method: "POST" }); toast("Ajuste desfeito"); return viewHoje(sch.week_start); }
       if (d.rundo) { await api(`/api/readiness/undo/${d.rundo}`, { method: "POST" }); toast("Treino original de volta"); return viewHoje(sch.week_start); }
+      if (t.id === "rd-open") return openReadiness(sch._rd, sch);
       if (t.id === "rd-apply") { t.disabled = true; const r = await api("/api/readiness/apply", { method: "POST", body: {} }); toast(r.changed.length ? `Ajustado: ${r.changed.join(", ")}` : "Nada para ajustar hoje", 5000); return viewHoje(); }
       if (t.id === "rd-refresh") { t.disabled = true; await api("/api/readiness/refresh", { method: "POST" }); return viewHoje(); }
       if (d.move) {
@@ -656,7 +641,7 @@ async function showAuth(mode, code) {
   const isReg = mode === "convite" && inv && inv.valid;
   view.innerHTML = `<div class="card auth-card"><h2>${isReg ? "Criar sua conta" : "Entrar"}</h2>
     ${mode === "convite" && !isReg ? `<p class="pill bad">Convite inválido ou já usado. Peça um novo a quem te convidou.</p>` : ""}
-    ${isReg ? `<p class="small muted">Você foi convidado${inv.note ? ` (${esc(inv.note)})` : ""} para o GymGarmin. Seus treinos, planilhas e Garmin ficam só na sua conta.</p>` : ""}
+    ${isReg ? `<p class="small muted">Você foi convidado${inv.note ? ` (${esc(inv.note)})` : ""} para o Hybrid Lab. Seus treinos, planilhas e Garmin ficam só na sua conta.</p>` : ""}
     <form id="auth-form" class="stack">
       ${isReg ? `<div class="field"><label>Seu nome</label><input name="name" autocomplete="name" required></div>` : ""}
       <div class="field"><label>E-mail</label><input name="email" type="email" autocomplete="email" required></div>
@@ -728,7 +713,7 @@ async function devicesCard() {
     <p class="small ${last ? "" : "muted"}">${last ? `Último envio: <b>${fmtDate(last.at)}</b> (${last.source === "android" ? "Android" : "iPhone"}) · ${last.days.length} dia(s) de saúde · ${last.workouts} treino(s) novo(s)${last.skipped ? ` · ${last.skipped} ignorado(s) (tipo não usado, ex.: ioga)` : ""}` : "Nenhum envio recebido ainda."}</p>
     <details><summary><b>iPhone (Apple Saúde) — app Atalhos</b></summary><div class="small">
       <ol>
-        <li>Abra o app <b>Atalhos</b> → <b>+</b> (novo atalho) → nome "GymGarmin".</li>
+        <li>Abra o app <b>Atalhos</b> → <b>+</b> (novo atalho) → nome "Hybrid Lab".</li>
         <li>Adicione <b>Encontrar Amostras de Saúde</b>: Tipo <b>Análise do Sono</b>, Data de Início <b>nas últimas 24 horas</b>. Depois <b>Obter Detalhes das Amostras de Saúde → Duração</b> e <b>Calcular Estatísticas → Soma</b> (resultado em horas).</li>
         <li>Repita para <b>Frequência Cardíaca em Repouso</b> (estatística <b>Média</b>), <b>Variabilidade da Frequência Cardíaca</b> (Média) e <b>Passos</b> (Soma, hoje).</li>
         <li>Adicione <b>Dicionário</b> com as chaves: <code>source</code> = apple · <code>date</code> = Data Atual formatada como <b>ISO 8601</b> (só a data) · <code>sleep_h</code> · <code>rhr</code> · <code>hrv</code> · <code>hrv_kind</code> = sdnn · <code>steps</code> (cada uma com o resultado do passo correspondente).</li>
@@ -739,7 +724,7 @@ async function devicesCard() {
       <p class="muted">Rode uma vez à mão e confira aqui em "Último envio". Os nomes dos menus mudam um pouco entre versões do iOS. Xiaomi (Mi Fitness) e Amazfit (Zepp) no iPhone: ligue a opção <b>Apple Saúde</b> no app do relógio, e o atalho leva os dados junto.</p></div></details>
     <details><summary><b>Android (Health Connect)</b></summary><div class="small">
       <p>Xiaomi (Mi Fitness), Samsung Health, Google Fit, Amazfit (Zepp), Fitbit…: no app do relógio, ligue o compartilhamento com o <b>Health Connect</b>.
-        Depois instale o app <b>GymGarmin Sync</b> (Android), cole o código pessoal e toque em Sincronizar. Ele envia sozinho a cada poucas horas.</p>
+        Depois instale o app <b>Hybrid Lab Sync</b> (Android), cole o código pessoal e toque em Sincronizar. Ele envia sozinho a cada poucas horas.</p>
       <p><a class="btn sm ghost" href="/static/gymgarmin-sync.apk" download>Baixar app Android (APK)</a></p>
       <p class="muted">Como o app não está na Play Store, o Android pede para permitir "instalar apps desta fonte".</p></div></details>
   </div>`;

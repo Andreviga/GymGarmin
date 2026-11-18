@@ -1,11 +1,11 @@
 {
-  "name": "GymGarmin",
-  "short_name": "GymGarmin",
-  "description": "Treinos de academia com análise muscular e envio para o Garmin",
+  "name": "Hybrid Lab",
+  "short_name": "Hybrid Lab",
+  "description": "Musculação e corrida no mesmo plano, com prontidão do relógio. Compatível com Garmin.",
   "start_url": "/#hoje",
   "display": "standalone",
-  "background_color": "#0e1114",
-  "theme_color": "#0f766e",
+  "background_color": "#f4f5f7",
+  "theme_color": "#2448d6",
   "lang": "pt-BR",
   "icons": [{ "src": "/static/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
 }

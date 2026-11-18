@@ -338,7 +338,7 @@ def endurance_connect_json(day: dict, plan_name: str = "") -> dict:
     sport = segments[0]["sportType"] if len(segments) == 1 else SPORTS["multi_sport"]
     out = {
         "workoutName": name[:80],
-        "description": (" · ".join(x for x in (items[0]["endurance"].get("note"), "Gerado pelo GymGarmin") if x))[:500],
+        "description": (" · ".join(x for x in (items[0]["endurance"].get("note"), "Gerado pelo Hybrid Lab") if x))[:500],
         "sportType": sport,
         "estimatedDurationInSecs": int(sum(i["endurance"]["dur_s"] for i in items)),
         "workoutSegments": segments,
@@ -394,7 +394,7 @@ def to_connect_json(day: dict, plan_name: str = "", overrides: dict | None = Non
     sport = SPORTS[sport_key]
     return {
         "workoutName": name[:80],
-        "description": (day.get("notes") or "Gerado pelo GymGarmin")[:500],
+        "description": (day.get("notes") or "Gerado pelo Hybrid Lab")[:500],
         "sportType": sport,
         "estimatedDurationInSecs": estimate_duration_s(items),
         "workoutSegments": [{"segmentOrder": 1, "sportType": sport, "workoutSteps": steps}],

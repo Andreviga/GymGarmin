@@ -110,9 +110,9 @@ def test_endurance_api_flow(client, monkeypatch):
     sch = client.get("/api/schedule").json()
     assert "endurance" in sch["goals"]
     # prontidão: grava dado do relógio e aplica no dia
-    from gymgarmin import db
+    from gymgarmin import clock, db
 
-    db.kv_set(f"readiness:{date.today().isoformat()}", '{"garmin_readiness": 30}')
+    db.kv_set(f"readiness:{clock.today().isoformat()}", '{"garmin_readiness": 30}')
     rv = client.get("/api/readiness").json()
     assert rv["action"] == "trocar"
     res = client.post("/api/readiness/apply", json={}).json()

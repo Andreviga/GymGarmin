@@ -1,4 +1,4 @@
-# GymGarmin
+# Hybrid Lab (antigo GymGarmin)
 
 App de academia (pessoal primeiro, multiusuário depois) que junta:
 

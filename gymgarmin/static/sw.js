@@ -1,5 +1,5 @@
 // Service worker simples: rede primeiro, cache como reserva para o "shell" do app.
-const CACHE = "gymgarmin-v2";
+const CACHE = "hybridlab-v3";
 const SHELL = ["/", "/static/style.css", "/static/app.js", "/static/icon.svg", "/manifest.webmanifest"];
 self.addEventListener("install", (e) => e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting())));
 self.addEventListener("activate", (e) => e.waitUntil(self.clients.claim()));
