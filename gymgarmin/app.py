@@ -716,6 +716,12 @@ def machine_detail(machine_id: str):
     return out
 
 
+@app.get("/api/public/version")
+def app_version():
+    """Versão dos arquivos do app no ar: o app aberto compara com a dele e se atualiza sozinho."""
+    return JSONResponse({"v": ASSET_V}, headers={"Cache-Control": "no-store"})
+
+
 _MEDIA_CHECK: dict = {}
 
 

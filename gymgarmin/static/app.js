@@ -2196,3 +2196,26 @@ function startApp() {
   updateGarminPill().then((g) => { if (g && g.connected) autoSync(); });
 }
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
+// App que estava aberto em segundo plano: ao voltar depois de alguns minutos, confere se há versão nova
+// (e recarrega), registra a abertura, atualiza a tela e sincroniza o relógio — como se tivesse aberto de novo.
+const MY_VERSION = ((document.querySelector('script[src*="app.js"]') || {}).src || "").split("v=")[1] || "";
+let hiddenAt = 0;
+document.addEventListener("visibilitychange", async () => {
+  if (document.hidden) { hiddenAt = Date.now(); return; }
+  if (!hiddenAt || Date.now() - hiddenAt < 3 * 60 * 1000) return;
+  hiddenAt = 0;
+  try {
+    const { v } = await (await fetch("/api/public/version", { cache: "no-store" })).json();
+    if (v && MY_VERSION && v !== MY_VERSION && !store("gg_session")) {
+      toast("Nova versão do app: atualizando…");
+      if (navigator.serviceWorker && navigator.serviceWorker.getRegistration) { const r = await navigator.serviceWorker.getRegistration(); if (r) r.update().catch(() => {}); }
+      setTimeout(() => location.reload(), 600);
+      return;
+    }
+  } catch (_) { /* sem rede: segue com o que tem */ }
+  try { state.me = await api("/api/auth/me"); } catch (_) { /* */ }
+  if (state.me && state.me.logged_in === false && !state.me.setup_needed) return showAuth("login");
+  const h = location.hash.split("/")[0];
+  if (!["#treinar", "#plano"].includes(h)) route();
+  updateGarminPill().then((g) => { if (g && g.connected) autoSync(); });
+});
