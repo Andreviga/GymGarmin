@@ -16,7 +16,7 @@ from fastapi.staticfiles import StaticFiles
 
 from datetime import date, timedelta
 
-from . import auth, coach, gallery, ingest
+from . import auth, coach, gallery, ingest, training_rules
 from . import (analysis, calibration, catalog, clock, db, dedupe, health, endurance, garmin_export, garmin_sync, generator, history, limitations,
                load, plans_io, progression, readiness, schedule, sports, templates)
 from .muscles import EQUIPMENT_PT, HR_ZONES, MUSCLES, hr_max, zone_bpm
@@ -822,8 +822,10 @@ def _plan_or_404(plan_id: int) -> dict:
 def get_plan(plan_id: int):
     """Planilha com os dados de cada exercício (nome, tipo, limitação) — evita uma requisição por exercício no celular."""
     p = _plan_or_404(plan_id)
-    lims, ovr, cache = _profile().get("limitations") or [], db.garmin_overrides(), {}
+    prof = _profile()
+    lims, ovr, cache = prof.get("limitations") or [], db.garmin_overrides(), {}
     for d in p.get("days", []):
+        d["items"] = training_rules.apply(d.get("items", []), prof, warmups=False)  # mostra o descanso que vale hoje
         for it in d.get("items", []):
             eid = it.get("exercise_id")
             if eid not in cache:
@@ -877,7 +879,7 @@ def day_fit(plan_id: int, idx: int):
     plan = _plan_or_404(plan_id)
     day = _day(plan, idx)
     try:
-        data = garmin_export.to_fit(day, plan["name"], db.garmin_overrides())
+        data = garmin_export.to_fit(day, plan["name"], db.garmin_overrides(), prefs=_profile())
     except ValueError as e:
         raise HTTPException(400, str(e)) from e
     fname = garmin_export.fit_filename(plan["name"], day.get("name", str(idx)))
@@ -889,7 +891,7 @@ def day_fit(plan_id: int, idx: int):
 def day_connect_json(plan_id: int, idx: int, download: bool = False):
     plan = _plan_or_404(plan_id)
     try:
-        payload = garmin_export.to_connect_json(_day(plan, idx), plan["name"], db.garmin_overrides())
+        payload = garmin_export.to_connect_json(_day(plan, idx), plan["name"], db.garmin_overrides(), prefs=_profile())
     except ValueError as e:
         raise HTTPException(400, str(e)) from e
     headers = {}
@@ -903,7 +905,7 @@ def day_connect_json(plan_id: int, idx: int, download: bool = False):
 def day_push(plan_id: int, idx: int, body: dict = Body(default={})):
     plan = _plan_or_404(plan_id)
     day = _day(plan, idx)
-    payload = garmin_export.to_connect_json(day, plan["name"], db.garmin_overrides())
+    payload = garmin_export.to_connect_json(day, plan["name"], db.garmin_overrides(), prefs=_profile())
     try:
         res = garmin_sync.push_workout(payload, body.get("date"))
     except garmin_sync.GarminUnavailable as e:
@@ -979,8 +981,9 @@ def del_session(session_id: int):
 
 def _prefill_items(day_items: list[dict], deload: bool = False) -> list[dict]:
     items = []
-    lims = _profile().get("limitations") or []
-    for it in day_items:
+    prof = _profile()
+    lims = prof.get("limitations") or []
+    for it in training_rules.apply(day_items, prof):
         ex = catalog.get(it.get("exercise_id"))
         if not ex:
             continue
@@ -1005,6 +1008,10 @@ def _prefill_items(day_items: list[dict], deload: bool = False) -> list[dict]:
             entry["sets"] = [{"reps": reps if not it.get("duration_s") else None,
                               "duration_s": it.get("duration_s"), "load_kg": sug.get("load_kg"), "rpe": None, "done": False}
                              for _ in range(int(it.get("sets") or (1 if entry["phase"] != "principal" else 3)))]
+            # séries de aquecimento do próprio exercício (não contam como séries válidas)
+            entry["warmup"] = [{"pct": w["pct"], "reps": w["reps"], "done": False,
+                                "load_kg": training_rules.warm_load(sug.get("load_kg"), w["pct"], ex.get("equipment"))}
+                               for w in it.get("warmup_sets") or []]
         items.append(entry)
     return items
 
@@ -1460,8 +1467,10 @@ def generator_apply(body: dict = Body(default={})):
 
 # --------------------------------------------------------------- agenda ----
 
-def _entry_view(e: dict, budget: float) -> dict:
+def _entry_view(e: dict, budget: float, fmt: str | None = None) -> dict:
     e = dict(e)
+    if fmt and e.get("status") == "planejado" and _garmin_outdated(e, fmt):
+        e["garmin_outdated"] = True
     e["can_undo"] = bool(e.pop("undo", None))
     e["time"] = generator.time_breakdown(e.get("items", []), budget)
     over = round(e["time"]["total"] - budget)
@@ -1487,7 +1496,7 @@ def get_schedule(date_: str | None = Query(None, alias="date")):
         "week_start": ws.isoformat(), "today": clock.today().isoformat(),
         "plan": {"id": plan["id"], "name": plan["name"], "generator": plan.get("generator")} if plan else None,
         "cycle": cycle, "budget": budget,
-        "entries": (views := [_entry_view(e, budget) for e in entries]),
+        "entries": (views := [_entry_view(e, budget, _garmin_fmt(prof)) for e in entries]),
         "goals": schedule.week_goals(entries, prof, ws),
         "time_warnings": _time_warnings(views, budget),
     }
@@ -1571,10 +1580,23 @@ def _entry_day(e: dict) -> dict:
 @app.get("/api/schedule/{entry_id}/fit")
 def schedule_fit(entry_id: int):
     e = _entry_or_404(entry_id)
-    data = garmin_export.to_fit(_entry_day(e), "", db.garmin_overrides())
+    data = garmin_export.to_fit(_entry_day(e), "", db.garmin_overrides(), prefs=_profile())
     fname = garmin_export.fit_filename(e["date"], e.get("day_name") or "treino")
     return Response(data, media_type="application/octet-stream",
                     headers={"Content-Disposition": f'attachment; filename="{fname}"'})
+
+
+GARMIN_FORMAT = 2  # 2: aquecimento do exercício, descanso pela evidência e passos por tempo manuais
+
+
+def _garmin_fmt(prof: dict | None = None) -> str:
+    """Muda quando o formato do envio ou as preferências do relógio mudam: o treino já enviado fica desatualizado."""
+    p = prof if prof is not None else _profile()
+    return f"{GARMIN_FORMAT}:{p.get('watch_timed') or 'manual'}:{p.get('rest_pref') or 'padrao'}:{p.get('warmup_sets') or 'auto'}"
+
+
+def _garmin_outdated(e: dict, fmt: str) -> bool:
+    return bool(e.get("garmin_outdated") or (e.get("garmin_workout_id") and e.get("garmin_fmt") != fmt))
 
 
 def _push_entry(e: dict) -> dict:
@@ -1583,10 +1605,11 @@ def _push_entry(e: dict) -> dict:
             garmin_sync.delete_workout(int(e["garmin_workout_id"]))
         except Exception:  # noqa: BLE001 - versão antiga pode já ter sido apagada
             pass
-    payload = garmin_export.to_connect_json(_entry_day(e), "", db.garmin_overrides())
+    payload = garmin_export.to_connect_json(_entry_day(e), "", db.garmin_overrides(), prefs=_profile())
     res = garmin_sync.push_workout(payload, e["date"])
     e["garmin_workout_id"] = res.get("workout_id")
     e["garmin_outdated"] = False
+    e["garmin_fmt"] = _garmin_fmt()
     db.save_entry(e)
     db.log_push(e.get("plan_id"), e.get("day_name"), res.get("workout_id"), e["date"])
     return res
@@ -1612,10 +1635,11 @@ def schedule_push(entry_id: int):
 @app.post("/api/schedule/push-week")
 def schedule_push_week(body: dict = Body(default={})):
     only_outdated = bool(body.get("only_outdated"))
+    fmt = _garmin_fmt()
     today = clock.today()
     ws = schedule.week_start(today)
     entries = [e for e in db.list_schedule(today.isoformat(), (ws + timedelta(days=6)).isoformat())
-               if e["status"] == "planejado" and (not only_outdated or e.get("garmin_outdated") or not e.get("garmin_workout_id"))]
+               if e["status"] == "planejado" and (not only_outdated or _garmin_outdated(e, fmt) or not e.get("garmin_workout_id"))]
     return _garmin_call(lambda: [{"date": e["date"], **_push_entry(e)} for e in entries])
 
 

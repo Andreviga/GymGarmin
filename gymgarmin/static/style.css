@@ -671,3 +671,18 @@ details.adv { margin-top: 12px; }
 .fx-extra { margin-top: 12px; }
 .fx-extra:empty, .fx-extra:not(:has(div)) { display: none; }
 .fx-name[data-ex] { padding: 8px 0; min-height: 40px; }
+
+/* aquecimento do exercício, preparo e fim de tempo sem troca automática */
+.fx-dot.warm { border-style: dashed; border-color: var(--warn); color: var(--warn); font-size: 13px; }
+.fx-dot.warm.done { background: var(--warn); border-style: solid; color: #fff; }
+.fx-dot.warm.skip { opacity: .35; text-decoration: line-through; }
+.fx-dot.warm.cur { box-shadow: 0 0 0 3px var(--warn-bg); border-color: var(--warn); color: var(--warn); }
+.fx-sep { width: 2px; height: 26px; background: var(--line); border-radius: 1px; align-self: center; margin: 0 2px; }
+.fx-setlbl.warm { color: var(--warn); }
+.fx-go.warm { background: var(--warn); border-color: var(--warn); color: #fff; }
+.fx-rest.over { background: var(--ok); color: var(--ok-ink); }
+.fx-rest.over .fx-skip { background: var(--ok-ink); color: var(--ok); border-color: var(--ok-ink); font-size: 18px; min-height: 60px; }
+.fx-rest.over .fx-next { background: color-mix(in srgb, var(--ok-ink) 14%, transparent); }
+.fx-work.prep .fx-clock { color: var(--warn); }
+.fx-work .eyebrow { margin-top: 4px; }
+.fx-timeup { margin-top: 12px; padding: 10px 12px; border-radius: 12px; background: var(--ok-bg); color: var(--ok); font-weight: 750; text-align: center; }

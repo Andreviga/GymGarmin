@@ -30,6 +30,7 @@ import math
 from collections import defaultdict
 
 from . import catalog, clock, endurance
+from . import training_rules
 from .limitations import check_exercise, max_zone
 from .muscles import HR_ZONES, MUSCLES, PRIMARY_WEIGHT, SECONDARY_WEIGHT
 
@@ -40,7 +41,7 @@ TIERS = {
     "iniciante": {
         "label": "Iniciante", "months": (0, 6), "max_strength_days": 3,
         "sets": {"main": 3, "sec": 2, "acc": 2}, "reps": {"main": "10-12", "sec": "10-12", "acc": "12-15"},
-        "rest": {"main": 120, "sec": 90, "acc": 60}, "rpe": 7, "cycle_weeks": 6, "ramp_sets": 0,
+        "rest": training_rules.REST["iniciante"], "rpe": 7, "cycle_weeks": 6, "ramp_sets": 0,
         "volume": lambda m: m["mev"] + (m["mav"][0] - m["mev"]) * 0.4, "timed_s": 30,
         "equipment_pref": ["machine", "cable", "dumbbell", "body only", "kettlebells", "e-z curl bar", "barbell"],
         "level": "iniciante",
@@ -48,21 +49,21 @@ TIERS = {
     "intermediario": {
         "label": "Intermediário", "months": (6, 24), "max_strength_days": 4,
         "sets": {"main": 4, "sec": 3, "acc": 3}, "reps": {"main": "6-10", "sec": "8-12", "acc": "10-15"},
-        "rest": {"main": 150, "sec": 120, "acc": 75}, "rpe": 8, "cycle_weeks": 5, "ramp_sets": 1,
+        "rest": training_rules.REST["intermediario"], "rpe": 8, "cycle_weeks": 5, "ramp_sets": 1,
         "volume": lambda m: m["mav"][0], "timed_s": 40,
         "equipment_pref": None, "level": "intermediario",
     },
     "avancado": {
         "label": "Avançado", "months": (24, 60), "max_strength_days": 5,
         "sets": {"main": 4, "sec": 3, "acc": 3}, "reps": {"main": "5-8", "sec": "8-12", "acc": "10-15"},
-        "rest": {"main": 180, "sec": 120, "acc": 75}, "rpe": 8.5, "cycle_weeks": 4, "ramp_sets": 1,
+        "rest": training_rules.REST["avancado"], "rpe": 8.5, "cycle_weeks": 4, "ramp_sets": 1,
         "volume": lambda m: (m["mav"][0] + m["mav"][1]) / 2, "timed_s": 45,
         "equipment_pref": None, "level": "avancado",
     },
     "elite": {
         "label": "Muito avançado", "months": (60, 10_000), "max_strength_days": 6,
         "sets": {"main": 5, "sec": 4, "acc": 3}, "reps": {"main": "4-6", "sec": "6-10", "acc": "10-15"},
-        "rest": {"main": 210, "sec": 150, "acc": 75}, "rpe": 9, "cycle_weeks": 4, "ramp_sets": 2,
+        "rest": training_rules.REST["elite"], "rpe": 9, "cycle_weeks": 4, "ramp_sets": 2,
         "volume": lambda m: m["mav"][1] * 0.9, "timed_s": 60,
         "equipment_pref": None, "level": "avancado",
     },
@@ -695,7 +696,7 @@ def generate(profile: dict, seed: int = 0, recent: dict | None = None, today=Non
     picker = _Picker(tier, lims, equipment, seed)
     picker.strength_focus = goal_key == "forca" and tier_key != "iniciante"
     reps = goal["reps"] or tier["reps"]
-    rest_mult = goal["rest"]
+    rest_mult = goal["rest"] * training_rules.REST_PREF.get(p.get("rest_pref") or "padrao", 1.0)
     if tier_key == "iniciante" and goal["reps"]:
         reps = {k: (v if _reps_bounds(v)[0] >= 8 else "8-12") for k, v in reps.items()}  # iniciante não vai a 3–5 reps
 
@@ -718,7 +719,7 @@ def generate(profile: dict, seed: int = 0, recent: dict | None = None, today=Non
             eid, st = ch
             used.add(eid)
             ex = catalog.get(eid)
-            item = {"exercise_id": eid, "sets": tier["sets"][role], "rest_s": int(round(tier["rest"][role] * rest_mult / 15) * 15),
+            item = {"exercise_id": eid, "sets": tier["sets"][role], "rest_s": training_rules.rest_for(role, tier_key, goal["rest"], p.get("rest_pref")),
                     "role": role, "pattern": pattern, "phase": "principal", "rpe_target": tier["rpe"],
                     "rir": RIR[tier_key][role]}
             if ex.get("timed"):
@@ -733,10 +734,8 @@ def generate(profile: dict, seed: int = 0, recent: dict | None = None, today=Non
             if first["role"] == "main" and not first.get("duration_s"):
                 first["approach_sets"] = True
                 heavy = _reps_bounds(first.get("reps"))[0] <= 6
-                ap = ("aproximação: barra×8, ~50%×5, ~70%×3, ~85%×1–2" if heavy else "aproximação: ~50%×8 e ~75%×4")
-                first["notes"] = ((first.get("notes") or "") + f" · {ap} antes das séries válidas").strip(" ·")
                 if heavy and tier_key in ("avancado", "elite"):
-                    first["notes"] += " · top set: 1 série pesada (RPE 8) e as demais ~10% mais leves"
+                    first["notes"] = ((first.get("notes") or "") + " · top set: 1 série pesada (RPE 8) e as demais ~10% mais leves").strip(" ·")
         accs = [i for i in main_items if i["role"] == "acc" and not catalog.get(i["exercise_id"]).get("timed")]
         if accs and tier_key != "iniciante" and goal_key in ("hipertrofia", "emagrecimento", "hibrido"):
             accs[-1]["notes"] = ((accs[-1].get("notes") or "") + " · última série: drop set (tire ~25% e continue até perto da falha)").strip(" ·")
@@ -900,7 +899,7 @@ def generate(profile: dict, seed: int = 0, recent: dict | None = None, today=Non
     # ---- cardio: finalizadores até a meta
     _cardio_fill(days, cardio_target, budget, lims, cardio_prefs, mz, goal)
 
-    acc_rest = int(round(tier["rest"]["acc"] * rest_mult / 15) * 15)
+    acc_rest = training_rules.rest_for("acc", tier_key, goal["rest"], p.get("rest_pref"))
     # ---- pós-treino (alongamento) com o que sobrar de tempo (mín. 3 min)
     for d in days:
         if d["kind"] != "forca":
@@ -1103,7 +1102,7 @@ def _add_complements(days, targets, budget, picker, tier, reps, rest_mult, limit
                 ex = catalog.get(ch[0])
                 item = {"exercise_id": ch[0], "sets": max(2, tier["sets"]["acc"] - 1), "role": "acc", "pattern": pattern,
                         "phase": "principal", "rpe_target": tier["rpe"], "complement": True,
-                        "rest_s": int(round(tier["rest"]["acc"] * rest_mult / 15) * 15)}
+                        "rest_s": int(max(30, round(tier["rest"]["acc"] * rest_mult / 15) * 15))}
                 if ex.get("timed"):
                     item["duration_s"] = tier["timed_s"]
                 else:

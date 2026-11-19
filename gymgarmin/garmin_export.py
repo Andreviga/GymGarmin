@@ -17,6 +17,7 @@ Um treino só de cardio vira um treino de corrida/ciclismo/cardio com zonas.
 
 from __future__ import annotations
 
+import contextvars
 import re
 from datetime import datetime, timezone
 
@@ -44,10 +45,23 @@ def parse_reps(reps) -> tuple[int, str | None]:
     return 10, s
 
 
+_PREFS: contextvars.ContextVar = contextvars.ContextVar("hax_export_prefs", default=None)
+
+
+def _manual_timed() -> bool:
+    """Passos por tempo só avançam ao apertar a volta (padrão): dá tempo de trocar de aparelho/posição."""
+    p = _PREFS.get()
+    return p is not None and (p.get("watch_timed") or "manual") != "auto"
+
+
 def normalize_day(day: dict) -> list[dict]:
     """Enriquece os itens do dia com dados do catálogo; ignora exercícios desconhecidos."""
     out = []
-    for it in day.get("items", []):
+    src = day.get("items", [])
+    if _PREFS.get() is not None:
+        from . import training_rules
+        src = training_rules.apply(src, _PREFS.get())
+    for it in src:
         ex = catalog.get(it.get("exercise_id"))
         if not ex:
             continue
@@ -201,6 +215,30 @@ def _cardio_steps_connect(order: _Order, it: dict, ex: dict, in_strength: bool, 
     return steps
 
 
+def _timed_step_connect(order: _Order, step_type: str, secs: int, desc: str | None, **kw) -> dict:
+    if _manual_timed():
+        return _exec_step(order, step_type, COND_LAP, None, description=(f"{secs} s · aperte a volta ao terminar"
+                                                                          + (f" · {desc}" if desc else ""))[:120], **kw)
+    return _exec_step(order, step_type, COND_TIME, secs, description=desc, **kw)
+
+
+def _warmup_steps_connect(order: _Order, it: dict, ex: dict, overrides: dict | None) -> list[dict]:
+    """Séries de aquecimento do próprio exercício antes das válidas (rampa de carga)."""
+    g = _garmin_override(ex, overrides)
+    out = []
+    ws = it.get("warmup_sets") or []
+    for k, w in enumerate(ws):
+        weight = {}
+        load = (w.get("load_kg") or (float(it["load_kg"]) * w["pct"] / 100 if it.get("load_kg") else None))
+        if load:
+            weight = {"weightValue": round(float(load) * 2) / 2 * 1000.0, "weightUnit": WEIGHT_UNIT_KG}
+        out.append(_exec_step(order, "warmup", COND_REPS, int(w["reps"]), category=g["category"], exerciseName=g["exercise"],
+                              description=f"Aquecimento {k + 1}/{len(ws)}: ~{w['pct']}% da carga", **weight))
+        from .training_rules import WARM_LAST_REST_S, WARM_REST_S
+        out.append(_exec_step(order, "rest", COND_TIME, WARM_LAST_REST_S if k == len(ws) - 1 else WARM_REST_S))
+    return out
+
+
 def _strength_work_connect(order: _Order, it: dict, ex: dict, overrides: dict | None) -> dict:
     g = _garmin_override(ex, overrides)
     reps, reps_note = parse_reps(it.get("reps"))
@@ -211,7 +249,8 @@ def _strength_work_connect(order: _Order, it: dict, ex: dict, overrides: dict | 
     timed = bool(it.get("duration_s")) or (ex.get("timed") and not it.get("reps"))
     kw = dict(category=g["category"], exerciseName=g["exercise"], description=desc, **weight)
     if timed:
-        return _exec_step(order, "interval", COND_TIME, int(it.get("duration_s") or 30), **kw)
+        kw.pop("description")
+        return _timed_step_connect(order, "interval", int(it.get("duration_s") or 30), desc, **kw)
     if reps > 0:
         return _exec_step(order, "interval", COND_REPS, reps, **kw)
     return _exec_step(order, "interval", COND_LAP, None, **kw)
@@ -242,8 +281,8 @@ def _strength_block_connect(order: _Order, it: dict, ex: dict, overrides: dict |
     desc = _notes(it, reps_note)
     timed = bool(it.get("duration_s")) or (ex.get("timed") and not it.get("reps"))
     if timed:
-        work = _exec_step(order, "interval", COND_TIME, int(it.get("duration_s") or 30),
-                          category=g["category"], exerciseName=g["exercise"], description=desc, **weight)
+        work = _timed_step_connect(order, "interval", int(it.get("duration_s") or 30), desc,
+                                   category=g["category"], exerciseName=g["exercise"], **weight)
     elif reps > 0:
         work = _exec_step(order, "interval", COND_REPS, reps,
                           category=g["category"], exerciseName=g["exercise"], description=desc, **weight)
@@ -265,8 +304,7 @@ def _phase_step_connect(order: _Order, it: dict, ex: dict, overrides: dict | Non
     g = _garmin_override(ex, overrides)
     secs = int(it.get("duration_s") or 30) * max(1, int(it.get("sets") or 1))
     extra = {"category": g["category"], "exerciseName": g["exercise"]} if with_exercise else {}
-    return _exec_step(order, _phase_step_type(it, "warmup"), COND_TIME, secs,
-                      description=_notes(it, ex["name"]), **extra)
+    return _timed_step_connect(order, _phase_step_type(it, "warmup"), secs, _notes(it, ex["name"]), **extra)
 
 
 # ---------------------------------------------------------------- resistência
@@ -353,7 +391,8 @@ def endurance_connect_json(day: dict, plan_name: str = "") -> dict:
     return out
 
 
-def to_connect_json(day: dict, plan_name: str = "", overrides: dict | None = None) -> dict:
+def to_connect_json(day: dict, plan_name: str = "", overrides: dict | None = None, prefs: dict | None = None) -> dict:
+    _PREFS.set(prefs)
     if endurance_items(day):
         return endurance_connect_json(day, plan_name)
     items = normalize_day(day)
@@ -390,6 +429,7 @@ def to_connect_json(day: dict, plan_name: str = "", overrides: dict | None = Non
             elif _phase(it) in ("preparo", "pos"):
                 steps.append(_phase_step_connect(order, it, ex, overrides, True))
             else:
+                steps += _warmup_steps_connect(order, it, ex, overrides)
                 steps.append(_strength_block_connect(order, it, ex, overrides))
     sport = SPORTS[sport_key]
     return {
@@ -521,9 +561,11 @@ def endurance_fit(day: dict, plan_name: str = "", now: datetime | None = None) -
 
 
 def to_fit(day: dict, plan_name: str = "", overrides: dict | None = None,
-           now: datetime | None = None) -> bytes:
+           now: datetime | None = None, prefs: dict | None = None) -> bytes:
     """Gera os bytes de um arquivo FIT do tipo 'workout'."""
     from garmin_fit_sdk import Encoder, Profile
+
+    _PREFS.set(prefs)
 
     if endurance_items(day):
         return endurance_fit(day, plan_name, now)
@@ -642,16 +684,33 @@ def to_fit(day: dict, plan_name: str = "", overrides: dict | None = None,
 
         if _phase(it) in ("preparo", "pos"):
             secs = int(it.get("duration_s") or 30) * max(1, int(it.get("sets") or 1))
-            add({"wkt_step_name": label, "duration_type": "time", "duration_value": secs * 1000,
+            dur = ({"duration_type": "open", "notes": f"{secs} s · aperte a volta ao terminar"} if _manual_timed()
+                   else {"duration_type": "time", "duration_value": secs * 1000})
+            add({"wkt_step_name": label, **dur,
                  "intensity": "warmup" if _phase(it) == "preparo" else "cooldown", "target_type": "open",
                  **({} if cardio_only else ex_fields)})
             continue
+        if it.get("warmup_sets"):
+            from .training_rules import WARM_LAST_REST_S, WARM_REST_S
+            ws = it["warmup_sets"]
+            for k, w in enumerate(ws):
+                wst = {"wkt_step_name": label, "intensity": "warmup", "target_type": "open", **ex_fields,
+                       "duration_type": "reps", "duration_value": int(w["reps"]), "notes": f"Aquecimento {k + 1}/{len(ws)}: ~{w['pct']}% da carga"}
+                load = w.get("load_kg") or (float(it["load_kg"]) * w["pct"] / 100 if it.get("load_kg") else None)
+                if load:
+                    wst.update(exercise_weight=round(float(load) * 2) / 2, weight_display_unit="kilogram")
+                add(wst)
+                add({"wkt_step_name": "Descanso", "duration_type": "time", "intensity": "rest", "target_type": "open",
+                     "duration_value": (WARM_LAST_REST_S if k == len(ws) - 1 else WARM_REST_S) * 1000})
         sets = max(1, int(it.get("sets") or 3))
         reps, reps_note = parse_reps(it.get("reps"))
         notes = _notes(it, reps_note)
         timed = bool(it.get("duration_s")) or (ex.get("timed") and not it.get("reps"))
         step = {"wkt_step_name": label, "intensity": "active", "target_type": "open", **ex_fields}
-        if timed:
+        if timed and _manual_timed():
+            step.update(duration_type="open")
+            notes = f"{int(it.get('duration_s') or 30)} s · aperte a volta ao terminar" + (f" · {notes}" if notes else "")
+        elif timed:
             step.update(duration_type="time", duration_value=int(it.get("duration_s") or 30) * 1000)
         elif reps > 0:
             step.update(duration_type="reps", duration_value=reps)

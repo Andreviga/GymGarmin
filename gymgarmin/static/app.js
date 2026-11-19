@@ -986,6 +986,7 @@ function readPlanForm() {
     $$("[data-f]").forEach((el) => {
       const it = day.items[+el.dataset.i]; const k = el.dataset.f; let v = el.value;
       if (["sets", "rest_s", "duration_s", "duration_min", "zone"].includes(k)) v = v === "" ? null : +v;
+      if (k === "rest_s" && v !== (it.rest_s ?? null)) it.rest_custom = true;  // escolhido à mão: o app não recalcula
       else if (k === "load_kg") v = v === "" ? null : parseFloat(v);
       else if (k === "reps") v = /^\d+$/.test(v) ? +v : (v || null);
       if (v === null || v === "") delete it[k]; else it[k] = v;
@@ -1216,6 +1217,7 @@ function sessionItemHtml(it, i) {
   const head = `<div class="row gap">${mediaHtml(it.exercise_id, "m")}
     <div class="grow"><b data-ex="${esc(it.exercise_id)}" style="cursor:pointer">${esc(it.name)}</b> ${limBadge(it.limitation)}
     <div class="small muted">${it.kind === "cardio" ? `${plan.duration_min || ""} min · Z${plan.zone || ""}` : `${plan.sets || ""}×${plan.reps || (plan.duration_s ? plan.duration_s + "s" : "")} ${plan.load_kg ? "· " + plan.load_kg + " kg" : ""} · descanso ${plan.rest_s || 90}s${plan.rir && !plan.deload ? ` · <span title="${RIR_TIP}">sobrar ${esc(plan.rir)} reps</span>` : ""}`}
+    ${(it.warmup || []).length ? `<br>Aquecimento: ${esc(it.warmup.map((w) => `${w.reps}×${w.load_kg ? w.load_kg + " kg" : "~" + w.pct + "%"}`).join(" · "))}` : ""}
     ${lastTxt ? `<br>Última: ${esc(lastTxt)}` : ""}${it.suggestion && it.suggestion.note ? `<br><b>${esc(it.suggestion.note)}</b>` : ""}${plan.notes ? `<br>${esc(plan.notes)}` : ""}</div></div></div>`;
   if (it.endurance) {
     const en = it.endurance; const meters = ["natacao", "remo"].includes(en.sport);
@@ -1334,10 +1336,19 @@ const fxStrength = (it) => !(it.kind === "cardio" || it.endurance) && fxPh(it) =
 const fxDone = (it) => fxStrength(it) ? it.sets.every((x) => x.done) : !!it.done;
 const fxOrder = (s) => s.items.map((_, i) => i).sort((a, b) => (PH_RANK[fxPh(s.items[a])] - PH_RANK[fxPh(s.items[b])]) || a - b);
 const mmss = (t) => `${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`;
-function fxCurSet(it, s) {
-  if (Number.isInteger(s.fsel) && s.fsel < it.sets.length) return s.fsel;
-  const k = it.sets.findIndex((x) => !x.done); return k < 0 ? it.sets.length - 1 : k;
+// série atual: aquecimento (w) enquanto houver e nenhuma válida foi feita; senão a 1ª válida pendente
+function fxCur(it, s) {
+  const W = it.warmup || [];
+  if (Number.isInteger(s.fsel)) {
+    if (s.fsel < 0 && -s.fsel - 1 < W.length) { const k = -s.fsel - 1; return { w: true, k, x: W[k] }; }
+    if (s.fsel >= 0 && s.fsel < it.sets.length) return { w: false, k: s.fsel, x: it.sets[s.fsel] };
+  }
+  const wk = W.findIndex((x) => !x.done && !x.skip);
+  if (wk >= 0 && !it.sets.some((x) => x.done)) return { w: true, k: wk, x: W[wk] };
+  let k = it.sets.findIndex((x) => !x.done); if (k < 0) k = it.sets.length - 1;
+  return { w: false, k, x: it.sets[k] };
 }
+const WARM_REST = 45, WARM_LAST_REST = 75;
 function fxNextPos(s, order, pos) {
   for (let p = pos + 1; p < order.length; p++) if (!fxDone(s.items[order[p]])) return p;
   for (let p = 0; p < pos; p++) if (!fxDone(s.items[order[p]])) return p;
@@ -1365,39 +1376,53 @@ function wakeOff() { try { WL && WL.release(); } catch (_) { /* já liberado */ 
 function fxLeave() { clearInterval(fxInt); fxInt = null; wakeOff(); document.body.classList.remove("focus-on"); }
 document.addEventListener("visibilitychange", () => { if (!document.hidden && document.body.classList.contains("focus-on")) { wakeOn(); fxTick(); } });
 
+// nada avança sozinho: o fim do descanso ou do tempo só avisa (som + vibração); trocar é sempre no seu toque
 function fxTick() {
   const s = state.session; if (!s || !document.body.classList.contains("focus-on")) return;
-  const end = s.restEnd || s.workEnd; if (!end) return;
-  const total = s.restEnd ? s.restTotal : s.workTotal;
-  const left = Math.max(0, Math.ceil((end - Date.now()) / 1000));
-  const el = $("#fx-clock"); if (el) el.textContent = mmss(left);
-  const bar = $("#fx-bar span"); if (bar && total) bar.style.width = `${Math.min(100, 100 * (1 - left / total))}%`;
-  if (left !== fxLast && left > 0 && left <= 3) beep(660, 0.12, 0.22);
-  fxLast = left;
-  if (left > 0) return;
-  const late = Date.now() - end > 8000;   // voltou ao app bem depois: não toca alarme atrasado
-  if (!late) alarm();
-  if (s.restEnd) { s.restEnd = null; store("gg_session", s); toast("Descanso terminado — bora!"); return renderFocus(); }
-  const kind = s.workKind; s.workEnd = null; s.workKind = null;
-  if (kind === "set") return fxSetDone();
-  store("gg_session", s); toast("Tempo concluído ✓"); renderFocus();
+  const el = $("#fx-clock"), bar = $("#fx-bar span"), now = Date.now();
+  const show = (left, total) => { if (el) el.textContent = mmss(left); if (bar && total) bar.style.width = `${Math.min(100, 100 * (1 - left / total))}%`; };
+  const beeps = (left) => { if (left !== fxLast && left > 0 && left <= 3) beep(660, 0.12, 0.22); fxLast = left; };
+  if (s.restEnd) {
+    const over = now - s.restEnd;
+    if (over < 0) { const left = Math.ceil(-over / 1000); show(left, s.restTotal); return beeps(left); }
+    if (!s.restOver) { s.restOver = true; store("gg_session", s); if (over < 8000) alarm(); return renderFocus(); }
+    if (el) el.textContent = "+" + mmss(Math.floor(over / 1000));
+    return;
+  }
+  if (s.prepEnd) {
+    const left = Math.ceil((s.prepEnd - now) / 1000);
+    if (left > 0) { if (el) el.textContent = String(left); if (left !== fxLast) beep(523, 0.1, 0.2); fxLast = left; return; }
+    s.prepEnd = null; s.workEnd = now + s.workTotal * 1000; fxLast = null; beep(1046, 0.3); store("gg_session", s); return renderFocus();
+  }
+  if (s.workEnd) {
+    const left = Math.max(0, Math.ceil((s.workEnd - now) / 1000));
+    show(left, s.workTotal); beeps(left);
+    if (left > 0) return;
+    if (now - s.workEnd < 8000) alarm();
+    s.workEnd = null; s.workKind = null; s.timeUp = true; store("gg_session", s);
+    toast("Tempo! Toque em ✓ quando terminar"); renderFocus();
+  }
 }
 
 function fxSetDone() {
   const s = state.session; const order = fxOrder(s); const it = s.items[order[s.fx]]; if (!it) return;
-  const x = it.sets[fxCurSet(it, s)]; x.done = true; s.fsel = null;
-  const rest = (it.plan || {}).rest_s ?? 90;
-  if (it.sets.every((y) => y.done)) s.fx = fxNextPos(s, order, s.fx);
-  if (rest > 0 && s.fx < order.length) { s.restTotal = rest; s.restEnd = Date.now() + rest * 1000; fxLast = null; }
+  const c = fxCur(it, s); c.x.done = true; s.fsel = null; s.timeUp = false; s.workEnd = null; s.prepEnd = null;
+  let rest;
+  if (c.w) rest = (it.warmup || []).some((y) => !y.done && !y.skip) ? WARM_REST : WARM_LAST_REST;
+  else { rest = (it.plan || {}).rest_s ?? 90; if (it.sets.every((y) => y.done)) s.fx = fxNextPos(s, order, s.fx); }
+  if (rest > 0 && s.fx < order.length) { s.restTotal = rest; s.restEnd = Date.now() + rest * 1000; s.restOver = false; fxLast = null; }
   store("gg_session", s); renderFocus();
 }
 
 function fxNextHtml(s, order) {
   const it = s.items[order[s.fx]];
   if (!it) return `<div class="fx-next"><span class="grow"><span class="small">A seguir</span><b>Fim do treino 🎉</b></span></div>`;
-  const k = fxStrength(it) ? fxCurSet(it, s) : null;
+  const c = fxStrength(it) ? fxCur(it, s) : null;
+  const what = !c ? esc(fxPlanTxt(it).replace(/&amp;/g, "&"))
+    : c.w ? `Aquecimento ${c.k + 1} de ${it.warmup.length} · ${esc(fxSetTxt(it, c.x))}${c.x.load_kg ? "" : ` (~${c.x.pct}% da carga)`}`
+    : `Série ${c.k + 1} de ${it.sets.length} · ${esc(fxSetTxt(it, c.x))}`;
   return `<div class="fx-next">${mediaHtml(it.exercise_id, "m", it.kind === "cardio" ? "run" : null)}<span class="grow"><span class="small">A seguir</span>
-    <b>${esc(it.name)}</b><span class="small">${k !== null ? `Série ${k + 1} de ${it.sets.length} · ${esc(fxSetTxt(it, it.sets[k]))}` : esc(fxPlanTxt(it).replace(/&amp;/g, "&"))}</span></span></div>`;
+    <b>${esc(it.name)}</b><span class="small">${what}</span></span></div>`;
 }
 
 function renderFocus() {
@@ -1417,11 +1442,17 @@ function renderFocus() {
   let body;
   if (s.restEnd) {
     const left = Math.max(0, Math.ceil((s.restEnd - Date.now()) / 1000));
-    body = `<section class="fx-rest" aria-live="polite"><div class="eyebrow">Descanso</div>
+    body = s.restOver
+      ? `<section class="fx-rest over" aria-live="polite"><div class="eyebrow">Descanso terminado</div>
+      <div class="fx-clock" id="fx-clock">+${mmss(Math.floor((Date.now() - s.restEnd) / 1000))}</div>
+      ${fxNextHtml(s, order)}
+      <button class="btn block fx-skip" data-fx="r-skip">▶ Começar</button>
+      <p class="small" style="margin:10px 0 0;opacity:.8">Sem pressa: só muda quando você tocar.</p></section>`
+      : `<section class="fx-rest" aria-live="polite"><div class="eyebrow">Descanso</div>
       <div class="fx-clock" id="fx-clock">${mmss(left)}</div><div class="fx-bar" id="fx-bar"><span style="width:${Math.round(100 * (1 - left / (s.restTotal || 1)))}%"></span></div>
       ${fxNextHtml(s, order)}
       <div class="fx-rest-btns"><button class="btn ghost" data-fx="r-15">−15 s</button><button class="btn ghost" data-fx="r+15">+15 s</button></div>
-      <button class="btn block fx-skip" data-fx="r-skip">Pular descanso</button></section>`;
+      <button class="btn block fx-skip" data-fx="r-skip">Estou pronto</button></section>`;
   } else if (!it) {
     const sets = s.items.reduce((n, x) => n + (fxStrength(x) ? x.sets.filter((y) => y.done).length : 0), 0);
     body = `<section class="today-card fx-end"><div class="eyebrow">Treino concluído</div><div class="tc-title">${esc(s.day_name || "Treino")} ✓</div>
@@ -1444,25 +1475,32 @@ function renderFocus() {
       <div class="eyebrow" style="margin-top:12px">${eyebrow}</div>
       <h2 class="fx-name" data-ex="${esc(it.exercise_id)}">${esc(it.name)} ${limBadge(it.limitation)}</h2>
       <div class="fx-plan">${fxPlanTxt(it)}</div>${extra}`;
-    const workClock = (label, sec, kind) => s.workEnd
-      ? `<div class="fx-work"><div class="fx-clock" id="fx-clock">${mmss(Math.max(0, Math.ceil((s.workEnd - Date.now()) / 1000)))}</div><div class="fx-bar" id="fx-bar"><span></span></div>
+    const workClock = (label, sec, kind) => s.prepEnd
+      ? `<div class="fx-work prep"><div class="eyebrow">Prepare-se</div><div class="fx-clock" id="fx-clock">${Math.max(1, Math.ceil((s.prepEnd - Date.now()) / 1000))}</div>
+          <button class="act" data-fx="work-stop">Cancelar</button></div>`
+      : s.workEnd
+      ? `<div class="fx-work"><div class="eyebrow">Valendo</div><div class="fx-clock" id="fx-clock">${mmss(Math.max(0, Math.ceil((s.workEnd - Date.now()) / 1000)))}</div><div class="fx-bar" id="fx-bar"><span></span></div>
           <button class="act" data-fx="work-stop" style="margin-top:8px">Parar cronômetro</button></div>`
-      : `<button class="btn ghost block fx-start" data-fx="work" data-sec="${sec}" data-kind="${kind}">▶ ${label}</button>`;
+      : `${s.timeUp ? `<div class="fx-timeup">Tempo! ✓ Toque abaixo quando terminar</div>` : ""}<button class="btn ghost block fx-start" data-fx="work" data-sec="${sec}" data-kind="${kind}">▶ ${s.timeUp ? "De novo" : label}</button>`;
     if (fxStrength(it)) {
-      const k = fxCurSet(it, s); const x = it.sets[k];
+      const c = fxCur(it, s); const k = c.k; const x = c.x; const W = it.warmup || [];
       const timed = it.timed && it.sets.some((y) => y.duration_s);
+      const wRest = W.some((y, j) => j !== k && !y.done && !y.skip) ? WARM_REST : WARM_LAST_REST;
       const fld = timed ? "duration_s" : "reps";
       const stepper = (f, label, step, mode) => `<div class="fx-step"><label>${label}</label><div class="stepper">
         <button data-st="${f}:-${step}" aria-label="menos">−</button><input data-fv="${f}" inputmode="${mode}" value="${esc(x[f] ?? "")}" aria-label="${label}">
         <button data-st="${f}:${step}" aria-label="mais">+</button></div></div>`;
       body = `<section class="fx-card">${head}
-        <div class="fx-sets">${it.sets.map((y, j) => `<button class="fx-dot ${y.done ? "done" : ""} ${j === k ? "cur" : ""}" data-fset="${j}" aria-label="Série ${j + 1}${y.done ? " feita" : ""}">${y.done ? "✓" : j + 1}</button>`).join("")}</div>
-        <div class="fx-setlbl">Série ${k + 1} de ${it.sets.length}${x.done ? " · feita" : ""}</div>
+        <div class="fx-sets">${W.map((y, j) => `<button class="fx-dot warm ${y.done ? "done" : ""} ${y.skip && !y.done ? "skip" : ""} ${c.w && j === k ? "cur" : ""}" data-fset="${-(j + 1)}" aria-label="Aquecimento ${j + 1}${y.done ? " feito" : ""}">${y.done ? "✓" : "A" + (j + 1)}</button>`).join("")}${W.length ? `<span class="fx-sep" aria-hidden="true"></span>` : ""}${it.sets.map((y, j) => `<button class="fx-dot ${y.done ? "done" : ""} ${!c.w && j === k ? "cur" : ""}" data-fset="${j}" aria-label="Série ${j + 1}${y.done ? " feita" : ""}">${y.done ? "✓" : j + 1}</button>`).join("")}</div>
+        <div class="fx-setlbl ${c.w ? "warm" : ""}">${c.w ? `Aquecimento ${k + 1} de ${W.length} · ~${x.pct}% da carga` : `Série ${k + 1} de ${it.sets.length}`}${x.done ? " · feita" : ""}</div>
+        ${c.w && k === 0 && !x.done ? `<div class="fx-plan small" style="text-align:center;margin:-4px 0 8px">Leve e rápido, sem cansar: prepara articulações e o padrão do movimento.</div>` : ""}
         <div class="fx-inputs">${stepper(fld, timed ? "Segundos" : "Repetições", timed ? 5 : 1, "numeric")}${stepper("load_kg", "Carga (kg)", 2.5, "decimal")}</div>
-        <div class="fx-rpe"><span class="small muted">Esforço</span>${[6, 7, 8, 9, 10].map((r) => `<button class="${+x.rpe === r ? "on" : ""}" data-rpe="${r}">${r}</button>`).join("")}</div>
-        ${timed && !x.done ? workClock(`Iniciar ${x.duration_s || p.duration_s || 30} s`, x.duration_s || p.duration_s || 30, "set") : ""}
-        ${x.done ? `<button class="btn ghost block fx-go" data-fx="undo-set">Desmarcar série ${k + 1}</button>`
+        ${c.w ? "" : `<div class="fx-rpe"><span class="small muted">Esforço</span>${[6, 7, 8, 9, 10].map((r) => `<button class="${+x.rpe === r ? "on" : ""}" data-rpe="${r}">${r}</button>`).join("")}</div>`}
+        ${timed && !x.done && !c.w ? workClock(`Iniciar ${x.duration_s || p.duration_s || 30} s`, x.duration_s || p.duration_s || 30, "set") : ""}
+        ${x.done ? `<button class="btn ghost block fx-go" data-fx="undo-set">Desmarcar ${c.w ? "aquecimento" : "série"} ${k + 1}</button>`
+          : c.w ? `<button class="btn block fx-go warm" data-fx="set">✓ Aquecimento ${k + 1} feito · descansar ${mmss(wRest)}</button>`
           : `<button class="btn block fx-go" data-fx="set">✓ Série ${k + 1} feita${(p.rest_s ?? 90) > 0 ? ` · descansar ${mmss(p.rest_s ?? 90)}` : ""}</button>`}
+        ${c.w ? `<div class="fx-setmini"><button class="act" data-fx="skipwarm">Pular aquecimento</button></div>` : ""}
         <div class="fx-extra">${extra}</div>
         ${it.sets.length ? `<div class="fx-setmini"><button class="act" data-fx="addset">+ série</button>${it.sets.length > 1 ? `<button class="act" data-fx="rmset">− série</button>` : ""}<button class="act" data-fx="skip">Pular exercício</button></div>` : ""}
       </section>`;
@@ -1495,7 +1533,7 @@ function bindFocus() {
   view.oninput = (e) => {
     const el = e.target;
     if (el.id === "s-notes") s.notes = el.value;
-    if (el.dataset.fv && it && fxStrength(it)) { const x = it.sets[fxCurSet(it, s)]; x[el.dataset.fv] = el.value === "" ? null : parseFloat(el.value.replace(",", ".")); }
+    if (el.dataset.fv && it && fxStrength(it)) { const x = fxCur(it, s).x; x[el.dataset.fv] = el.value === "" ? null : parseFloat(el.value.replace(",", ".")); }
     if (el.dataset.c) s.items[+el.dataset.i][el.dataset.c] = el.value === "" ? null : +String(el.value).replace(",", ".");
     if (el.dataset.t) s.items[+el.dataset.i][el.dataset.t] = el.value;
     if (el.dataset.c || el.dataset.t) { const pe = $(`#pace-${el.dataset.i}`); if (pe) pe.textContent = paceTxt(s.items[+el.dataset.i]); }
@@ -1508,27 +1546,28 @@ function bindFocus() {
     const t = e.target.closest("[data-fx],[data-fset],[data-st],[data-rpe],[data-ex],[data-cdone]"); if (!t) return;
     if (t.dataset.ex && !t.dataset.fx) return showExercise(t.dataset.ex);
     if (t.dataset.cdone) { const x = s.items[+t.dataset.cdone]; x.done = !x.done; t.classList.toggle("on", x.done); return save(); }
-    if (t.dataset.fset) { s.fsel = +t.dataset.fset; s.workEnd = null; return renderFocus(); }
+    if (t.dataset.fset) { s.fsel = +t.dataset.fset; s.workEnd = null; s.prepEnd = null; s.timeUp = false; return renderFocus(); }
     if (t.dataset.st && it) {
-      const [f, d] = t.dataset.st.split(":"); const x = it.sets[fxCurSet(it, s)];
+      const [f, d] = t.dataset.st.split(":"); const x = fxCur(it, s).x;
       x[f] = Math.max(0, Math.round(((+x[f] || 0) + +d) * 100) / 100); const inp = $(`[data-fv="${f}"]`); if (inp) inp.value = x[f]; return save();
     }
-    if (t.dataset.rpe && it) { const x = it.sets[fxCurSet(it, s)]; x.rpe = +x.rpe === +t.dataset.rpe ? null : +t.dataset.rpe; $$(".fx-rpe [data-rpe]").forEach((b) => b.classList.toggle("on", +b.dataset.rpe === x.rpe)); return save(); }
+    if (t.dataset.rpe && it) { const x = fxCur(it, s).x; x.rpe = +x.rpe === +t.dataset.rpe ? null : +t.dataset.rpe; $$(".fx-rpe [data-rpe]").forEach((b) => b.classList.toggle("on", +b.dataset.rpe === x.rpe)); return save(); }
     const a = t.dataset.fx;
     if (a === "set") return fxSetDone();
-    if (a === "undo-set") { it.sets[fxCurSet(it, s)].done = false; save(); return renderFocus(); }
-    if (a === "done") { it.done = true; s.workEnd = null; s.fx = fxNextPos(s, order, s.fx); save(); return renderFocus(); }
-    if (a === "skip") { s.workEnd = null; s.fsel = null; s.fx = Math.min(order.length, s.fx + 1); save(); return renderFocus(); }
-    if (a === "prev" || a === "next") { s.restEnd = null; s.workEnd = null; s.fsel = null; s.fx = Math.max(0, Math.min(order.length, s.fx + (a === "next" ? 1 : -1))); save(); return renderFocus(); }
+    if (a === "undo-set") { fxCur(it, s).x.done = false; save(); return renderFocus(); }
+    if (a === "skipwarm") { (it.warmup || []).forEach((w) => { if (!w.done) w.skip = true; }); s.fsel = null; save(); return renderFocus(); }
+    if (a === "done") { it.done = true; s.workEnd = null; s.prepEnd = null; s.timeUp = false; s.fx = fxNextPos(s, order, s.fx); save(); return renderFocus(); }
+    if (a === "skip") { s.workEnd = null; s.prepEnd = null; s.timeUp = false; s.fsel = null; s.fx = Math.min(order.length, s.fx + 1); save(); return renderFocus(); }
+    if (a === "prev" || a === "next") { s.restEnd = null; s.restOver = false; s.workEnd = null; s.prepEnd = null; s.timeUp = false; s.fsel = null; s.fx = Math.max(0, Math.min(order.length, s.fx + (a === "next" ? 1 : -1))); save(); return renderFocus(); }
     if (a === "r-15" || a === "r+15") { s.restEnd = Math.max(Date.now(), s.restEnd + (a === "r+15" ? 15000 : -15000)); s.restTotal = Math.max(s.restTotal, Math.ceil((s.restEnd - Date.now()) / 1000)); save(); return fxTick(); }
-    if (a === "r-skip") { s.restEnd = null; save(); return renderFocus(); }
-    if (a === "work") { s.workTotal = +t.dataset.sec; s.workEnd = Date.now() + s.workTotal * 1000; s.workKind = t.dataset.kind; fxLast = null; save(); return renderFocus(); }
-    if (a === "work-stop") { s.workEnd = null; save(); return renderFocus(); }
+    if (a === "r-skip") { s.restEnd = null; s.restOver = false; save(); return renderFocus(); }
+    if (a === "work") { s.workTotal = +t.dataset.sec; s.prepEnd = Date.now() + 5000; s.workEnd = null; s.timeUp = false; s.workKind = t.dataset.kind; fxLast = null; save(); return renderFocus(); }
+    if (a === "work-stop") { s.workEnd = null; s.prepEnd = null; save(); return renderFocus(); }
     if (a === "addset" && it) { const last = it.sets[it.sets.length - 1] || {}; it.sets.push({ ...last, done: false }); save(); return renderFocus(); }
     if (a === "rmset" && it && it.sets.length > 1) { it.sets.pop(); s.fsel = null; save(); return renderFocus(); }
     if (a === "list") {
       const left = s.restEnd ? Math.ceil((s.restEnd - Date.now()) / 1000) : 0;
-      s.view = "lista"; s.restEnd = null; s.workEnd = null; save(); renderSession(); if (left > 0) startTimer(left); return;
+      s.view = "lista"; s.restEnd = null; s.restOver = false; s.workEnd = null; s.prepEnd = null; save(); renderSession(); if (left > 0) startTimer(left); return;
     }
     if (a === "add") return pickExercise(null, (ex) => {
       s.items.push(ex.kind === "cardio" ? { exercise_id: ex.id, name: ex.name, kind: "cardio", plan: {}, duration_min: 10, zone: 2, images: ex.images, limitation: ex.limitation }
@@ -2148,6 +2187,13 @@ async function viewPerfil(openSec) {
     <div class="chips">${[["barbell", "Barra"], ["dumbbell", "Halteres"], ["machine", "Máquinas"], ["cable", "Polia/cabo"], ["kettlebells", "Kettlebell"], ["bands", "Elástico"], ["e-z curl bar", "Barra W"]].map(([k, t]) => `<label class="chip"><input type="checkbox" data-eq="${k}" ${!(p.equipment || []).length || p.equipment.includes(k) ? "checked" : ""}> ${t}</label>`).join("")}</div>
     <label style="margin-top:12px">Cardio que você gosta de usar</label>
     <div class="chips" id="cm-list"></div>
+    <h3 style="margin-top:16px">Durante o treino</h3>
+    <div class="grid2">
+      <div class="field"><label>Descanso entre séries</label><select data-p="rest_pref">${[["padrao", "Padrão (pela ciência)"], ["curto", "Mais curto (−25%)"], ["longo", "Mais longo (+25%)"]].map(([v, t]) => `<option value="${v}" ${(p.rest_pref || "padrao") === v ? "selected" : ""}>${t}</option>`).join("")}</select></div>
+      <div class="field"><label>Séries de aquecimento do exercício</label><select data-p="warmup_sets">${[["auto", "Automáticas (recomendado)"], ["off", "Desligadas"]].map(([v, t]) => `<option value="${v}" ${(p.warmup_sets || "auto") === v ? "selected" : ""}>${t}</option>`).join("")}</select></div>
+      <div class="field"><label>No relógio, exercícios por tempo</label><select data-p="watch_timed">${[["manual", "Só avançam quando eu apertar"], ["auto", "Avançam sozinhos no fim do tempo"]].map(([v, t]) => `<option value="${v}" ${(p.watch_timed || "manual") === v ? "selected" : ""}>${t}</option>`).join("")}</select></div>
+    </div>
+    <p class="small muted">Padrão: ~2–2,5 min nos exercícios principais pesados, 1,5–2 min nos secundários e 1 min nos isoladores — a partir de ~90 s o ganho de massa não aumenta, e no app você pode encerrar antes em “Estou pronto”. Vale na hora para o app e para o próximo envio ao relógio.</p>
     <details class="adv"><summary class="small">Ajustes avançados</summary>
       <div class="grid2">${num("cardio_target_min", "Meta de cardio (min/semana)", 'min="0" step="10" placeholder="pelo objetivo"')}
         ${num("volume_factor", "Ajuste de volume (×)", 'step="0.05" min="0.5" max="1.5"')}</div>
