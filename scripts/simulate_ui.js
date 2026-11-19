@@ -213,6 +213,28 @@ async function flows(page, base, persona, tag) {
 
   if (persona === "novo") {
     await go(page, "#hoje", W("hoje (novo)"));
+    // perfil vazio: as 7 perguntas do bem-vindo montam o treino
+    if (await page.locator("#wiz-open").count()) {
+      await click("#wiz-open", "Responder 7 perguntas");
+      await page.waitForSelector(".wz", { timeout: 8000 }).catch(() => issue("bem-vindo não abriu", W("novo")));
+      await page.fill("#wz-name", "Novo"); await click("[data-wk=sex][data-wv=M]", "sexo");
+      await page.fill("#wz-age", "40"); await page.fill("#wz-w", "85");
+      await audit(page, W("bem-vindo: sobre você"));
+      await click("#wz-next", "Continuar");
+      await click("[data-wk=goal][data-wv=hipertrofia]", "objetivo"); await page.waitForTimeout(300);
+      await click('[data-wk=training_months][data-wv="0"]', "experiência"); await page.waitForTimeout(300);
+      for (const d of [0, 2, 4]) await click(`[data-wk=day][data-wv="${d}"]`, "dia");
+      await audit(page, W("bem-vindo: dias"));
+      await click("#wz-next", "Continuar");
+      await click("[data-wk=place][data-wv=academia]", "onde"); await page.waitForTimeout(300);
+      await click("[data-wk=none]", "sem lesão"); await click("#wz-next", "Continuar");
+      await click('[data-wk=run][data-wv="0"]', "corrida"); await page.waitForTimeout(300);
+      await audit(page, W("bem-vindo: resumo"));
+      await click("#wz-next", "Montar meu treino");
+      await page.waitForFunction(() => /Semana de/.test(document.getElementById("view").innerText), null, { timeout: 15000 }).catch(() => issue("bem-vindo não montou a semana", W("novo")));
+      await audit(page, W("hoje depois do bem-vindo"));
+      return;
+    }
     await page.evaluate(() => { const d = document.querySelector("#gen-open") && document.querySelector("#gen-open").closest("details"); if (d) d.open = true; });
     if (await click("#gen-open", "Gerar meu treino")) {
       await modalCheck("gerador");

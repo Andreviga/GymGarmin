@@ -202,12 +202,13 @@ async function viewHoje(weekDate) {
   const [sch, rd, gst] = await Promise.all([api(`/api/schedule${weekDate ? `?date=${weekDate}` : ""}`),
     weekDate ? Promise.resolve(null) : api("/api/readiness").catch(() => null), api("/api/garmin/status").catch(() => null)]);
   if (!sch.plan) {
+    const incomplete = profileMissing(state.profile || await api("/api/profile").catch(() => ({}))).length > 0;
     view.innerHTML = `${pageHead("Hoje")}${firstStepsHtml(false)}${installCardHtml("hoje")}<section class="today-card">
       <div class="eyebrow">Comece por aqui</div><div class="tc-title">Monte seu treino</div>
       <p class="muted">Diga há quanto tempo treina, os dias e o tempo que tem. O app monta musculação e corrida juntas, respeita suas limitações e reorganiza a semana quando você faltar.</p>
-      <button class="btn block" id="gen-open">Gerar meu treino</button>
+      ${incomplete ? `<a class="btn block" id="wiz-open" href="#bemvindo">✨ Responder 7 perguntas e montar meu treino</a>` : `<button class="btn block" id="gen-open">Gerar meu treino</button>`}
       <a class="btn ghost block" href="#planilhas" style="margin-top:8px">Montar manualmente</a></section>`;
-    $("#gen-open").onclick = () => openGenerator();
+    const go = $("#gen-open"); if (go) go.onclick = () => openGenerator();
     bindSteps();
     return;
   }
@@ -748,6 +749,20 @@ function bindCoachMine() {
 }
 
 /* ---------------------------------------------------------------- CONTA -- */
+async function openFamily() {
+  const cfg = await api("/api/admin/signup");
+  const link = location.origin + "/#criar";
+  const msg = `Oi! Estou testando o HAX, um app de treino que monta musculação e corrida juntas e guia o treino com cronômetro. Quero sua opinião 🙂\n\n1) Abra este link e crie sua conta (nome, e-mail e senha): ${link}\n2) Responda 7 perguntas rápidas: o treino sai montado.\n3) Toque em "Instalar" para colocar o ícone na tela do celular.\n4) Qualquer coisa estranha: Perfil → "Mandar sugestão ou problema".`;
+  const body = openModal(`<h2>👨‍👩‍👧 Chamar a família</h2>
+    <label class="row gap mg-sug"><input type="checkbox" id="fam-open-sw" ${cfg.open ? "checked" : ""}> <span><b>Cadastro aberto</b>: quem tiver o link cria a própria conta, sem convite (${cfg.accounts} de ${cfg.max} contas usadas)</span></label>
+    <pre class="inv-msg">${esc(msg)}</pre>
+    <a class="btn block wa" href="https://wa.me/?text=${encodeURIComponent(msg)}" target="_blank" rel="noopener">Enviar pelo WhatsApp</a>
+    <div class="row gap" style="margin-top:8px"><button class="btn ghost grow" id="fam-share">Compartilhar…</button><button class="btn ghost grow" id="fam-copy">Copiar mensagem</button></div>
+    <p class="small muted">Depois que todos entrarem, você pode fechar o cadastro aqui. Convite individual continua em Perfil → Conta e segurança.</p>`);
+  $("#fam-open-sw", body).onchange = async (e) => { try { const r = await api("/api/admin/signup", { method: "PUT", body: { open: e.target.checked } }); toast(r.open ? "Cadastro aberto" : "Cadastro fechado"); } catch (err) { toast(err.message); } };
+  $("#fam-share", body).onclick = async () => { try { if (navigator.share) await navigator.share({ text: msg }); else { await navigator.clipboard.writeText(msg); toast("Mensagem copiada"); } } catch (_) { /* cancelado */ } };
+  $("#fam-copy", body).onclick = async () => { try { await navigator.clipboard.writeText(msg); toast("Mensagem copiada"); } catch (_) { prompt("Copie a mensagem:", msg); } };
+}
 function inviteMsg(note, link) {
   const nome = (note || "").trim().split(/\s+/)[0];
   return `Oi${nome ? " " + nome : ""}! Estou testando o HAX, um app de treino que monta musculação e corrida juntas, guia o treino com cronômetro e conversa com o relógio. Quero sua opinião 🙂\n\n1) Crie sua conta por este link (é só seu, vale uma vez):\n${link}\n2) Depois toque em "Instalar" para colocar o ícone na tela do celular.\n3) Qualquer coisa estranha, toque em Perfil → "Mandar sugestão ou problema".`;
@@ -771,8 +786,13 @@ async function showAuth(mode, code) {
   $("#modal").hidden = true;
   let inv = null;
   if (mode === "convite") { try { inv = await api(`/api/auth/invite/${encodeURIComponent(code)}`); } catch (_) { inv = { valid: false }; } }
+  let open = false;
+  if (mode !== "convite") { try { open = (await api("/api/public/signup")).open; } catch (_) { open = false; } }
+  if (mode === "criar" && open) return showSignup();
   const isReg = mode === "convite" && inv && inv.valid;
-  view.innerHTML = `<div class="card auth-card"><h2>${isReg ? "Criar sua conta" : "Entrar"}</h2>
+  view.innerHTML = `${open && !isReg ? `<div class="auth-hero"><img src="/static/icon-192.png" alt=""><b>HAX</b><span>Seu treino de musculação e corrida, montado e guiado.</span></div>
+    <button class="btn block auth-new" id="go-signup">✨ Sou novo: criar minha conta</button><p class="small muted auth-or">ou entre com a sua conta</p>` : ""}
+    <div class="card auth-card"><h2>${isReg ? "Criar sua conta" : "Entrar"}</h2>
     ${mode === "convite" && !isReg ? `<p class="pill bad">Convite inválido ou já usado. Peça um novo a quem te convidou.</p>` : ""}
     ${isReg ? `<p class="small muted">Você foi convidado${inv.note ? ` (${esc(inv.note)})` : ""} para o HAX. Seus treinos, planilhas e Garmin ficam só na sua conta.</p>` : ""}
     <form id="auth-form" class="stack">
@@ -782,6 +802,7 @@ async function showAuth(mode, code) {
       <button class="btn" type="submit">${isReg ? "Criar conta" : "Entrar"}</button>
     </form>
     ${!isReg ? `<p class="small muted">Esqueceu a senha? Peça ao administrador uma senha provisória.</p>` : ""}</div>`;
+  const gs = $("#go-signup"); if (gs) gs.onclick = () => showSignup();
   $("#auth-form").onsubmit = async (e) => {
     e.preventDefault();
     const f = Object.fromEntries(new FormData(e.target));
@@ -791,11 +812,132 @@ async function showAuth(mode, code) {
         : await api("/api/auth/login", { method: "POST", body: f });
       state.me = me; state.profile = null; state.meta = null;
       clearLocalDrafts();
-      if (location.hash.startsWith("#convite")) history.replaceState(null, "", "#hoje");
+      if (location.hash.startsWith("#convite")) history.replaceState(null, "", isReg ? "#bemvindo" : "#hoje");
       startApp();
     } catch (err) { toast(err.message, 5000); btn.disabled = false; }
   };
 }
+// criar conta sem convite: só nome, e-mail e senha; o resto vem no passo a passo
+function showSignup() {
+  document.body.classList.add("auth-mode");
+  view.innerHTML = `<div class="auth-hero"><img src="/static/icon-192.png" alt=""><b>Criar sua conta</b><span>Leva 1 minuto. Depois o app faz 7 perguntas rápidas e monta seu treino.</span></div>
+    <div class="card auth-card"><form id="su-form" class="stack">
+      <div class="field"><label for="su-name">Seu nome</label><input id="su-name" name="name" autocomplete="given-name" required placeholder="ex.: Rosa"></div>
+      <div class="field"><label for="su-email">E-mail</label><input id="su-email" name="email" type="email" inputmode="email" autocomplete="email" autocapitalize="off" required placeholder="voce@email.com"></div>
+      <div class="field"><label for="su-pw">Crie uma senha (mín. 8 letras ou números)</label>
+        <div class="pw-wrap"><input id="su-pw" name="password" type="password" minlength="8" autocomplete="new-password" required><button type="button" class="act" id="su-eye">mostrar</button></div></div>
+      <button class="btn block" type="submit">Criar conta e continuar</button></form>
+      <p class="small muted">Seus treinos ficam só na sua conta. Anote o e-mail e a senha: é com eles que você entra de novo.</p>
+      <button class="act" id="su-back">Já tenho conta: entrar</button></div>`;
+  $("#su-eye").onclick = () => { const i = $("#su-pw"); i.type = i.type === "password" ? "text" : "password"; $("#su-eye").textContent = i.type === "password" ? "mostrar" : "esconder"; };
+  $("#su-back").onclick = () => showAuth("entrar");
+  $("#su-form").onsubmit = async (e) => {
+    e.preventDefault();
+    const f = Object.fromEntries(new FormData(e.target)); const btn = e.target.querySelector("button[type=submit]"); btn.disabled = true;
+    try {
+      state.me = await api("/api/auth/signup", { method: "POST", body: f }); state.profile = null; state.meta = null;
+      clearLocalDrafts(); history.replaceState(null, "", "#bemvindo"); startApp();
+    } catch (err) { btn.disabled = false; toast(err.message, 6000); }
+  };
+}
+
+/* ---- bem-vindo: 7 perguntas, um toque cada, e o treino sai montado ---- */
+const WIZ = { step: 0, d: null };
+const WIZ_GOALS = [["hipertrofia", "💪 Ganhar massa muscular", "ficar mais forte e com mais músculo"], ["emagrecimento", "🔥 Emagrecer", "perder gordura mantendo os músculos"],
+  ["saude", "❤️ Saúde e disposição", "se mexer bem, dormir melhor, sem exagero"], ["condicionamento", "🫁 Condicionamento", "fôlego e resistência"],
+  ["forca", "🏋️ Força", "levantar mais peso"], ["hibrido", "🏃 Musculação + corrida", "os dois juntos, no mesmo plano"]];
+const WIZ_PLACES = [["academia", "🏟️ Academia completa", "máquinas, polias, barras e halteres", []], ["pequena", "🏠 Academia pequena / do prédio", "halteres, barra e algumas máquinas", ["barbell", "dumbbell", "machine", "cable"]],
+  ["casa", "🛋️ Em casa com halteres ou elástico", "", ["dumbbell", "bands", "kettlebells"]], ["corpo", "🤸 Só o peso do corpo", "sem equipamento", ["bands"]]];
+async function viewBemVindo() {
+  const [p, meta] = await Promise.all([api("/api/profile"), state.meta ? Promise.resolve(state.meta) : api("/api/meta")]);
+  state.profile = p; state.meta = meta;
+  const run = (((p.endurance || {}).sports || {}).corrida || {});
+  WIZ.d = { name: p.name && p.name !== "Eu" ? p.name : "", sex: p.sex || "", age: p.age ?? "", weight_kg: p.weight_kg ?? "", height_cm: p.height_cm ?? "",
+    goal: p.goal || "", training_months: p.training_months ?? "", available_days: p.available_days || [], session_minutes: p.session_minutes || 60,
+    place: (p.equipment || []).length ? (WIZ_PLACES.find((x) => JSON.stringify(x[3]) === JSON.stringify(p.equipment)) || ["academia"])[0] : "academia",
+    lims: (p.limitations || []).map((l) => l.key).filter((k) => k !== "personalizado"), none: !(p.limitations || []).length,
+    run: run.enabled ? (run.sessions || 2) : 0 };
+  WIZ.step = 0; renderWiz();
+}
+function wizOk(step) {
+  const d = WIZ.d;
+  return [() => d.name.trim() && d.sex && +d.age >= 10 && +d.age <= 100 && +d.weight_kg >= 25 && +d.weight_kg <= 300, () => !!d.goal, () => d.training_months !== "",
+    () => d.available_days.length > 0 && d.session_minutes, () => !!d.place, () => d.none || d.lims.length > 0, () => true, () => true][step]();
+}
+function renderWiz() {
+  const d = WIZ.d; const st = WIZ.step; const N = 7;
+  const opt = (key, val, title, sub, on) => `<button type="button" class="wz-opt ${on ? "on" : ""}" data-wk="${key}" data-wv="${esc(String(val))}"><b>${title}</b>${sub ? `<span>${sub}</span>` : ""}</button>`;
+  const chip = (key, val, txt, on) => `<button type="button" class="wz-chip ${on ? "on" : ""}" data-wk="${key}" data-wv="${esc(String(val))}">${txt}</button>`;
+  const steps = [
+    () => `<h1 class="wz-q">Oi! Primeiro, sobre você</h1>
+      <div class="field"><label for="wz-name">Como quer ser chamado(a)?</label><input id="wz-name" data-wf="name" value="${esc(d.name)}" autocomplete="given-name"></div>
+      <label>Sexo (ajusta cargas e frequência cardíaca)</label><div class="wz-row">${chip("sex", "F", "Feminino", d.sex === "F")}${chip("sex", "M", "Masculino", d.sex === "M")}</div>
+      <div class="wz-nums"><div class="field"><label for="wz-age">Idade</label><input id="wz-age" data-wf="age" type="number" inputmode="numeric" value="${esc(d.age)}" placeholder="anos"></div>
+        <div class="field"><label for="wz-w">Peso (kg)</label><input id="wz-w" data-wf="weight_kg" type="number" inputmode="decimal" step="0.1" value="${esc(d.weight_kg)}" placeholder="kg"></div>
+        <div class="field"><label for="wz-h">Altura (cm)</label><input id="wz-h" data-wf="height_cm" type="number" inputmode="numeric" value="${esc(d.height_cm)}" placeholder="opcional"></div></div>`,
+    () => `<h1 class="wz-q">Qual é o seu principal objetivo?</h1><div class="wz-opts">${WIZ_GOALS.map(([v, t, s]) => opt("goal", v, t, s, d.goal === v)).join("")}</div>`,
+    () => `<h1 class="wz-q">Há quanto tempo você treina musculação?</h1><div class="wz-opts">${[[0, "Nunca treinei / estou parado(a)", "o app começa leve, com máquinas"], ...MONTH_OPTS.slice(1).map(([v, t]) => [v, t, ""])].map(([v, t, s]) => opt("training_months", v, t, s, String(d.training_months) === String(v))).join("")}</div>`,
+    () => `<h1 class="wz-q">Quando você pode treinar?</h1><label>Dias da semana (toque em todos que der)</label>
+      <div class="wz-row wz-days">${["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"].map((w, i) => chip("day", i, w, d.available_days.includes(i))).join("")}</div>
+      <label style="margin-top:14px">Quanto tempo por treino?</label><div class="wz-row">${[30, 45, 60, 75, 90, 120].map((m) => chip("session_minutes", m, `${m} min`, +d.session_minutes === m)).join("")}</div>
+      <p class="small muted">O app distribui: não precisa treinar todos os dias marcados.</p>`,
+    () => `<h1 class="wz-q">Onde você vai treinar?</h1><div class="wz-opts">${WIZ_PLACES.map(([v, t, s]) => opt("place", v, t, s, d.place === v)).join("")}</div>`,
+    () => `<h1 class="wz-q">Tem alguma dor ou lesão?</h1><p class="small muted">O app evita ou adapta os exercícios. Pode marcar mais de uma.</p>
+      <div class="wz-opts">${opt("none", 1, "✅ Nenhuma", "", d.none)}${(state.meta.limitations || []).filter((l) => l.id !== "personalizado").map((l) => opt("lim", l.id, esc(l.label), "", d.lims.includes(l.id))).join("")}</div>`,
+    () => `<h1 class="wz-q">Quer incluir corrida?</h1><div class="wz-opts">${opt("run", 0, "Não, só musculação", "dá para ligar depois em Perfil → Esportes", +d.run === 0)}${opt("run", 2, "🏃 Sim, 2 vezes por semana", "leve, para fôlego e saúde", +d.run === 2)}${opt("run", 3, "🏃 Sim, 3 vezes por semana", "quer evoluir na corrida", +d.run === 3)}</div>`,
+  ];
+  const goalT = (WIZ_GOALS.find((g) => g[0] === d.goal) || [])[1] || "—";
+  const summary = `<h1 class="wz-q">Tudo certo, ${esc(d.name.split(" ")[0] || "")}! 🎉</h1>
+    <ul class="wz-sum"><li><span>Objetivo</span><b>${goalT}</b></li><li><span>Treinos</span><b>${d.available_days.length} dias possíveis · ${d.session_minutes} min</b></li>
+      <li><span>Onde</span><b>${(WIZ_PLACES.find((x) => x[0] === d.place) || [])[1] || "—"}</b></li><li><span>Cuidados</span><b>${d.none ? "nenhum" : d.lims.map((k) => esc(((state.meta.limitations || []).find((l) => l.id === k) || {}).label || k)).join(", ")}</b></li>
+      <li><span>Corrida</span><b>${+d.run ? `${d.run}× por semana` : "não"}</b></li></ul>
+    <p class="small muted">Vou montar a semana com aquecimento, descanso e progressão de carga. Você pode mudar tudo depois no Perfil.</p>`;
+  const last = st >= N;
+  view.innerHTML = `<div class="wz"><div class="wz-top"><span class="small muted">${last ? "Pronto para montar" : `Pergunta ${st + 1} de ${N}`}</span>
+      <div class="meter"><span style="width:${Math.round(100 * Math.min(st, N) / N)}%"></span></div></div>
+    <section class="wz-body">${last ? summary : steps[st]()}</section>
+    <div class="wz-nav">${st > 0 ? `<button class="btn ghost" id="wz-back">Voltar</button>` : `<button class="btn ghost" id="wz-skip">Depois</button>`}
+      <button class="btn" id="wz-next" ${last || wizOk(st) ? "" : "disabled"}>${last ? "✨ Montar meu treino" : "Continuar"}</button></div></div>`;
+  const nextBtn = $("#wz-next");
+  const refresh = () => { if (!last) nextBtn.disabled = !wizOk(st); };
+  view.oninput = (e) => { const k = e.target.dataset.wf; if (k) { d[k] = e.target.value; refresh(); } };
+  view.onclick = async (e) => {
+    const b = e.target.closest("[data-wk]");
+    if (b) {
+      const k = b.dataset.wk, v = b.dataset.wv;
+      if (k === "day") { const i = +v; d.available_days = d.available_days.includes(i) ? d.available_days.filter((x) => x !== i) : [...d.available_days, i].sort(); b.classList.toggle("on"); return refresh(); }
+      if (k === "lim") { d.none = false; d.lims = d.lims.includes(v) ? d.lims.filter((x) => x !== v) : [...d.lims, v]; return renderWiz(); }
+      if (k === "none") { d.none = true; d.lims = []; return renderWiz(); }
+      d[k] = ["training_months", "session_minutes", "run"].includes(k) ? +v : v;
+      if (["goal", "training_months", "place", "run"].includes(k)) { renderWiz(); if (st < N) setTimeout(() => { WIZ.step++; renderWiz(); }, 180); return; }  // escolha única: avança sozinho
+      return renderWiz();
+    }
+    if (e.target.id === "wz-back") { WIZ.step = Math.max(0, st - 1); return renderWiz(); }
+    if (e.target.id === "wz-skip") { location.hash = "#hoje"; return; }
+    if (e.target.id === "wz-next") {
+      if (!last) { WIZ.step++; return renderWiz(); }
+      nextBtn.disabled = true; nextBtn.textContent = "Montando seu treino…";
+      try { await wizFinish(); } catch (err) { nextBtn.disabled = false; nextBtn.textContent = "✨ Montar meu treino"; toast(err.message, 6000); }
+    }
+  };
+  const first = $(".wz-body input"); if (first && !first.value && st === 0) setTimeout(() => first.focus(), 50);
+}
+async function wizFinish() {
+  const d = WIZ.d; const p = state.profile || {};
+  const end = JSON.parse(JSON.stringify(p.endurance || {})); end.sports = end.sports || {};
+  end.sports.corrida = { ...(end.sports.corrida || {}), enabled: +d.run > 0, env: (end.sports.corrida || {}).env || "rua", sessions: +d.run || 2 };
+  const prof = { name: d.name.trim(), sex: d.sex, age: +d.age, weight_kg: +d.weight_kg, height_cm: d.height_cm ? +d.height_cm : null,
+    goal: d.goal, training_months: +d.training_months, available_days: d.available_days, session_minutes: +d.session_minutes,
+    equipment: (WIZ_PLACES.find((x) => x[0] === d.place) || [, , , []])[3], limitations: d.none ? [] : d.lims.map((k) => ({ key: k, severity: "cuidado" })),
+    endurance: end, same_session: true };
+  if (d.goal === "hibrido" && !(+d.run)) prof.endurance.sports.corrida = { ...prof.endurance.sports.corrida, enabled: true, sessions: 2 };
+  await api("/api/profile", { method: "PUT", body: { ...p, ...prof } });
+  await api("/api/generator/apply", { method: "POST", body: { profile: prof } });
+  state.profile = await api("/api/profile");
+  toast(`Pronto, ${prof.name.split(" ")[0]}! Seu treino está montado 💪`, 5000);
+  location.hash = "#hoje";
+}
+
 function clearLocalDrafts() {
   // rascunhos de treino ficam no aparelho: não passam de uma conta para outra
   SWR.mem.clear();
@@ -2413,7 +2555,7 @@ async function viewPerfil(openSec) {
       <span class="small ${miss.length ? "muted" : "ok-txt"}">${miss.length ? `Falta: ${miss.map((m) => m[1]).join(", ")}` : "Perfil completo ✔"}</span></div>
   </section>
   ${installCardHtml("perfil")}
-  ${state.me && state.me.user && state.me.user.is_admin ? `<button class="link-card sect dev-link" id="fam-open" type="button"><span class="sect-ico" aria-hidden="true">👨‍👩‍👧</span><span class="grow"><b>Convidar família</b><span class="small muted">link pelo WhatsApp: cada pessoa cria a própria conta</span></span><span class="chev" aria-hidden="true">›</span></button>` : ""}
+  ${state.me && state.me.user && state.me.user.is_admin ? `<button class="link-card sect dev-link" id="fam-open" type="button"><span class="sect-ico" aria-hidden="true">👨‍👩‍👧</span><span class="grow"><b>Chamar a família</b><span class="small muted">mensagem pronta no WhatsApp: cada um cria a conta sozinho</span></span><span class="chev" aria-hidden="true">›</span></button>` : ""}
   ${state.me && state.me.logged_in ? `<button class="link-card sect dev-link" data-feedback type="button"><span class="sect-ico" aria-hidden="true">💬</span><span class="grow"><b>Mandar sugestão ou problema</b><span class="small muted">o que achou, o que faltou, o que deu errado</span></span><span class="chev" aria-hidden="true">›</span></button>` : ""}
   ${state.me && state.me.user && state.me.user.is_admin ? `<a class="link-card sect dev-link" href="#dev"><span class="sect-ico" aria-hidden="true">🛠️</span><span class="grow"><b>Área do desenvolvedor</b><span class="small muted" id="dev-count">fotos de aparelhos para aprovar</span></span><span class="chev" aria-hidden="true">›</span></a>` : ""}
   ${sect("dados", "👤", "Seus dados", [p.age ? `${p.age} anos` : "", p.weight_kg ? `${p.weight_kg} kg` : "", p.height_cm ? `${p.height_cm} cm` : ""].filter(Boolean).join(" · ") || "nome, idade, peso, altura, FC",
@@ -2560,7 +2702,7 @@ async function viewPerfil(openSec) {
     } catch (e) { box.innerHTML = `<p class="pill bad">${esc(e.message)}</p>`; }
   };
   const rg = $("#prof-regen"); if (rg) rg.onclick = () => openGenerator();
-  const fo = $("#fam-open"); if (fo) fo.onclick = () => { const d = $("#sec-conta"); if (d) { d.open = true; d.scrollIntoView({ behavior: "smooth", block: "start" }); setTimeout(() => { const n = $("#inv-form input[name=note]"); if (n) n.focus(); }, 400); } };
+  const fo = $("#fam-open"); if (fo) fo.onclick = () => openFamily();
   loadMyGym();
   if (state.me && state.me.user && state.me.user.is_admin) api("/api/dev/queue").then((q) => { const el = $("#dev-count"); if (el) el.textContent = q.pending.length ? `${q.pending.length} ${q.pending.length === 1 ? "foto" : "fotos"} para aprovar` : "nenhuma foto na fila · adicionar aparelhos"; }).catch(() => {});
 }
@@ -2620,7 +2762,7 @@ async function doRoute(ctl) {
   const [name, a, b] = (location.hash.slice(1) || "hoje").split("/");
   if (!$("#modal").hidden) closeModal();  // trocar de tela fecha a janela aberta (não fica por cima da tela nova)
   if (name !== "treinar") fxLeave();
-  $$(".tabbar a").forEach((el) => el.classList.toggle("active", el.dataset.tab === ({ plano: "planilhas", exercicios: "planilhas", aparelhos: "planilhas", evolucao: "analise", saude: "analise", esportes: "perfil", coach: "perfil", dev: "perfil" }[name] || name)));
+  $$(".tabbar a").forEach((el) => el.classList.toggle("active", el.dataset.tab === ({ plano: "planilhas", exercicios: "planilhas", aparelhos: "planilhas", evolucao: "analise", saude: "analise", esportes: "perfil", coach: "perfil", dev: "perfil", bemvindo: "hoje" }[name] || name)));
   const TITLES = { planilhas: "Planos", exercicios: "Planos", aparelhos: "Planos", plano: "Planilha", treinar: "Treinar", analise: "Progresso", evolucao: "Evolução", saude: "Saúde e sono", perfil: "Perfil", esportes: "Esportes", coach: "Coach", dev: "Desenvolvedor" };
   const pt = $("#page-title"); pt.textContent = TITLES[name] || ""; pt.hidden = !TITLES[name] || (name === "treinar" && a);
   const sn = $("#subnav"); sn.hidden = !["planilhas", "exercicios", "aparelhos"].includes(name);
@@ -2644,7 +2786,7 @@ async function doRoute(ctl) {
         document.querySelector(".topbar").insertAdjacentHTML("afterend", `<div id="eph" class="rec atencao small" style="margin:8px 16px 0">Versão de teste online: os dados podem ser apagados pelo servidor. Use <a href="#perfil">Perfil → Backup</a> para salvar e restaurar.</div>`);
       }
     }
-    const routes = { hoje: () => viewHoje(a), planilhas: viewPlanilhas, plano: () => viewPlano(a), treinar: () => viewTreinar(a, b), analise: viewAnalise, evolucao: () => viewEvolucao(decodeURIComponent(a || "")), esportes: viewEsportes, saude: viewSaude, exercicios: viewExercicios, aparelhos: () => viewAparelhos(a), perfil: () => viewPerfil(a), coach: viewCoach, dev: viewDev };
+    const routes = { hoje: () => viewHoje(a), planilhas: viewPlanilhas, plano: () => viewPlano(a), treinar: () => viewTreinar(a, b), analise: viewAnalise, evolucao: () => viewEvolucao(decodeURIComponent(a || "")), esportes: viewEsportes, saude: viewSaude, exercicios: viewExercicios, aparelhos: () => viewAparelhos(a), perfil: () => viewPerfil(a), coach: viewCoach, dev: viewDev, bemvindo: viewBemVindo };
     const render = async () => {
       await (routes[name] || viewHoje)();
       if (!view.onclick) view.onclick = (e) => { const id = e.target.dataset && e.target.dataset.ex; if (id) showExercise(id); };
@@ -2733,6 +2875,7 @@ window.addEventListener("online", flushOutbox);
   try { me = await api("/api/auth/me"); } catch (_) { /* offline: segue com o que houver */ }
   state.me = me;
   if (conv && !(me && me.logged_in)) return showAuth("convite", conv[1]);
+  if (location.hash.startsWith("#criar") && me && !me.logged_in && !me.setup_needed) return showAuth("criar");
   if (me && !me.logged_in && !me.setup_needed) return showAuth("login");
   startApp();
 })();

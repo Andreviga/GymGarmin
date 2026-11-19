@@ -236,6 +236,65 @@ def auth_register(body: dict = Body(...)):
     return _with_cookie(_me_payload(acc), acc)
 
 
+# cadastro aberto: a pessoa cria a conta sozinha na tela de entrada (sem convite). O administrador
+# pode fechar e há um limite de contas, para o link não virar porta aberta se vazar.
+SIGNUP_DEFAULT = {"open": True, "max": 30}
+
+
+def _signup_cfg() -> dict:
+    return {**SIGNUP_DEFAULT, **json.loads(db.kv_get("signup", user_id=-1) or "{}")}
+
+
+@app.get("/api/public/signup")
+def signup_status():
+    c = _signup_cfg()
+    return {"open": bool(c["open"]) and db.count_accounts() < int(c["max"]) and auth.accounts_exist()}
+
+
+@app.post("/api/auth/signup")
+def auth_signup(body: dict = Body(...)):
+    c = _signup_cfg()
+    if not auth.accounts_exist():
+        raise HTTPException(400, "O app ainda não tem dono: crie a primeira conta pelo Perfil.")
+    if not c["open"] or db.count_accounts() >= int(c["max"]):
+        raise HTTPException(403, "O cadastro está fechado. Peça para quem te mandou o app liberar.")
+    name = (body.get("name") or "").strip()
+    email, pw = (body.get("email") or "").strip().lower(), body.get("password") or ""
+    if not name:
+        raise HTTPException(400, "Diga seu nome.")
+    if "@" not in email or "." not in email.split("@")[-1]:
+        raise HTTPException(400, "E-mail inválido.")
+    if db.get_account_by_email(email):
+        raise HTTPException(409, "Já existe uma conta com esse e-mail. Toque em Entrar.")
+    try:
+        auth.validate_password(pw)
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from e
+    acc = db.create_account(email, auth.hash_password(pw), name[:60])
+    with db.as_user(acc["user_id"]):
+        db.save_profile({"name": name[:60]})
+    return _with_cookie(_me_payload(acc), acc)
+
+
+@app.get("/api/admin/signup")
+def admin_signup_get():
+    _require_admin()
+    c = _signup_cfg()
+    return {**c, "accounts": db.count_accounts()}
+
+
+@app.put("/api/admin/signup")
+def admin_signup_put(body: dict = Body(...)):
+    _require_admin()
+    c = _signup_cfg()
+    if "open" in body:
+        c["open"] = bool(body["open"])
+    if body.get("max"):
+        c["max"] = max(1, min(500, int(body["max"])))
+    db.kv_set("signup", json.dumps(c), user_id=-1)
+    return {**c, "accounts": db.count_accounts()}
+
+
 @app.post("/api/account/password")
 def account_password(body: dict = Body(...)):
     acc = auth.current_account()
