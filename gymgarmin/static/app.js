@@ -1110,7 +1110,9 @@ async function showExercise(id) {
   const body = openModal(`<h2>${esc(ex.name)}</h2>
     ${ex.name !== ex.name_en ? `<p class="small muted">${esc(ex.name_en)}</p>` : ""}
     <div class="ex-hero">${mediaHtml(ex.id, "l")}</div>
+    ${ex.my_machine ? myMachineChip(ex.my_machine, false) : ""}
     ${ex.machine_id ? `<button class="btn ghost block" data-machine="${esc(ex.machine_id)}" style="margin:-2px 0 10px">▶ Ver o aparelho em vídeo</button>` : ""}
+    ${ex.kind !== "cardio" ? `<button class="act" id="ex-mm" style="margin:0 0 10px">📷 ${ex.my_machine ? "Editar meu aparelho" : "Fotografar o aparelho da minha academia"}</button>` : ""}
     ${ex.image_like ? `<p class="small muted img-note">Foto de um movimento parecido (${esc(ex.image_like)}): o aparelho da sua academia pode ser diferente.</p>` : ""}
     ${ex.top_machine ? `<div class="evidence"><b>Por que está entre os melhores</b><p class="small">${esc(ex.evidence)}</p>
       <p class="small muted">${ex.availability_br === "comum" ? "Comum nas academias brasileiras." : ex.availability_br === "média" ? "Aparece em academias médias e grandes." : "Mais raro: academias grandes e premium."}${ex.lengthened ? " Trabalha o músculo alongado." : ""}</p>
@@ -1129,6 +1131,8 @@ async function showExercise(id) {
       ${ex.machine ? "" : `<button class="btn sm ghost" id="g-edit">Alterar</button>`}</div>
     <div id="g-box"></div>`);
   const evo = $("[data-close]", body); if (evo) evo.onclick = () => closeModal();
+  const exmm = $("#ex-mm", body);
+  if (exmm) exmm.onclick = () => openMyMachine({ ...(ex.my_machine || {}), exercise_id: ex.id, exercise_name: ex.name }, () => showExercise(ex.id));
   const mb = $("[data-machine]", body); if (mb) mb.onclick = () => showMachine(mb.dataset.machine);
   const ge = $("#g-edit", body);
   if (ge) ge.onclick = () => {
@@ -1329,6 +1333,175 @@ async function finishSession() {
     location.hash = s.schedule_id ? "#hoje" : "#analise";
 }
 
+/* ---- minha academia: foto e regulagem do aparelho, troca por equivalente ---- */
+// reduz a foto no celular antes de enviar (lado maior 1280 px, JPEG ~0,8): rápido mesmo com 4G fraco
+function shrinkPhoto(file, max = 1280, q = 0.8) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file); const img = new Image();
+    img.onload = () => {
+      const k = Math.min(1, max / Math.max(img.width, img.height));
+      const c = document.createElement("canvas"); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(url);
+      resolve(c.toDataURL("image/jpeg", q));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Não deu para ler a foto")); };
+    img.src = url;
+  });
+}
+const myMachineChip = (mm, tappable = true) => mm ? `<${tappable ? "button" : "div"} class="mm-chip" ${tappable ? `data-mm="edit"` : ""}>${mm.photo_url ? `<img src="${esc(mm.photo_url)}" alt="">` : `<span class="mm-ph" aria-hidden="true">📷</span>`}
+  <span class="grow"><b>Seu aparelho${mm.name ? `: ${esc(mm.name)}` : ""}</b>${mm.settings ? `<span>Regulagem: ${esc(mm.settings)}</span>` : `<span class="muted">Toque para anotar a regulagem</span>`}</span></${tappable ? "button" : "div"}>` : "";
+
+// cadastrar/editar o aparelho da pessoa para um exercício (foto + nome + regulagem); st guarda o que já foi preenchido
+function openMyMachine(st, onSaved) {
+  st = { suggest: true, ...st };
+  const isAdmin = !!(state.me && state.me.user && state.me.user.is_admin);
+  const body = openModal(`<h2>${st.id ? "Seu aparelho" : "📷 Fotografar meu aparelho"}</h2>
+    <p class="small muted">Para o exercício <b>${esc(st.exercise_name || "—")}</b> <button class="act" id="mg-ex">trocar exercício</button></p>
+    <label class="photo-pick">${st.image || st.photo_url ? `<img id="mg-prev" src="${esc(st.image || st.photo_url)}" alt="">` : `<span class="pp-empty">📷<b>Tirar foto do aparelho</b><span class="small">ou escolher da galeria</span></span>`}
+      <input type="file" id="mg-file" accept="image/*" capture="environment" ${st.id ? "disabled" : ""}></label>
+    <div class="field"><label for="mg-name">Nome do aparelho</label><input id="mg-name" value="${esc(st.name || st.exercise_name || "")}" placeholder="ex.: Leg press 45° (Matrix)"></div>
+    <div class="field"><label for="mg-set">Regulagem (o que você ajusta)</label><input id="mg-set" value="${esc(st.settings || "")}" placeholder="ex.: banco 4, encosto 2, pino da perna no 3"></div>
+    ${st.id ? "" : `<label class="row gap mg-sug"><input type="checkbox" id="mg-sug" ${st.suggest ? "checked" : ""}> <span>Sugerir para o catálogo do HAX${isAdmin ? " (vai para a sua área do desenvolvedor)" : " (o desenvolvedor aprova)"}</span></label>`}
+    <button class="btn block" id="mg-save" ${st.exercise_id ? "" : "disabled"}>Salvar</button>
+    ${st.id ? `<button class="act" id="mg-del" style="margin-top:10px">Remover este aparelho</button>` : ""}
+    <p class="small muted" style="margin-top:10px">Da próxima vez que esse exercício aparecer, o app mostra a foto e a regulagem.</p>`);
+  const keep = () => { st.name = $("#mg-name", body).value; st.settings = $("#mg-set", body).value; const sg = $("#mg-sug", body); if (sg) st.suggest = sg.checked; };
+  $("#mg-ex", body).onclick = () => { keep(); pickExercise(null, (ex) => { st.exercise_id = ex.id; st.exercise_name = ex.name; if (!st.name || st.name === st.prev_ex) st.name = ex.name; st.prev_ex = ex.name; openMyMachine(st, onSaved); }); };
+  $("#mg-file", body).onchange = async (e) => {
+    const f = e.target.files && e.target.files[0]; if (!f) return;
+    keep();
+    try { st.image = await shrinkPhoto(f); openMyMachine(st, onSaved); } catch (err) { toast(err.message); }
+  };
+  const del = $("#mg-del", body);
+  if (del) del.onclick = async () => { if (!confirm("Remover este aparelho?")) return; await api(`/api/my-gym/machines/${st.id}`, { method: "DELETE" }); closeModal(); toast("Removido"); onSaved && onSaved(null); };
+  $("#mg-save", body).onclick = async (e) => {
+    keep(); e.target.disabled = true;
+    try {
+      const out = st.id
+        ? await api(`/api/my-gym/machines/${st.id}`, { method: "PATCH", body: { name: st.name, settings: st.settings, exercise_id: st.exercise_id } })
+        : await api("/api/my-gym/machines", { method: "POST", body: { image: st.image || null, exercise_id: st.exercise_id, name: st.name, settings: st.settings, suggest: !!(st.image && st.suggest) } });
+      closeModal(); toast(st.id ? "Regulagem salva" : out.suggested ? "Aparelho salvo e enviado para o catálogo 👍" : "Aparelho salvo 👍");
+      onSaved && onSaved(out);
+    } catch (err) { e.target.disabled = false; toast(err.message, 5000); }
+  };
+}
+
+// trocar o exercício no meio do treino por um que faz o mesmo movimento
+async function openSwap(it, onPick) {
+  const body = openModal(`<h2>Trocar ${esc(it.name)}</h2><p class="small muted">Aparelho ocupado ou sua academia não tem? Estes fazem o mesmo trabalho:</p><div id="sw-list" class="sk"><span class="sk-line"></span><span class="sk-line"></span></div>`);
+  const s = state.session;
+  let alts = [];
+  try { alts = await api(`/api/exercises/${encodeURIComponent(it.exercise_id)}/alternatives`); } catch (e) { $("#sw-list", body).innerHTML = `<p class="pill bad">${esc(e.message)}</p>`; return; }
+  $("#sw-list", body).className = "";
+  $("#sw-list", body).innerHTML = `${alts.length ? `<ul class="list sw-list">${alts.map((x) => `<li><button class="sw-row" data-sw="${esc(x.id)}">${x.my_machine && x.my_machine.photo_url ? `<img class="sw-mine" src="${esc(x.my_machine.photo_url)}" alt="">` : mediaHtml(x.id, "s")}
+      <span class="grow"><b>${esc(x.name)}</b><span class="small muted">${esc(x.equipment_pt || "")}${x.my_machine ? ` · <span class="ok-txt">seu aparelho${x.my_machine.settings ? ` (${esc(x.my_machine.settings)})` : ""}</span>` : ""}</span></span>${limBadge(x.limitation)}</button></li>`).join("")}</ul>` : `<p class="muted">Não achei equivalente no catálogo.</p>`}
+    ${s && s.plan_id ? `<label class="row gap mg-sug"><input type="checkbox" id="sw-plan"> <span>Usar sempre: trocar na planilha e nos próximos treinos</span></label>` : ""}
+    <button class="act" id="sw-photo" style="margin-top:12px">📷 Minha academia tem outro aparelho para isso</button>`;
+  body.onclick = async (e) => {
+    const b = e.target.closest("[data-sw]");
+    if (b) { const also = !!($("#sw-plan", body) || {}).checked; closeModal(); return onPick(b.dataset.sw, also); }
+    if (e.target.id === "sw-photo") openMyMachine({ exercise_id: it.exercise_id, exercise_name: it.name }, (mm) => { it.my_machine = mm; store("gg_session", state.session); renderSession(); });
+  };
+}
+
+async function fxSwap(it, toId, alsoPlan) {
+  const s = state.session; const i = s.items.indexOf(it); const p = it.plan || {};
+  const keepKeys = ["sets", "reps", "duration_s", "rest_s", "role", "phase", "rpe_target", "rir", "rest_custom"];
+  const done = (it.sets || []).filter((x) => x.done);
+  const req = Object.fromEntries(keepKeys.filter((k) => p[k] != null).map((k) => [k, p[k]]));
+  req.exercise_id = toId; req.sets = Math.max(1, (it.sets || []).length - done.length) || p.sets || 3;
+  req.warmup_sets = done.length ? [] : (p.warmup_sets || []);  // mesma rampa de aquecimento, recalculada no novo exercício
+  let fresh;
+  try { fresh = await api("/api/sessions/item", { method: "POST", body: req }); } catch (e) { return toast(e.message, 5000); }
+  fresh.swapped_from = it.name;
+  if (done.length) { it.sets = done; s.items.splice(i + 1, 0, fresh); } else s.items[i] = fresh;
+  s.fsel = null; s.restEnd = null; s.restOver = false; s.workEnd = null; s.prepEnd = null;
+  s.fx = fxOrder(s).indexOf(done.length ? i + 1 : i);
+  store("gg_session", s); renderSession();
+  toast(`Trocado por ${fresh.name}`);
+  if (alsoPlan && s.plan_id) {
+    try { const r = await api(`/api/plans/${s.plan_id}/swap`, { method: "POST", body: { from: it.exercise_id, to: toId } }); toast(`Planilha atualizada (${r.changed} ${r.changed === 1 ? "lugar" : "lugares"})`); }
+    catch (e) { toast(e.message, 5000); }
+  }
+}
+
+async function loadMyGym() {
+  const box = $("#mygym-box"); if (!box) return;
+  let list = [];
+  try { list = await api("/api/my-gym/machines"); } catch (e) { box.innerHTML = `<p class="pill bad">${esc(e.message)}</p>`; return; }
+  box.innerHTML = `<p class="small muted">Fotografe os aparelhos da sua academia e anote a regulagem (banco, encosto, pino). No treino o app mostra a foto e a regulagem, e na troca de aparelho os seus aparecem primeiro.</p>
+    ${list.length ? `<ul class="list mg-list">${list.map((m) => `<li><button class="mg-row" data-mgid="${esc(m.id)}">${m.photo_url ? `<img src="${esc(m.photo_url)}" alt="">` : `<span class="mm-ph">📷</span>`}
+      <span class="grow"><b>${esc(m.name)}</b><span class="small muted">${esc(m.exercise_name || m.exercise_id)}${m.settings ? ` · ${esc(m.settings)}` : ""}</span></span><span class="chev">›</span></button></li>`).join("")}</ul>` : ""}
+    <button class="btn ghost block" id="mg-new">📷 Fotografar um aparelho</button>`;
+  box.onclick = (e) => {
+    const r = e.target.closest("[data-mgid]");
+    if (r) { const m = list.find((x) => x.id === r.dataset.mgid); return openMyMachine({ ...m }, loadMyGym); }
+    if (e.target.id === "mg-new") pickExercise(null, (ex) => openMyMachine({ exercise_id: ex.id, exercise_name: ex.name }, loadMyGym));
+  };
+}
+
+/* ---- área do desenvolvedor: fotos de aparelhos viram aparelhos do catálogo ---- */
+async function viewDev() {
+  if (!(state.me && state.me.user && state.me.user.is_admin) && state.me && state.me.logged_in) { view.innerHTML = `<p class="muted">Só o administrador acessa esta área.</p>`; return; }
+  const q = await api("/api/dev/queue");
+  const catOpts = (sel) => q.categories.map((c) => `<option value="${c.id}" ${c.id === sel ? "selected" : ""}>${esc(c.name)}</option>`).join("");
+  const guessCat = (eid) => { const e = (eid || "").toLowerCase(); return /leg|squat|lunge|calf|hack/.test(e) ? "pernas" : /glute|hip_thrust|bridge/.test(e) ? "gluteo" : /row|pull|lat|chin/.test(e) ? "costas" : /bench|chest|fly|press_machine|dip/.test(e) ? "peito" : /shoulder|lateral|delt|military/.test(e) ? "ombros" : /curl|tricep|bicep/.test(e) ? "bracos" : /crunch|ab|plank|torso/.test(e) ? "core" : "funcional"; };
+  view.innerHTML = `<p class="small muted" style="margin:2px 4px 12px">Só você (administrador) vê esta área. O que for aprovado aqui entra na galeria de aparelhos para todos.</p>
+    <div class="card"><h2>Adicionar aparelho com foto</h2><p class="small muted">Na academia: fotografe, diga o nome e quais exercícios dá para fazer. Entra na galeria de aparelhos para todos na hora.</p>
+      <button class="btn block" id="dv-new">📷 Fotografar aparelho novo</button></div>
+    <h2 class="sec-title">Fotos para aprovar (${q.pending.length})</h2>
+    ${q.pending.length ? q.pending.map((x) => `<div class="card dv-card" data-q="${esc(x.qid)}">
+      <img class="dv-img" src="${esc(x.photo_url)}" alt="">
+      <p class="small muted">Enviada por <b>${esc(x.user_name || "—")}</b> · ${fmtDate(x.created)}${x.exercise_name ? ` · usada para <b>${esc(x.exercise_name)}</b>` : ""}${x.settings ? ` · regulagem: ${esc(x.settings)}` : ""}</p>
+      <div class="field"><label>Nome do aparelho</label><input data-k="name" value="${esc(x.name || "")}"></div>
+      <div class="grid2"><div class="field"><label>Categoria</label><select data-k="category">${catOpts(guessCat(x.exercise_id))}</select></div>
+        <div class="field"><label>Ou juntar a um aparelho que já existe</label><select data-k="merge_into"><option value="">— aparelho novo —</option>${q.machines.map((m) => `<option value="${esc(m.id)}">${esc(m.name)}</option>`).join("")}</select></div></div>
+      <label>Exercícios que dá para fazer</label><div class="chips dv-exs" data-exs="${esc(x.exercise_id || "")}">${x.exercise_id ? `<span class="chip" data-rm-ex="${esc(x.exercise_id)}">${esc(x.exercise_name)} ✕</span>` : ""}<button class="chip" data-add-ex>+ exercício</button></div>
+      <div class="field" style="margin-top:10px"><label>O que dá para fazer / dica de uso</label><textarea data-k="what" rows="2" style="min-height:64px" placeholder="ex.: Empurre a plataforma com os pés na largura do quadril…"></textarea></div>
+      <div class="row gap"><button class="btn grow" data-approve>Aprovar</button><button class="btn ghost" data-discard>Descartar</button></div></div>`).join("") : `<p class="muted small" style="margin:0 4px 14px">Nenhuma foto na fila. Quando alguém fotografar um aparelho e marcar “sugerir para o catálogo”, ela aparece aqui.</p>`}
+    <h2 class="sec-title">Aparelhos da comunidade (${q.custom.length})</h2>
+    ${q.custom.length ? `<div class="picks">${q.custom.map((m) => `<div class="pick"><a class="grow" href="#aparelhos/${esc(m.id)}"><b>${esc(m.name)}</b><span class="small muted">${esc((q.categories.find((c) => c.id === m.category) || {}).name || "")}</span></a><button class="act" data-del-m="${esc(m.id)}">Remover</button></div>`).join("")}</div>` : `<p class="muted small" style="margin:0 4px">Ainda nenhum.</p>`}`;
+  const exsOf = (card) => [...card.querySelectorAll("[data-rm-ex]")].map((c) => c.dataset.rmEx);
+  view.onclick = async (e) => {
+    const card = e.target.closest("[data-q]");
+    if (e.target.id === "dv-new") return devNewMachine(q, catOpts, guessCat);
+    const del = e.target.closest("[data-del-m]");
+    if (del) { if (!confirm("Remover este aparelho da galeria?")) return; await api(`/api/dev/machines/${del.dataset.delM}`, { method: "DELETE" }); toast("Removido"); return viewDev(); }
+    if (!card) return;
+    const rm = e.target.closest("[data-rm-ex]"); if (rm) return rm.remove();
+    if (e.target.closest("[data-add-ex]")) {
+      return pickExercise(null, (ex) => { closeModal(); if (exsOf(card).includes(ex.id)) return; e.target.closest("[data-add-ex]").insertAdjacentHTML("beforebegin", `<span class="chip" data-rm-ex="${esc(ex.id)}">${esc(ex.name)} ✕</span>`); });
+    }
+    const val = (k) => (card.querySelector(`[data-k="${k}"]`) || {}).value;
+    if (e.target.closest("[data-discard]")) { await api(`/api/dev/queue/${card.dataset.q}/discard`, { method: "POST" }); toast("Descartada"); return viewDev(); }
+    if (e.target.closest("[data-approve]")) {
+      try {
+        await api(`/api/dev/queue/${card.dataset.q}/approve`, { method: "POST", body: { name: val("name"), category: val("category"), merge_into: val("merge_into"), exercise_ids: exsOf(card), what: val("what") } });
+        toast("Aprovado: já está na galeria 🎉"); viewDev();
+      } catch (err) { toast(err.message, 5000); }
+    }
+  };
+}
+
+function devNewMachine(q, catOpts, guessCat, st = {}) {
+  const body = openModal(`<h2>Aparelho novo</h2>
+    <label class="photo-pick">${st.image ? `<img src="${esc(st.image)}" alt="">` : `<span class="pp-empty">📷<b>Tirar foto do aparelho</b><span class="small">ou escolher da galeria</span></span>`}<input type="file" id="dn-file" accept="image/*" capture="environment"></label>
+    <div class="field"><label>Nome</label><input id="dn-name" value="${esc(st.name || "")}" placeholder="ex.: Remada articulada (Hammer)"></div>
+    <div class="field"><label>Categoria</label><select id="dn-cat">${catOpts(st.category || guessCat((st.exs || [])[0] && st.exs[0].id))}</select></div>
+    <label>Exercícios que dá para fazer</label><div class="chips">${(st.exs || []).map((x) => `<span class="chip">${esc(x.name)}</span>`).join("")}<button class="chip" id="dn-add">+ exercício</button></div>
+    <div class="field" style="margin-top:10px"><label>O que dá para fazer / dica</label><textarea id="dn-what" rows="2" style="min-height:64px">${esc(st.what || "")}</textarea></div>
+    <button class="btn block" id="dn-save" ${st.image && (st.exs || []).length ? "" : "disabled"}>Publicar na galeria</button>
+    <p class="small muted">Precisa de foto e de pelo menos um exercício.</p>`);
+  const keep = () => { st.name = $("#dn-name", body).value; st.category = $("#dn-cat", body).value; st.what = $("#dn-what", body).value; };
+  $("#dn-file", body).onchange = async (e) => { const f = e.target.files && e.target.files[0]; if (!f) return; keep(); try { st.image = await shrinkPhoto(f); } catch (err) { return toast(err.message); } devNewMachine(q, catOpts, guessCat, st); };
+  $("#dn-add", body).onclick = () => { keep(); pickExercise(null, (ex) => { st.exs = [...(st.exs || []).filter((x) => x.id !== ex.id), { id: ex.id, name: ex.name }]; if (!st.name) st.name = ex.name; devNewMachine(q, catOpts, guessCat, st); }); };
+  $("#dn-save", body).onclick = async (e) => {
+    keep(); e.target.disabled = true;
+    try { await api("/api/dev/machines", { method: "POST", body: { image: st.image, name: st.name, category: st.category, what: st.what, exercise_ids: st.exs.map((x) => x.id) } }); closeModal(); toast("Publicado na galeria 🎉"); viewDev(); }
+    catch (err) { e.target.disabled = false; toast(err.message, 5000); }
+  };
+}
+
 /* ---- treino guiado: um exercício por vez, descanso cronometrado ---- */
 const PH_RANK = { preparo: 0, principal: 1, pos: 2 };
 const fxPh = (it) => it.phase || "principal";
@@ -1470,11 +1643,12 @@ function renderFocus() {
       ? `<div class="fx-head"><div class="fx-thumb" data-ex="${esc(it.exercise_id)}">${mediaHtml(it.exercise_id, "l")}</div>
           <div class="fx-hd"><div class="eyebrow">${eyebrow}</div><h2 class="fx-name" data-ex="${esc(it.exercise_id)}">${esc(it.name)}</h2>
           <div class="fx-plan">${fxPlanTxt(it)}</div>${limBadge(it.limitation)}</div></div>
+        ${myMachineChip(it.my_machine)}
         ${it.suggestion && it.suggestion.note ? `<div class="fx-tip">${esc(it.suggestion.note)}</div>` : ""}`
       : `<div class="fx-media" data-ex="${esc(it.exercise_id)}">${mediaHtml(it.exercise_id, "l", it.kind === "cardio" ? "run" : null)}</div>
       <div class="eyebrow" style="margin-top:12px">${eyebrow}</div>
       <h2 class="fx-name" data-ex="${esc(it.exercise_id)}">${esc(it.name)} ${limBadge(it.limitation)}</h2>
-      <div class="fx-plan">${fxPlanTxt(it)}</div>${extra}`;
+      <div class="fx-plan">${fxPlanTxt(it)}</div>${extra}${it.kind !== "cardio" && !it.endurance ? myMachineChip(it.my_machine) : ""}`;
     const workClock = (label, sec, kind) => s.prepEnd
       ? `<div class="fx-work prep"><div class="eyebrow">Prepare-se</div><div class="fx-clock" id="fx-clock">${Math.max(1, Math.ceil((s.prepEnd - Date.now()) / 1000))}</div>
           <button class="act" data-fx="work-stop">Cancelar</button></div>`
@@ -1502,6 +1676,7 @@ function renderFocus() {
           : `<button class="btn block fx-go" data-fx="set">✓ Série ${k + 1} feita${(p.rest_s ?? 90) > 0 ? ` · descansar ${mmss(p.rest_s ?? 90)}` : ""}</button>`}
         ${c.w ? `<div class="fx-setmini"><button class="act" data-fx="skipwarm">Pular aquecimento</button></div>` : ""}
         <div class="fx-extra">${extra}</div>
+        <div class="fx-setmini fx-gym"><button class="act" data-fx="swap">⇄ Trocar aparelho</button>${it.my_machine ? "" : `<button class="act" data-fx="mymachine">📷 Meu aparelho</button>`}</div>
         ${it.sets.length ? `<div class="fx-setmini"><button class="act" data-fx="addset">+ série</button>${it.sets.length > 1 ? `<button class="act" data-fx="rmset">− série</button>` : ""}<button class="act" data-fx="skip">Pular exercício</button></div>` : ""}
       </section>`;
     } else if (it.endurance) {
@@ -1543,7 +1718,11 @@ function bindFocus() {
   view.onchange = view.oninput;
   view.onclick = (e) => {
     audioUnlock();
-    const t = e.target.closest("[data-fx],[data-fset],[data-st],[data-rpe],[data-ex],[data-cdone]"); if (!t) return;
+    const t = e.target.closest("[data-fx],[data-fset],[data-st],[data-rpe],[data-ex],[data-cdone],[data-mm]"); if (!t) return;
+    const saveMM = (mm) => { it.my_machine = mm; save(); renderFocus(); };
+    if (t.dataset.mm && it) { const mm = it.my_machine || {}; return openMyMachine({ ...mm, exercise_id: it.exercise_id, exercise_name: it.name }, saveMM); }
+    if (t.dataset.fx === "mymachine" && it) return openMyMachine({ exercise_id: it.exercise_id, exercise_name: it.name }, saveMM);
+    if (t.dataset.fx === "swap" && it) return openSwap(it, (to, also) => fxSwap(it, to, also));
     if (t.dataset.ex && !t.dataset.fx) return showExercise(t.dataset.ex);
     if (t.dataset.cdone) { const x = s.items[+t.dataset.cdone]; x.done = !x.done; t.classList.toggle("on", x.done); return save(); }
     if (t.dataset.fset) { s.fsel = +t.dataset.fset; s.workEnd = null; s.prepEnd = null; s.timeUp = false; return renderFocus(); }
@@ -1991,7 +2170,7 @@ async function viewAparelhos(openId) {
     $("#mx-count").textContent = `${items.length} aparelho${items.length === 1 ? "" : "s"}`;
     $("#mx-list").innerHTML = items.map((m) => `<li class="mx-card" data-machine="${esc(m.id)}">
       <span class="mx-img" data-machine="${esc(m.id)}">${m.thumb ? `<img loading="lazy" src="${esc(m.thumb)}" alt="" data-machine="${esc(m.id)}">` : pictoHtml(CAT_PICTO[m.category] || "dumbbell", "tile")}
-        ${m.has_video ? `<span class="mx-play" aria-hidden="true">▶</span>` : ""}${m.is_new ? `<span class="tile-new">novo</span>` : ""}</span>
+        ${m.has_video ? `<span class="mx-play" aria-hidden="true">▶</span>` : ""}${m.community ? `<span class="tile-new">comunidade</span>` : m.is_new ? `<span class="tile-new">novo</span>` : ""}</span>
       <span class="mx-cap" data-machine="${esc(m.id)}"><b data-machine="${esc(m.id)}">${esc(m.name)}</b><span class="small muted" data-machine="${esc(m.id)}">${m.n_exercises} ${m.n_exercises === 1 ? "exercício" : "exercícios"}${m.availability_br === "rara" ? " · academias grandes" : ""}</span></span></li>`).join("")
       || `<li class="empty">Nada encontrado.</li>`;
   };
@@ -2017,7 +2196,7 @@ async function showMachine(id) {
   const body = openModal(`<h2>${esc(m.name)}</h2>${m.name_en && m.name_en !== m.name ? `<p class="small muted">${esc(m.name_en)}</p>` : ""}
     <p><span class="pill">${esc(m.category_pt || "")}</span> ${m.availability_br ? `<span class="pill muted">${m.availability_br === "comum" ? "comum no Brasil" : m.availability_br === "média" ? "academias médias e grandes" : "academias grandes e premium"}</span>` : ""}</p>
     ${embeds.length ? ytEmbed(embeds[0]) : ""}
-    ${ph ? `<figure class="mx-photo"><img loading="lazy" src="${esc(ph.url)}" alt="Foto do aparelho ${esc(m.name)}"><figcaption class="small muted">Foto: ${esc(ph.author || "Wikimedia Commons")}${ph.license ? ` · ${esc(ph.license)}` : ""}${ph.page ? ` · <a href="${esc(ph.page)}" target="_blank" rel="noopener">fonte</a>` : ""}</figcaption></figure>` : ""}
+    ${ph ? `<figure class="mx-photo"><img loading="lazy" src="${esc(ph.url)}" alt="Foto do aparelho ${esc(m.name)}"><figcaption class="small muted">Foto: ${esc(ph.author || (String(ph.url).startsWith("/api/photos/") ? "comunidade HAX" : "Wikimedia Commons"))}${ph.license ? ` · ${esc(ph.license)}` : ""}${ph.page ? ` · <a href="${esc(ph.page)}" target="_blank" rel="noopener">fonte</a>` : ""}</figcaption></figure>` : ""}
     ${m.why ? `<div class="evidence"><b>Por que vale a pena</b><p class="small">${esc(m.why)}</p></div>` : ""}
     ${(m.exercises || []).length ? `<h3>O que dá para fazer</h3><ul class="exlist mx-ex">${m.exercises.map((x) => `<li><span class="grow"><b>${esc(x.name)}</b><span class="small muted">${esc(x.how || "")}</span></span>
       ${x.video ? (x.video.embed ? `<button class="act" data-ytx="${esc(x.video.id)}" aria-label="Ver vídeo: ${esc(x.name)}">▶ vídeo</button>` : `<a class="act" href="https://www.youtube.com/watch?v=${esc(x.video.id)}" target="_blank" rel="noopener">▶ YouTube</a>`) : ""}
@@ -2208,6 +2387,8 @@ async function viewPerfil(openSec) {
   ${sect("esportes", "🏃", "Esportes e provas", Object.entries((p.endurance || {}).sports || {}).filter(([, c]) => c.enabled).map(([k]) => SPORT_WORD[k] || k).join(", ") || "corrida, bike, natação…",
     `<p class="small">Corrida, ciclismo, natação, remo, caminhada e trilha: meta de volume ou prova com tempo alvo, zonas por ritmo, potência ou FC.</p>
     <a class="btn ghost block" href="#esportes">Configurar esportes e provas</a>`)}
+  ${sect("academia", "🏟️", "Minha academia", "fotos e regulagem dos aparelhos que você usa", `<div id="mygym-box"><div class="sk"><span class="sk-line"></span></div></div>`)}
+  ${state.me && state.me.user && state.me.user.is_admin ? `<a class="link-card sect dev-link" href="#dev"><span class="sect-ico" aria-hidden="true">🛠️</span><span class="grow"><b>Área do desenvolvedor</b><span class="small muted" id="dev-count">fotos de aparelhos para aprovar</span></span><span class="chev" aria-hidden="true">›</span></a>` : ""}
   ${sect("relogios", "⌚", "Relógios", g.connected ? `Garmin conectado${g.display_name ? "" : ""}` : g.needs_reconnect ? "Garmin: reconectar" : "Garmin, Apple, Android",
     `<h3>Garmin</h3>
     ${!g.library_installed ? `<p class="pill bad">Biblioteca garminconnect não instalada no servidor: <code>pip install "garminconnect>=0.3.20"</code></p>` : ""}
@@ -2305,6 +2486,8 @@ async function viewPerfil(openSec) {
       };
     } catch (e) { box.innerHTML = `<p class="pill bad">${esc(e.message)}</p>`; }
   };
+  loadMyGym();
+  if (state.me && state.me.user && state.me.user.is_admin) api("/api/dev/queue").then((q) => { const el = $("#dev-count"); if (el) el.textContent = q.pending.length ? `${q.pending.length} ${q.pending.length === 1 ? "foto" : "fotos"} para aprovar` : "nenhuma foto na fila · adicionar aparelhos"; }).catch(() => {});
 }
 
 function syncInfo(sy) {
@@ -2362,8 +2545,8 @@ async function doRoute(ctl) {
   const [name, a, b] = (location.hash.slice(1) || "hoje").split("/");
   if (!$("#modal").hidden) closeModal();  // trocar de tela fecha a janela aberta (não fica por cima da tela nova)
   if (name !== "treinar") fxLeave();
-  $$(".tabbar a").forEach((el) => el.classList.toggle("active", el.dataset.tab === ({ plano: "planilhas", exercicios: "planilhas", aparelhos: "planilhas", evolucao: "analise", saude: "analise", esportes: "perfil", coach: "perfil" }[name] || name)));
-  const TITLES = { planilhas: "Planos", exercicios: "Planos", aparelhos: "Planos", plano: "Planilha", treinar: "Treinar", analise: "Progresso", evolucao: "Evolução", saude: "Saúde e sono", perfil: "Perfil", esportes: "Esportes", coach: "Coach" };
+  $$(".tabbar a").forEach((el) => el.classList.toggle("active", el.dataset.tab === ({ plano: "planilhas", exercicios: "planilhas", aparelhos: "planilhas", evolucao: "analise", saude: "analise", esportes: "perfil", coach: "perfil", dev: "perfil" }[name] || name)));
+  const TITLES = { planilhas: "Planos", exercicios: "Planos", aparelhos: "Planos", plano: "Planilha", treinar: "Treinar", analise: "Progresso", evolucao: "Evolução", saude: "Saúde e sono", perfil: "Perfil", esportes: "Esportes", coach: "Coach", dev: "Desenvolvedor" };
   const pt = $("#page-title"); pt.textContent = TITLES[name] || ""; pt.hidden = !TITLES[name] || (name === "treinar" && a);
   const sn = $("#subnav"); sn.hidden = !["planilhas", "exercicios", "aparelhos"].includes(name);
   $$("#subnav a").forEach((x) => x.classList.toggle("on", x.dataset.sub === name));
@@ -2386,7 +2569,7 @@ async function doRoute(ctl) {
         document.querySelector(".topbar").insertAdjacentHTML("afterend", `<div id="eph" class="rec atencao small" style="margin:8px 16px 0">Versão de teste online: os dados podem ser apagados pelo servidor. Use <a href="#perfil">Perfil → Backup</a> para salvar e restaurar.</div>`);
       }
     }
-    const routes = { hoje: () => viewHoje(a), planilhas: viewPlanilhas, plano: () => viewPlano(a), treinar: () => viewTreinar(a, b), analise: viewAnalise, evolucao: () => viewEvolucao(decodeURIComponent(a || "")), esportes: viewEsportes, saude: viewSaude, exercicios: viewExercicios, aparelhos: () => viewAparelhos(a), perfil: () => viewPerfil(a), coach: viewCoach };
+    const routes = { hoje: () => viewHoje(a), planilhas: viewPlanilhas, plano: () => viewPlano(a), treinar: () => viewTreinar(a, b), analise: viewAnalise, evolucao: () => viewEvolucao(decodeURIComponent(a || "")), esportes: viewEsportes, saude: viewSaude, exercicios: viewExercicios, aparelhos: () => viewAparelhos(a), perfil: () => viewPerfil(a), coach: viewCoach, dev: viewDev };
     const render = async () => {
       await (routes[name] || viewHoje)();
       if (!view.onclick) view.onclick = (e) => { const id = e.target.dataset && e.target.dataset.ex; if (id) showExercise(id); };

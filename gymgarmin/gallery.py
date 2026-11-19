@@ -28,17 +28,32 @@ def yt_id(url: str) -> str | None:
 
 
 @lru_cache(maxsize=1)
-def load() -> list[dict]:
+def _file_load() -> list[dict]:
     if not DATA.exists():
         return []
     return json.loads(DATA.read_text())
+
+
+def load() -> list[dict]:
+    """Aparelhos da pesquisa + os aprovados na área do desenvolvedor (fotos da comunidade)."""
+    base = _file_load()
+    try:
+        from . import my_gym
+        customs, extra = my_gym.custom_machines(), my_gym.extra_photos()
+    except Exception:  # noqa: BLE001 - sem banco (scripts/testes): só a pesquisa
+        return base
+    if extra:
+        base = [{**m, "photos": extra[m["machine_id"]] + (m.get("photos") or [])} if m["machine_id"] in extra else m for m in base]
+    return base + customs
+
+
+load.cache_clear = _file_load.cache_clear  # compatível com quem limpava o cache do arquivo
 
 
 def get(machine_id: str) -> dict | None:
     return next((m for m in load() if m["machine_id"] == machine_id), None)
 
 
-@lru_cache(maxsize=1)
 def by_exercise() -> dict[str, str]:
     """exercício do catálogo → aparelho onde ele é feito (para o detalhe do exercício mostrar o vídeo)."""
     out: dict[str, str] = {}
@@ -46,6 +61,9 @@ def by_exercise() -> dict[str, str]:
         for eid in m.get("existing_exercise_ids") or []:
             out.setdefault(eid, m["machine_id"])
     return out
+
+
+by_exercise.cache_clear = lambda: None  # sem cache: os aparelhos da comunidade entram na hora
 
 
 # resultado da conferência no ar (YouTube/Commons), guardado no banco para todas as contas (user -1)
@@ -105,7 +123,7 @@ def summary(m: dict) -> dict:
     vids, photos = _videos(m), _photos(m)
     thumb = photos[0]["url"] if photos else (f"https://i.ytimg.com/vi/{vids[0]['id']}/hqdefault.jpg" if vids else None)
     return {"id": m["machine_id"], "name": m["name"], "name_en": m.get("name_en"), "category": m.get("category"),
-            "is_new": bool(m.get("is_new")), "availability_br": m.get("availability_br"), "thumb": thumb,
+            "is_new": bool(m.get("is_new")), "community": bool(m.get("community")), "availability_br": m.get("availability_br"), "thumb": thumb,
             "thumb_kind": "photo" if photos else "video" if vids else None, "has_video": bool(vids),
             "n_exercises": len(m.get("exercises") or []), "_search": _norm(" ".join([m["name"], m.get("name_en") or "",
                                                                                     " ".join(e.get("name", "") for e in m.get("exercises") or [])]))}

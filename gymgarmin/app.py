@@ -16,7 +16,7 @@ from fastapi.staticfiles import StaticFiles
 
 from datetime import date, timedelta
 
-from . import auth, coach, gallery, ingest, training_rules
+from . import auth, coach, gallery, ingest, my_gym, training_rules
 from . import (analysis, calibration, catalog, clock, db, dedupe, health, endurance, garmin_export, garmin_sync, generator, history, limitations,
                load, plans_io, progression, readiness, schedule, sports, templates)
 from .muscles import EQUIPMENT_PT, HR_ZONES, MUSCLES, hr_max, zone_bpm
@@ -754,6 +754,7 @@ def exercise_detail(exercise_id: str):
     out = _with_status(ex, _profile().get("limitations") or [], db.garmin_overrides())
     out["last"] = db.last_performance(exercise_id)
     out["machine_id"] = gallery.by_exercise().get(exercise_id)
+    out["my_machine"] = my_gym.for_exercise(exercise_id)
     return out
 
 
@@ -834,6 +835,176 @@ def get_plan(plan_id: int):
             if cache[eid]:
                 it["_ex"] = cache[eid]
     return p
+
+
+def _me_ids() -> tuple[int, str | None, bool]:
+    acc = auth.current_account()
+    uid = db.current_user()
+    is_admin = (not auth.accounts_exist()) or bool(acc and acc.get("is_admin"))
+    return uid, (db.get_profile(uid).get("name") or (acc or {}).get("name")), is_admin
+
+
+# ------------------------------------------------------- minha academia ----
+
+@app.get("/api/my-gym/machines")
+def my_gym_list():
+    return my_gym.list_mine()
+
+
+@app.post("/api/my-gym/machines")
+def my_gym_add(body: dict = Body(...)):
+    uid, name, _ = _me_ids()
+    try:
+        return my_gym.add_mine(uid, name, body.get("image"), body.get("exercise_id") or "", body.get("name") or "",
+                               body.get("settings"), bool(body.get("suggest")))
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from e
+
+
+@app.patch("/api/my-gym/machines/{mid}")
+def my_gym_update(mid: str, body: dict = Body(...)):
+    out = my_gym.update_mine(db.current_user(), mid, body)
+    if not out:
+        raise HTTPException(404, "Aparelho não encontrado")
+    return out
+
+
+@app.delete("/api/my-gym/machines/{mid}")
+def my_gym_delete(mid: str):
+    if not my_gym.delete_mine(db.current_user(), mid):
+        raise HTTPException(404, "Aparelho não encontrado")
+    return {"ok": True}
+
+
+@app.get("/api/photos/{pid}")
+def photo_get(pid: str):
+    p = my_gym.photo(pid)
+    uid, _, is_admin = _me_ids()
+    if not p or not my_gym.can_see(p, uid, is_admin):
+        raise HTTPException(404, "Foto não encontrada")
+    import base64 as _b64
+    return Response(_b64.b64decode(p["b64"]), media_type=p["mime"],
+                    headers={"Cache-Control": "private, max-age=31536000, immutable"})
+
+
+@app.get("/api/exercises/{exercise_id}/alternatives")
+def exercise_alternatives(exercise_id: str):
+    lims, ovr = _profile().get("limitations") or [], db.garmin_overrides()
+    out = []
+    for eid in my_gym.alternatives(exercise_id):
+        ex = catalog.get(eid)
+        v = _with_status(ex, lims, ovr)
+        out.append({"id": eid, "name": v["name"], "equipment_pt": v.get("equipment_pt"), "limitation": v.get("limitation"),
+                    "kind": ex["kind"], "timed": ex.get("timed"), "my_machine": my_gym.for_exercise(eid)})
+    out.sort(key=lambda x: ((x["limitation"] or {}).get("status") == "evitar", not x["my_machine"]))
+    return out
+
+
+@app.post("/api/sessions/item")
+def session_item(body: dict = Body(...)):
+    """Item de treino pronto (sugestão de carga, última vez, aquecimento) para trocar o exercício no meio do treino."""
+    ex = catalog.get(body.get("exercise_id"))
+    if ex and ex.get("timed") and not body.get("duration_s"):
+        body = {**body, "duration_s": 40}
+        body.pop("reps", None)
+    elif ex and not ex.get("timed") and body.get("duration_s") and not body.get("reps"):
+        body = {**body, "reps": "10"}
+        body.pop("duration_s", None)
+    items = _prefill_items([body])
+    if not items:
+        raise HTTPException(404, "Exercício desconhecido")
+    return items[0]
+
+
+@app.post("/api/plans/{plan_id}/swap")
+def plan_swap(plan_id: int, body: dict = Body(...)):
+    """Troca o exercício em toda a planilha e nos próximos treinos da agenda (a academia não tem / prefere outro)."""
+    src, dst = body.get("from"), body.get("to")
+    if not catalog.get(dst):
+        raise HTTPException(400, "Exercício desconhecido")
+    p = _plan_or_404(plan_id)
+    n = 0
+    for d in p.get("days", []):
+        for it in d.get("items", []):
+            if it.get("exercise_id") == src:
+                it["exercise_id"] = dst
+                if catalog.get(dst).get("timed") and not it.get("duration_s"):
+                    it.pop("reps", None)
+                    it["duration_s"] = 40
+                n += 1
+    db.update_plan(plan_id, p)
+    today = clock.today()
+    for e in db.list_schedule(today.isoformat(), (today + timedelta(days=21)).isoformat()):
+        if e.get("status") != "planejado":
+            continue
+        hit = False
+        for it in e.get("items", []):
+            if it.get("exercise_id") == src:
+                it["exercise_id"] = dst
+                hit = True
+        if hit:
+            if e.get("garmin_workout_id"):
+                e["garmin_outdated"] = True
+            db.save_entry(e)
+    return {"changed": n}
+
+
+# ------------------------------------------------------- área do desenvolvedor ----
+
+def _dev() -> None:
+    if not _me_ids()[2]:
+        raise HTTPException(403, "Área do desenvolvedor: só o administrador.")
+
+
+@app.get("/api/dev/queue")
+def dev_queue():
+    _dev()
+    return {"pending": my_gym.queue("pendente"), "approved": my_gym.queue("aprovado")[:20],
+            "custom": [gallery.summary(m) for m in my_gym.custom_machines()],
+            "categories": [{"id": k, "name": v} for k, v in gallery.CATEGORIES],
+            "machines": [{"id": m["machine_id"], "name": m["name"]} for m in gallery.load()]}
+
+
+@app.post("/api/dev/queue/{qid}/approve")
+def dev_approve(qid: str, body: dict = Body(...)):
+    _dev()
+    try:
+        m = my_gym.approve(qid, body.get("name") or "", body.get("category") or "", list(body.get("exercise_ids") or []),
+                           body.get("what"), body.get("merge_into") or None)
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from e
+    return {"machine_id": m["machine_id"]}
+
+
+@app.post("/api/dev/queue/{qid}/discard")
+def dev_discard(qid: str):
+    _dev()
+    if not my_gym.discard(qid):
+        raise HTTPException(404, "Item não encontrado")
+    return {"ok": True}
+
+
+@app.post("/api/dev/machines")
+def dev_add_machine(body: dict = Body(...)):
+    """Administrador fotografa e publica direto (vai pela fila já aprovada, para ficar registrado)."""
+    _dev()
+    uid, name, _ = _me_ids()
+    try:
+        pid = my_gym.save_photo(body.get("image") or "", uid)
+        q = my_gym.submit(pid, uid, name, (body.get("exercise_ids") or [None])[0], body.get("name") or "", None)
+        m = my_gym.approve(q["qid"], body.get("name") or "", body.get("category") or "", list(body.get("exercise_ids") or []),
+                           body.get("what"), body.get("merge_into") or None)
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from e
+    return {"machine_id": m["machine_id"]}
+
+
+@app.delete("/api/dev/machines/{machine_id}")
+def dev_delete_machine(machine_id: str):
+    _dev()
+    if not my_gym.delete_custom(machine_id):
+        raise HTTPException(404, "Aparelho não encontrado")
+    return {"ok": True}
 
 
 @app.put("/api/plans/{plan_id}")
@@ -989,6 +1160,7 @@ def _prefill_items(day_items: list[dict], deload: bool = False) -> list[dict]:
             continue
         last = db.last_performance(ex["id"])
         entry = {"exercise_id": ex["id"], "name": ex["name"], "kind": ex["kind"], "plan": it,
+                 "my_machine": my_gym.for_exercise(ex["id"]),
                  "phase": it.get("phase") or "principal", "last": last,
                  "limitation": limitations.check_exercise(ex, lims), "images": ex["images"][:2], "timed": ex.get("timed")}
         if ex["kind"] == "cardio":
