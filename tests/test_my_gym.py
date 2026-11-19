@@ -113,3 +113,16 @@ def test_dev_merge_photo_into_existing_machine(owner):
     my_gym._CACHE["custom"] = None
     d = owner.get(f"/api/machines/{base}").json()
     assert d["photos"][0]["url"].startswith("/api/photos/")
+
+
+def test_swap_survives_regenerating_the_plan(owner):
+    prof = {"training_months": 36, "goal": "hipertrofia", "session_minutes": 75, "available_days": [0, 2, 4], "age": 34, "sex": "M"}
+    plan = owner.post("/api/generator/apply", json={"profile": prof}).json()
+    ids = [i["exercise_id"] for d in plan["days"] for i in d["items"] if i.get("phase") == "principal"]
+    src = ids[0]
+    alt = owner.get(f"/api/exercises/{src}/alternatives").json()
+    dst = next(a["id"] for a in alt if a["id"] not in ids)
+    assert owner.post(f"/api/plans/{plan['id']}/swap", json={"from": src, "to": dst}).json()["changed"] >= 1
+    new = owner.post("/api/generator/apply", json={"profile": prof}).json()
+    new_ids = [i["exercise_id"] for d in new["days"] for i in d["items"]]
+    assert src not in new_ids and dst in new_ids

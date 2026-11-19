@@ -933,6 +933,10 @@ def plan_swap(plan_id: int, body: dict = Body(...)):
                     it["duration_s"] = 40
                 n += 1
     db.update_plan(plan_id, p)
+    prefs = json.loads(db.kv_get("swap_prefs") or "{}")  # lembra a troca: ao regerar o treino ela continua valendo
+    prefs = {k: v for k, v in prefs.items() if k != dst and v != src}
+    prefs[src] = dst
+    db.kv_set("swap_prefs", json.dumps(prefs))
     today = clock.today()
     for e in db.list_schedule(today.isoformat(), (today + timedelta(days=21)).isoformat()):
         if e.get("status") != "planejado":
@@ -1617,6 +1621,24 @@ def generator_preview(body: dict = Body(default={})):
     return plan
 
 
+def _apply_swaps(plan: dict) -> dict:
+    """Aplica as trocas de aparelho que a pessoa marcou como 'usar sempre' num treino recém-gerado."""
+    prefs = json.loads(db.kv_get("swap_prefs") or "{}")
+    if not prefs:
+        return plan
+    for d in plan.get("days", []):
+        used = {i.get("exercise_id") for i in d.get("items", [])}
+        for it in d.get("items", []):
+            dst = prefs.get(it.get("exercise_id"))
+            if dst and dst not in used and catalog.get(dst):
+                used.add(dst)
+                it["exercise_id"] = dst
+                if catalog.get(dst).get("timed") and not it.get("duration_s"):
+                    it.pop("reps", None)
+                    it["duration_s"] = 40
+    return plan
+
+
 @app.post("/api/generator/apply")
 def generator_apply(body: dict = Body(default={})):
     """Gera, salva a planilha, define como planilha da agenda e (re)monta a semana."""
@@ -1625,7 +1647,7 @@ def generator_apply(body: dict = Body(default={})):
         db.save_profile(overrides)
     prof = _profile()
     seed = int(body.get("seed") or 0)
-    plan = generator.generate(prof, seed, recent=_recent(prof))
+    plan = _apply_swaps(generator.generate(prof, seed, recent=_recent(prof)))
     plan["generator"]["cycle_start"] = schedule.week_start(clock.today()).isoformat()
     for p in db.list_plans():
         if p.get("generator") and p.get("active"):

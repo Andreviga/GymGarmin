@@ -711,3 +711,13 @@ div.mm-chip { cursor: default; margin: 0 0 10px; }
 .dev-link { padding: 14px 16px; gap: 12px; align-items: center; text-decoration: none !important; }
 .dv-img { width: 100%; max-height: 50vh; object-fit: contain; background: #000; border-radius: 14px; margin-bottom: 8px; }
 .dv-exs .chip { min-height: 36px; }
+
+/* instalar na tela inicial */
+.install-card { display: flex; align-items: center; gap: 12px; background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow);
+  padding: 12px 14px; margin-bottom: 14px; border: 2px solid var(--brand-soft); flex-wrap: wrap; }
+.install-card .grow { display: flex; flex-direction: column; min-width: 160px; flex: 1; }
+.ic-logo { width: 44px; height: 44px; border-radius: 12px; flex: none; }
+.ic-btns { display: flex; gap: 6px; align-items: center; margin-left: auto; }
+.inst-steps { padding-left: 22px; margin: 6px 0 12px; }
+.inst-steps li { margin: 10px 0; line-height: 1.45; }
+.inst-ico { display: inline-grid; place-items: center; min-width: 26px; height: 26px; padding: 0 4px; border-radius: 7px; background: var(--info-bg); font-weight: 800; }

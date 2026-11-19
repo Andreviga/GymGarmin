@@ -225,7 +225,7 @@ async function viewHoje(weekDate) {
   sch._sel = sel;
   const adjusted = plannedToday.some((e) => e.readiness_backup);
   view.innerHTML = `${weekDate ? pageHead(`Semana de ${ddmm(sch.week_start)}`) : pageHead("Hoje", true, sch.today)}
-  ${weekDate ? "" : firstStepsHtml(true) + statsHtml(rd, g, adjusted, plannedToday.length > 0)}${athleteHtml}
+  ${weekDate ? "" : firstStepsHtml(true) + statsHtml(rd, g, adjusted, plannedToday.length > 0) + installCardHtml("hoje")}${athleteHtml}
   ${missed.length ? `<div class="rec alerta"><b>Treino perdido:</b> ${missed.map((e) => `${e.weekday} ${ddmm(e.date)} – ${esc(e.day_name)}`).join(", ")}.
      <div class="row gap wrap" style="margin-top:6px">${missed.map((e) => `<button class="btn sm" data-skip="${e.id}">Ajustar a semana (${e.weekday})</button>`).join("")}</div></div>` : ""}
   <section class="week">
@@ -466,6 +466,7 @@ async function openGenerator() {
   const nearest = (m) => MONTH_OPTS.reduce((a, b) => (Math.abs(b[0] - (m ?? 12)) < Math.abs(a[0] - (m ?? 12)) ? b : a))[0];
   let seed = 0;
   const body = openModal(`<h2>Gerar treino automático</h2>
+    ${state.profile && state.profile.schedule_plan_id ? `<p class="small rec">Gera um treino novo com as regras atuais (descanso pela evidência, aquecimento do exercício, aparelhos novos). Você vê a prévia antes; o anterior fica guardado em Planos. Histórico, cargas, aparelhos fotografados e trocas “usar sempre” continuam.</p>` : ""}
     <div class="grid2">
       <div class="field"><label>Tempo de prática</label><select id="gm-months">${MONTH_OPTS.map(([v, t]) => `<option value="${v}" ${nearest(p.training_months) === v ? "selected" : ""}>${t}</option>`).join("")}</select></div>
       <div class="field"><label>Objetivo</label><select id="gm-goal">${opts.goals.map((g) => `<option value="${g.id}" ${p.goal === g.id ? "selected" : ""}>${esc(g.label)}</option>`).join("")}</select></div>
@@ -2343,6 +2344,7 @@ async function viewPerfil(openSec) {
       <div class="meter" style="margin-top:8px"><span style="width:${Math.round(100 * filled / PROFILE_REQ.length)}%"></span></div>
       <span class="small ${miss.length ? "muted" : "ok-txt"}">${miss.length ? `Falta: ${miss.map((m) => m[1]).join(", ")}` : "Perfil completo ✔"}</span></div>
   </section>
+  ${installCardHtml("perfil")}
   ${sect("dados", "👤", "Seus dados", [p.age ? `${p.age} anos` : "", p.weight_kg ? `${p.weight_kg} kg` : "", p.height_cm ? `${p.height_cm} cm` : ""].filter(Boolean).join(" · ") || "nome, idade, peso, altura, FC",
     `<div class="grid2">
       <div class="field"><label>Nome</label><input data-p="name" value="${esc(p.name && p.name !== "Eu" ? p.name : "")}" placeholder="Como quer ser chamado" autocomplete="given-name"></div>
@@ -2377,7 +2379,8 @@ async function viewPerfil(openSec) {
       <div class="grid2">${num("cardio_target_min", "Meta de cardio (min/semana)", 'min="0" step="10" placeholder="pelo objetivo"')}
         ${num("volume_factor", "Ajuste de volume (×)", 'step="0.05" min="0.5" max="1.5"')}</div>
       <p class="small muted">“Ajuste de volume” multiplica as séries por músculo: reduza se não estiver recuperando, aumente se estagnou recuperando bem.</p></details>
-    <p class="small muted">Mudou algo aqui? Depois de salvar, gere o treino de novo em Hoje → Opções da semana.</p>`, miss.some((m) => ["training_months", "available_days", "goal"].includes(m[0])))}
+    <button class="btn ghost block" id="prof-regen" type="button" style="margin-top:12px">🔄 Gerar meu treino de novo</button>
+    <p class="small muted">Mudou algo aqui? Salve e gere de novo: você vê a prévia antes de trocar. Histórico, cargas, aparelhos fotografados e as trocas “usar sempre” continuam.</p>`, miss.some((m) => ["training_months", "available_days", "goal"].includes(m[0])))}
   ${sect("limites", "🩹", "Limitações e lesões", lims.length ? lims.map((l) => (state.meta.limitations.find((x) => x.id === l.key) || {}).label || l.key).join(", ") : "nenhuma marcada",
     `<p class="small muted">O app marca exercícios como <span class="pill warn">cuidado</span> ou <span class="pill bad">evitar</span>, troca os que não servem e limita a zona do cardio. Não substitui orientação de um profissional.</p>
     <ul class="list">${state.meta.limitations.map((l) => `<li><label class="row gap" style="color:var(--ink);font-size:15px;margin:0"><input type="checkbox" data-lim="${l.id}" ${ul[l.id] ? "checked" : ""}> <span class="grow">${esc(l.label)}</span>
@@ -2486,6 +2489,7 @@ async function viewPerfil(openSec) {
       };
     } catch (e) { box.innerHTML = `<p class="pill bad">${esc(e.message)}</p>`; }
   };
+  const rg = $("#prof-regen"); if (rg) rg.onclick = () => openGenerator();
   loadMyGym();
   if (state.me && state.me.user && state.me.user.is_admin) api("/api/dev/queue").then((q) => { const el = $("#dev-count"); if (el) el.textContent = q.pending.length ? `${q.pending.length} ${q.pending.length === 1 ? "foto" : "fotos"} para aprovar` : "nenhuma foto na fila · adicionar aparelhos"; }).catch(() => {});
 }
@@ -2668,6 +2672,43 @@ function startApp() {
   updateGarminPill().then((g) => { if (g && g.connected) autoSync(); });
 }
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
+
+/* ---- instalar na tela inicial: Android/Chrome usa o instalador nativo; iPhone mostra o passo a passo ---- */
+let INSTALL_EVT = null;
+const isStandalone = () => (window.matchMedia && matchMedia("(display-mode: standalone)").matches) || navigator.standalone === true;
+const isIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); INSTALL_EVT = e; $$("[data-install]").forEach((b) => (b.hidden = false)); });
+window.addEventListener("appinstalled", () => { INSTALL_EVT = null; $$(".install-card").forEach((c) => c.remove()); toast("HAX instalado na tela inicial 🎉"); });
+function installCardHtml(kind = "hoje") {
+  if (isStandalone()) return "";
+  if (kind === "hoje") { try { const t = +localStorage.getItem("gg_install_later") || 0; if (Date.now() - t < 14 * 864e5) return ""; } catch (_) { /* sem storage */ } }
+  return `<section class="install-card ${kind}"><img src="/static/icon-192.png" alt="" class="ic-logo">
+    <span class="grow"><b>Instalar o HAX no celular</b><span class="small muted">Ícone na tela inicial, abre em tela cheia e mais rápido na academia.</span></span>
+    <span class="ic-btns"><button class="btn sm" data-install>📲 Instalar</button>${kind === "hoje" ? `<button class="act" data-install-later aria-label="Agora não">Agora não</button>` : ""}</span></section>`;
+}
+async function doInstall() {
+  if (INSTALL_EVT) {
+    const ev = INSTALL_EVT; INSTALL_EVT = null;
+    ev.prompt();
+    try { const r = await ev.userChoice; if (r && r.outcome === "accepted") return; } catch (_) { /* navegador antigo */ }
+    return;
+  }
+  const ios = isIOS(); const safari = ios && !/crios|fxios|edgios|gsa/i.test(navigator.userAgent);
+  openModal(`<h2>📲 Instalar o HAX</h2>${ios ? `
+    <ol class="inst-steps">${safari ? "" : `<li>Se não aparecer a opção abaixo, abra <b>${esc(location.host)}</b> no <b>Safari</b>.</li>`}
+      <li>Toque em <b>Compartilhar</b> <span class="inst-ico">⬆︎</span> (na barra de baixo do Safari${safari ? "" : " ou no menu do navegador"}).</li>
+      <li>Role e toque em <b>Adicionar à Tela de Início</b> <span class="inst-ico">⊞</span>.</li>
+      <li>Confirme em <b>Adicionar</b>. O ícone do HAX aparece junto dos seus apps.</li></ol>`
+    : `<ol class="inst-steps"><li>Toque no menu <span class="inst-ico">⋮</span> do navegador (canto de cima).</li>
+      <li>Escolha <b>Instalar app</b> ou <b>Adicionar à tela inicial</b>.</li>
+      <li>Confirme. O ícone do HAX aparece junto dos seus apps.</li></ol>
+    <p class="small muted">No Chrome do Android o botão “Instalar” abre o instalador direto; se ele não abriu, use o menu como acima.</p>`}
+    <p class="small muted">Instalado, o HAX abre em tela cheia (sem a barra do navegador), mantém o login e funciona mesmo com sinal fraco na academia.</p>`);
+}
+document.addEventListener("click", (e) => {
+  if (e.target.closest("[data-install]")) { e.preventDefault(); return doInstall(); }
+  if (e.target.closest("[data-install-later]")) { try { localStorage.setItem("gg_install_later", String(Date.now())); } catch (_) { /* */ } const c = e.target.closest(".install-card"); if (c) c.remove(); }
+});
 // App que estava aberto em segundo plano: ao voltar depois de alguns minutos, confere se há versão nova
 // (e recarrega), registra a abertura, atualiza a tela e sincroniza o relógio — como se tivesse aberto de novo.
 const MY_VERSION = ((document.querySelector('script[src*="app.js"]') || {}).src || "").split("v=")[1] || "";
