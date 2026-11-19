@@ -199,10 +199,10 @@ function meter(label, done, target, unit = "") {
 
 async function viewHoje(weekDate) {
   const athletePromise = weekDate ? Promise.resolve("") : athleteCards().catch(() => "");
-  const [sch, rd] = await Promise.all([api(`/api/schedule${weekDate ? `?date=${weekDate}` : ""}`),
-    weekDate ? Promise.resolve(null) : api("/api/readiness").catch(() => null)]);
+  const [sch, rd, gst] = await Promise.all([api(`/api/schedule${weekDate ? `?date=${weekDate}` : ""}`),
+    weekDate ? Promise.resolve(null) : api("/api/readiness").catch(() => null), api("/api/garmin/status").catch(() => null)]);
   if (!sch.plan) {
-    view.innerHTML = `${pageHead("Hoje")}${firstStepsHtml(false)}<section class="today-card">
+    view.innerHTML = `${pageHead("Hoje")}${firstStepsHtml(false)}${installCardHtml("hoje")}<section class="today-card">
       <div class="eyebrow">Comece por aqui</div><div class="tc-title">Monte seu treino</div>
       <p class="muted">Diga há quanto tempo treina, os dias e o tempo que tem. O app monta musculação e corrida juntas, respeita suas limitações e reorganiza a semana quando você faltar.</p>
       <button class="btn block" id="gen-open">Gerar meu treino</button>
@@ -225,7 +225,7 @@ async function viewHoje(weekDate) {
   sch._sel = sel;
   const adjusted = plannedToday.some((e) => e.readiness_backup);
   view.innerHTML = `${weekDate ? pageHead(`Semana de ${ddmm(sch.week_start)}`) : pageHead("Hoje", true, sch.today)}
-  ${weekDate ? "" : firstStepsHtml(true) + statsHtml(rd, g, adjusted, plannedToday.length > 0) + installCardHtml("hoje")}${athleteHtml}
+  ${weekDate ? "" : firstStepsHtml(true) + statsHtml(rd, g, adjusted, plannedToday.length > 0) + garminSyncCard(sch, gst) + installCardHtml("hoje")}${athleteHtml}
   ${missed.length ? `<div class="rec alerta"><b>Treino perdido:</b> ${missed.map((e) => `${e.weekday} ${ddmm(e.date)} – ${esc(e.day_name)}`).join(", ")}.
      <div class="row gap wrap" style="margin-top:6px">${missed.map((e) => `<button class="btn sm" data-skip="${e.id}">Ajustar a semana (${e.weekday})</button>`).join("")}</div></div>` : ""}
   <section class="week">
@@ -285,6 +285,17 @@ const SPORT_WORD = { corrida: "corrida", ciclismo: "bike", natacao: "natação",
 const WD_LONG = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"];
 const WD_SHORT = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SÁB"];
 const MONTHS = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
+// treinos desta semana que mudaram (ou ainda não foram) para o relógio: um toque reenvia só esses
+function garminSyncCard(sch, gst) {
+  if (!gst || !gst.connected) return "";
+  const pend = (sch.entries || []).filter((e) => e.status === "planejado" && e.date >= sch.today);
+  const out = pend.filter((e) => e.garmin_outdated); const missing = pend.filter((e) => !e.garmin_workout_id && !e.garmin_outdated);
+  const n = out.length + missing.length; if (!n) return "";
+  return `<section class="garmin-card"><span class="gc-ico" aria-hidden="true">⌚</span><span class="grow"><b>${n} ${n === 1 ? "treino para atualizar" : "treinos para atualizar"} no relógio</b>
+    <span class="small muted">${out.length ? "O treino mudou desde o último envio (regras novas, troca ou regeração)" : "Ainda não foram para o Garmin"}</span></span>
+    <button class="btn sm" id="push-outdated">Reenviar ao Garmin</button></section>`;
+}
+
 function pageHead(title, greet = false, today = null) {
   const d = today ? new Date(today + "T12:00:00") : new Date();
   const name = state.me && state.me.user && state.me.user.name ? String(state.me.user.name).split(" ")[0] : "";
@@ -444,6 +455,11 @@ function bindAgenda(sch) {
         return;
       }
       if (d.push) { t.disabled = true; const r = await api(`/api/schedule/${d.push}/push`, { method: "POST" }); toast(`Enviado ao Garmin para ${r.scheduled}`); return viewHoje(sch.week_start); }
+      if (t.id === "push-outdated") {
+        t.disabled = true; t.textContent = "Enviando…";
+        const r = await api("/api/schedule/push-week", { method: "POST", body: { only_outdated: true } });
+        toast(`⌚ ${r.length} ${r.length === 1 ? "treino atualizado" : "treinos atualizados"} no Garmin. Sincronize o relógio pelo app Garmin Connect.`, 6000); return viewHoje(sch.week_start);
+      }
       if (t.id === "push-week") {
         t.disabled = true;
         const r = await api("/api/schedule/push-week", { method: "POST", body: { only_outdated: false } });
@@ -484,8 +500,9 @@ async function openGenerator() {
       Musculação e esporte no mesmo treino (os minutos acima valem para o dia todo: força primeiro, esporte logo depois)</label>
     <p class="small muted">Entra na mesma semana da musculação: longe dos dias de perna pesada, longo no fim de semana, ~80% leve.
       Metas de prova, triathlon e zonas ficam em <a href="#esportes" id="gm-esportes">Esportes</a>. Limitações e equipamentos vêm do Perfil.</p>
-    <div class="row gap wrap"><button class="btn ghost" id="gm-prev">Pré-visualizar</button><button class="btn ghost" id="gm-var" hidden>Outra variação</button><button class="btn" id="gm-apply" hidden>Usar e montar minha semana</button></div>
-    <div id="gm-out" style="margin-top:12px"></div>`);
+    <div id="gm-out" style="margin-top:12px"></div>
+    <div class="gm-bar"><p class="small muted" id="gm-hint">1º veja a prévia. Nada muda até você tocar em <b>Usar este treino</b>.</p>
+      <div class="row gap wrap"><button class="btn" id="gm-prev">Ver prévia</button><button class="btn ghost" id="gm-var" hidden>Outra variação</button><button class="btn" id="gm-apply" hidden>✓ Usar este treino</button></div></div>`);
   const read = () => ({
     training_months: +$("#gm-months", body).value, goal: $("#gm-goal", body).value,
     session_minutes: +$("#gm-min", body).value || 60,
@@ -521,16 +538,36 @@ async function openGenerator() {
     const ids = [...new Set(plan.days.flatMap((d) => d.items.map((i) => i.exercise_id)))];
     const names = {}; await Promise.all(ids.map(async (id) => { try { names[id] = (await api(`/api/exercises/${encodeURIComponent(id)}`)).name; } catch (_) { /* */ } }));
     $$("#gm-out [data-ex]", body).forEach((el) => { if (names[el.dataset.ex]) el.textContent = names[el.dataset.ex]; });
-    $("#gm-var", body).hidden = false; $("#gm-apply", body).hidden = false;
+    $("#gm-var", body).hidden = false; $("#gm-apply", body).hidden = false; $("#gm-prev", body).hidden = true;
+    $("#gm-hint", body).innerHTML = "Gostou? Toque em <b>✓ Usar este treino</b> para trocar (o anterior fica em Planos).";
   };
   $("#gm-esportes", body).onclick = () => closeModal();
   $("#gm-prev", body).onclick = () => preview().catch((e) => toast(e.message));
   $("#gm-var", body).onclick = () => { seed += 1; preview().catch((e) => toast(e.message)); };
-  $("#gm-apply", body).onclick = async () => {
-    await api("/api/generator/apply", { method: "POST", body: { profile: read(), seed } });
+  $("#gm-apply", body).onclick = async (e) => {
+    e.target.disabled = true; e.target.textContent = "Montando a semana…";
+    let plan;
+    try { plan = await api("/api/generator/apply", { method: "POST", body: { profile: read(), seed } }); }
+    catch (err) { e.target.disabled = false; e.target.textContent = "✓ Usar este treino"; return toast(err.message, 6000); }
     state.profile = await api("/api/profile");
-    closeModal(); toast("Treino gerado e semana montada!");
+    const gst = await api("/api/garmin/status").catch(() => null);
+    // a semana nova já fica desenhada atrás da janela
+    closeModal();
+    view.dataset.route = ""; view.setAttribute("aria-busy", "true");
     if (location.hash.startsWith("#hoje") || !location.hash) route(); else location.hash = "#hoje";
+    for (let k = 0; k < 40 && !(view.dataset.route === "hoje" && view.getAttribute("aria-busy") !== "true"); k++) await new Promise((r) => setTimeout(r, 100));
+    const done = openModal(`<h2>Treino novo pronto ✓</h2><p>“${esc(plan.name || "Treino")}” virou o seu treino e a semana foi remontada a partir de hoje. O anterior ficou guardado em Planos.</p>
+      ${gst && gst.connected ? `<div class="rec"><b>Falta o relógio:</b> o Garmin ainda tem o treino antigo. Envie agora para trocar (os antigos desta semana são apagados lá).</div>
+        <button class="btn block" id="gm-push">⌚ Enviar a semana ao Garmin</button>` : ""}
+      <a class="btn ghost block" href="#hoje" id="gm-see" style="margin-top:8px">Ver minha semana</a>`);
+    const goHoje = () => { closeModal(); route(); };
+    $("#gm-see", done).onclick = (ev) => { ev.preventDefault(); goHoje(); };
+    const gp = $("#gm-push", done);
+    if (gp) gp.onclick = async () => {
+      gp.disabled = true; gp.textContent = "Enviando…";
+      try { const r = await api("/api/schedule/push-week", { method: "POST", body: { only_outdated: false } }); toast(`⌚ ${r.length} treinos enviados ao Garmin. Sincronize o relógio pelo app Garmin Connect.`, 6000); goHoje(); }
+      catch (err) { gp.disabled = false; gp.textContent = "⌚ Tentar de novo"; toast(err.message, 6000); }
+    };
   };
 }
 
@@ -711,6 +748,24 @@ function bindCoachMine() {
 }
 
 /* ---------------------------------------------------------------- CONTA -- */
+function inviteMsg(note, link) {
+  const nome = (note || "").trim().split(/\s+/)[0];
+  return `Oi${nome ? " " + nome : ""}! Estou testando o HAX, um app de treino que monta musculação e corrida juntas, guia o treino com cronômetro e conversa com o relógio. Quero sua opinião 🙂\n\n1) Crie sua conta por este link (é só seu, vale uma vez):\n${link}\n2) Depois toque em "Instalar" para colocar o ícone na tela do celular.\n3) Qualquer coisa estranha, toque em Perfil → "Mandar sugestão ou problema".`;
+}
+function openFeedback() {
+  const where = (location.hash || "#hoje").slice(1, 40);
+  const body = openModal(`<h2>💬 Sugestão ou problema</h2>
+    <p class="small muted">Conta o que achou, o que faltou ou o que deu errado. Vai direto para quem desenvolve o app.</p>
+    <textarea id="fb-text" rows="5" placeholder="ex.: no treino guiado o botão de carga ficou pequeno no meu celular…"></textarea>
+    <button class="btn block" id="fb-send" style="margin-top:10px">Enviar</button>`);
+  $("#fb-send", body).onclick = async (e) => {
+    e.target.disabled = true;
+    try {
+      await api("/api/feedback", { method: "POST", body: { text: $("#fb-text", body).value, where, device: `${navigator.userAgent.match(/\(([^)]+)\)/)?.[1] || ""} · ${innerWidth}px${isStandalone() ? " · instalado" : ""}` } });
+      closeModal(); toast("Recebido, obrigado! 🙏");
+    } catch (err) { e.target.disabled = false; toast(err.message, 5000); }
+  };
+}
 async function showAuth(mode, code) {
   document.body.classList.add("auth-mode");
   $("#modal").hidden = true;
@@ -766,9 +821,9 @@ async function accountCard() {
         ${x.user_id !== u.id ? `<span class="row gap"><button class="btn sm ghost" data-coach="${x.user_id}" data-on="${x.is_coach ? 0 : 1}">${x.is_coach ? "Tirar coach" : "Tornar coach"}</button><button class="btn sm ghost" data-reset="${x.user_id}">Senha provisória</button></span>` : ""}</li>`).join("")}</ul>
       <h3>Convites</h3>
       ${a.invites.length ? `<ul class="list">${a.invites.map((i) => `<li class="row between gap wrap"><span class="small"><b>${esc(i.note || "Convite")}</b><br><span class="muted" style="word-break:break-all">${esc(base)}#convite/${esc(i.code)}</span></span>
-        <span class="row gap"><button class="btn sm" data-copy="${esc(base)}#convite/${esc(i.code)}">Copiar link</button><button class="btn sm ghost" data-delinv="${esc(i.code)}">Apagar</button></span></li>`).join("")}</ul>` : `<p class="small muted">Nenhum convite pendente.</p>`}
+        <span class="row gap wrap"><a class="btn sm wa" href="https://wa.me/?text=${encodeURIComponent(inviteMsg(i.note, `${base}#convite/${i.code}`))}" target="_blank" rel="noopener">WhatsApp</a><button class="btn sm ghost" data-share="${esc(inviteMsg(i.note, `${base}#convite/${i.code}`))}">Compartilhar</button><button class="btn sm ghost" data-copy="${esc(base)}#convite/${esc(i.code)}">Copiar link</button><button class="btn sm ghost" data-delinv="${esc(i.code)}">Apagar</button></span></li>`).join("")}</ul>` : `<p class="small muted">Nenhum convite pendente.</p>`}
       <form id="inv-form" class="row gap wrap"><input name="note" placeholder="Para quem? (ex.: Maria)" style="flex:1;min-width:160px"><button class="btn sm" type="submit">Criar convite</button></form>
-      <p class="small muted">Cada convite vale para uma pessoa. Mande o link por WhatsApp: ela cria e-mail e senha e começa com o app vazio, com seu próprio Garmin.</p></div>`;
+      <p class="small muted">Cada convite vale para uma pessoa (crie um por pessoa). Ela cria e-mail e senha e começa com o app vazio: perfil, treino e Garmin próprios. Você não vê os treinos dela (só se ela te escolher como coach).</p></div>`;
   }
   return `<div class="card"><h2>Sua conta</h2><p><b>${esc(u.name || "")}</b> <span class="small muted">${esc(u.email)}${u.is_admin ? " · administrador" : ""}</span></p>
     <details><summary class="small">Trocar senha</summary><form id="pw-form" class="stack"><div class="grid2">
@@ -840,11 +895,19 @@ function bindAccount() {
   const inv = $("#inv-form");
   if (inv) inv.onsubmit = async (e) => {
     e.preventDefault();
+    const note = new FormData(e.target).get("note");
     const r = await api("/api/admin/invites", { method: "POST", body: Object.fromEntries(new FormData(e.target)) });
     const link = `${location.origin}${location.pathname}#convite/${r.code}`;
-    try { await navigator.clipboard.writeText(link); toast("Convite criado e link copiado"); } catch (_) { toast("Convite criado"); }
-    viewPerfil();
+    const msg = inviteMsg(note, link);
+    await viewPerfil("conta");
+    const body = openModal(`<h2>Convite ${note ? `para ${esc(note)}` : "criado"} ✓</h2>
+      <p class="small muted">Mande esta mensagem (o link vale para uma pessoa):</p><pre class="inv-msg">${esc(msg)}</pre>
+      <a class="btn block wa" id="inv-wa" href="https://wa.me/?text=${encodeURIComponent(msg)}" target="_blank" rel="noopener">Enviar pelo WhatsApp</a>
+      <div class="row gap" style="margin-top:8px"><button class="btn ghost grow" id="inv-share">Compartilhar…</button><button class="btn ghost grow" id="inv-copy">Copiar mensagem</button></div>`);
+    $("#inv-share", body).onclick = async () => { try { if (navigator.share) await navigator.share({ text: msg }); else { await navigator.clipboard.writeText(msg); toast("Mensagem copiada"); } } catch (_) { /* cancelado */ } };
+    $("#inv-copy", body).onclick = async () => { try { await navigator.clipboard.writeText(msg); toast("Mensagem copiada"); } catch (_) { prompt("Copie a mensagem:", msg); } };
   };
+  $$("[data-share]").forEach((b) => { b.onclick = async () => { try { if (navigator.share) await navigator.share({ text: b.dataset.share }); else { await navigator.clipboard.writeText(b.dataset.share); toast("Mensagem copiada"); } } catch (_) { /* cancelado */ } }; });
   $$("[data-copy]").forEach((b) => { b.onclick = async () => { try { await navigator.clipboard.writeText(b.dataset.copy); toast("Link copiado"); } catch (_) { prompt("Copie o link:", b.dataset.copy); } }; });
   $$("[data-delinv]").forEach((b) => { b.onclick = async () => { await api(`/api/admin/invites/${b.dataset.delinv}`, { method: "DELETE" }); viewPerfil(); }; });
   $$("[data-reset]").forEach((b) => { b.onclick = async () => {
@@ -1450,6 +1513,9 @@ async function viewDev() {
   view.innerHTML = `<p class="small muted" style="margin:2px 4px 12px">Só você (administrador) vê esta área. O que for aprovado aqui entra na galeria de aparelhos para todos.</p>
     <div class="card"><h2>Adicionar aparelho com foto</h2><p class="small muted">Na academia: fotografe, diga o nome e quais exercícios dá para fazer. Entra na galeria de aparelhos para todos na hora.</p>
       <button class="btn block" id="dv-new">📷 Fotografar aparelho novo</button></div>
+    <h2 class="sec-title">Feedback (${(q.feedback || []).filter((f) => !f.done).length} novos)</h2>
+    ${(q.feedback || []).length ? `<div class="picks fb-list">${q.feedback.map((f) => `<div class="pick fb ${f.done ? "done" : ""}"><span class="grow"><b>${esc(f.user_name || "—")}</b><span class="small muted">${fmtDate(f.created)} · tela ${esc(f.where || "—")}${f.device ? ` · ${esc(f.device)}` : ""}</span>
+      <span class="fb-text">${esc(f.text)}</span></span><button class="act" data-fbdone="${esc(f.id)}" data-v="${f.done ? 0 : 1}">${f.done ? "Reabrir" : "✓ Resolvido"}</button></div>`).join("")}</div>` : `<p class="muted small" style="margin:0 4px 14px">Ainda nenhum. Todo mundo tem o botão “Mandar sugestão ou problema” no Perfil.</p>`}
     <h2 class="sec-title">Fotos para aprovar (${q.pending.length})</h2>
     ${q.pending.length ? q.pending.map((x) => `<div class="card dv-card" data-q="${esc(x.qid)}">
       <img class="dv-img" src="${esc(x.photo_url)}" alt="">
@@ -1465,6 +1531,8 @@ async function viewDev() {
   const exsOf = (card) => [...card.querySelectorAll("[data-rm-ex]")].map((c) => c.dataset.rmEx);
   view.onclick = async (e) => {
     const card = e.target.closest("[data-q]");
+    const fb = e.target.closest("[data-fbdone]");
+    if (fb) { await api(`/api/dev/feedback/${fb.dataset.fbdone}/done`, { method: "POST", body: { done: fb.dataset.v === "1" } }); return viewDev(); }
     if (e.target.id === "dv-new") return devNewMachine(q, catOpts, guessCat);
     const del = e.target.closest("[data-del-m]");
     if (del) { if (!confirm("Remover este aparelho da galeria?")) return; await api(`/api/dev/machines/${del.dataset.delM}`, { method: "DELETE" }); toast("Removido"); return viewDev(); }
@@ -2345,6 +2413,9 @@ async function viewPerfil(openSec) {
       <span class="small ${miss.length ? "muted" : "ok-txt"}">${miss.length ? `Falta: ${miss.map((m) => m[1]).join(", ")}` : "Perfil completo ✔"}</span></div>
   </section>
   ${installCardHtml("perfil")}
+  ${state.me && state.me.user && state.me.user.is_admin ? `<button class="link-card sect dev-link" id="fam-open" type="button"><span class="sect-ico" aria-hidden="true">👨‍👩‍👧</span><span class="grow"><b>Convidar família</b><span class="small muted">link pelo WhatsApp: cada pessoa cria a própria conta</span></span><span class="chev" aria-hidden="true">›</span></button>` : ""}
+  ${state.me && state.me.logged_in ? `<button class="link-card sect dev-link" data-feedback type="button"><span class="sect-ico" aria-hidden="true">💬</span><span class="grow"><b>Mandar sugestão ou problema</b><span class="small muted">o que achou, o que faltou, o que deu errado</span></span><span class="chev" aria-hidden="true">›</span></button>` : ""}
+  ${state.me && state.me.user && state.me.user.is_admin ? `<a class="link-card sect dev-link" href="#dev"><span class="sect-ico" aria-hidden="true">🛠️</span><span class="grow"><b>Área do desenvolvedor</b><span class="small muted" id="dev-count">fotos de aparelhos para aprovar</span></span><span class="chev" aria-hidden="true">›</span></a>` : ""}
   ${sect("dados", "👤", "Seus dados", [p.age ? `${p.age} anos` : "", p.weight_kg ? `${p.weight_kg} kg` : "", p.height_cm ? `${p.height_cm} cm` : ""].filter(Boolean).join(" · ") || "nome, idade, peso, altura, FC",
     `<div class="grid2">
       <div class="field"><label>Nome</label><input data-p="name" value="${esc(p.name && p.name !== "Eu" ? p.name : "")}" placeholder="Como quer ser chamado" autocomplete="given-name"></div>
@@ -2391,7 +2462,6 @@ async function viewPerfil(openSec) {
     `<p class="small">Corrida, ciclismo, natação, remo, caminhada e trilha: meta de volume ou prova com tempo alvo, zonas por ritmo, potência ou FC.</p>
     <a class="btn ghost block" href="#esportes">Configurar esportes e provas</a>`)}
   ${sect("academia", "🏟️", "Minha academia", "fotos e regulagem dos aparelhos que você usa", `<div id="mygym-box"><div class="sk"><span class="sk-line"></span></div></div>`)}
-  ${state.me && state.me.user && state.me.user.is_admin ? `<a class="link-card sect dev-link" href="#dev"><span class="sect-ico" aria-hidden="true">🛠️</span><span class="grow"><b>Área do desenvolvedor</b><span class="small muted" id="dev-count">fotos de aparelhos para aprovar</span></span><span class="chev" aria-hidden="true">›</span></a>` : ""}
   ${sect("relogios", "⌚", "Relógios", g.connected ? `Garmin conectado${g.display_name ? "" : ""}` : g.needs_reconnect ? "Garmin: reconectar" : "Garmin, Apple, Android",
     `<h3>Garmin</h3>
     ${!g.library_installed ? `<p class="pill bad">Biblioteca garminconnect não instalada no servidor: <code>pip install "garminconnect>=0.3.20"</code></p>` : ""}
@@ -2490,6 +2560,7 @@ async function viewPerfil(openSec) {
     } catch (e) { box.innerHTML = `<p class="pill bad">${esc(e.message)}</p>`; }
   };
   const rg = $("#prof-regen"); if (rg) rg.onclick = () => openGenerator();
+  const fo = $("#fam-open"); if (fo) fo.onclick = () => { const d = $("#sec-conta"); if (d) { d.open = true; d.scrollIntoView({ behavior: "smooth", block: "start" }); setTimeout(() => { const n = $("#inv-form input[name=note]"); if (n) n.focus(); }, 400); } };
   loadMyGym();
   if (state.me && state.me.user && state.me.user.is_admin) api("/api/dev/queue").then((q) => { const el = $("#dev-count"); if (el) el.textContent = q.pending.length ? `${q.pending.length} ${q.pending.length === 1 ? "foto" : "fotos"} para aprovar` : "nenhuma foto na fila · adicionar aparelhos"; }).catch(() => {});
 }
@@ -2698,7 +2769,8 @@ async function doInstall() {
     <ol class="inst-steps">${safari ? "" : `<li>Se não aparecer a opção abaixo, abra <b>${esc(location.host)}</b> no <b>Safari</b>.</li>`}
       <li>Toque em <b>Compartilhar</b> <span class="inst-ico">⬆︎</span> (na barra de baixo do Safari${safari ? "" : " ou no menu do navegador"}).</li>
       <li>Role e toque em <b>Adicionar à Tela de Início</b> <span class="inst-ico">⊞</span>.</li>
-      <li>Confirme em <b>Adicionar</b>. O ícone do HAX aparece junto dos seus apps.</li></ol>`
+      <li>Confirme em <b>Adicionar</b>. O ícone do HAX aparece junto dos seus apps.</li>
+      <li>Abra pelo ícone e <b>entre com o mesmo e-mail e senha</b> (no iPhone o app instalado pede login uma vez).</li></ol>`
     : `<ol class="inst-steps"><li>Toque no menu <span class="inst-ico">⋮</span> do navegador (canto de cima).</li>
       <li>Escolha <b>Instalar app</b> ou <b>Adicionar à tela inicial</b>.</li>
       <li>Confirme. O ícone do HAX aparece junto dos seus apps.</li></ol>
@@ -2707,6 +2779,7 @@ async function doInstall() {
 }
 document.addEventListener("click", (e) => {
   if (e.target.closest("[data-install]")) { e.preventDefault(); return doInstall(); }
+  if (e.target.closest("[data-feedback]")) { e.preventDefault(); return openFeedback(); }
   if (e.target.closest("[data-install-later]")) { try { localStorage.setItem("gg_install_later", String(Date.now())); } catch (_) { /* */ } const c = e.target.closest(".install-card"); if (c) c.remove(); }
 });
 // App que estava aberto em segundo plano: ao voltar depois de alguns minutos, confere se há versão nova

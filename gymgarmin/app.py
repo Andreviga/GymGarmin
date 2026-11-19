@@ -953,6 +953,24 @@ def plan_swap(plan_id: int, body: dict = Body(...)):
     return {"changed": n}
 
 
+@app.post("/api/feedback")
+def send_feedback(body: dict = Body(...)):
+    uid, name, _ = _me_ids()
+    try:
+        my_gym.add_feedback(uid, name, body.get("text") or "", body.get("where"), body.get("device"))
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from e
+    return {"ok": True}
+
+
+@app.post("/api/dev/feedback/{fid}/done")
+def dev_feedback_done(fid: str, body: dict = Body(default={})):
+    _dev()
+    if not my_gym.feedback_done(fid, bool(body.get("done", True))):
+        raise HTTPException(404, "Não encontrado")
+    return {"ok": True}
+
+
 # ------------------------------------------------------- área do desenvolvedor ----
 
 def _dev() -> None:
@@ -963,7 +981,7 @@ def _dev() -> None:
 @app.get("/api/dev/queue")
 def dev_queue():
     _dev()
-    return {"pending": my_gym.queue("pendente"), "approved": my_gym.queue("aprovado")[:20],
+    return {"pending": my_gym.queue("pendente"), "approved": my_gym.queue("aprovado")[:20], "feedback": my_gym.feedback(),
             "custom": [gallery.summary(m) for m in my_gym.custom_machines()],
             "categories": [{"id": k, "name": v} for k, v in gallery.CATEGORIES],
             "machines": [{"id": m["machine_id"], "name": m["name"]} for m in gallery.load()]}
@@ -1834,7 +1852,27 @@ def schedule_push_week(body: dict = Body(default={})):
     ws = schedule.week_start(today)
     entries = [e for e in db.list_schedule(today.isoformat(), (ws + timedelta(days=6)).isoformat())
                if e["status"] == "planejado" and (not only_outdated or _garmin_outdated(e, fmt) or not e.get("garmin_workout_id"))]
-    return _garmin_call(lambda: [{"date": e["date"], **_push_entry(e)} for e in entries])
+
+    def run():
+        _clear_garmin_orphans()
+        return [{"date": e["date"], **_push_entry(e)} for e in entries]
+    return _garmin_call(run)
+
+
+def _clear_garmin_orphans() -> int:
+    """Apaga do Garmin os treinos de uma semana que foi remontada (regerar/recriar), para não duplicar no relógio."""
+    ids = json.loads(db.kv_get("garmin_orphans") or "[]")
+    if not ids:
+        return 0
+    left = []
+    for wid in ids:
+        try:
+            garmin_sync.delete_workout(int(wid))
+        except Exception as e:  # noqa: BLE001 - já apagado lá (404) conta como feito; falha de rede tenta de novo depois
+            if "404" not in str(e) and "not found" not in str(e).lower():
+                left.append(wid)
+    db.kv_set("garmin_orphans", json.dumps(left))
+    return len(ids) - len(left)
 
 
 # --------------------------------------------------------------- backup ----

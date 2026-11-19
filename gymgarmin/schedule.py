@@ -398,9 +398,16 @@ def rebuild_week(profile: dict, today: date | None = None) -> list[dict]:
     """Recria os treinos ainda não feitos da semana atual a partir da planilha da agenda."""
     today = today or clock.today()
     ws = week_start(today)
+    orphans = []
     for e in db.list_schedule(today.isoformat(), (ws + timedelta(days=6)).isoformat()):
         if e["status"] in ("planejado", "perdido"):
+            if e.get("garmin_workout_id"):
+                orphans.append(e["garmin_workout_id"])  # já está no relógio: apagar lá no próximo envio
             db.delete_entry(e["id"])
+    if orphans:
+        import json
+        old = json.loads(db.kv_get("garmin_orphans") or "[]")
+        db.kv_set("garmin_orphans", json.dumps(sorted(set(old) | set(orphans), key=str)))
     plan = schedule_plan(profile)
     if plan:
         existing = {e["date"] for e in db.list_schedule(ws.isoformat(), (ws + timedelta(days=6)).isoformat())

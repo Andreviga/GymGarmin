@@ -219,7 +219,10 @@ async function flows(page, base, persona, tag) {
       await click("#gm-prev", "Pré-visualizar");
       await page.waitForSelector("#gm-apply:not([hidden])", { timeout: 15000 }).catch(() => issue("pré-visualização não terminou", W("gerador")));
       await modalCheck("gerador com prévia");
-      await click("#gm-apply", "Usar e montar minha semana");
+      await click("#gm-apply", "Usar este treino");
+      await page.waitForSelector("#gm-see", { timeout: 15000 }).catch(() => issue("janela 'treino novo pronto' não abriu", W("gerador")));
+      await modalCheck("treino novo pronto");
+      await click("#gm-see", "Ver minha semana");
       await page.waitForTimeout(600);
       const ok = await page.evaluate(() => /Semana de/.test(document.getElementById("view").innerText));
       if (!ok) issue("gerar treino não montou a semana", W("novo"));

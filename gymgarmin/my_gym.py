@@ -288,3 +288,32 @@ def delete_custom(machine_id: str) -> bool:
     _put("custom_machines", keep, GLOBAL)
     _invalidate()
     return True
+
+
+# ------------------------------------------------------------------ feedback ----
+
+def add_feedback(user_id: int, user_name: str | None, text: str, where: str | None, device: str | None) -> dict:
+    text = (text or "").strip()
+    if len(text) < 3:
+        raise ValueError("Escreva um pouco mais 🙂")
+    items = _get("feedback", GLOBAL, [])
+    item = {"id": secrets.token_hex(5), "user_id": user_id, "user_name": user_name, "text": text[:2000],
+            "where": (where or "")[:60], "device": (device or "")[:120], "done": False,
+            "created": clock.now().isoformat(timespec="seconds")}
+    items.append(item)
+    _put("feedback", items[-300:], GLOBAL)
+    return item
+
+
+def feedback(limit: int = 60) -> list[dict]:
+    return sorted(_get("feedback", GLOBAL, []), key=lambda f: f["created"], reverse=True)[:limit]
+
+
+def feedback_done(fid: str, done: bool = True) -> bool:
+    items = _get("feedback", GLOBAL, [])
+    for f in items:
+        if f["id"] == fid:
+            f["done"] = done
+            _put("feedback", items, GLOBAL)
+            return True
+    return False

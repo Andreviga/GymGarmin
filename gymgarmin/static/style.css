@@ -721,3 +721,22 @@ div.mm-chip { cursor: default; margin: 0 0 10px; }
 .inst-steps { padding-left: 22px; margin: 6px 0 12px; }
 .inst-steps li { margin: 10px 0; line-height: 1.45; }
 .inst-ico { display: inline-grid; place-items: center; min-width: 26px; height: 26px; padding: 0 4px; border-radius: 7px; background: var(--info-bg); font-weight: 800; }
+
+/* gerador: ação sempre visível; cartão de reenviar ao Garmin */
+.gm-bar { position: sticky; bottom: calc(-24px - env(safe-area-inset-bottom)); margin: 12px -16px calc(-24px - env(safe-area-inset-bottom));
+  padding: 10px 16px calc(14px + env(safe-area-inset-bottom)); background: var(--card); border-top: 1px solid var(--line); z-index: 3; }
+.gm-bar p { margin: 0 0 8px; }
+.gm-bar .btn { flex: 1; }
+.gm-bar .btn[hidden] { display: none; }
+.garmin-card { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; background: var(--warn-bg); border-radius: var(--radius); padding: 12px 14px; margin-bottom: 14px; }
+.garmin-card .grow { display: flex; flex-direction: column; min-width: 170px; flex: 1; }
+.garmin-card .gc-ico { font-size: 26px; }
+.garmin-card .btn { margin-left: auto; }
+
+/* família e feedback */
+button.link-card { width: 100%; border: 0; font: inherit; color: var(--ink); text-align: left; cursor: pointer; }
+.btn.wa { background: #1fa855; border-color: #1fa855; color: #fff; }
+.fb-list .pick { align-items: flex-start; }
+.fb-text { display: block; margin-top: 6px; white-space: pre-wrap; font-size: 14px; }
+.pick.fb.done { opacity: .55; }
+.inv-msg { white-space: pre-wrap; font: inherit; font-size: 14px; background: var(--bg); border-radius: 12px; padding: 12px; margin: 6px 0 12px; max-height: 36vh; overflow: auto; }

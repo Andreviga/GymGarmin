@@ -126,3 +126,14 @@ def test_swap_survives_regenerating_the_plan(owner):
     new = owner.post("/api/generator/apply", json={"profile": prof}).json()
     new_ids = [i["exercise_id"] for d in new["days"] for i in d["items"]]
     assert src not in new_ids and dst in new_ids
+
+
+def test_family_feedback_reaches_dev_area(owner):
+    m = _member(owner)
+    assert m.post("/api/feedback", json={"text": "ok"}).status_code == 400
+    assert m.post("/api/feedback", json={"text": "O botão de carga ficou pequeno", "where": "treinar", "device": "Android"}).status_code == 200
+    assert m.get("/api/dev/queue").status_code == 403
+    fb = owner.get("/api/dev/queue").json()["feedback"]
+    assert fb[0]["user_name"] == "Maria" and fb[0]["where"] == "treinar" and not fb[0]["done"]
+    assert owner.post(f"/api/dev/feedback/{fb[0]['id']}/done", json={"done": True}).status_code == 200
+    assert owner.get("/api/dev/queue").json()["feedback"][0]["done"]
