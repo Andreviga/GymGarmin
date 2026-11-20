@@ -222,7 +222,7 @@ def test_reinforcement_guards(fresh_db):
                 # só reforça músculo que o treino pulado treinava de verdade, em exercício que treina ESSE músculo
                 assert o["muscle"] in catalog.get(a["exercise_id"])["primaryMuscles"]
                 assert credit.entry_direct(target, base=True).get(o["muscle"], 0) >= 2
-                assert credit.entry_direct(src).get(o["muscle"], 0) >= schedule.NEIGHBOR_DIRECT  # o treino já treinava o músculo
+                assert credit.entry_direct(src).get(o["muscle"], 0) >= schedule.REINFORCE_MIN_DIRECT  # o treino já treinava o músculo
             per = {}
             for o in ops:
                 per[o["entry_id"]] = per.get(o["entry_id"], 0) + 1

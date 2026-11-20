@@ -264,7 +264,7 @@ function weekMissHtml(g) {
     ${miss.length ? `<p class="small muted" style="margin:0 0 8px">Séries por músculo que ficam faltando mesmo com os treinos que ainda estão na agenda (treino perdido, pulado ou feito pela metade).</p>
       ${missListHtml(miss)}
       <a class="btn ghost block" href="#treinar/livre" style="margin-top:12px">Montar treino livre com o que falta</a>
-      <p class="small muted" style="margin:8px 0 0">Repor é opcional: uma falta isolada não muda o resultado. O que conta é a sequência das próximas semanas.</p>`
+      <p class="small muted" style="margin:8px 0 0">Séries por músculo na semana (quando o músculo só ajuda no exercício, conta meia série). Repor é opcional: uma semana mais leve não muda o resultado; o que conta é a sequência das próximas.</p>`
     : `<p class="small ok-txt" style="margin:0">✓ Com os treinos que estão na agenda, cada músculo fecha a semana no volume planejado.</p>`}</section>`;
 }
 // reforço que a regra antiga espalhou pela semana ao pular um treino: oferece voltar ao plano original
@@ -396,7 +396,7 @@ function dayPanel(sch, date) {
         <button class="act" data-skip="${first.id}">Não vou treinar</button>
         <button class="act" data-push="${first.id}">Enviar ao relógio</button>
         <a class="act" href="/api/schedule/${first.id}/fit">.FIT</a>` : ""}
-      ${es.filter((e) => e.status === "pulado" && e.can_undo).map((e) => `<button class="act" data-undo="${e.id}">Desfazer ajuste</button>`).join("")}
+      ${es.filter((e) => e.status === "pulado" && e.can_undo).map((e, _i, all) => `<button class="act" data-undo="${e.id}">${all.length > 1 ? `Desfazer: ${esc(shortName(e))}` : "Desfazer ajuste"}</button>`).join("")}
       ${es.filter((e) => e.readiness_backup && e.status === "planejado").map((e) => `<button class="act" data-rundo="${e.id}">Desfazer ajuste de prontidão</button>`).join("")}
     </div></section>`;
 }
@@ -534,6 +534,7 @@ async function openSkip(id, sch) {
         <ul>${r.changes.map((c) => `<li>${esc(c)}</li>`).join("")}</ul>
         <p class="small muted">Você pode desfazer pelo cartão do dia.${r.strategy !== "seguir" && state.garmin && state.garmin.connected ? " Treinos que mudaram e já estavam no Garmin foram marcados para reenviar." : ""}</p>
         <button class="btn" id="ok-close">Ok</button>`;
+      const card = body.closest(".modal-card"); if (card) card.scrollTop = 0;
       body.onclick = (e2) => { if (e2.target.id === "ok-close") closeModal(); };
       (sch._again || viewHoje)();
     } catch (err) { st.busy = false; draw(); toast(err.message, 5000); }
@@ -1449,7 +1450,7 @@ function newSessionItem(ex) {
 function removeSessionItem(i) {
   const s = state.session; const it = s.items[i]; if (!it) return false;
   const doneN = (it.sets || []).filter((x) => x.done).length;
-  if ((doneN || it.done) && !confirm(`Tirar ${it.name} do treino? ${doneN ? `As ${doneN} séries marcadas serão apagadas.` : "Ele está marcado como feito."}`)) return false;
+  if ((doneN || it.done) && !confirm(`Tirar ${it.name} do treino? ${doneN ? (doneN === 1 ? "A série marcada será apagada." : `As ${doneN} séries marcadas serão apagadas.`) : "Ele está marcado como feito."}`)) return false;
   const order = fxOrder(s); const pos = order.indexOf(i);
   s.items.splice(i, 1);
   s.fsel = null; s.restEnd = null; s.restOver = false; s.workEnd = null; s.prepEnd = null; s.timeUp = false; s.lastSet = null;
@@ -1459,6 +1460,7 @@ function removeSessionItem(i) {
     if (Number.isInteger(s.fx)) s.fx = Math.max(0, Math.min(s.fx, s.items.length));
   }
   s.fxBack = null;
+  if (!s.items.length && !s.schedule_id && !s.plan_id) s.view = "lista";  // treino livre vazio: volta para montar
   store("gg_session", s.items.length || s.schedule_id || s.plan_id ? s : null); toast(`${it.name} saiu do treino`);
   return true;
 }
@@ -1709,6 +1711,7 @@ async function finishSession() {
         : { exercise_id: it.exercise_id, ...((it.plan && it.plan.deload) ? { deload: true } : {}), sets: it.sets.filter((x) => x.done).map(({ reps, load_kg, rpe, duration_s }) => ({ reps, load_kg, rpe, duration_s })) })
         .filter((it) => it && (it.duration_min || (it.sets && it.sets.length))),
     };
+    if (!payload.items.length) return toast("Nada para salvar ainda: marque pelo menos uma série ou um cardio como feito.", 5000);
     payload.client_id = s.client_id || (s.client_id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
     save();
     const btn = $("#s-finish"); btn.disabled = true;
@@ -1748,7 +1751,7 @@ function balanceAfterHtml(rows) {
   if (!rows || !rows.length) return "";
   const miss = rows.filter((b) => b.state === "falta");
   return miss.length ? `<h3 class="sv-h">O que ainda falta nesta semana</h3><p class="small muted" style="margin:0 0 6px">Mesmo fazendo os treinos que restam na agenda:</p>${missListHtml(miss)}
-      <p class="small muted" style="margin:8px 0 0">Não é obrigatório repor: uma semana um pouco mais leve não muda o resultado.</p>`
+      <p class="small muted" style="margin:8px 0 0">Séries por músculo na semana (quando o músculo só ajuda no exercício, conta meia série). Não é obrigatório repor: uma semana um pouco mais leve não muda o resultado.</p>`
     : `<p class="small ok-txt" style="margin:12px 0 0">✓ Com os treinos que ainda estão na agenda, a semana fecha no volume planejado.</p>`;
 }
 async function answerMatch(val) {
@@ -2161,6 +2164,7 @@ function fxSetDone() {
   else { rest = (it.plan || {}).rest_s ?? 90; if (it.sets.every((y) => y.done)) s.fx = fxNextPos(s, order, s.fx); }
   if (rest > 0 && s.fx < order.length) { s.restTotal = rest; s.restEnd = Date.now() + rest * 1000; s.restOver = false; fxLast = null; }
   store("gg_session", s); renderFocus();
+  if (s.restEnd) window.scrollTo(0, 0);
 }
 
 function fxNextHtml(s, order) {
@@ -2192,13 +2196,16 @@ function renderFocus() {
   if (s.restEnd) {
     const left = Math.max(0, Math.ceil((s.restEnd - Date.now()) / 1000));
     const just = fxJustHtml(s);
+    const clock = `<div class="fx-clock" id="fx-clock">${s.restOver ? "+" + mmss(Math.floor((Date.now() - s.restEnd) / 1000)) : mmss(left)}</div>`;
+    const go = `<button class="btn ${just ? "" : "block"} fx-skip" data-fx="r-skip">${s.restOver ? "▶ Começar" : "Estou pronto"}</button>`;
+    // com a série recém-feita editável em cima, o cronômetro e o botão ficam juntos numa barra fixa embaixo (sempre visíveis)
     body = `<section class="fx-rest ${s.restOver ? "over" : ""} ${just ? "has-just" : ""}">${just}
       <div class="eyebrow" id="fx-rest-lbl" aria-live="polite">${s.restOver ? "Descanso terminado" : "Descanso"}</div>
-      <div class="fx-clock" id="fx-clock">${s.restOver ? "+" + mmss(Math.floor((Date.now() - s.restEnd) / 1000)) : mmss(left)}</div>
+      ${just ? "" : clock}
       <div class="fx-bar" id="fx-bar" data-when="rest" ${s.restOver ? "hidden" : ""}><span style="width:${Math.round(100 * (1 - left / (s.restTotal || 1)))}%"></span></div>
       <div id="fx-next-box">${fxNextHtml(s, order)}</div>
       <div class="fx-rest-btns" data-when="rest" ${s.restOver ? "hidden" : ""}><button class="btn ghost" data-fx="r-15">−15 s</button><button class="btn ghost" data-fx="r+15">+15 s</button></div>
-      <button class="btn block fx-skip" data-fx="r-skip">${s.restOver ? "▶ Começar" : "Estou pronto"}</button>
+      ${just ? `<div class="fx-dock">${clock}${go}</div>` : go}
       <p class="small" data-when="over" ${s.restOver ? "" : "hidden"} style="margin:10px 0 0;opacity:.8">Sem pressa: só muda quando você tocar.</p></section>`;
   } else if (!it) {
     const sets = s.items.reduce((n, x) => n + (fxStrength(x) ? x.sets.filter((y) => y.done).length : 0), 0);
@@ -2319,7 +2326,7 @@ function bindFocus() {
     if (t.dataset.rpe && it) { const x = fxCur(it, s).x; x.rpe = +x.rpe === +t.dataset.rpe ? null : +t.dataset.rpe; $$(".fx-rpe [data-rpe]").forEach((b) => b.classList.toggle("on", +b.dataset.rpe === x.rpe)); return save(); }
     const a = t.dataset.fx;
     if (a === "set") { s.fxBack = null; return fxSetDone(); }
-    if (a === "drop" && it) { if (removeSessionItem(order[s.fx])) renderFocus(); return; }
+    if (a === "drop" && it) { if (removeSessionItem(order[s.fx])) renderSession(); return; }
     if (a === "undo-set") { fxCur(it, s).x.done = false; s.lastSet = null; save(); return renderFocus(); }
     if (a === "skipwarm") { (it.warmup || []).forEach((w) => { if (!w.done) w.skip = true; }); s.fsel = null; save(); return renderFocus(); }
     if (a === "done") { it.done = true; s.workEnd = null; s.prepEnd = null; s.timeUp = false; s.fx = fxNextPos(s, order, s.fx); save(); return renderFocus(); }

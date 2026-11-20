@@ -576,6 +576,7 @@ COMP_PER_MUSCLE = 3          # no máximo +3 séries por músculo
 COMP_PER_SESSION = 4         # no máximo +4 séries por treino
 DAY_TOL = 1.10               # o dia (musculação + corrida) pode passar 10% do tempo do perfil
 NEIGHBOR_DIRECT = 4          # 4+ séries diretas do mesmo músculo no dia vizinho bloqueiam o reforço
+REINFORCE_MIN_DIRECT = 2     # o treino que recebe o reforço já precisa treinar o músculo (2+ séries diretas)
 #   (repetir peito pesado com 24 h derrubou as repetições; com 48 h não: Miranda et al. 2018)
 LEG_DAY_DIRECT = 6           # treino com 6+ séries diretas de perna é "dia de perna"
 LOWER = {"quadriceps", "hamstrings", "glutes", "calves", "adductors", "abductors"}
@@ -689,7 +690,7 @@ def _reinforce_ops(missed: dict, ctx: dict, asked: bool) -> tuple[list[dict], di
             best = None
             for e in sorted(work.values(), key=lambda x: (credit.entry_load(x).get(m, 0), x["date"])):
                 load_e, day = credit.entry_load(e), _d(e["date"])
-                if comp[e["id"]] >= COMP_PER_SESSION or credit.entry_direct(e).get(m, 0) < NEIGHBOR_DIRECT:
+                if comp[e["id"]] >= COMP_PER_SESSION or credit.entry_direct(e).get(m, 0) < REINFORCE_MIN_DIRECT:
                     continue
                 if any(_direct_on((day + timedelta(days=k)).isoformat(), view, ctx["sessions"]).get(m, 0) >= NEIGHBOR_DIRECT
                        for k in (-1, 1)):
@@ -793,7 +794,7 @@ def _move_days(missed: dict, ctx: dict) -> list[dict]:
             if total > limit:
                 warns.append(f"o dia fica com ~{round(total)} min")
             if cardio_days:
-                warns.append(f"o cardio do dia vira finalizador de {fin} min" + (f" (os outros {c_total - fin} min saem)" if fin < c_total else "")
+                warns.append(f"{fin} min do cardio do dia passam para o fim do treino" + (f" (os outros {c_total - fin} min saem)" if fin < c_total else "")
                              if fin else f"o cardio do dia ({c_total} min) sai da semana: não cabe junto com o treino")
             if races:
                 warns.append("treino de perna a menos de 3 dias da prova" if leg else "prova em menos de 3 dias: vá leve")
@@ -844,7 +845,7 @@ def _apply_move(missed: dict, to_iso: str, ctx: dict, undo_info: dict) -> list[s
     saved = db.save_entry(new)
     undo_info["created"].append(saved["id"])
     lines.append(f"{missed['day_name']} foi movido para {_fmt(saved['date'])}"
-                 + (f" ({fin_added} min do cardio do dia viraram finalizador)" if fin_added else "") + ".")
+                 + (f" ({fin_added} min do cardio do dia passaram para o fim do treino)" if fin_added else "") + ".")
     if cardio_total > fin_added:
         lines.append(f"{cardio_total - fin_added} min de cardio desse dia saíram da semana (não cabiam junto com o treino).")
     return lines
@@ -863,7 +864,7 @@ def _calm(ctx: dict) -> str:
 def _skip_options(missed: dict, ctx: dict) -> dict:
     """As opções de "Não vou treinar", com a consequência de cada uma e UMA recomendação com o motivo."""
     affected = _affected(missed, ctx)
-    closing = "; ".join(f"{b['pt']} fecha a semana com {_num(b['projected'])} de {_num(b['ref'])} séries" for b in affected[:3])
+    closing = "; ".join(f"{b['pt']}: {_num(b['projected'])} de {_num(b['ref'])} séries na semana" for b in affected[:3])
     seguir = {"id": "seguir", "title": "Só pular", "available": True,
               "text": "Os outros dias ficam como estão." + (f" {closing}." if closing else ""), "note": _calm(ctx)}
     opts, days, auto_ops = [seguir], [], []
@@ -876,9 +877,9 @@ def _skip_options(missed: dict, ctx: dict) -> dict:
             ref.update(text=" ".join(d["text"] for d in lines) + " Os outros treinos não mudam.", days=lines)
         elif ctx["deload"]:
             ref["reason"] = "Semana leve: não precisa repor."
-        elif not any(credit.entry_direct(e).get(b["key"], 0) >= NEIGHBOR_DIRECT for e in ctx["future"] if e.get("kind") == "forca"
+        elif not any(credit.entry_direct(e).get(b["key"], 0) >= REINFORCE_MIN_DIRECT for e in ctx["future"] if e.get("kind") == "forca"
                      for b in affected):
-            ref["reason"] = "Não há outro treino desses músculos nesta semana."
+            ref["reason"] = "Não há outro treino desses músculos daqui até o fim da semana."
         elif not any(b["ref"] - b["projected"] >= 1 for b in affected):
             ref["reason"] = "A semana já fica no volume planejado sem este treino."
         else:
@@ -891,7 +892,7 @@ def _skip_options(missed: dict, ctx: dict) -> dict:
         if best:
             mv.update(text=f"Dia livre: {_fmt(best['date'])}. O treino inteiro vai para lá, sem mexer nos outros.", to_date=best["date"])
         elif okd:
-            mv["text"] = "Não há dia totalmente livre; dá para escolher um dia, com os avisos de cada um."
+            mv["text"] = "Seus outros dias de treino já estão ocupados; dá para escolher outro dia, com os avisos de cada um."
         else:
             mv["reason"] = "Não sobrou dia possível nesta semana."
         opts.append(mv)
@@ -1005,7 +1006,7 @@ def handle_missed(entry_id: int, profile: dict, today: date | None = None, strat
         def gained(m: str) -> float:  # o que o reforço devolveu ao músculo (séries fracionadas)
             exs = [catalog.get(o["exercise_id"]) for o in undo_info["ops"]]
             return sum(PRIMARY_WEIGHT if m in x["primaryMuscles"] else SECONDARY_WEIGHT if m in x["secondaryMuscles"] else 0 for x in exs)
-        changes += [f"{b['pt']}: {_num(b['projected'] + gained(b['key']))} de {_num(b['ref'])} séries nesta semana."
+        changes += [f"{b['pt']}: {_num(b['projected'] + gained(b['key']))} de {_num(b['ref'])} séries na semana."
                     for b in _affected(missed, ctx)[:3]]
         changes.append(_calm(ctx))
     missed["status"] = "pulado"

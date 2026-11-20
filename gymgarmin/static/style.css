@@ -859,3 +859,19 @@ body:has(.wz) { padding-bottom: 0; }
 .fx-just .fx-rpe { gap: 4px; flex-wrap: nowrap; margin-top: 8px; }
 .fx-just .fx-rpe button { flex: 1 1 0; width: auto; min-width: 32px; max-width: 44px; height: 38px; }
 .fx-just-h { margin-bottom: 6px; }
+/* descanso: o botão principal fica sempre à mão (como o da série) e o esforço não encolhe abaixo de 40 px */
+.fx-rest .fx-skip { position: sticky; bottom: calc(66px + env(safe-area-inset-bottom)); z-index: 3; box-shadow: 0 10px 24px -8px rgba(0,0,0,.45); }
+.fx-just .fx-rpe { flex-wrap: wrap; }
+.fx-just .fx-rpe > span { flex: 1 0 100%; text-align: left; }
+.fx-just .fx-rpe button { height: 40px; min-width: 40px; max-width: none; }
+/* opção indisponível: o motivo continua legível (sem apagar o bloco inteiro) */
+.opt:disabled, .mv-day:disabled { opacity: 1; cursor: default; }
+.opt:disabled b, .mv-day:disabled b { color: var(--ink-2); font-weight: 650; }
+.opt:disabled .small, .mv-day:disabled .small { color: var(--ink-2); }
+/* descanso com série editável: cronômetro + botão numa barra fixa embaixo, sempre visíveis */
+.fx-dock { position: sticky; bottom: calc(66px + env(safe-area-inset-bottom)); z-index: 3; display: flex; align-items: center; gap: 12px;
+  background: var(--ink); margin: 14px -8px 0; padding: 10px 12px; border-radius: 16px; box-shadow: 0 -10px 22px -12px rgba(0,0,0,.55); }
+.fx-rest.over .fx-dock { background: var(--ok); }
+.fx-rest.has-just .fx-dock .fx-clock, .fx-dock .fx-clock { font-size: 44px; margin: 0; letter-spacing: -1px; min-width: 104px; text-align: left; line-height: 1; }
+.fx-dock .fx-skip { position: static; flex: 1; margin: 0; min-height: 52px; box-shadow: none; }
+.fx-rest.has-just { padding-bottom: 8px; }
