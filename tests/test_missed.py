@@ -808,3 +808,24 @@ def test_api_free_workout_with_strength_and_run_closes_both(client):
         assert now[lift["id"]]["status"] == "feito" and now[run["id"]]["status"] == "feito"
     finally:
         clock.freeze(None)
+
+
+def test_prefill_survives_a_session_saved_without_load(client):
+    """Séries marcadas sem digitar o peso, depois outra sessão com peso: abrir o treino da agenda não pode dar erro."""
+    from datetime import datetime
+    try:
+        clock.freeze(datetime(2026, 11, 16, 9, 0))
+        client.put("/api/profile", json=UL4)
+        client.post("/api/generator/apply", json={})
+        sch = client.get("/api/schedule").json()
+        e = next(x for x in sch["entries"] if x["kind"] == "forca" and x["status"] == "planejado")
+        ex = next(i["exercise_id"] for i in e["items"] if (i.get("phase") or "principal") == "principal" and i.get("reps"))
+        for k, load in enumerate((None, 40, None)):
+            client.post("/api/sessions", json={"date": f"2026-11-1{k + 3}T10:00", "day_name": "Treino livre", "client_id": f"nl-{k}",
+                                               "items": [{"exercise_id": ex, "sets": [{"reps": 10, "load_kg": load}] * 3}]})
+            r = client.get(f"/api/schedule/{e['id']}/prefill")
+            assert r.status_code == 200, r.text[:200]
+        it = next(i for i in r.json()["items"] if i["exercise_id"] == ex)
+        assert it["suggestion"]["load_kg"]  # a sessão com carga é a base (a sem carga não apaga o histórico)
+    finally:
+        clock.freeze(None)

@@ -1301,8 +1301,11 @@ def _prefill_items(day_items: list[dict], deload: bool = False) -> list[dict]:
                              name=f"{sports.SPORTS[end['sport']]['name']}: {end['title']}",
                              planned_distance_km=round((end.get("dist_m") or 0) / 1000, 2) or None)
         else:
-            sug = progression.suggest(it, last, deload=deload or it.get("deload", False), today=clock.today()) \
-                if entry["phase"] == "principal" and not ex.get("timed") else {"load_kg": it.get("load_kg"), "note": None}
+            try:
+                sug = progression.suggest(it, last, deload=deload or it.get("deload", False), today=clock.today()) \
+                    if entry["phase"] == "principal" and not ex.get("timed") else {"load_kg": it.get("load_kg"), "note": None}
+            except Exception:  # noqa: BLE001 — um histórico estranho de UM exercício nunca pode impedir o treino de abrir
+                sug = {"load_kg": it.get("load_kg"), "note": None}
             entry["suggestion"] = sug
             reps, _ = garmin_export.parse_reps(it.get("reps"))
             entry["sets"] = [{"reps": reps if not it.get("duration_s") else None,

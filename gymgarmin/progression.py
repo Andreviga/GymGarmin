@@ -68,6 +68,9 @@ def pick_last(perfs: list[dict]) -> dict | None:
     perfs = [p for p in perfs if p and p.get("sets")]
     if not perfs:
         return None
+    # treino registrado sem carga (séries marcadas sem digitar o peso) não serve de base quando há outros com carga
+    loaded = [p for p in perfs if any(s.get("load_kg") for s in p["sets"])]
+    perfs = loaded or perfs
     normal = [p for i, p in enumerate(perfs) if not _is_deload(p, perfs[i + 1] if i + 1 < len(perfs) else None)]
     base = normal[0] if normal else perfs[0]
     return {**base, "recent": normal[:3], "last_any_date": perfs[0].get("date")}
@@ -113,7 +116,7 @@ def suggest(plan_item: dict, last: dict | None, deload: bool = False, today: dat
         new = _round_load(max(inc, work_load - math.ceil(work_load * (1 - cut) / inc) * inc))
         return {"load_kg": new, "note": f"{gap // 7} semanas sem este exercício → −{round((1 - cut) * 100)}% para voltar com segurança"}
     recent = (last or {}).get("recent") or [last]
-    prev = recent[1] if len(recent) > 1 else None
+    prev = next((p for p in recent[1:] if any(s.get("load_kg") for s in (p or {}).get("sets") or [])), None)
     best = max(range(len(reps)), key=lambda i: reps[i])
     e1 = _e1rm(work_load, reps[best], avg_rpe)
     mid = (lo + hi) / 2

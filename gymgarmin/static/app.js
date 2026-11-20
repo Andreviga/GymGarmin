@@ -56,7 +56,7 @@ function toast(msg, ms = 2600) {
 function store(key, val) { try { if (val === undefined) return JSON.parse(localStorage.getItem(key)); if (val === null) localStorage.removeItem(key); else localStorage.setItem(key, JSON.stringify(val)); } catch (_) { return null; } }
 
 function openModal(html) { $("#modal-body").innerHTML = html; $("#modal").hidden = false; return $("#modal-body"); }
-function closeModal() { $("#modal").hidden = true; $("#modal-body").innerHTML = ""; }
+function closeModal() { $("#modal").hidden = true; $("#modal-body").innerHTML = ""; if (typeof route === "function" && route.again) { route.again = false; route(); } }
 $("#modal").addEventListener("click", (e) => { if (e.target.id === "modal" || e.target.classList.contains("modal-close")) closeModal(); });
 
 const STATUS_CLASS = { esquecido: "bad", abaixo: "warn", manutencao: "", otimo: "ok", alto: "warn", excesso: "bad" };
@@ -522,11 +522,12 @@ async function openSkip(id, sch) {
   draw();
   body.onchange = (e) => { if (e.target.id === "sk-run") st.run = e.target.checked; };
   body.onclick = async (e) => {
+    if (st.busy) return;  // já enviando: ignora toques até a resposta
     const o = e.target.closest("[data-opt]"); if (o) { st.strategy = o.dataset.opt; return draw(); }
     const to = e.target.closest("[data-to]"); if (to) { st.to = to.dataset.to; return draw(); }
     if (e.target.id === "sk-cancel") return closeModal();
     if (e.target.id !== "sk-go") return;
-    e.target.disabled = true;
+    e.target.disabled = true; st.busy = true; e.target.textContent = "Enviando…";
     try {
       const r = await api(`/api/schedule/${id}/skip`, { method: "POST", body: { strategy: st.strategy, to_date: st.strategy === "mover" ? st.to : null, skip_endurance: st.run } });
       body.innerHTML = `<h2>${esc(r.title || "Treino pulado")}</h2>
@@ -535,7 +536,7 @@ async function openSkip(id, sch) {
         <button class="btn" id="ok-close">Ok</button>`;
       body.onclick = (e2) => { if (e2.target.id === "ok-close") closeModal(); };
       (sch._again || viewHoje)();
-    } catch (err) { e.target.disabled = false; toast(err.message, 5000); }
+    } catch (err) { st.busy = false; draw(); toast(err.message, 5000); }
   };
 }
 
@@ -1452,8 +1453,13 @@ function removeSessionItem(i) {
   const order = fxOrder(s); const pos = order.indexOf(i);
   s.items.splice(i, 1);
   s.fsel = null; s.restEnd = null; s.restOver = false; s.workEnd = null; s.prepEnd = null; s.timeUp = false; s.lastSet = null;
-  if (Number.isInteger(s.fx)) { if (pos >= 0 && pos < s.fx) s.fx -= 1; s.fx = Math.max(0, Math.min(s.fx, s.items.length)); }
-  store("gg_session", s); toast(`${it.name} saiu do treino`);
+  if (Number.isInteger(s.fx)) {
+    if (pos === s.fx) s.fx = Number.isInteger(s.fxBack) ? s.fxBack : null;  // estava neste exercício: volta para onde veio (ou ao 1º pendente)
+    else if (pos >= 0 && pos < s.fx) s.fx -= 1;
+    if (Number.isInteger(s.fx)) s.fx = Math.max(0, Math.min(s.fx, s.items.length));
+  }
+  s.fxBack = null;
+  store("gg_session", s.items.length || s.schedule_id || s.plan_id ? s : null); toast(`${it.name} saiu do treino`);
   return true;
 }
 
@@ -1509,8 +1515,15 @@ async function viewTreinar(planId, idx) {
   if (planId === "livre") {
     const draft = store("gg_session");
     if (draft && (draft.schedule_id || draft.plan_id)) return viewTreinar();  // já existe outro treino em andamento: a pessoa escolhe
-    if (draft) { state.session = draft; return renderSession(); }
-    return startFree(await api("/api/schedule").catch(() => null));
+    if (draft) {
+      const started = (draft.items || []).some((it) => it.done || (it.sets || []).some((x) => x.done));
+      const sameDay = String(draft.date || "").slice(0, 10) === localISO().slice(0, 10);
+      // rascunho de hoje, ou com séries já feitas que a pessoa confirma: continua; vazio ou esquecido de outro dia: começa do zero
+      if (sameDay || (started && confirm(`Continuar o treino livre de ${fmtDate(draft.date)}? (Cancelar começa um novo, com a data de hoje)`))) { state.session = draft; return renderSession(); }
+      store("gg_session", null);
+    }
+    const sch = await api("/api/schedule").catch((e) => { if (e && e.name === "AbortError") throw e; return null; });
+    return startFree(sch);
   }
   if (planId === "agenda") {
     const draft = store("gg_session");
@@ -1555,7 +1568,8 @@ function renderSession() {
   const s = state.session;
   if (s.view !== "lista") return renderFocus();
   fxLeave();
-  store("gg_session", s);
+  // treino livre ainda sem nenhum exercício não vira "treino em andamento" (senão volta dias depois com a data antiga)
+  if (s.items.length || s.schedule_id || s.plan_id) store("gg_session", s); else store("gg_session", null);
   const idxs = s.items.map((it, i) => [it, i]);
   const phaseOf = (it) => it.phase || "principal";
   const compact = (ph) => idxs.filter(([it]) => phaseOf(it) === ph);
@@ -1747,7 +1761,7 @@ function showSaved(saved, cr, prTxt) {
     : cr.extra ? `Contou como <b>treino extra</b>.${cr.kept_open ? ` O treino de hoje (${esc(cr.kept_open.day_name)}) continua na agenda.` : ""}`
     : cr.kept_open ? `Você fez ${pctTxt0(cr.kept_open.coverage)} do treino <b>${esc(cr.kept_open.day_name)}</b>: ele continua na agenda.` : "";
   view.innerHTML = `<section class="today-card saved-card"><div class="eyebrow">Treino salvo ✓</div>
-    <div class="tc-title">${cr.work_sets} ${cr.work_sets === 1 ? "série de trabalho" : "séries de trabalho"}</div>
+    <div class="tc-title">${cr.work_sets ? `${cr.work_sets} ${cr.work_sets === 1 ? "série de trabalho" : "séries de trabalho"}` : "Treino registrado"}</div>
     ${prTxt ? `<p>${esc(prTxt)}</p>` : ""}
     <div id="sv-credit">${head ? `<p>${head}</p>` : ""}${cr.question ? questionHtml({ ...cr.question, session_id: saved.id }) : ""}
       ${cr.kept_open && !cr.extra && !cr.question ? `<button class="btn ghost block" data-match="${saved.id}:${cr.kept_open.entry_id}">Marcar como feito mesmo assim</button>` : ""}</div>
@@ -2304,7 +2318,7 @@ function bindFocus() {
     }
     if (t.dataset.rpe && it) { const x = fxCur(it, s).x; x.rpe = +x.rpe === +t.dataset.rpe ? null : +t.dataset.rpe; $$(".fx-rpe [data-rpe]").forEach((b) => b.classList.toggle("on", +b.dataset.rpe === x.rpe)); return save(); }
     const a = t.dataset.fx;
-    if (a === "set") return fxSetDone();
+    if (a === "set") { s.fxBack = null; return fxSetDone(); }
     if (a === "drop" && it) { if (removeSessionItem(order[s.fx])) renderFocus(); return; }
     if (a === "undo-set") { fxCur(it, s).x.done = false; s.lastSet = null; save(); return renderFocus(); }
     if (a === "skipwarm") { (it.warmup || []).forEach((w) => { if (!w.done) w.skip = true; }); s.fsel = null; save(); return renderFocus(); }
@@ -2322,8 +2336,11 @@ function bindFocus() {
       s.view = "lista"; s.restEnd = null; s.restOver = false; s.workEnd = null; s.prepEnd = null; save(); renderSession(); if (left > 0) startTimer(left); return;
     }
     if (a === "add") return pickExercise(null, (ex) => {
+      const cur = fxOrder(s)[s.fx];  // onde a pessoa estava (para voltar se ela tirar o exercício que acabou de pôr)
       s.items.push(newSessionItem(ex));
-      s.fx = fxOrder(s).indexOf(s.items.length - 1); save(); renderFocus();
+      const order2 = fxOrder(s);
+      s.fxBack = cur === undefined ? null : order2.indexOf(cur);
+      s.fx = order2.indexOf(s.items.length - 1); save(); renderFocus();
     }, { missing: s.missing });
   };
   const fin = $("#s-finish"); if (fin) fin.onclick = finishSession;
@@ -3118,12 +3135,15 @@ async function autoSync() {
 // uma tela por vez: trocar de tela cancela as leituras da anterior e espera ela sair, para nunca aparecer
 // a tela velha por cima da nova (4G lento de academia)
 function route() {
+  // mesma tela e uma janela aberta (ex.: opções de "Não vou treinar"): a atualização espera a janela fechar
+  if (!$("#modal").hidden && location.hash === route.lastHash) { route.again = true; return route.chain || Promise.resolve(); }
   if (route.ctl) route.ctl.abort();
   const ctl = route.ctl = new AbortController();
   route.chain = (route.chain || Promise.resolve()).then(() => (ctl.signal.aborted ? null : doRoute(ctl))).catch(() => {});
   return route.chain;
 }
 async function doRoute(ctl) {
+  route.lastHash = location.hash; route.again = false;
   const [name, a, b] = (location.hash.slice(1) || "hoje").split("/");
   if (!$("#modal").hidden) closeModal();  // trocar de tela fecha a janela aberta (não fica por cima da tela nova)
   if (name !== "treinar") fxLeave();
