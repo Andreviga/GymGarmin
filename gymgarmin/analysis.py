@@ -66,25 +66,37 @@ def _classify(sets: float, lm: dict, days_since: float | None) -> str:
     return "excesso"
 
 
-WARMUP_SHARE = 0.60  # série com até 60% da carga mais pesada do exercício, feita antes dela, é aquecimento
+WARMUP_SHARE = 0.60  # série com MENOS de 60% da carga mais pesada do exercício, no começo, é aquecimento
+WARMUP_MAX = 3       # no máximo as 3 primeiras séries podem ser tratadas como aquecimento
 
 
-def _hard_sets(item: dict) -> list[dict]:
+def detect_warmup(session: dict) -> bool:
+    """A detecção de aquecimento vale para treino livre e atividade do relógio (onde as séries de aquecimento
+    são registradas junto). Treino aberto pela planilha/agenda (plan_id) já separa o aquecimento: lá toda
+    série registrada é de trabalho, mesmo quando a pessoa sobe a carga de uma série para a outra."""
+    return not session.get("plan_id")
+
+
+def _hard_sets(item: dict, detect: bool = True) -> list[dict]:
     """Séries de trabalho de um item registrado (ignora aquecimento e séries não feitas).
 
-    Aquecimento marcado (`warmup: true`) nunca conta. Sem marca, a série é tratada como aquecimento quando
-    tem carga de até 60% da mais pesada do exercício E vem antes dela (rampa de subida); série leve DEPOIS
-    da pesada (drop set, back-off) continua contando. `warmup: false` força a contar.
+    Aquecimento marcado (`warmup: true`) nunca conta; `warmup: false` força a contar. Sem marca (e com
+    `detect`), as primeiras séries (até 3, seguidas, desde a primeira) com menos de 60% da carga mais pesada
+    do exercício são tratadas como aquecimento. Série leve DEPOIS de uma série de trabalho (drop set,
+    back-off) continua contando. Exercício com o peso do corpo não entra na detecção (a carga anotada é só
+    o peso extra).
     """
     sets = [s for s in (item.get("sets") or []) if s.get("done", True)]
     loads = [float(s.get("load_kg") or 0) for s in sets]
     top = max(loads, default=0.0)
-    first_top = loads.index(top) if top > 0 else -1
-    out = []
+    ex = catalog.get(item.get("exercise_id")) or {}
+    auto = detect and top > 0 and ex.get("equipment") != "body only"
+    out, ramp = [], True
     for i, s in enumerate(sets):
         w = s.get("warmup")
         if w is None:
-            w = top > 0 and i < first_top and 0 < loads[i] <= WARMUP_SHARE * top
+            w = bool(auto and ramp and i < WARMUP_MAX and 0 < loads[i] < WARMUP_SHARE * top)
+            ramp = ramp and w
         if not w:
             out.append(s)
     return out
@@ -93,11 +105,12 @@ def _hard_sets(item: dict) -> list[dict]:
 def session_muscle_load(session: dict) -> dict[str, dict]:
     """Séries ponderadas e tonelagem por músculo numa sessão."""
     out: dict[str, dict] = defaultdict(lambda: {"sets": 0.0, "direct": 0.0, "indirect": 0.0, "tonnage": 0.0, "rpe": []})
+    detect = detect_warmup(session)
     for it in session.get("items", []):
         ex = catalog.get(it.get("exercise_id"))
         if not ex or ex["kind"] == "cardio" or ex["kind"] == "stretching":
             continue
-        hs = _hard_sets(it)
+        hs = _hard_sets(it, detect)
         n = len(hs)
         if not n:
             continue
@@ -345,8 +358,8 @@ def weekly_report(sessions: list[dict], profile: dict | None = None, now: dateti
     new_user = first is not None and (now - first).days < 10
     week = [s for s in sessions if start7 <= _to_dt(s["date"]) <= end]
     no_sets = sum(1 for s in week if any(it.get("strength_min") or it.get("exercise_id") == "Garmin_musculacao"
-                                         for it in s.get("items", [])) and not any(_hard_sets(it) for it in s.get("items", [])))
-    with_sets = sum(1 for s in week if any(_hard_sets(it) for it in s.get("items", []) if (catalog.get(it.get("exercise_id")) or {}).get("kind") == "strength"))
+                                         for it in s.get("items", [])) and not any(_hard_sets(it, detect_warmup(s)) for it in s.get("items", [])))
+    with_sets = sum(1 for s in week if any(_hard_sets(it, detect_warmup(s)) for it in s.get("items", []) if (catalog.get(it.get("exercise_id")) or {}).get("kind") == "strength"))
     from .load import sport_of
     leg_min = sum(float(it.get("duration_min") or 0) for s in week for it in s.get("items", []) if sport_of(it) in LEG_SPORTS)
 

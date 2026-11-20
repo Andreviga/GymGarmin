@@ -257,6 +257,7 @@ async function viewHoje(weekDate) {
 
 // o que fica faltando na semana, por músculo, mesmo com os treinos que ainda estão na agenda
 function weekMissHtml(g) {
+  if (g && g.light_week) return `<section class="card miss-week"><h2>O que falta esta semana</h2><p class="small muted" style="margin:0">Semana leve (deload ou polimento): é para treinar menos mesmo. Nada a repor.</p></section>`;
   const rows = (g && g.muscles) || []; if (!rows.length) return "";
   const miss = rows.filter((b) => b.state === "falta");
   return `<section class="card miss-week"><h2>O que falta esta semana</h2>
@@ -462,7 +463,7 @@ function bindAgenda(sch) {
       if (t.id === "legacy-clean" || t.id === "legacy-keep") {
         t.disabled = true; const keep = t.id === "legacy-keep";
         const r = await api("/api/schedule/legacy", { method: "POST", body: { keep } });
-        toast(keep ? "Ok, os treinos ficam como estão." : `Pronto: ${r.removed_sets} séries de reforço saíram. Os treinos voltaram ao plano original${state.garmin && state.garmin.connected ? "; reenvie ao Garmin para atualizar o relógio" : ""}.`, 6000);
+        toast(keep ? "Ok, os treinos ficam como estão." : `Pronto: os treinos voltaram ao plano original${r.removed_sets ? ` (${r.removed_sets} ${r.removed_sets === 1 ? "série de reforço saiu" : "séries de reforço saíram"})` : ""}${state.garmin && state.garmin.connected ? ". Reenvie ao Garmin para atualizar o relógio" : ""}.`, 6000);
         return again();
       }
       if (d.undo) { await api(`/api/schedule/${d.undo}/undo`, { method: "POST" }); toast("Ajuste desfeito"); return again(); }
@@ -2255,7 +2256,7 @@ function renderFocus() {
       body = `<section class="fx-card">${head}
         ${sec ? workClock(`Iniciar ${sec >= 60 ? mmss(sec) + " min" : sec + " s"}`, sec, "item") : ""}
         <button class="btn block fx-go" data-fx="done">${it.done ? "Feito ✓ — próximo" : "✓ Feito — próximo"}</button>
-        <div class="fx-setmini"><button class="act" data-fx="skip">Pular</button>${it.added ? `<button class="act drop-ex" data-fx="drop">🗑 Tirar do treino</button>` : ""}</div></section>`;
+        <div class="fx-setmini"><button class="act" data-fx="skip">Pular</button><button class="act drop-ex" data-fx="drop">🗑 Tirar do treino</button></div></section>`;
     }
   }
   view.innerHTML = top + body + (s.restEnd ? "" : tools);

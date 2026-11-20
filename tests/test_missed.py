@@ -326,23 +326,42 @@ def test_legacy_compensation_is_detected_and_removed(fresh_db):
 
 
 def test_legacy_keep_hides_the_card_and_legacy_undo_refuses_after_newer_adjustment(fresh_db):
+    from datetime import datetime
     prof, _ = _setup(UL4)
     upper_a, leg, upper_b, _ = _legacy_week(prof)
-    clock.freeze(clock.now().replace(year=2026, month=11, day=17, hour=10))
+    tue = MONDAY + timedelta(days=1)
     try:
-        schedule.handle_missed(leg["id"], prof, MONDAY + timedelta(days=1))
+        clock.freeze(datetime(2026, 11, 17, 10, 0))
+        # pulo novo que SÓ pula (não mexe em ninguém): não impede desfazer o ajuste antigo e continua pulado
+        schedule.handle_missed(leg["id"], prof, tue)
+        schedule.remove_compensation(MONDAY, tue, keep=True)
+        assert schedule.legacy_compensation(_week(prof, tue), tue) is None
+        assert any(i.get("added_from") for i in db.get_entry(leg["id"])["items"])  # "manter como está" não mexe no treino
+        schedule.undo(upper_a["id"])
+        assert db.get_entry(upper_a["id"])["status"] == "planejado" and db.get_entry(leg["id"])["status"] == "pulado"
+        assert not schedule._has_legacy(db.get_entry(upper_b["id"]))  # o retrato antigo devolveu o treino original
+    finally:
+        clock.freeze(None)
+
+
+def test_legacy_undo_refuses_when_a_newer_adjustment_changed_other_workouts(fresh_db):
+    from datetime import datetime
+    prof, _ = _setup(UL4)
+    upper_a, leg, upper_b, _ = _legacy_week(prof)
+    tue = MONDAY + timedelta(days=1)
+    try:
+        clock.freeze(datetime(2026, 11, 17, 10, 0))
+        opts = schedule.handle_missed(leg["id"], prof, tue, dry_run=True)
+        to = next(d["date"] for d in opts["move_days"] if d["ok"])
+        schedule.handle_missed(leg["id"], prof, tue, strategy="mover", to_date=to)  # criou uma cópia em outro dia
         with pytest.raises(ValueError) as ex:
-            schedule.undo(upper_a["id"])  # o retrato antigo apagaria o ajuste mais novo
+            schedule.undo(upper_a["id"])  # o retrato antigo passaria por cima do ajuste mais novo
         assert "Desfaça primeiro" in str(ex.value)
         schedule.undo(leg["id"])
-        schedule.remove_compensation(MONDAY, MONDAY + timedelta(days=1), keep=True)
-        assert schedule.legacy_compensation(_week(prof, MONDAY + timedelta(days=1)), MONDAY + timedelta(days=1)) is None
-        kept = db.get_entry(leg["id"])
-        assert any(i.get("added_from") for i in kept["items"])  # "manter como está" não mexe no treino
         schedule.undo(upper_a["id"])
         assert db.get_entry(upper_a["id"])["status"] == "planejado"
     finally:
-        clock.unfreeze() if hasattr(clock, "unfreeze") else clock.freeze(None)
+        clock.freeze(None)
 
 
 # ------------------------------------------------------------------------------- API ---
@@ -437,3 +456,355 @@ def test_api_exercises_ranked_for_training_a_muscle(client):
         for x in r[:5]:
             ex = catalog.get(x["id"])
             assert ex["primaryMuscles"][0] == muscle and x["id"] not in my_gym.station_ids() and ex.get("category") != "stretching", (muscle, x["id"])
+
+
+def test_workout_closed_by_the_watch_counts_as_planned(fresh_db):
+    """O relógio reconhece mal os exercícios: treino fechado por ele vale pelo que estava planejado, sem contar duas vezes."""
+    prof, _ = _setup(UL4)
+    tue = MONDAY + timedelta(days=1)
+    leg = next(e for e in _week(prof, tue) if e["date"] == tue.isoformat())
+    db.save_session({"date": tue.isoformat() + "T06:00", "source": "garmin", "garmin_activity_id": 77,
+                     "items": [{"exercise_id": "Seated_Cable_Rows", "sets": [{"reps": 12, "load_kg": 45}, {"reps": 11, "load_kg": 68}]},
+                               {"exercise_id": "Garmin_desconhecido", "sets": [{"reps": 12, "load_kg": 86}] * 12}]})
+    week = _week(prof, tue)
+    done = next(e for e in week if e["id"] == leg["id"])
+    assert done["status"] == "feito" and credit.credited_by_plan(done, schedule._sessions_in_week(MONDAY))
+    bal = {b["key"]: b for b in schedule.balance(prof, tue, tue)}
+    planned = credit.entry_load(leg, base=True)
+    assert bal["quadriceps"]["done"] == pytest.approx(planned["quadriceps"], abs=0.05)  # o agachamento planejado conta
+    assert bal["calves"]["done"] > 0
+    assert bal.get("middle back", {"done": 0})["done"] == pytest.approx(planned.get("middle back", 0), abs=0.05)  # a "remada" do relógio não
+    # a mesma sessão registrada no app (com séries) vale pelo que foi feito de verdade
+    s = _free([("Leg_Extensions", 3)], tue, schedule_id=None)
+    schedule.match_session(s["id"], prof, None, today=tue)
+    bal2 = {b["key"]: b for b in schedule.balance(prof, tue, tue)}
+    assert bal2["quadriceps"]["done"] == pytest.approx(planned["quadriceps"] + 3, abs=0.05)
+
+
+# ------------------------------------------------- regressões achadas na revisão do código ---
+ANDRE = {"training_months": 72, "goal": "hipertrofia", "available_days": [0, 1, 2, 3, 4, 5, 6], "session_minutes": 90, "same_session": True,
+         "endurance": {"sports": {"corrida": {"enabled": True, "env": "esteira", "sessions": 4, "long_day": 6}}}}
+
+
+def test_session_that_closes_another_days_workout_is_not_counted_twice(fresh_db):
+    prof, _ = _setup(UL4)
+    tue = MONDAY + timedelta(days=1)
+    _week(prof)
+    upper_a = _week(prof, tue)[0]
+    assert upper_a["status"] == "perdido"
+    s = _free(_items_of(upper_a), tue)
+    c = schedule.credit_session(s, prof, tue)
+    assert c["closed"]["entry_id"] == upper_a["id"] and c["closed"]["other_day"]
+    real = credit.session_load(db.get_session(s["id"]))
+    bal = {b["key"]: b for b in schedule.balance(prof, tue, tue)}
+    for m in ("chest", "lats", "biceps"):
+        assert bal[m]["done"] == pytest.approx(real[m], abs=0.05), m  # o feito de verdade, uma vez só
+
+
+def test_one_session_closes_one_strength_workout_even_via_the_watch_twin(client):
+    """Relógio fecha o treino do dia; depois o mesmo treino chega pelo app (vira a mesma sessão): não fecha um segundo."""
+    from datetime import datetime
+    try:
+        clock.freeze(datetime(2026, 11, 16, 9, 0))   # segunda: a semana nasce inteira
+        client.put("/api/profile", json=UL4)
+        client.post("/api/generator/apply", json={})
+        client.get("/api/schedule")
+        clock.freeze(datetime(2026, 11, 19, 9, 0))   # quinta: Superior A (seg) e Inferior A (ter) perdidos; hoje é Superior B
+        sch = client.get("/api/schedule").json()
+        today = sch["today"]
+        e = next(x for x in sch["entries"] if x["date"] == today and x["kind"] == "forca")
+        earlier = [x for x in sch["entries"] if x["date"] < today and x["kind"] == "forca"]
+        assert earlier and all(x["status"] == "perdido" for x in earlier)
+        client.post("/api/sessions", json={"date": today + "T07:00", "source": "garmin", "garmin_activity_id": 9001,
+                                           "items": [{"exercise_id": "Garmin_musculacao", "strength_min": 55, "duration_min": 55}]})
+        by = {x["id"]: x for x in client.get("/api/schedule").json()["entries"]}
+        assert by[e["id"]]["status"] == "feito"
+        its = [i for i in e["items"] if (i.get("phase") or "principal") == "principal" and i.get("sets") and not i.get("duration_min")]
+        saved = client.post("/api/sessions", json={"date": today + "T07:30", "day_name": "Treino livre", "client_id": "twin-1",
+                                                   "items": [{"exercise_id": i["exercise_id"], "sets": [{"reps": 10, "load_kg": 20}] * int(i["sets"])} for i in its]}).json()
+        assert saved["credit"]["closed"]["entry_id"] == e["id"]
+        by = {x["id"]: x for x in client.get("/api/schedule").json()["entries"]}
+        assert all(by[x["id"]]["status"] == "perdido" for x in earlier)  # nenhum treino antigo fechado de carona
+        assert sum(1 for x in by.values() if (x.get("done_by") or {}).get("session_id") == saved["id"] and x["kind"] == "forca") == 1
+        # reenviar o mesmo treino (sinal caiu na resposta) não muda nada
+        again = client.post("/api/sessions", json={"date": today + "T07:30", "day_name": "Treino livre", "client_id": "twin-1", "items": []}).json()
+        assert again["id"] == saved["id"] and again["credit"]["closed"]["entry_id"] == e["id"]
+    finally:
+        clock.freeze(None)
+
+
+def test_agenda_workout_saved_with_only_cardio_or_only_stretching_stays_open(fresh_db):
+    prof, _ = _setup(UL4)
+    today_e = _week(prof)[0]
+    _cid[0] += 1
+    s = db.save_session({"date": MONDAY.isoformat() + "T18:00", "client_id": f"t-{_cid[0]}", "schedule_id": today_e["id"],
+                         "items": [{"exercise_id": "cardio_esteira_corrida", "duration_min": 15, "zone": 2}]})
+    c = schedule.credit_session(s, prof, MONDAY)
+    assert c["kept_open"]["entry_id"] == today_e["id"] and not c["closed"] and c["work_sets"] == 0
+    assert next(e for e in _week(prof) if e["id"] == today_e["id"])["status"] == "planejado"
+    # treino livre só de alongamento não "faz" a musculação do dia pelo tipo
+    _free([("90_90_Hamstring", 2), ("Adductor", 2)], MONDAY)
+    assert next(e for e in _week(prof) if e["id"] == today_e["id"])["status"] == "planejado"
+    bal = {b["key"]: b for b in schedule.balance(prof, MONDAY, MONDAY)}
+    assert bal["chest"]["done"] == 0
+
+
+def test_session_saved_before_the_week_exists_still_closes_the_days_workout(fresh_db):
+    prof, plan = _setup(UL4)
+    nxt = MONDAY + timedelta(days=7)
+    planned = next(e for e in schedule.build_week(plan, prof, nxt) if e["date"] == nxt.isoformat() and e["kind"] == "forca")
+    assert db.list_schedule(nxt.isoformat(), (nxt + timedelta(days=6)).isoformat()) == []
+    s = _free(_items_of(planned), nxt)
+    c = schedule.credit_session(s, prof, nxt)
+    assert c["closed"] and c["closed"]["date"] == nxt.isoformat() and not c["extra"]
+
+
+def test_app_session_with_strength_and_run_closes_both(fresh_db, monkeypatch):
+    monkeypatch.setattr(db, "save_entry", lambda e: e)
+    lift = {"id": 1, "date": "2026-11-18", "kind": "forca", "status": "planejado", "day_name": "Puxar",
+            "items": [{"exercise_id": "Pullups", "sets": 4}]}
+    run = {"id": 2, "date": "2026-11-18", "kind": "resistencia", "sport": "corrida", "status": "planejado", "day_name": "Corrida",
+           "items": [{"sport": "corrida", "endurance": {"dur_s": 2400}}]}
+    sess = [{"id": 9, "client_id": "x", "schedule_id": 1, "date": "2026-11-18T07:00",
+             "items": [{"exercise_id": "Pullups", "sets": [{"reps": 8, "load_kg": 0}] * 4}, {"sport": "corrida", "duration_min": 35}]}]
+    out = {e["id"]: e["status"] for e in schedule.sync_status([lift, run], sess, date(2026, 11, 18))}
+    assert out == {1: "feito", 2: "feito"}
+
+
+def test_deleting_the_session_of_a_skipped_workout_brings_the_skip_back(fresh_db):
+    prof, _ = _setup({**UL4, "available_days": [0, 2, 4], "session_minutes": 75})
+    first = _week(prof)[0]
+    schedule.handle_missed(first["id"], prof, MONDAY)
+    tue = MONDAY + timedelta(days=1)
+    s = _free(_items_of(first), tue)
+    assert schedule.credit_session(s, prof, tue)["closed"]["was_skipped"]
+    schedule.reopen_for_session(db.get_session(s["id"]), tue)
+    e = db.get_entry(first["id"])
+    assert e["status"] == "pulado" and e["undo"]["v"] == 2
+    schedule.undo(first["id"])
+    assert db.get_entry(first["id"])["status"] == "planejado"
+
+
+def test_light_week_has_nothing_to_make_up(fresh_db):
+    prof, _ = _setup(UL4)
+    week = _week(prof)
+    for e in week:
+        e["cycle"] = {**(e.get("cycle") or {}), "deload": True}
+        db.save_entry(e)
+    schedule.handle_missed(week[0]["id"], prof, MONDAY)
+    goals = schedule.week_goals(_week(prof), prof, MONDAY, MONDAY)
+    assert goals["light_week"] and goals["muscles"] == [] and schedule.balance(prof, MONDAY, MONDAY) == []
+
+
+def test_also_skipping_the_run_only_skips_it(fresh_db):
+    """"Também não vou fazer a corrida" = só pular: nenhuma outra corrida muda de dia, de papel ou de volume."""
+    prof, _ = _setup(ANDRE)
+    week = _week(prof)
+    day = next(d for d in sorted({e["date"] for e in week})
+               if {"forca", "resistencia"} <= {e["kind"] for e in week if e["date"] == d}
+               and schedule._is_heavy_end(next(e for e in week if e["date"] == d and e["kind"] == "resistencia")))
+    lift = next(e for e in week if e["date"] == day and e["kind"] == "forca")
+    run = next(e for e in week if e["date"] == day and e["kind"] == "resistencia")
+    before = _shape(week)
+    today = date.fromisoformat(day)
+    r = schedule.handle_missed(lift["id"], prof, today, strategy="seguir", skip_endurance=True)
+    after = _shape(_week(prof, today))
+    assert after[run["id"]][1] == "pulado" and after[lift["id"]][1] == "pulado" and len(after) == len(before)
+    for k, v in before.items():
+        if k not in (run["id"], lift["id"]) and v[0] >= day:
+            assert after[k] == v, "outro treino mudou"
+    assert any("também pulada" in c for c in r["changes"])
+    schedule.undo(lift["id"])
+    back = _shape(_week(prof, today))
+    assert back[run["id"]][1] == "planejado" and back[lift["id"]][1] == "planejado"
+
+
+def test_undo_of_a_moved_workout_whose_copy_was_moved_again(fresh_db):
+    prof, _ = _setup({**UL4, "available_days": [0, 1, 3, 4]})
+    week = _week(prof)
+    first = week[0]
+    n0 = len(week)
+    schedule.handle_missed(first["id"], prof, MONDAY, strategy="mover", to_date="2026-11-18")
+    copy1 = next(e for e in _week(prof) if e.get("moved_from") == first["date"])
+    wed = MONDAY + timedelta(days=2)
+    schedule.handle_missed(copy1["id"], prof, wed, strategy="mover", to_date="2026-11-21")
+    assert sum(1 for e in _week(prof, wed) if e["day_name"] == first["day_name"]) == 3  # original + 2 cópias
+    schedule.undo(first["id"])
+    after = _week(prof, wed)
+    assert len(after) == n0 and sum(1 for e in after if e["day_name"] == first["day_name"]) == 1
+    assert not any(e.get("moved_from") for e in after)
+
+
+def test_undo_removes_reinforcement_even_if_the_exercise_was_swapped(fresh_db):
+    prof, _ = _setup({**UL4, "available_days": [0, 2, 4], "session_minutes": 75})
+    week = _week(prof)
+    first = week[0]
+    opts = schedule.handle_missed(first["id"], prof, MONDAY, dry_run=True)
+    if not next(o for o in opts["options"] if o["id"] == "reforcar")["available"]:
+        pytest.skip("este plano não tem onde reforçar")
+    total0 = {e["id"]: sum(int(i.get("sets") or 0) for i in e["items"]) for e in week}
+    schedule.handle_missed(first["id"], prof, MONDAY, strategy="reforcar")
+    for e in _week(prof):  # a pessoa troca o exercício reforçado por outro (academia não tem o aparelho)
+        for it in e["items"]:
+            if it.get("comp_from") == first["id"]:
+                it["exercise_id"] = "Leg_Extensions"
+                db.save_entry(e)
+    schedule.undo(first["id"])
+    after = _week(prof)
+    assert {e["id"]: sum(int(i.get("sets") or 0) for i in e["items"]) for e in after} == total0
+    assert not any(i.get("comp_from") or i.get("added") for e in after for i in e["items"])
+
+
+def test_back_to_original_plan_uses_the_snapshot_and_keeps_the_runs_undo(fresh_db):
+    """A regra antiga também tirava série de outro exercício e somava cardio: "voltar ao plano original" volta tudo."""
+    prof, _ = _setup(ANDRE)
+    week = _week(prof)
+    lifts = [e for e in week if e["kind"] == "forca"]
+    runs = [e for e in week if e["kind"] == "resistencia"]
+    skipped, target = lifts[0], lifts[-1]
+    snapshot = [copy.deepcopy(e) for e in week if e["id"] != skipped["id"]]
+    its = credit.strength_items(target)
+    its[0]["sets"], its[0]["added"] = int(its[0]["sets"]) + 2, 2          # reforço
+    its[1]["sets"] = int(its[1]["sets"]) - 1                               # doador (sem marca)
+    target["changes"] = ["+2 séries em X (compensa A)", "−1 série em Y (volume já sobrando)"]
+    db.save_entry(target)
+    skipped.update(status="pulado", undo={"snapshot": snapshot, "created": []},
+                   skip_result={"strategy": "redistribuir", "changes": ["…"], "at": "2026-11-16T09:00"})
+    db.save_entry(skipped)
+    # corrida pulada pela regra antiga, 1 min depois: a próxima corrida virou outra sessão (troca)
+    run, other = runs[0], runs[1]
+    snap2 = [copy.deepcopy(db.get_entry(e["id"])) for e in week if e["id"] != run["id"]]
+    other["day_name"] = "Corrida: sessão trocada"
+    db.save_entry(other)
+    run.update(status="pulado", undo={"snapshot": snap2, "created": []},
+               skip_result={"strategy": "trocar", "changes": ["…"], "at": "2026-11-16T09:01"})
+    db.save_entry(run)
+    orig = {e["id"]: e for e in snapshot}
+    r = schedule.remove_compensation(MONDAY, MONDAY)
+    now = db.get_entry(target["id"])
+    assert [(i["exercise_id"], i.get("sets")) for i in now["items"]] == [(i["exercise_id"], i.get("sets")) for i in orig[target["id"]]["items"]]
+    assert r["removed_sets"] == 1 and schedule.legacy_compensation(_week(prof), MONDAY) is None
+    schedule.undo(run["id"])  # o desfazer da corrida antiga continua funcionando e não traz o reforço de volta
+    assert db.get_entry(other["id"])["day_name"] == orig[other["id"]]["day_name"]
+    assert not schedule._has_legacy(db.get_entry(target["id"]))
+
+
+def test_moving_to_a_cardio_day_says_what_happens_to_the_cardio(fresh_db):
+    prof, _ = _setup({"training_months": 8, "goal": "emagrecimento", "available_days": [0, 1, 2, 3, 4, 5], "session_minutes": 50})
+    week = _week(prof)
+    lift = next(e for e in week if e["kind"] == "forca")
+    cardio = next((e for e in week if e["kind"] == "cardio" and e["date"] > lift["date"]), None)
+    if not cardio:
+        pytest.skip("plano sem dia de cardio")
+    opts = schedule.handle_missed(lift["id"], prof, MONDAY, dry_run=True)
+    day = next(d for d in opts["move_days"] if d["date"] == cardio["date"])
+    assert day["ok"] and any("cardio do dia" in w for w in day["warnings"])
+    c_min = round(sum(float(c.get("duration_min") or 0) for c in schedule._cardio_items(cardio)))
+    r = schedule.handle_missed(lift["id"], prof, MONDAY, strategy="mover", to_date=cardio["date"])
+    moved = next(e for e in _week(prof) if e.get("moved_from") == lift["date"])
+    fin = sum(float(i.get("duration_min") or 0) for i in moved["items"] if i.get("finisher") and "virou finalizador" in (i.get("notes") or ""))
+    if fin < c_min:  # o que não coube é dito com todas as letras
+        assert any("saíram da semana" in c for c in r["changes"])
+        assert any("sai" in w for w in day["warnings"])
+
+
+def test_reinforcement_respects_the_session_cap_for_helper_muscles_too(fresh_db):
+    for prof_in in (UL4, {"training_months": 40, "goal": "hipertrofia", "available_days": [0, 1, 2, 3, 4], "session_minutes": 75},
+                    {"training_months": 30, "goal": "forca", "available_days": [0, 2, 4], "session_minutes": 75}):
+        for e in db.list_schedule("2026-11-16", "2026-11-22"):
+            db.delete_entry(e["id"])
+        prof, _ = _setup(prof_in)
+        week = _week(prof)
+        for target in [e for e in week if e["kind"] == "forca"]:
+            ctx = schedule._skip_ctx(target, prof, MONDAY)
+            cap = schedule.SESSION_CAP[ctx["tier"]]
+            ops, work = schedule._reinforce_ops(target, ctx, asked=True)
+            base = {e["id"]: credit.entry_load(e) for e in week}
+            for eid in {o["entry_id"] for o in ops}:
+                after = credit.entry_load(work[eid])
+                for m, v in after.items():
+                    if v > base[eid].get(m, 0) + 1e-9:
+                        assert v <= cap + 1e-9, (prof_in["goal"], m, base[eid].get(m), v)
+
+
+def test_warmup_detection_does_not_eat_real_work_sets():
+    mk = lambda ex, loads: {"exercise_id": ex, "sets": [{"reps": 10, "load_kg": w} for w in loads]}  # noqa: E731
+    assert len(analysis._hard_sets(mk("Side_Lateral_Raise", [6, 8, 10]))) == 3       # 60% exato não é aquecimento
+    assert len(analysis._hard_sets(mk("Barbell_Squat", [40, 60, 100]))) == 2         # só a de 40%
+    assert len(analysis._hard_sets(mk("Barbell_Squat", [20, 20, 20, 20, 100]))) == 2  # no máximo 3 de aquecimento
+    assert len(analysis._hard_sets(mk("Pullups", [5, 10, 20]))) == 3                 # peso do corpo: carga é só o extra
+    assert len(analysis._hard_sets(mk("Barbell_Squat", [100, 40, 100]))) == 3        # leve no meio é trabalho
+    ramp = {"plan_id": 1, "items": [mk("Barbell_Squat", [50, 60, 80, 100])]}
+    free = {"items": [mk("Barbell_Squat", [50, 60, 80, 100])]}
+    assert credit.work_sets(ramp) == 4 and credit.work_sets(free) == 3               # treino da planilha: tudo é série de trabalho
+
+
+def test_watch_activity_hours_after_an_extra_free_workout_is_its_own_session():
+    from gymgarmin import dedupe
+    extra = {"id": 1, "date": "2026-11-16T07:00", "client_id": "a", "extra": True,
+             "items": [{"exercise_id": "Ab_Crunch_Machine", "sets": [{"reps": 12, "load_kg": 30}] * 3}]}
+    watch = {"date": "2026-11-16T19:00", "source": "garmin", "garmin_activity_id": 5,
+             "items": [{"exercise_id": "Garmin_musculacao", "strength_min": 58, "duration_min": 58}]}
+    assert dedupe.find_twin(watch, [extra]) is None
+    assert dedupe.find_twin({**watch, "date": "2026-11-16T07:20"}, [extra]) == extra   # mesmo horário: é a mesma atividade
+
+
+def test_api_match_needs_an_explicit_answer_and_watch_closed_workout_reopens_when_the_app_shows_other_content(client):
+    from datetime import datetime
+    try:
+        clock.freeze(datetime(2026, 11, 16, 9, 0))
+        client.put("/api/profile", json=UL4)
+        client.post("/api/generator/apply", json={})
+        clock.freeze(datetime(2026, 11, 17, 9, 0))   # terça: Inferior A
+        sch = client.get("/api/schedule").json()
+        today = sch["today"]
+        leg = next(x for x in sch["entries"] if x["date"] == today and x["kind"] == "forca")
+        client.post("/api/sessions", json={"date": today + "T07:00", "source": "garmin", "garmin_activity_id": 9100,
+                                           "items": [{"exercise_id": "Garmin_musculacao", "strength_min": 45, "duration_min": 45}]})
+        assert {x["id"]: x for x in client.get("/api/schedule").json()["entries"]}[leg["id"]]["status"] == "feito"
+        # o mesmo treino chega detalhado pelo app: era braço, não perna → o treino de perna volta para a agenda
+        saved = client.post("/api/sessions", json={"date": today + "T07:10", "day_name": "Treino livre", "client_id": "arms-1", "items": [
+            {"exercise_id": "Dumbbell_Bicep_Curl", "sets": [{"reps": 10, "load_kg": 12}] * 3},
+            {"exercise_id": "Triceps_Pushdown_-_Rope_Attachment", "sets": [{"reps": 10, "load_kg": 20}] * 3}]}).json()
+        assert saved["credit"]["extra"] and not saved["credit"]["closed"]
+        now = {x["id"]: x for x in client.get("/api/schedule").json()["entries"]}
+        assert now[leg["id"]]["status"] == "planejado"
+        # resposta à pergunta precisa ser explícita
+        assert client.post(f"/api/sessions/{saved['id']}/match", json={}).status_code == 400
+        assert client.post(f"/api/sessions/{saved['id']}/match", json={"schedule_id": [leg["id"]]}).status_code == 400
+        assert client.post(f"/api/sessions/{saved['id']}/match", json={"schedule_id": "x"}).status_code == 400
+        r = client.post(f"/api/sessions/{saved['id']}/match", json={"schedule_id": leg["id"]})
+        assert r.status_code == 200 and r.json()["closed"]["entry_id"] == leg["id"]
+        # corpo errado no pulo não derruba o servidor
+        other = next(x for x in sch["entries"] if x["date"] > today and x["status"] == "planejado")
+        assert client.post(f"/api/schedule/{other['id']}/skip", json={"strategy": "voar"}).status_code == 400
+        assert client.post(f"/api/schedule/{other['id']}/skip", json={"strategy": "mover", "to_date": "amanhã"}).status_code == 400
+        assert client.post(f"/api/schedule/{other['id']}/move", json={"date": "32/13"}).status_code == 400
+    finally:
+        clock.freeze(None)
+
+
+def test_api_free_workout_with_strength_and_run_closes_both(client):
+    from datetime import datetime
+    try:
+        clock.freeze(datetime(2026, 11, 16, 9, 0))
+        client.put("/api/profile", json=ANDRE)
+        client.post("/api/generator/apply", json={})
+        sch = client.get("/api/schedule").json()
+        day = next(d for d in sorted({e["date"] for e in sch["entries"]})
+                   if {"forca", "resistencia"} <= {e["kind"] for e in sch["entries"] if e["date"] == d})
+        clock.freeze(datetime.fromisoformat(day + "T09:00"))
+        sch = client.get("/api/schedule").json()
+        lift = next(e for e in sch["entries"] if e["date"] == day and e["kind"] == "forca")
+        run = next(e for e in sch["entries"] if e["date"] == day and e["kind"] == "resistencia")
+        its = [i for i in lift["items"] if (i.get("phase") or "principal") == "principal" and i.get("sets") and not i.get("endurance")]
+        mins = max(30, round(sum((i.get("endurance") or {}).get("dur_s", 0) for i in run["items"]) / 60))
+        body = {"date": day + "T18:00", "day_name": "Treino livre", "client_id": "both-1",
+                "items": [{"exercise_id": i["exercise_id"], "sets": [{"reps": 8, "load_kg": 30}] * int(i["sets"])} for i in its]
+                + [{"exercise_id": "cardio_esteira_corrida", "sport": "corrida", "duration_min": mins}]}
+        saved = client.post("/api/sessions", json=body).json()
+        assert saved["credit"]["closed"]["entry_id"] == lift["id"]
+        now = {x["id"]: x for x in client.get("/api/schedule").json()["entries"]}
+        assert now[lift["id"]]["status"] == "feito" and now[run["id"]]["status"] == "feito"
+    finally:
+        clock.freeze(None)

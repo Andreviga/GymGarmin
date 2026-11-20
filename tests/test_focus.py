@@ -38,8 +38,9 @@ def test_muscle_focus_raises_volume_frequency_and_comes_first():
     for d in foc["days"]:
         pr = [i for i in d["items"] if (i.get("phase") or "principal") == "principal"]
         pos = [k for k, i in enumerate(pr) if "biceps" in catalog.get(i["exercise_id"])["primaryMuscles"]]
-        if pos:
-            assert pos[0] <= 2
+        if pos:  # o bloco do foco (bíceps + tríceps) vem no começo: no máximo um exercício principal antes dele
+            n_focus = sum(1 for i in pr if i.get("focus"))
+            assert pos[0] <= max(2, n_focus)
     notes = " ".join(i.get("notes") or "" for d in foc["days"] for i in d["items"])
     assert "myo-reps" in notes and "foco" in notes
     assert any(r.startswith("Foco: Bíceps + Tríceps") for r in foc["rationale"])

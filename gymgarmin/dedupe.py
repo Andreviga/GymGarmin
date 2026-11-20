@@ -54,6 +54,10 @@ def find_twin(new: dict, sessions: list[dict]) -> dict | None:
             continue
         t1, t2 = _time(s), _time(new)
         gap = abs((t1 - t2).total_seconds()) if t1 and t2 else 0
+        # treino livre que o app já decidiu que NÃO era o treino do dia ("extra" / pergunta em aberto): só é a
+        # mesma atividade do relógio se for no mesmo horário; horas depois é outro treino (o do dia, feito com o relógio)
+        if (s.get("extra") or s.get("match_pending")) and gap > 2 * 3600:
+            continue
         if best is None or gap < best_gap:
             best, best_gap = s, gap
     return best

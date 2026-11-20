@@ -41,13 +41,13 @@ def session_direct(session: dict) -> dict[str, float]:
 
 
 def has_sets(session: dict) -> bool:
-    return any(analysis._hard_sets(it) for it in session.get("items", [])
-               if (catalog.get(it.get("exercise_id")) or {}).get("kind") == "strength")
+    return work_sets(session) > 0
 
 
 def work_sets(session: dict) -> int:
     """Quantas séries de trabalho de musculação a sessão tem (aquecimento e série não feita ficam fora)."""
-    return sum(len(analysis._hard_sets(it)) for it in session.get("items", [])
+    detect = analysis.detect_warmup(session)
+    return sum(len(analysis._hard_sets(it, detect)) for it in session.get("items", [])
                if (catalog.get(it.get("exercise_id")) or {}).get("kind") == "strength")
 
 
@@ -111,6 +111,20 @@ def _moved_away(e: dict) -> bool:
     return e.get("status") == "pulado" and (e.get("skip_result") or {}).get("strategy") == "mover"
 
 
+def credited_by_plan(e: dict, sessions: list[dict]) -> bool:
+    """Treino FEITO cujo conteúdo vale pelo PLANO: foi fechado pelo relógio / por importação, ou por uma
+    sessão sem séries registradas. A detecção de exercícios do relógio erra muito (séries "desconhecidas",
+    remada no lugar de agachamento), então ela não serve para dizer que músculo foi treinado. Só uma sessão
+    registrada no app (client_id) com séries substitui o plano pelo que foi feito de verdade."""
+    if e.get("status") != "feito" or e.get("kind") != "forca":
+        return False
+    by = e.get("done_by") or {}
+    for s in sessions:
+        if s.get("client_id") and has_sets(s) and (s.get("schedule_id") == e.get("id") or (by and by.get("session_id") == s.get("id"))):
+            return False
+    return True
+
+
 def week_balance(entries: list[dict], sessions: list[dict], targets: dict | None, today: date,
                  exclude_id: int | None = None) -> dict[str, dict]:
     """Por músculo: feito (real), agenda (o que ainda vem), ref, piso, projetado, falta e sobra.
@@ -120,20 +134,20 @@ def week_balance(entries: list[dict], sessions: list[dict], targets: dict | None
     strength = [e for e in entries if e.get("kind") == "forca" and e.get("status") != "substituido" and not _moved_away(e)]
     done: dict[str, float] = defaultdict(float)
     direct_done: dict[str, float] = defaultdict(float)
-    dates_with_sets = set()
-    for s in sessions:
-        if has_sets(s):
-            dates_with_sets.add(str(s.get("date"))[:10])
-        for m, v in analysis.session_muscle_load(s).items():
-            done[m] += v["sets"]
-            direct_done[m] += v["direct"]
+    plan_dates = set()  # dias cujo treino feito já entrou pelo plano (fechado pelo relógio)
     for e in strength:
-        # feito só pelo relógio (sem séries registradas): vale o que estava planejado
-        if e.get("status") == "feito" and e["date"] not in dates_with_sets:
+        if credited_by_plan(e, sessions):
+            plan_dates.add(e["date"])
             for m, v in entry_load(e, base=True).items():
                 done[m] += v
             for m, v in entry_direct(e, base=True).items():
                 direct_done[m] += v
+    for s in sessions:
+        if not s.get("client_id") and str(s.get("date"))[:10] in plan_dates:
+            continue  # atividade do relógio de um dia já creditado pelo plano: não conta duas vezes
+        for m, v in analysis.session_muscle_load(s).items():
+            done[m] += v["sets"]
+            direct_done[m] += v["direct"]
     scheduled: dict[str, float] = defaultdict(float)
     plan: dict[str, float] = defaultdict(float)
     for e in strength:

@@ -852,3 +852,4 @@ body:has(.wz) { padding-bottom: 0; }
 .fx-just .stepper { grid-template-columns: 40px minmax(36px, 1fr) 40px; }
 #pk-q { min-width: 0; flex: 1 1 56%; }
 #pk-m { max-width: 42%; }
+.icon-btn { min-width: 40px; }

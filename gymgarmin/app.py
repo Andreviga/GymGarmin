@@ -1269,8 +1269,11 @@ def del_session(session_id: int):
 @app.post("/api/sessions/{session_id}/match")
 def match_session(session_id: int, body: dict = Body(...)):
     """Resposta a "esse treino livre foi o treino X?": {schedule_id} = foi esse; {extra: true} = é um extra."""
+    extra, sid = body.get("extra") is True, body.get("schedule_id")
+    if not extra and not (isinstance(sid, int) and not isinstance(sid, bool) and sid > 0):
+        raise HTTPException(400, "Diga se foi o treino da agenda (schedule_id) ou um treino extra (extra: true)")
     try:
-        return schedule.match_session(session_id, _profile(), None if body.get("extra") else body.get("schedule_id"))
+        return schedule.match_session(session_id, _profile(), None if extra else sid)
     except ValueError as e:
         raise HTTPException(400, str(e)) from e
 
