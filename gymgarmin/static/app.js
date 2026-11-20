@@ -227,7 +227,7 @@ async function viewHoje(weekDate) {
   sch._sel = sel;
   const adjusted = plannedToday.some((e) => e.readiness_backup);
   view.innerHTML = `${weekDate ? pageHead(`Semana de ${ddmm(sch.week_start)}`) : pageHead("Hoje", true, sch.today)}
-  ${weekDate ? "" : firstStepsHtml(true) + statsHtml(rd, g, adjusted, plannedToday.length > 0) + focusChip(prof) + garminSyncCard(sch, gst) + installCardHtml("hoje")}${athleteHtml}
+  ${weekDate ? "" : firstStepsHtml(true) + statsHtml(rd, g, adjusted, plannedToday.length > 0) + (sch.pending || []).map(questionHtml).join("") + legacyHtml(sch) + focusChip(prof) + garminSyncCard(sch, gst) + installCardHtml("hoje")}${athleteHtml}
   ${missed.length ? `<div class="rec alerta"><b>Treino perdido:</b> ${missed.map((e) => `${e.weekday} ${ddmm(e.date)} – ${esc(e.day_name)}`).join(", ")}.
      <div class="row gap wrap" style="margin-top:6px">${missed.map((e) => `<button class="btn sm" data-skip="${e.id}">Ajustar a semana (${e.weekday})</button>`).join("")}</div></div>` : ""}
   <section class="week">
@@ -241,17 +241,38 @@ async function viewHoje(weekDate) {
   ${(sch.time_warnings || []).length ? `<details class="rec atencao small"><summary><b>⏱ ${sch.time_warnings.length} ${sch.time_warnings.length > 1 ? "dias passam" : "dia passa"} do seu tempo de treino</b></summary><ul class="plain">${sch.time_warnings.map((w) => `<li>${esc(w)}</li>`).join("")}</ul></details>` : ""}
   ${cyc && cyc.deload ? `<p class="small rec">Semana de deload: menos séries, carga −10% e RPE ~6 para o corpo assimilar o ciclo.</p>` : ""}
   <section class="card goals"><div class="row between"><h2>Metas da semana</h2><a class="small" href="#analise">Progresso ›</a></div><div class="stack">
-    ${meter("Treinos", g.sessions.done, g.sessions.planned)}
+    ${meter(`Treinos${g.sessions.extra ? ` (+${g.sessions.extra} extra)` : ""}`, g.sessions.done, g.sessions.planned)}
     ${meter("Séries de força", g.sets.done, g.sets.planned)}
     ${meter("Cardio (min equivalentes)", g.cardio.done, g.cardio.target)}
     ${Object.entries(g.endurance || {}).map(([k, x]) => meter(`${esc(x.name)}`, x.done, x.planned, " " + x.unit)).join("")}
   </div></section>
+  ${weekDate ? "" : weekMissHtml(g)}
   <details class="card more"><summary><b>Opções da semana</b></summary><div class="stack" style="padding-bottom:4px">
     <button class="btn ghost block" id="push-week">${sch.entries.some((e) => e.garmin_outdated && e.status === "planejado") ? "Reenviar alterações ao Garmin" : "Enviar semana ao Garmin"}</button>
     <button class="btn ghost block" id="gen-open">Regerar treino</button>
     <button class="btn ghost block" id="rebuild">Refazer a semana pela planilha</button></div></details>`;
   sch._rd = rd;
   bindAgenda(sch);
+}
+
+// o que fica faltando na semana, por músculo, mesmo com os treinos que ainda estão na agenda
+function weekMissHtml(g) {
+  const rows = (g && g.muscles) || []; if (!rows.length) return "";
+  const miss = rows.filter((b) => b.state === "falta");
+  return `<section class="card miss-week"><h2>O que falta esta semana</h2>
+    ${miss.length ? `<p class="small muted" style="margin:0 0 8px">Séries por músculo que ficam faltando mesmo com os treinos que ainda estão na agenda (treino perdido, pulado ou feito pela metade).</p>
+      ${missListHtml(miss)}
+      <a class="btn ghost block" href="#treinar/livre" style="margin-top:12px">Montar treino livre com o que falta</a>
+      <p class="small muted" style="margin:8px 0 0">Repor é opcional: uma falta isolada não muda o resultado. O que conta é a sequência das próximas semanas.</p>`
+    : `<p class="small ok-txt" style="margin:0">✓ Com os treinos que estão na agenda, cada músculo fecha a semana no volume planejado.</p>`}</section>`;
+}
+// reforço que a regra antiga espalhou pela semana ao pular um treino: oferece voltar ao plano original
+function legacyHtml(sch) {
+  const lg = sch.legacy; if (!lg || !lg.days || !lg.days.length) return "";
+  return `<section class="rec atencao legacy-card"><b>Ajuste antigo nesta semana</b>
+    <p class="small" style="margin:4px 0 6px">Quando um treino foi pulado, a regra antiga espalhou parte dele em outros dias. O app não faz mais isso: falta isolada não precisa ser reposta.</p>
+    <ul class="small plain">${lg.days.map((d) => `<li><b>${esc(d.label)}:</b> ${d.lines.map(esc).join("; ")}</li>`).join("")}</ul>
+    <div class="row gap wrap" style="margin-top:8px"><button class="btn sm" id="legacy-clean">Voltar ao plano original</button><button class="btn sm ghost" id="legacy-keep">Manter como está</button></div></section>`;
 }
 
 /* ------------------------------------------------- HOJE: primeiros passos (quem acabou de entrar) -- */
@@ -346,7 +367,7 @@ function dayPanel(sch, date) {
   const extra = all.filter((i) => (i.phase || "principal") !== "principal");
   const nStr = main.filter((i) => !i.endurance).length;
   const runs = main.filter((i) => i.endurance);
-  const status = es.every((e) => e.status === "feito") ? ["Feito ✔", "ok"] : es.some((e) => e.status === "perdido") ? ["Perdido", "bad"]
+  const status = es.every((e) => e.status === "feito") ? [es.some((e) => e.partial) ? "Feito em parte" : "Feito ✔", "ok"] : es.some((e) => e.status === "perdido") ? ["Perdido", "bad"]
     : es.every((e) => e.status === "pulado") ? ["Não treinou", "warn"] : null;
   const strength = es.find((e) => !e.sport);
   const thumbId = strength ? mainIds(strength).find((x) => frames(x)) : null;
@@ -417,6 +438,8 @@ async function openReadiness(rd) {
 function bindAgenda(sch) {
   bindAthleteCards();
   bindSteps();
+  // redesenha a mesma tela em que a pessoa está: "Hoje" (com os cartões do topo) ou a semana que ela abriu
+  const again = sch._again = () => viewHoje(location.hash.startsWith("#hoje/") ? location.hash.split("/")[1] : undefined);
   view.onclick = async (ev) => {
     const t = ev.target.closest("button, [data-ex]"); if (!t) return;
     const d = t.dataset;
@@ -431,18 +454,19 @@ function bindAgenda(sch) {
       }
       if (d.ex) return showExercise(d.ex);
       if (d.week) { location.hash = `#hoje/${d.week}`; return; }
-      if (d.skip) {
-        t.disabled = true;
-        const r = await api(`/api/schedule/${d.skip}/skip`, { method: "POST" });
-        openModal(`<h2>${r.strategy === "mover" ? "Treino remarcado" : "Semana reajustada"}</h2>
-          <ul>${r.changes.map((c) => `<li>${esc(c)}</li>`).join("")}</ul>
-          <p class="small muted">Você pode desfazer pelo card do dia. Treinos já enviados ao Garmin foram marcados para reenviar.</p>
-          <button class="btn" id="ok-close">Ok</button>`);
-        $("#ok-close").onclick = closeModal;
-        return viewHoje(sch.week_start);
+      if (d.skip) return openSkip(d.skip, sch);
+      if (d.match) {
+        t.disabled = true; const r = await answerMatch(d.match);
+        toast(r.closed ? `${r.closed.day_name} marcado como feito` : "Contou como treino extra", 3500); return again();
       }
-      if (d.undo) { await api(`/api/schedule/${d.undo}/undo`, { method: "POST" }); toast("Ajuste desfeito"); return viewHoje(sch.week_start); }
-      if (d.rundo) { await api(`/api/readiness/undo/${d.rundo}`, { method: "POST" }); toast("Treino original de volta"); return viewHoje(sch.week_start); }
+      if (t.id === "legacy-clean" || t.id === "legacy-keep") {
+        t.disabled = true; const keep = t.id === "legacy-keep";
+        const r = await api("/api/schedule/legacy", { method: "POST", body: { keep } });
+        toast(keep ? "Ok, os treinos ficam como estão." : `Pronto: ${r.removed_sets} séries de reforço saíram. Os treinos voltaram ao plano original${state.garmin && state.garmin.connected ? "; reenvie ao Garmin para atualizar o relógio" : ""}.`, 6000);
+        return again();
+      }
+      if (d.undo) { await api(`/api/schedule/${d.undo}/undo`, { method: "POST" }); toast("Ajuste desfeito"); return again(); }
+      if (d.rundo) { await api(`/api/readiness/undo/${d.rundo}`, { method: "POST" }); toast("Treino original de volta"); return again(); }
       if (t.id === "rd-open") return openReadiness(sch._rd);
       if (t.id === "rd-apply") { t.disabled = true; const r = await api("/api/readiness/apply", { method: "POST", body: {} }); toast(r.changed.length ? `Ajustado: ${r.changed.join(", ")}` : "Nada para ajustar hoje", 5000); return viewHoje(); }
       if (t.id === "rd-refresh") { t.disabled = true; await api("/api/readiness/refresh", { method: "POST" }); return viewHoje(); }
@@ -452,24 +476,65 @@ function bindAgenda(sch) {
         body.onclick = async (e2) => {
           const to = e2.target.dataset.to; if (!to) return;
           const r = await api(`/api/schedule/${d.move}/move`, { method: "POST", body: { date: to } });
-          closeModal(); toast(r.warning || "Treino movido", r.warning ? 6000 : 2500); viewHoje(sch.week_start);
+          closeModal(); toast(r.warning || "Treino movido", r.warning ? 6000 : 2500); again();
         };
         return;
       }
-      if (d.push) { t.disabled = true; const r = await api(`/api/schedule/${d.push}/push`, { method: "POST" }); toast(`Enviado ao Garmin para ${r.scheduled}`); return viewHoje(sch.week_start); }
+      if (d.push) { t.disabled = true; const r = await api(`/api/schedule/${d.push}/push`, { method: "POST" }); toast(`Enviado ao Garmin para ${r.scheduled}`); return again(); }
       if (t.id === "push-outdated") {
         t.disabled = true; t.textContent = "Enviando…";
         const r = await api("/api/schedule/push-week", { method: "POST", body: { only_outdated: true } });
-        toast(`⌚ ${r.length} ${r.length === 1 ? "treino atualizado" : "treinos atualizados"} no Garmin. Sincronize o relógio pelo app Garmin Connect.`, 6000); return viewHoje(sch.week_start);
+        toast(`⌚ ${r.length} ${r.length === 1 ? "treino atualizado" : "treinos atualizados"} no Garmin. Sincronize o relógio pelo app Garmin Connect.`, 6000); return again();
       }
       if (t.id === "push-week") {
         t.disabled = true;
         const r = await api("/api/schedule/push-week", { method: "POST", body: { only_outdated: false } });
-        toast(`${r.length} treinos enviados ao Garmin Connect`); return viewHoje(sch.week_start);
+        toast(`${r.length} treinos enviados ao Garmin Connect`); return again();
       }
       if (t.id === "gen-open") return openGenerator();
-      if (t.id === "rebuild") { if (!confirm("Recriar os treinos ainda não feitos desta semana a partir da planilha?")) return; await api("/api/schedule/rebuild", { method: "POST" }); return viewHoje(sch.week_start); }
+      if (t.id === "rebuild") { if (!confirm("Recriar os treinos ainda não feitos desta semana a partir da planilha?")) return; await api("/api/schedule/rebuild", { method: "POST" }); return again(); }
     } catch (err) { t.disabled = false; toast(err.message, 5000); if (/login|conectado/i.test(err.message)) location.hash = "#perfil"; }
+  };
+}
+
+async function openSkip(id, sch) {
+  const body = openModal(`<h2>Não vou treinar</h2><div class="sk"><span class="sk-line"></span><span class="sk-line"></span><span class="sk-line"></span></div>`);
+  let pre;
+  try { pre = await api(`/api/schedule/${id}/skip`, { method: "POST", body: { dry_run: true } }); } catch (e) { body.innerHTML = `<h2>Não vou treinar</h2><p class="pill bad">${esc(e.message)}</p>`; return; }
+  const missed = pre.entry.status === "perdido";
+  const mover = pre.options.find((o) => o.id === "mover");
+  const st = { strategy: pre.recommended, to: (mover && mover.to_date) || null, run: false };
+  const dname = (iso) => { const dt = new Date(iso + "T12:00:00"); return `${WD_LONG[dt.getDay()]} ${ddmm(iso)}`; };
+  const draw = () => {
+    body.innerHTML = `<h2>${missed ? "Treino perdido" : "Não vou treinar"}</h2>
+      <p class="muted" style="margin:-6px 0 12px">${esc(pre.entry.day_name)} · ${esc(dname(pre.entry.date))}</p>
+      <div class="opts" role="radiogroup" aria-label="O que fazer com este treino">${pre.options.map((o) => `<button class="opt ${st.strategy === o.id ? "on" : ""}" role="radio" aria-checked="${st.strategy === o.id}" data-opt="${o.id}" ${o.available ? "" : "disabled"}>
+        <span class="opt-h"><b>${esc(missed && o.id === "seguir" ? "Seguir em frente" : o.title)}</b>${o.recommended ? `<span class="pill ok">recomendado</span>` : ""}</span>
+        <span class="small">${esc(o.available ? (o.text || "") : (o.reason || "Indisponível"))}</span>${o.available && o.note && st.strategy === o.id ? `<span class="small muted">${esc(o.note)}</span>` : ""}</button>`).join("")}</div>
+      ${st.strategy === "mover" ? `<div class="mv-days"><b class="small">Para qual dia?</b>${(pre.move_days || []).map((x) => `<button class="mv-day ${st.to === x.date ? "on" : ""}" data-to="${x.date}" ${x.ok ? "" : "disabled"}>
+        <b>${esc(x.label)}</b><span class="small">${esc(x.ok ? (x.warnings.length ? "Atenção: " + x.warnings.join("; ") : "sem conflitos") : x.reason)}</span></button>`).join("")}</div>` : ""}
+      ${pre.run ? `<label class="row gap opt-run"><input type="checkbox" id="sk-run" ${st.run ? "checked" : ""}> <span>Também não vou fazer: ${esc(pre.run.name)}</span></label>` : ""}
+      ${pre.why ? `<p class="small muted" style="margin:10px 0">${esc(pre.why)}</p>` : ""}
+      <button class="btn block" id="sk-go" ${st.strategy === "mover" && !st.to ? "disabled" : ""}>Confirmar</button>
+      <button class="act" id="sk-cancel" style="margin-top:8px">Cancelar</button>`;
+  };
+  draw();
+  body.onchange = (e) => { if (e.target.id === "sk-run") st.run = e.target.checked; };
+  body.onclick = async (e) => {
+    const o = e.target.closest("[data-opt]"); if (o) { st.strategy = o.dataset.opt; return draw(); }
+    const to = e.target.closest("[data-to]"); if (to) { st.to = to.dataset.to; return draw(); }
+    if (e.target.id === "sk-cancel") return closeModal();
+    if (e.target.id !== "sk-go") return;
+    e.target.disabled = true;
+    try {
+      const r = await api(`/api/schedule/${id}/skip`, { method: "POST", body: { strategy: st.strategy, to_date: st.strategy === "mover" ? st.to : null, skip_endurance: st.run } });
+      body.innerHTML = `<h2>${esc(r.title || "Treino pulado")}</h2>
+        <ul>${r.changes.map((c) => `<li>${esc(c)}</li>`).join("")}</ul>
+        <p class="small muted">Você pode desfazer pelo cartão do dia.${r.strategy !== "seguir" && state.garmin && state.garmin.connected ? " Treinos que mudaram e já estavam no Garmin foram marcados para reenviar." : ""}</p>
+        <button class="btn" id="ok-close">Ok</button>`;
+      body.onclick = (e2) => { if (e2.target.id === "ok-close") closeModal(); };
+      (sch._again || viewHoje)();
+    } catch (err) { e.target.disabled = false; toast(err.message, 5000); }
   };
 }
 
@@ -1338,18 +1403,24 @@ function bindPlano() {
 }
 
 /* ----------------------------------------------------- seletor exercício */
-function pickExercise(kind, onPick) {
+function pickExercise(kind, onPick, opts = {}) {
+  const missing = (opts.missing || []).slice(0, 6);
   const body = openModal(`<h2>${kind === "cardio" ? "Aparelho de cardio" : "Adicionar exercício"}</h2>
-    <div class="row gap"><input id="pk-q" placeholder="Buscar (ex.: supino, remada, esteira)" autofocus class="grow">
-      <select id="pk-m" style="width:auto"><option value="">Músculo</option>${state.meta.muscles.map((m) => `<option value="${m.key}">${esc(m.pt)}</option>`).join("")}</select></div>
+    ${missing.length ? `<div class="pk-miss"><span class="small muted">Falta na semana:</span>${missing.map((m) => `<button class="chip ${opts.muscle === m.key ? "on" : ""}" data-pkm="${esc(m.key)}">${esc(m.pt)} <b>${fmtSets(m.missing)}</b></button>`).join("")}</div>` : ""}
+    <div class="row gap"><input id="pk-q" placeholder="Buscar (ex.: supino, remada, esteira)" ${opts.muscle ? "" : "autofocus"} class="grow">
+      <select id="pk-m" style="width:auto"><option value="">Músculo</option>${state.meta.muscles.map((m) => `<option value="${m.key}" ${opts.muscle === m.key ? "selected" : ""}>${esc(m.pt)}</option>`).join("")}</select></div>
     <label class="row gap small" style="margin:8px 0"><input type="checkbox" id="pk-hide" checked> ocultar exercícios a evitar</label>
     <ul class="list" id="pk-list"></ul>`);
   let t;
   const load = async () => {
+    if (!$("#pk-q", body)) return;  // a janela já fechou (busca atrasada)
     const qs = new URLSearchParams({ q: $("#pk-q", body).value, limit: 40, hide_avoid: $("#pk-hide", body).checked });
+    const mus = $("#pk-m", body).value;
     if (kind) qs.set("kind", kind);
-    if ($("#pk-m", body).value) qs.set("muscle", $("#pk-m", body).value);
+    else if (mus && !$("#pk-q", body).value.trim()) { qs.set("kind", "strength"); qs.set("train", "true"); }  // "quero treinar este músculo": os exercícios certos primeiro
+    if (mus) qs.set("muscle", mus);
     const res = await api(`/api/exercises?${qs}`);
+    if (!$("#pk-list", body)) return;
     $("#pk-list", body).innerHTML = res.map((ex) => `<li class="ex-item" data-pick="${esc(ex.id)}">
       ${mediaHtml(ex.id, "s")}
       <span class="grow"><b>${esc(ex.name)}</b> ${limBadge(ex.limitation)}<br><span class="small muted">${esc(ex.primary_pt.join(", "))} · ${esc(ex.equipment_pt || "")}</span></span></li>`).join("") || `<li class="empty">Nada encontrado.</li>`;
@@ -1357,8 +1428,32 @@ function pickExercise(kind, onPick) {
   };
   body.oninput = () => { clearTimeout(t); t = setTimeout(load, 200); };
   body.onchange = body.oninput;
-  body.onclick = (e) => { const li = e.target.closest("[data-pick]"); if (!li) return; const ex = body._res.find((x) => x.id === li.dataset.pick); closeModal(); onPick(ex); };
+  body.onclick = (e) => {
+    const m = e.target.closest("[data-pkm]");
+    if (m) { const sel = $("#pk-m", body); sel.value = sel.value === m.dataset.pkm ? "" : m.dataset.pkm; $$("[data-pkm]", body).forEach((b) => b.classList.toggle("on", b.dataset.pkm === sel.value)); return load(); }
+    const li = e.target.closest("[data-pick]"); if (!li) return;
+    const ex = (body._res || []).find((x) => x.id === li.dataset.pick); if (!ex) return;
+    clearTimeout(t); closeModal(); onPick(ex);
+  };
   load();
+}
+const fmtSets = (v) => (Math.round(v * 2) / 2).toLocaleString("pt-BR");
+// item novo num treino em andamento (livre ou guiado)
+function newSessionItem(ex) {
+  return ex.kind === "cardio" ? { exercise_id: ex.id, name: ex.name, kind: "cardio", plan: {}, duration_min: 10, zone: 2, images: ex.images, limitation: ex.limitation, added: true }
+    : { exercise_id: ex.id, name: ex.name, kind: ex.kind, plan: { rest_s: 90 }, sets: [1, 2, 3].map(() => ({ reps: 10, load_kg: null, done: false })), images: ex.images, limitation: ex.limitation, timed: ex.timed, added: true };
+}
+// tirar um exercício do treino em andamento (selecionou o aparelho errado)
+function removeSessionItem(i) {
+  const s = state.session; const it = s.items[i]; if (!it) return false;
+  const doneN = (it.sets || []).filter((x) => x.done).length;
+  if ((doneN || it.done) && !confirm(`Tirar ${it.name} do treino? ${doneN ? `As ${doneN} séries marcadas serão apagadas.` : "Ele está marcado como feito."}`)) return false;
+  const order = fxOrder(s); const pos = order.indexOf(i);
+  s.items.splice(i, 1);
+  s.fsel = null; s.restEnd = null; s.restOver = false; s.workEnd = null; s.prepEnd = null; s.timeUp = false; s.lastSet = null;
+  if (Number.isInteger(s.fx)) { if (pos >= 0 && pos < s.fx) s.fx -= 1; s.fx = Math.max(0, Math.min(s.fx, s.items.length)); }
+  store("gg_session", s); toast(`${it.name} saiu do treino`);
+  return true;
 }
 
 /* --------------------------------------------------- detalhe exercício -- */
@@ -1410,6 +1505,12 @@ async function showExercise(id) {
 
 /* ------------------------------------------------------------- TREINAR -- */
 async function viewTreinar(planId, idx) {
+  if (planId === "livre") {
+    const draft = store("gg_session");
+    if (draft && (draft.schedule_id || draft.plan_id)) return viewTreinar();  // já existe outro treino em andamento: a pessoa escolhe
+    if (draft) { state.session = draft; return renderSession(); }
+    return startFree(await api("/api/schedule").catch(() => null));
+  }
   if (planId === "agenda") {
     const draft = store("gg_session");
     if (draft && String(draft.schedule_id) === String(idx)) state.session = draft;
@@ -1432,13 +1533,21 @@ async function viewTreinar(planId, idx) {
       <button class="btn ghost block" id="free" style="margin-top:14px">Treino livre</button>`;
     const r = $("#resume"); if (r) r.onclick = () => { state.session = draft; renderSession(); };
     const d = $("#discard"); if (d) d.onclick = () => { store("gg_session", null); viewTreinar(); };
-    $("#free").onclick = () => { state.session = { date: localISO(), day_name: "Treino livre", items: [] }; renderSession(); };
+    $("#free").onclick = () => startFree(sch);
     return;
   }
   const draft = store("gg_session");
   if (draft && String(draft.plan_id) === String(planId) && draft.day_name && draft._idx === +idx) state.session = draft;
   else { state.session = await api(`/api/sessions/prefill/${planId}/${idx}`); state.session._idx = +idx; }
   renderSession();
+}
+
+// treino livre: começa na lista (para montar) e já sabe o que falta na semana
+function startFree(sch, muscle) {
+  const missing = (((sch || {}).goals || {}).muscles || []).filter((m) => m.state === "falta").map((m) => ({ key: m.key, pt: m.pt, missing: m.missing }));
+  state.session = { date: localISO(), day_name: "Treino livre", items: [], view: "lista", missing };
+  renderSession();
+  if (muscle) pickExercise(null, (ex) => { state.session.items.push(newSessionItem(ex)); renderSession(); }, { muscle, missing });
 }
 
 function renderSession() {
@@ -1463,6 +1572,7 @@ function renderSession() {
       <details class="small sub" style="margin-top:8px"><summary>Data e hora: ${esc(when)}</summary>
         <div class="field" style="margin:0 0 6px"><label for="s-date">Data e hora do treino</label><input type="datetime-local" id="s-date" value="${esc((s.date || "").slice(0, 16))}"></div></details>
       ${s.deload ? `<p class="small rec">Semana de deload: menos séries, carga −10%, RPE ~6.</p>` : ""}</section>
+    ${missingChipsHtml(s)}
     ${compactCard("preparo", "Aquecimento — elevar, ativar, potencializar")}
     ${idxs.filter(([it]) => phaseOf(it) === "principal").map(([it, i]) => sessionItemHtml(it, i)).join("")}
     ${compactCard("pos", "Pós-treino — alongamento")}
@@ -1473,12 +1583,22 @@ function renderSession() {
   bindSession();
 }
 
+// treino livre: atalhos para o que ainda falta na semana (o app não escolhe por você, só mostra)
+function missingChipsHtml(s) {
+  if (s.schedule_id || s.plan_id) return "";
+  const miss = (s.missing || []).filter((m) => m.missing >= 2);
+  if (!miss.length) return s.items.length ? "" : `<p class="muted" style="margin:4px 2px 12px">Toque em “+ Adicionar exercício” para começar. O que você fizer entra na conta da semana.</p>`;
+  return `<section class="card miss-card"><b>O que ainda falta nesta semana</b>
+    <p class="small muted" style="margin:2px 0 8px">Séries que a agenda não vai cobrir. Toque num músculo para escolher o exercício:</p>
+    <div class="chips">${miss.slice(0, 8).map((m) => `<button class="chip" data-miss="${esc(m.key)}">${esc(m.pt)} <b>${fmtSets(m.missing)}</b></button>`).join("")}</div></section>`;
+}
+
 function sessionItemHtml(it, i) {
   const plan = it.plan || {};
   const lastTxt = it.last ? (it.last.sets ? it.last.sets.map((x) => `${x.reps ?? "-"}×${x.load_kg ?? 0}`).join(" · ") : `${it.last.duration_min} min Z${it.last.zone}`) : "";
   const head = `<div class="row gap">${mediaHtml(it.exercise_id, "m")}
     <div class="grow"><b data-ex="${esc(it.exercise_id)}" style="cursor:pointer">${esc(it.name)}</b> ${limBadge(it.limitation)}
-    <div class="small muted">${it.kind === "cardio" ? `${plan.duration_min || ""} min · Z${plan.zone || ""}` : `${plan.sets || ""}×${plan.reps || (plan.duration_s ? plan.duration_s + "s" : "")} ${plan.load_kg ? "· " + plan.load_kg + " kg" : ""} · descanso ${plan.rest_s || 90}s${plan.rir && !plan.deload ? ` · <span title="${RIR_TIP}">sobrar ${esc(plan.rir)} reps</span>` : ""}`}
+    <div class="small muted">${it.kind === "cardio" ? `${plan.duration_min || ""} min · Z${plan.zone || ""}` : `${plan.sets || plan.reps || plan.duration_s ? `${plan.sets || ""}×${plan.reps || (plan.duration_s ? plan.duration_s + "s" : "")} ${plan.load_kg ? "· " + plan.load_kg + " kg" : ""} · ` : ""}descanso ${plan.rest_s || 90}s${plan.rir && !plan.deload ? ` · <span title="${RIR_TIP}">sobrar ${esc(plan.rir)} reps</span>` : ""}`}
     ${(it.warmup || []).length ? `<br>Aquecimento: ${esc(it.warmup.map((w) => `${w.reps}×${w.load_kg ? w.load_kg + " kg" : "~" + w.pct + "%"}`).join(" · "))}` : ""}
     ${lastTxt ? `<br>Última: ${esc(lastTxt)}` : ""}${it.suggestion && it.suggestion.note ? `<br><b>${esc(it.suggestion.note)}</b>` : ""}${plan.notes ? `<br>${esc(plan.notes)}` : ""}</div></div></div>`;
   if (it.endurance) {
@@ -1498,7 +1618,8 @@ function sessionItemHtml(it, i) {
       <div><label>Minutos</label><input type="number" data-c="duration_min" data-i="${i}" value="${esc(it.duration_min ?? "")}"></div>
       <div><label>Zona</label><select data-c="zone" data-i="${i}">${zoneOpts(it.zone)}</select></div>
       <div><label>FC média</label><input type="number" data-c="avg_hr" data-i="${i}" value="${esc(it.avg_hr ?? "")}"></div>
-      <div><label>Feito</label><button class="check ${it.done ? "on" : ""}" data-cdone="${i}">✓</button></div></div></div>`;
+      <div><label>Feito</label><button class="check ${it.done ? "on" : ""}" data-cdone="${i}">✓</button></div></div>
+      <button class="act drop-ex" data-dropitem="${i}" style="margin-top:8px" aria-label="Tirar ${esc(it.name)} do treino">🗑 Tirar do treino</button></div>`;
   }
   const timed = it.timed && it.sets.some((x) => x.duration_s);
   return `<div class="card">${head}
@@ -1509,7 +1630,8 @@ function sessionItemHtml(it, i) {
       <td><select class="num" data-s="rpe" data-i="${i}" data-j="${j}"><option value=""></option>${[6, 7, 8, 9, 10].map((r) => `<option ${+x.rpe === r ? "selected" : ""}>${r}</option>`).join("")}</select></td>
       <td><button class="check ${x.done ? "on" : ""}" data-done="${i}:${j}" aria-label="Série feita">✓</button></td></tr>`).join("")}
     </tbody></table>
-    <div class="row gap" style="margin-top:6px"><button class="btn sm ghost" data-addset="${i}">+ série</button><button class="btn sm ghost" data-rmset="${i}">− série</button></div></div>`;
+    <div class="row gap wrap" style="margin-top:6px"><button class="btn sm ghost" data-addset="${i}">+ série</button><button class="btn sm ghost" data-rmset="${i}">− série</button>
+      <button class="act drop-ex" data-dropitem="${i}" aria-label="Tirar ${esc(it.name)} do treino">🗑 Tirar do treino</button></div></div>`;
 }
 
 function sessionProgress() {
@@ -1546,12 +1668,12 @@ function bindSession() {
     if (t.dataset.pdone) { const it = s.items[+t.dataset.pdone]; it.done = !it.done; t.classList.toggle("on", it.done); save(); }
     if (t.dataset.addset) { const it = s.items[+t.dataset.addset]; const last = it.sets[it.sets.length - 1] || {}; it.sets.push({ ...last, done: false }); renderSession(); }
     if (t.dataset.rmset) { const it = s.items[+t.dataset.rmset]; it.sets.pop(); renderSession(); }
+    if (t.dataset.dropitem && removeSessionItem(+t.dataset.dropitem)) return renderSession();
+    const mk = t.closest("[data-miss]");
+    if (mk) addEx(mk.dataset.miss);
   };
-  $("#s-add").onclick = () => pickExercise(null, (ex) => {
-    s.items.push(ex.kind === "cardio" ? { exercise_id: ex.id, name: ex.name, kind: "cardio", plan: {}, duration_min: 10, zone: 2, images: ex.images, limitation: ex.limitation }
-      : { exercise_id: ex.id, name: ex.name, kind: ex.kind, plan: {}, sets: [1, 2, 3].map(() => ({ reps: 10, load_kg: null, done: false })), images: ex.images, limitation: ex.limitation, timed: ex.timed });
-    renderSession();
-  });
+  const addEx = (muscle) => pickExercise(null, (ex) => { s.items.push(newSessionItem(ex)); renderSession(); }, { muscle, missing: s.missing });
+  $("#s-add").onclick = () => addEx();
   $("#s-cancel").onclick = () => { if (confirm("Descartar este treino?")) { store("gg_session", null); state.session = null; location.hash = "#hoje"; } };
   $("#s-finish").onclick = finishSession;
 }
@@ -1587,8 +1709,62 @@ async function finishSession() {
     }
     store("gg_session", null); state.session = null; stopTimer(); fxLeave();
     const prs = (saved && saved.prs) || [];
-    toast(prs.length ? `Treino salvo! 🏆 Recorde em ${prs.map((p) => `${p.name} (${prText(p)})`).join(", ")}` : "Treino salvo! 🎉", prs.length ? 6000 : 2600);
-    location.hash = s.schedule_id ? "#hoje" : "#analise";
+    const prTxt = prs.length ? `🏆 Recorde em ${prs.map((p) => `${p.name} (${prText(p)})`).join(", ")}` : "";
+    const cr = saved && saved.credit;
+    // treino livre, ou treino que não fechou sozinho o que estava na agenda: mostra o que contou e o que falta
+    if (cr && (!s.schedule_id || cr.question || cr.kept_open || cr.extra)) return showSaved(saved, cr, prTxt);
+    toast(prs.length ? `Treino salvo! ${prTxt}` : "Treino salvo! 🎉", prs.length ? 6000 : 2600);
+    location.hash = "#hoje";
+}
+
+/* ---- depois de salvar: o que o treino fechou na agenda e o que ainda falta na semana ---- */
+const pctTxt0 = (c) => (c == null ? "" : `${Math.round(c * 100)}%`);
+function questionHtml(q) {
+  return `<div class="rec atencao q-card"><b>Esse treino livre foi o ${esc(q.day_name)} (${esc(q.label)})?</b>
+    <p class="small" style="margin:4px 0 8px">${q.coverage != null ? `Ele cobriu cerca de ${pctTxt0(q.coverage)} do que estava planejado. ` : ""}${q.kind === "futuro"
+      ? "Se foi, marco esse treino como feito e ele sai do dia dele." : "Se foi, marco o treino como feito."} Se não, conta como treino extra e o planejado continua na agenda.</p>
+    <div class="row gap wrap"><button class="btn sm" data-match="${q.session_id}:${q.entry_id}">Sim, foi esse</button>
+      <button class="btn sm ghost" data-match="${q.session_id}:extra">Não, foi um extra</button></div></div>`;
+}
+function missListHtml(rows, limit = 6) {
+  return `<ul class="miss-list">${rows.slice(0, limit).map((b) => `<li><span class="grow">${esc(b.pt)}<span class="small muted"> · ${fmtSets(b.projected)} de ${fmtSets(b.ref)} séries</span></span><b>faltam ${fmtSets(b.missing)}</b></li>`).join("")}</ul>`;
+}
+function balanceAfterHtml(rows) {
+  if (!rows || !rows.length) return "";
+  const miss = rows.filter((b) => b.state === "falta");
+  return miss.length ? `<h3 class="sv-h">O que ainda falta nesta semana</h3><p class="small muted" style="margin:0 0 6px">Mesmo fazendo os treinos que restam na agenda:</p>${missListHtml(miss)}
+      <p class="small muted" style="margin:8px 0 0">Não é obrigatório repor: uma semana um pouco mais leve não muda o resultado.</p>`
+    : `<p class="small ok-txt" style="margin:12px 0 0">✓ Com os treinos que ainda estão na agenda, a semana fecha no volume planejado.</p>`;
+}
+async function answerMatch(val) {
+  const [sid, target] = String(val).split(":");
+  return api(`/api/sessions/${sid}/match`, { method: "POST", body: target === "extra" ? { extra: true } : { schedule_id: +target } });
+}
+function showSaved(saved, cr, prTxt) {
+  const closedTxt = (c) => `Fechou o treino <b>${esc(c.day_name)}</b> (${esc(c.label)})${c.coverage != null ? `: cobriu ${pctTxt0(c.coverage)} do planejado` : ""}.${c.was_skipped ? " Ele estava como pulado; o ajuste do pulo foi desfeito." : ""}`;
+  const head = cr.closed ? closedTxt(cr.closed)
+    : cr.extra ? `Contou como <b>treino extra</b>.${cr.kept_open ? ` O treino de hoje (${esc(cr.kept_open.day_name)}) continua na agenda.` : ""}`
+    : cr.kept_open ? `Você fez ${pctTxt0(cr.kept_open.coverage)} do treino <b>${esc(cr.kept_open.day_name)}</b>: ele continua na agenda.` : "";
+  view.innerHTML = `<section class="today-card saved-card"><div class="eyebrow">Treino salvo ✓</div>
+    <div class="tc-title">${cr.work_sets} ${cr.work_sets === 1 ? "série de trabalho" : "séries de trabalho"}</div>
+    ${prTxt ? `<p>${esc(prTxt)}</p>` : ""}
+    <div id="sv-credit">${head ? `<p>${head}</p>` : ""}${cr.question ? questionHtml({ ...cr.question, session_id: saved.id }) : ""}
+      ${cr.kept_open && !cr.extra && !cr.question ? `<button class="btn ghost block" data-match="${saved.id}:${cr.kept_open.entry_id}">Marcar como feito mesmo assim</button>` : ""}</div>
+    ${cr.added && cr.added.length ? `<h3 class="sv-h">O que entrou na conta da semana</h3><div class="tc-chips">${cr.added.map((x) => `<span>${esc(x.pt)} +${fmtSets(x.sets)}</span>`).join("")}</div>
+      <p class="small muted" style="margin:6px 0 0">Séries de trabalho por músculo (aquecimento não conta; músculo auxiliar conta metade).</p>` : ""}
+    <div id="sv-bal">${balanceAfterHtml(cr.balance)}</div>
+    <a class="btn block" href="#hoje" style="margin-top:16px">Ver minha semana</a></section>`;
+  window.scrollTo(0, 0);
+  view.oninput = view.onchange = null;
+  view.onclick = async (e) => {
+    const b = e.target.closest("[data-match]"); if (!b) return;
+    b.disabled = true;
+    try {
+      const r = await answerMatch(b.dataset.match);
+      $("#sv-credit").innerHTML = `<p>${r.closed ? closedTxt(r.closed) : "Contou como <b>treino extra</b>. O treino planejado continua na agenda."}</p>`;
+      $("#sv-bal").innerHTML = balanceAfterHtml(r.balance);
+    } catch (err) { b.disabled = false; toast(err.message, 5000); }
+  };
 }
 
 /* ---- minha academia: foto e regulagem do aparelho, troca por equivalente ---- */
@@ -1878,6 +2054,27 @@ function fxCur(it, s) {
   return { w: false, k, x: it.sets[k] };
 }
 const WARM_REST = 45, WARM_LAST_REST = 75;
+function fxCarry(it, k, f, old, val) {
+  if (f !== "load_kg" || !it || !it.sets) return;
+  for (let j = k + 1; j < it.sets.length; j++) { const y = it.sets[j]; if (!y.done && (y.load_kg == null || y.load_kg === old)) y.load_kg = val; }
+}
+// a série que acabou de ser feita (para corrigir repetições e carga enquanto o descanso já corre)
+function fxLast_(s) {
+  const L = s.lastSet; const it = L && s.items[L.i]; if (!it || !fxStrength(it)) return null;
+  const x = L.w ? (it.warmup || [])[L.k] : it.sets[L.k];
+  return x && x.done ? { it, x, w: L.w, k: L.k } : null;
+}
+function fxJustHtml(s) {
+  const L = fxLast_(s); if (!L) return "";
+  const { it, x } = L; const timed = it.timed && it.sets.some((y) => y.duration_s); const fld = timed ? "duration_s" : "reps";
+  const st = (f, label, step, mode) => `<div class="fx-step"><label>${label}</label><div class="stepper">
+    <button data-lst="${f}:-${step}" aria-label="menos ${label}">−</button><input data-lv="${f}" inputmode="${mode}" value="${esc(x[f] ?? "")}" aria-label="${label} da série feita">
+    <button data-lst="${f}:${step}" aria-label="mais ${label}">+</button></div></div>`;
+  return `<div class="fx-just"><div class="fx-just-h"><span class="small">Você acabou de fazer · ajuste se precisar</span>
+      <b>${esc(it.name)} · ${L.w ? `aquecimento ${L.k + 1}` : `série ${L.k + 1}`}</b></div>
+    <div class="fx-inputs">${st(fld, timed ? "Segundos" : "Repetições", timed ? 5 : 1, "numeric")}${st("load_kg", "Carga (kg)", 2.5, "decimal")}</div>
+    ${L.w ? "" : `<div class="fx-rpe"><span class="small muted">Esforço</span>${[6, 7, 8, 9, 10].map((r) => `<button class="${+x.rpe === r ? "on" : ""}" data-lrpe="${r}">${r}</button>`).join("")}</div>`}</div>`;
+}
 function fxNextPos(s, order, pos) {
   for (let p = pos + 1; p < order.length; p++) if (!fxDone(s.items[order[p]])) return p;
   for (let p = 0; p < pos; p++) if (!fxDone(s.items[order[p]])) return p;
@@ -1914,7 +2111,13 @@ function fxTick() {
   if (s.restEnd) {
     const over = now - s.restEnd;
     if (over < 0) { const left = Math.ceil(-over / 1000); show(left, s.restTotal); return beeps(left); }
-    if (!s.restOver) { s.restOver = true; store("gg_session", s); if (over < 8000) alarm(); return renderFocus(); }
+    if (!s.restOver) {
+      s.restOver = true; store("gg_session", s); if (over < 8000) alarm();
+      const sec = $(".fx-rest"); if (!sec) return renderFocus();
+      sec.classList.add("over"); const lbl = $("#fx-rest-lbl"); if (lbl) lbl.textContent = "Descanso terminado";
+      $$(".fx-rest [data-when=rest]").forEach((x) => { x.hidden = true; }); $$(".fx-rest [data-when=over]").forEach((x) => { x.hidden = false; });
+      const go = $(".fx-rest .fx-skip"); if (go) go.textContent = "▶ Começar";
+    }
     if (el) el.textContent = "+" + mmss(Math.floor(over / 1000));
     return;
   }
@@ -1936,6 +2139,8 @@ function fxTick() {
 function fxSetDone() {
   const s = state.session; const order = fxOrder(s); const it = s.items[order[s.fx]]; if (!it) return;
   const c = fxCur(it, s); c.x.done = true; s.fsel = null; s.timeUp = false; s.workEnd = null; s.prepEnd = null;
+  s.lastSet = { i: order[s.fx], w: c.w, k: c.k };
+  if (!c.w) fxCarry(it, c.k, "load_kg", null, c.x.load_kg);
   let rest;
   if (c.w) rest = (it.warmup || []).some((y) => !y.done && !y.skip) ? WARM_REST : WARM_LAST_REST;
   else { rest = (it.plan || {}).rest_s ?? 90; if (it.sets.every((y) => y.done)) s.fx = fxNextPos(s, order, s.fx); }
@@ -1971,17 +2176,15 @@ function renderFocus() {
   let body;
   if (s.restEnd) {
     const left = Math.max(0, Math.ceil((s.restEnd - Date.now()) / 1000));
-    body = s.restOver
-      ? `<section class="fx-rest over" aria-live="polite"><div class="eyebrow">Descanso terminado</div>
-      <div class="fx-clock" id="fx-clock">+${mmss(Math.floor((Date.now() - s.restEnd) / 1000))}</div>
-      ${fxNextHtml(s, order)}
-      <button class="btn block fx-skip" data-fx="r-skip">▶ Começar</button>
-      <p class="small" style="margin:10px 0 0;opacity:.8">Sem pressa: só muda quando você tocar.</p></section>`
-      : `<section class="fx-rest" aria-live="polite"><div class="eyebrow">Descanso</div>
-      <div class="fx-clock" id="fx-clock">${mmss(left)}</div><div class="fx-bar" id="fx-bar"><span style="width:${Math.round(100 * (1 - left / (s.restTotal || 1)))}%"></span></div>
-      ${fxNextHtml(s, order)}
-      <div class="fx-rest-btns"><button class="btn ghost" data-fx="r-15">−15 s</button><button class="btn ghost" data-fx="r+15">+15 s</button></div>
-      <button class="btn block fx-skip" data-fx="r-skip">Estou pronto</button></section>`;
+    const just = fxJustHtml(s);
+    body = `<section class="fx-rest ${s.restOver ? "over" : ""} ${just ? "has-just" : ""}">${just}
+      <div class="eyebrow" id="fx-rest-lbl" aria-live="polite">${s.restOver ? "Descanso terminado" : "Descanso"}</div>
+      <div class="fx-clock" id="fx-clock">${s.restOver ? "+" + mmss(Math.floor((Date.now() - s.restEnd) / 1000)) : mmss(left)}</div>
+      <div class="fx-bar" id="fx-bar" data-when="rest" ${s.restOver ? "hidden" : ""}><span style="width:${Math.round(100 * (1 - left / (s.restTotal || 1)))}%"></span></div>
+      <div id="fx-next-box">${fxNextHtml(s, order)}</div>
+      <div class="fx-rest-btns" data-when="rest" ${s.restOver ? "hidden" : ""}><button class="btn ghost" data-fx="r-15">−15 s</button><button class="btn ghost" data-fx="r+15">+15 s</button></div>
+      <button class="btn block fx-skip" data-fx="r-skip">${s.restOver ? "▶ Começar" : "Estou pronto"}</button>
+      <p class="small" data-when="over" ${s.restOver ? "" : "hidden"} style="margin:10px 0 0;opacity:.8">Sem pressa: só muda quando você tocar.</p></section>`;
   } else if (!it) {
     const sets = s.items.reduce((n, x) => n + (fxStrength(x) ? x.sets.filter((y) => y.done).length : 0), 0);
     body = `<section class="today-card fx-end"><div class="eyebrow">Treino concluído</div><div class="tc-title">${esc(s.day_name || "Treino")} ✓</div>
@@ -2034,6 +2237,7 @@ function renderFocus() {
         <div class="fx-extra">${extra}</div>
         <div class="fx-setmini fx-gym"><button class="act" data-fx="swap">⇄ Trocar aparelho</button>${it.my_machine ? "" : `<button class="act" data-fx="mymachine">📷 Meu aparelho</button>`}</div>
         ${it.sets.length ? `<div class="fx-setmini"><button class="act" data-fx="addset">+ série</button>${it.sets.length > 1 ? `<button class="act" data-fx="rmset">− série</button>` : ""}<button class="act" data-fx="skip">Pular exercício</button></div>` : ""}
+        <div class="fx-setmini"><button class="act drop-ex" data-fx="drop">🗑 Tirar do treino${it.added ? " (escolhi errado)" : ""}</button></div>
       </section>`;
     } else if (it.endurance) {
       body = `<section class="fx-card">${head}</section>${sessionItemHtml(it, i)}
@@ -2045,13 +2249,13 @@ function renderFocus() {
           <div><label>Zona</label><select data-c="zone" data-i="${i}">${zoneOpts(it.zone)}</select></div>
           <div><label>FC média</label><input type="number" inputmode="numeric" data-c="avg_hr" data-i="${i}" value="${esc(it.avg_hr ?? "")}"></div></div>
         <button class="btn block fx-go" data-fx="done">${it.done ? "Feito ✓ — próximo" : "✓ Feito — próximo"}</button>
-        <div class="fx-setmini"><button class="act" data-fx="skip">Pular</button></div></section>`;
+        <div class="fx-setmini"><button class="act" data-fx="skip">Pular</button><button class="act drop-ex" data-fx="drop">🗑 Tirar do treino</button></div></section>`;
     } else {
       const sec = (p.duration_s || (p.reps ? 0 : 30)) * (p.sets || 1);
       body = `<section class="fx-card">${head}
         ${sec ? workClock(`Iniciar ${sec >= 60 ? mmss(sec) + " min" : sec + " s"}`, sec, "item") : ""}
         <button class="btn block fx-go" data-fx="done">${it.done ? "Feito ✓ — próximo" : "✓ Feito — próximo"}</button>
-        <div class="fx-setmini"><button class="act" data-fx="skip">Pular</button></div></section>`;
+        <div class="fx-setmini"><button class="act" data-fx="skip">Pular</button>${it.added ? `<button class="act drop-ex" data-fx="drop">🗑 Tirar do treino</button>` : ""}</div></section>`;
     }
   }
   view.innerHTML = top + body + (s.restEnd ? "" : tools);
@@ -2064,7 +2268,9 @@ function bindFocus() {
   view.oninput = (e) => {
     const el = e.target;
     if (el.id === "s-notes") s.notes = el.value;
-    if (el.dataset.fv && it && fxStrength(it)) { const x = fxCur(it, s).x; x[el.dataset.fv] = el.value === "" ? null : parseFloat(el.value.replace(",", ".")); }
+    const num = (v) => { const n = v === "" ? null : parseFloat(String(v).replace(",", ".")); return Number.isFinite(n) ? n : null; };
+    if (el.dataset.fv && it && fxStrength(it)) { const c = fxCur(it, s); const old = c.x[el.dataset.fv]; c.x[el.dataset.fv] = num(el.value); if (!c.w) fxCarry(it, c.k, el.dataset.fv, old, c.x[el.dataset.fv]); }
+    if (el.dataset.lv) { const L = fxLast_(s); if (L) { const old = L.x[el.dataset.lv]; L.x[el.dataset.lv] = num(el.value); if (!L.w) fxCarry(L.it, L.k, el.dataset.lv, old, L.x[el.dataset.lv]); const nb = $("#fx-next-box"); if (nb) nb.innerHTML = fxNextHtml(s, order); } }
     if (el.dataset.c) s.items[+el.dataset.i][el.dataset.c] = el.value === "" ? null : +String(el.value).replace(",", ".");
     if (el.dataset.t) s.items[+el.dataset.i][el.dataset.t] = el.value;
     if (el.dataset.c || el.dataset.t) { const pe = $(`#pace-${el.dataset.i}`); if (pe) pe.textContent = paceTxt(s.items[+el.dataset.i]); }
@@ -2074,7 +2280,15 @@ function bindFocus() {
   view.onchange = view.oninput;
   view.onclick = (e) => {
     audioUnlock();
-    const t = e.target.closest("[data-fx],[data-fset],[data-st],[data-rpe],[data-ex],[data-cdone],[data-mm]"); if (!t) return;
+    const t = e.target.closest("[data-fx],[data-fset],[data-st],[data-rpe],[data-ex],[data-cdone],[data-mm],[data-lst],[data-lrpe]"); if (!t) return;
+    if (t.dataset.lst || t.dataset.lrpe) {
+      const L = fxLast_(s); if (!L) return;
+      if (t.dataset.lrpe) { L.x.rpe = +L.x.rpe === +t.dataset.lrpe ? null : +t.dataset.lrpe; $$(".fx-just [data-lrpe]").forEach((b) => b.classList.toggle("on", +b.dataset.lrpe === L.x.rpe)); return save(); }
+      const [f, d] = t.dataset.lst.split(":"); const old = L.x[f];
+      L.x[f] = Math.max(0, Math.round(((+L.x[f] || 0) + +d) * 100) / 100); if (!L.w) fxCarry(L.it, L.k, f, old, L.x[f]);
+      const inp = $(`[data-lv="${f}"]`); if (inp) inp.value = L.x[f]; const nb = $("#fx-next-box"); if (nb) nb.innerHTML = fxNextHtml(s, order);
+      return save();
+    }
     const saveMM = (mm) => { it.my_machine = mm; save(); renderFocus(); };
     if (t.dataset.mm && it) { const mm = it.my_machine || {}; return openMyMachine({ ...mm, exercise_id: it.exercise_id, exercise_name: it.name }, saveMM); }
     if (t.dataset.fx === "mymachine" && it) return openMyMachine({ exercise_id: it.exercise_id, exercise_name: it.name }, saveMM);
@@ -2083,19 +2297,21 @@ function bindFocus() {
     if (t.dataset.cdone) { const x = s.items[+t.dataset.cdone]; x.done = !x.done; t.classList.toggle("on", x.done); return save(); }
     if (t.dataset.fset) { s.fsel = +t.dataset.fset; s.workEnd = null; s.prepEnd = null; s.timeUp = false; return renderFocus(); }
     if (t.dataset.st && it) {
-      const [f, d] = t.dataset.st.split(":"); const x = fxCur(it, s).x;
-      x[f] = Math.max(0, Math.round(((+x[f] || 0) + +d) * 100) / 100); const inp = $(`[data-fv="${f}"]`); if (inp) inp.value = x[f]; return save();
+      const [f, d] = t.dataset.st.split(":"); const c = fxCur(it, s); const x = c.x; const old = x[f];
+      x[f] = Math.max(0, Math.round(((+x[f] || 0) + +d) * 100) / 100); if (!c.w) fxCarry(it, c.k, f, old, x[f]);
+      const inp = $(`[data-fv="${f}"]`); if (inp) inp.value = x[f]; return save();
     }
     if (t.dataset.rpe && it) { const x = fxCur(it, s).x; x.rpe = +x.rpe === +t.dataset.rpe ? null : +t.dataset.rpe; $$(".fx-rpe [data-rpe]").forEach((b) => b.classList.toggle("on", +b.dataset.rpe === x.rpe)); return save(); }
     const a = t.dataset.fx;
     if (a === "set") return fxSetDone();
-    if (a === "undo-set") { fxCur(it, s).x.done = false; save(); return renderFocus(); }
+    if (a === "drop" && it) { if (removeSessionItem(order[s.fx])) renderFocus(); return; }
+    if (a === "undo-set") { fxCur(it, s).x.done = false; s.lastSet = null; save(); return renderFocus(); }
     if (a === "skipwarm") { (it.warmup || []).forEach((w) => { if (!w.done) w.skip = true; }); s.fsel = null; save(); return renderFocus(); }
     if (a === "done") { it.done = true; s.workEnd = null; s.prepEnd = null; s.timeUp = false; s.fx = fxNextPos(s, order, s.fx); save(); return renderFocus(); }
     if (a === "skip") { s.workEnd = null; s.prepEnd = null; s.timeUp = false; s.fsel = null; s.fx = Math.min(order.length, s.fx + 1); save(); return renderFocus(); }
-    if (a === "prev" || a === "next") { s.restEnd = null; s.restOver = false; s.workEnd = null; s.prepEnd = null; s.timeUp = false; s.fsel = null; s.fx = Math.max(0, Math.min(order.length, s.fx + (a === "next" ? 1 : -1))); save(); return renderFocus(); }
+    if (a === "prev" || a === "next") { s.lastSet = null; s.restEnd = null; s.restOver = false; s.workEnd = null; s.prepEnd = null; s.timeUp = false; s.fsel = null; s.fx = Math.max(0, Math.min(order.length, s.fx + (a === "next" ? 1 : -1))); save(); return renderFocus(); }
     if (a === "r-15" || a === "r+15") { s.restEnd = Math.max(Date.now(), s.restEnd + (a === "r+15" ? 15000 : -15000)); s.restTotal = Math.max(s.restTotal, Math.ceil((s.restEnd - Date.now()) / 1000)); save(); return fxTick(); }
-    if (a === "r-skip") { s.restEnd = null; s.restOver = false; save(); return renderFocus(); }
+    if (a === "r-skip") { s.restEnd = null; s.restOver = false; s.lastSet = null; save(); return renderFocus(); }
     if (a === "work") { s.workTotal = +t.dataset.sec; s.prepEnd = Date.now() + 5000; s.workEnd = null; s.timeUp = false; s.workKind = t.dataset.kind; fxLast = null; save(); return renderFocus(); }
     if (a === "work-stop") { s.workEnd = null; s.prepEnd = null; save(); return renderFocus(); }
     if (a === "addset" && it) { const last = it.sets[it.sets.length - 1] || {}; it.sets.push({ ...last, done: false }); save(); return renderFocus(); }
@@ -2105,10 +2321,9 @@ function bindFocus() {
       s.view = "lista"; s.restEnd = null; s.restOver = false; s.workEnd = null; s.prepEnd = null; save(); renderSession(); if (left > 0) startTimer(left); return;
     }
     if (a === "add") return pickExercise(null, (ex) => {
-      s.items.push(ex.kind === "cardio" ? { exercise_id: ex.id, name: ex.name, kind: "cardio", plan: {}, duration_min: 10, zone: 2, images: ex.images, limitation: ex.limitation }
-        : { exercise_id: ex.id, name: ex.name, kind: ex.kind, plan: { rest_s: 90 }, sets: [1, 2, 3].map(() => ({ reps: 10, load_kg: null, done: false })), images: ex.images, limitation: ex.limitation, timed: ex.timed });
+      s.items.push(newSessionItem(ex));
       s.fx = fxOrder(s).indexOf(s.items.length - 1); save(); renderFocus();
-    });
+    }, { missing: s.missing });
   };
   const fin = $("#s-finish"); if (fin) fin.onclick = finishSession;
   const cancel = $("#s-cancel"); if (cancel) cancel.onclick = () => { if (confirm("Descartar este treino?")) { store("gg_session", null); state.session = null; fxLeave(); location.hash = "#hoje"; } };

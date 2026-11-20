@@ -38,7 +38,7 @@ const DEVICES = [
   ["iPhone SE deitado", devices["iPhone SE landscape"]],
 ].filter((d) => !QUICK || ["iPhone SE", "Pixel 7"].includes(d[0]));
 const THEMES = QUICK ? ["light"] : ["light", "dark"];
-const PERSONAS = ["novo", "musculacao", "hibrido", "extremo"];
+const PERSONAS = (process.env.GG_PERSONAS || "novo,musculacao,hibrido,extremo").split(",");
 
 const ISSUES = new Map();
 const STATS = { render_ms: [] };
@@ -268,6 +268,21 @@ async function flows(page, base, persona, tag) {
   await openDay("[data-skip]");
   if (await page.locator("#day-panel [data-skip]").count()) {
     await click("#day-panel [data-skip]", "Não vou treinar");
+    await page.waitForSelector("#sk-go", { timeout: 4000 }).catch(() => issue("opções de 'Não vou treinar' não abriram", W("hoje")));
+    await modalCheck("não vou treinar: opções");
+    const nOpt = await page.locator(".opt").count();
+    if (nOpt < 1) issue("'Não vou treinar' sem opções", W("hoje"));
+    if ((await page.locator(".opt.on").count()) !== 1) issue("'Não vou treinar' sem uma opção recomendada marcada", W("hoje"));
+    // mover: escolher um dia mostra os avisos e libera o confirmar
+    const mv = page.locator(".opt[data-opt='mover']:not([disabled])");
+    if (await mv.count()) {
+      await mv.click(); await page.waitForTimeout(80);
+      if (!(await page.locator(".mv-day").count())) issue("'Fazer em outro dia' sem lista de dias", W("hoje"));
+      await modalCheck("não vou treinar: dias para mover");
+      await page.locator(".opt[data-opt='seguir']").click(); await page.waitForTimeout(80);
+    }
+    await click("#sk-go", "Confirmar (não vou treinar)");
+    await page.waitForSelector("#ok-close", { timeout: 4000 }).catch(() => issue("resultado do pulo não apareceu", W("hoje")));
     await modalCheck("reajuste");
     await click("#ok-close", "Ok do reajuste");
     if (await page.locator("[data-undo]").count()) { await openDay("[data-undo]"); } if (await page.locator("[data-undo]").count()) await click("#day-panel [data-undo]", "Desfazer ajuste");
@@ -291,7 +306,23 @@ async function flows(page, base, persona, tag) {
         await click("[data-st='reps:1']", "+1 repetição");
         await click("[data-fx='set']", "série feita (guiado)");
         if (!(await page.locator(".fx-rest #fx-clock").count())) issue("treino guiado: descanso não começou", W("treinar"));
-        else { await audit(page, W("treino guiado: descanso")); await click("[data-fx='r+15']", "+15 s"); await click("[data-fx='r-skip']", "Pular descanso (guiado)"); }
+        else {
+          await audit(page, W("treino guiado: descanso"));
+          // a série recém-feita continua editável com o cronômetro correndo
+          const just = page.locator(".fx-just [data-lst='load_kg:2.5']");
+          if (!(await just.count())) issue("descanso: não dá para ajustar a série que acabou de fazer", W("treinar"));
+          else {
+            const before = await page.locator(".fx-just [data-lv='load_kg']").inputValue();
+            await just.click(); await page.waitForTimeout(60);
+            const after = await page.locator(".fx-just [data-lv='load_kg']").inputValue();
+            if (before === after) issue("descanso: +2,5 kg na série feita não mudou o valor", W(`${before} → ${after}`));
+            await page.locator(".fx-just [data-lv='reps'], .fx-just [data-lv='duration_s']").first().fill("9");
+            if (!(await page.locator(".fx-rest #fx-clock").count())) issue("descanso: editar a série apagou o cronômetro", W("treinar"));
+            const saved = await page.evaluate(() => { const s = JSON.parse(localStorage.getItem("gg_session") || "{}"); const L = s.lastSet; if (!L) return null; const it = s.items[L.i]; return (L.w ? it.warmup : it.sets)[L.k]; });
+            if (!saved || +saved.load_kg !== +after) issue("descanso: ajuste da série feita não foi guardado", W(JSON.stringify(saved)));
+          }
+          await click("[data-fx='r+15']", "+15 s"); await click("[data-fx='r-skip']", "Pular descanso (guiado)");
+        }
       } else if (e.kind === "forca") issue("treino guiado: sem exercício com séries", W("treinar"));
       await click("[data-fx='list']", "Ver lista");
     } else issue("treino guiado não abriu", W("treinar"));
@@ -334,6 +365,46 @@ async function flows(page, base, persona, tag) {
     await page.waitForTimeout(500);
     await audit(page, W("depois de salvar o treino"));
   }
+
+  // Treino livre: montar, tirar o exercício escolhido errado, registrar e ver o que contou
+  await go(page, "#treinar/livre", W("treino livre"));
+  // já havia outro treino em andamento neste aparelho: o app não passa por cima; a pessoa escolhe "Treino livre"
+  if (!(await page.locator("#s-add").count()) && (await page.locator("#free").count())) await click("#free", "Treino livre");
+  if (await page.locator("#s-add").count()) {
+    const addOne = async (nth) => {
+      await click("#s-add", "+ Adicionar exercício");
+      await page.waitForSelector("#pk-list [data-pick]", { timeout: 4000 }).catch(() => issue("seletor de exercício vazio", W("treino livre")));
+      await modalCheck("treino livre: escolher exercício");
+      await page.locator("#pk-list [data-pick]").nth(nth).click(); await page.waitForTimeout(150);
+    };
+    await addOne(0); await addOne(1);
+    let n = await page.locator("[data-dropitem]").count();
+    if (n !== 2) issue("treino livre: exercício adicionado sem botão de tirar", W(`${n} botões`));
+    else {
+      await audit(page, W("treino livre com exercícios"));
+      await click("[data-dropitem]", "Tirar do treino (escolhi errado)");
+      n = await page.locator("[data-dropitem]").count();
+      if (n !== 1) issue("treino livre: não tirou o exercício errado", W(`${n} restantes`));
+    }
+    // modo guiado: também dá para tirar
+    await click("#to-focus", "Treinar um exercício por vez");
+    if (!(await page.locator("[data-fx='drop']").count())) issue("modo guiado: sem botão de tirar o exercício", W("treino livre"));
+    await audit(page, W("treino livre guiado"));
+    if (await page.locator("[data-fx='set']").count()) {
+      await click("[data-st='load_kg:2.5']", "+2,5 kg");
+      await click("[data-fx='set']", "série feita (livre)");
+      await click("[data-fx='r-skip']", "Estou pronto");
+    }
+    await click("[data-fx='list']", "Ver lista");
+    await click("#s-finish", "Finalizar treino livre");
+    await page.waitForSelector(".saved-card", { timeout: 5000 }).catch(() => issue("treino livre: tela de resumo não apareceu", W("treino livre")));
+    await audit(page, W("treino livre salvo"));
+    const q = page.locator(".saved-card [data-match]").first();
+    if (await q.count()) { await q.scrollIntoViewIfNeeded(); await q.click(); await page.waitForTimeout(300); await audit(page, W("treino livre: respondeu se foi o treino do dia")); }
+    await go(page, "#hoje", W("hoje depois do treino livre"));
+    const sch2 = await (await fetch(`${base}/api/schedule`)).json();
+    if (((sch2.goals || {}).muscles || []).length && !(await page.locator(".miss-week").count())) issue("Hoje sem o cartão 'O que falta esta semana'", W("hoje"));
+  } else issue("treino livre não abriu", W(await page.evaluate(() => { const d = JSON.parse(localStorage.getItem("gg_session") || "null"); return `rascunho: ${d ? `${d.day_name} sched=${d.schedule_id} plan=${d.plan_id}` : "nenhum"} · tela: ${document.getElementById("view").innerText.slice(0, 80).replace(/\s+/g, " ")}`; })));
 
   // Perfil: editar e salvar
   await go(page, "#perfil", W("perfil"));

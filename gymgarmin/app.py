@@ -719,10 +719,14 @@ def meta():
 @app.get("/api/exercises")
 def exercises(q: str = "", muscle: str | None = None, equipment: str | None = None,
               kind: str | None = None, level: str | None = None, limit: int = Query(60, le=1000),
-              hide_avoid: bool = False):
+              hide_avoid: bool = False, train: bool = False):
     lims = _profile().get("limitations") or []
     ov = db.garmin_overrides()
-    res = [_with_status(e, lims, ov) for e in catalog.search(q, muscle, equipment, kind, level, limit=limit * 2)]
+    found = catalog.search(q, muscle, equipment, kind, level, limit=1000 if train and muscle and not q else limit * 2)
+    if train and muscle and not q:  # "quero treinar este músculo": os exercícios certos primeiro
+        mkey = catalog.MUSCLE_SEARCH_PT.get(catalog.strip_accents(muscle), muscle)
+        found = my_gym.rank_for_muscle(found, mkey)[:limit * 2]
+    res = [_with_status(e, lims, ov) for e in found]
     if hide_avoid:
         res = [r for r in res if r["limitation"]["status"] != "evitar"]
     for r in res:
@@ -1223,12 +1227,11 @@ def create_session(body: dict = Body(...)):
             saved = db.save_session(dedupe.merge(body, twin), session_id=twin["id"])
         else:
             saved = db.save_session(body)
-        if body.get("schedule_id"):
-            e = db.get_entry(int(body["schedule_id"]))
-            if e:
-                e["status"] = "feito"
-                db.save_entry(e)
-        return {**saved, "prs": history.session_prs(db.list_sessions(limit=5000), saved, _profile().get("weight_kg"))}
+        # que treino da agenda esta sessão fecha (pelo conteúdo) e o que ainda falta na semana
+        credit = schedule.credit_session(saved, _profile())
+        saved = db.get_session(saved["id"]) or saved
+        return {**saved, "prs": history.session_prs(db.list_sessions(limit=5000), saved, _profile().get("weight_kg")),
+                "credit": credit}
     except ValueError as e:
         raise HTTPException(409, str(e)) from e
 
@@ -1243,13 +1246,33 @@ def get_session(session_id: int):
 
 @app.put("/api/sessions/{session_id}")
 def put_session(session_id: int, body: dict = Body(...)):
-    return db.save_session(body, session_id=session_id)
+    old = db.get_session(session_id)
+    if not old:
+        raise HTTPException(404, "Sessão não encontrada")
+    # a edição não apaga o vínculo com a agenda nem a decisão "foi o treino X / é um extra"
+    keep = {k: old[k] for k in ("schedule_id", "client_id", "extra", "match_pending") if k in old and k not in body}
+    saved = db.save_session({**keep, **body}, session_id=session_id)
+    from .credit import COVER_ASK
+    schedule.reopen_for_session(saved, min_cover=COVER_ASK)  # editou até não cobrir mais o treino: ele volta à agenda
+    return saved
 
 
 @app.delete("/api/sessions/{session_id}")
 def del_session(session_id: int):
+    s = db.get_session(session_id)
+    if s:
+        schedule.reopen_for_session(s)  # o treino que esta sessão tinha fechado volta para a agenda
     db.delete_session(session_id)
     return {"ok": True}
+
+
+@app.post("/api/sessions/{session_id}/match")
+def match_session(session_id: int, body: dict = Body(...)):
+    """Resposta a "esse treino livre foi o treino X?": {schedule_id} = foi esse; {extra: true} = é um extra."""
+    try:
+        return schedule.match_session(session_id, _profile(), None if body.get("extra") else body.get("schedule_id"))
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from e
 
 
 def _prefill_items(day_items: list[dict], deload: bool = False) -> list[dict]:
@@ -1778,9 +1801,12 @@ def _entry_view(e: dict, budget: float, fmt: str | None = None) -> dict:
 @app.get("/api/schedule")
 def get_schedule(date_: str | None = Query(None, alias="date")):
     prof = _profile()
-    day = date.fromisoformat(date_) if date_ else clock.today()
-    entries = schedule.ensure_week(prof, day)
+    today = clock.today()
+    day = date.fromisoformat(date_) if date_ else today
     ws = schedule.week_start(day)
+    current = ws == schedule.week_start(today)
+    pending = schedule.free_workout_state(prof, today) if current else []
+    entries = schedule.ensure_week(prof, day)
     plan = schedule.schedule_plan(prof)
     budget = schedule.session_budget(prof, plan)
     cycle = next((e.get("cycle") for e in entries if e.get("cycle")), None)
@@ -1789,7 +1815,9 @@ def get_schedule(date_: str | None = Query(None, alias="date")):
         "plan": {"id": plan["id"], "name": plan["name"], "generator": plan.get("generator")} if plan else None,
         "cycle": cycle, "budget": budget,
         "entries": (views := [_entry_view(e, budget, _garmin_fmt(prof)) for e in entries]),
-        "goals": schedule.week_goals(entries, prof, ws),
+        "goals": schedule.week_goals(entries, prof, ws, today),
+        "pending": pending,  # treinos livres esperando a resposta "foi o treino X?"
+        "legacy": schedule.legacy_compensation(entries, today) if current else None,  # reforço da regra antiga
         "time_warnings": _time_warnings(views, budget),
     }
 
@@ -1824,11 +1852,22 @@ def _entry_or_404(entry_id: int) -> dict:
 
 
 @app.post("/api/schedule/{entry_id}/skip")
-def schedule_skip(entry_id: int):
+def schedule_skip(entry_id: int, body: dict | None = Body(None)):
+    """"Não vou treinar". {dry_run: true} devolve as opções com a prévia de cada uma (nada é gravado).
+    Sem `strategy` só pula (não mexe nos outros dias)."""
+    b = body or {}
     try:
-        return schedule.handle_missed(entry_id, _profile())
+        return schedule.handle_missed(entry_id, _profile(), strategy=b.get("strategy"), to_date=b.get("to_date"),
+                                      dry_run=bool(b.get("dry_run")), skip_endurance=bool(b.get("skip_endurance")))
     except ValueError as e:
         raise HTTPException(400, str(e)) from e
+
+
+@app.post("/api/schedule/legacy")
+def schedule_legacy(body: dict | None = Body(None)):
+    """Reforço espalhado pela regra antiga de treino pulado: volta ao plano original, ou {keep: true} mantém."""
+    today = clock.today()
+    return schedule.remove_compensation(schedule.week_start(today), today, keep=bool((body or {}).get("keep")))
 
 
 @app.post("/api/schedule/{entry_id}/undo")
@@ -1843,7 +1882,7 @@ def schedule_undo(entry_id: int):
 @app.post("/api/schedule/{entry_id}/move")
 def schedule_move(entry_id: int, body: dict = Body(...)):
     try:
-        return schedule.move(entry_id, body["date"])
+        return schedule.move(entry_id, body["date"], clock.today())
     except (ValueError, KeyError) as e:
         raise HTTPException(400, str(e)) from e
 

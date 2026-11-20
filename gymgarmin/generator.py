@@ -578,7 +578,8 @@ def _choose_split_endurance(days: list[int], tier_key: str, goal: dict, hard_leg
 
     base = _choose_split(days, tier_key, goal)
     best, best_key = base, None
-    for perm in set(itertools.permutations(base)):
+    # ordem fixa: a mesma pessoa recebe sempre a mesma divisão (a prévia é igual ao treino aplicado)
+    for perm in sorted(set(itertools.permutations(base))):
         by = dict(zip(days, perm))
         leg_leg = sum(1 for d, t in by.items() if t in HEAVY_LEGS and by.get((d + 1) % 7) in HEAVY_LEGS)  # perna 2 dias seguidos
         key = (_leg_penalty(days, list(perm), hard_leg_days) * 2 + _adjacent_conflicts(days, list(perm)) + 2 * leg_leg,
@@ -1099,9 +1100,30 @@ MUSCLE_PATTERN = {
 }
 
 
+COMPLEMENT_SAME_REGION = True  # complemento de superior não entra em dia de perna (nem o contrário)
+_UPPER_M = {"chest", "lats", "middle back", "shoulders", "biceps", "triceps", "traps", "forearms", "neck"}
+_LOWER_M = {"quadriceps", "hamstrings", "glutes", "calves", "adductors", "abductors"}
+
+
+def _day_region(d: dict) -> str:
+    """superior / inferior / misto, pelo que o treino já tem (séries diretas dos exercícios principais)."""
+    up = lo = 0
+    for it in d["items"]:
+        ex = catalog.get(it.get("exercise_id")) or {}
+        if (it.get("phase") or "principal") != "principal" or ex.get("kind") != "strength" or it.get("complement"):
+            continue
+        prim = set(ex.get("primaryMuscles") or [])
+        n = int(it.get("sets") or 0)
+        up += n if prim & _UPPER_M else 0
+        lo += n if prim & _LOWER_M else 0
+    return "superior" if up > 2 * lo else "inferior" if lo > 2 * up else "misto"
+
+
 def _add_complements(days, targets, budget, picker, tier, reps, rest_mult, limit: int = 8) -> list[str]:
-    """Onde sobrou tempo, adiciona um exercício para o músculo mais abaixo do alvo semanal."""
+    """Onde sobrou tempo, adiciona um exercício para o músculo mais abaixo do alvo semanal.
+    O complemento fica na mesma região do treino: nada de peito/costas/trapézio em dia de perna (nem o contrário)."""
     added: list[str] = []
+    region = {id(d): _day_region(d) for d in days if d["kind"] == "forca"}
     for _ in range(limit):
         vol = _weekly_volume(days)
         deficits = sorted(((vol.get(m, 0) / t, m) for m, t in targets.items() if t >= 3 and m in MUSCLE_PATTERN
@@ -1113,6 +1135,9 @@ def _add_complements(days, targets, budget, picker, tier, reps, rest_mult, limit
             pattern = MUSCLE_PATTERN[m]
             strength = [d for d in days if d["kind"] == "forca"]
             for d in sorted(strength, key=_day_total):
+                reg = region.get(id(d), "misto")
+                if COMPLEMENT_SAME_REGION and ((reg == "inferior" and m in _UPPER_M) or (reg == "superior" and m in _LOWER_M)):
+                    continue
                 used = {i["exercise_id"] for i in d["items"]}
                 # não coloca o músculo colado em outro dia que já o treina pesado
                 neighbors = [x for x in strength if x is not d and abs(x["weekday"] - d["weekday"]) in (1, 6)]

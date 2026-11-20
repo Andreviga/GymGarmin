@@ -149,9 +149,22 @@ class Sim:
             print("  !! " + w)
 
     # ---- ações
-    def skip(self, name: str) -> dict:
+    def options(self, name: str) -> dict:
+        """As opções de "Não vou treinar" (prévia, nada é gravado)."""
         e = self.find(name)
-        r = self.schedule.handle_missed(e["id"], self.db.get_profile(), self.today)
+        r = self.schedule.handle_missed(e["id"], self.db.get_profile(), self.today, dry_run=True)
+        print(f"\n>>> opções para {e['date']} {e['day_name']} (recomendado: {r['recommended']} — {r['why']})")
+        for o in r["options"]:
+            mark = "★" if o.get("recommended") else " "
+            print(f"   {mark} [{o['id']}] {o['title']}: " + (o.get("text") or f"indisponível — {o.get('reason')}"))
+        for d in r.get("move_days") or []:
+            print(f"       dia {d['label']}: " + ("ok" if d["ok"] else f"bloqueado ({d['reason']})")
+                  + (f" · avisos: {'; '.join(d['warnings'])}" if d["warnings"] else ""))
+        return r
+
+    def skip(self, name: str, strategy: str | None = None, to_date: str | None = None) -> dict:
+        e = self.find(name)
+        r = self.schedule.handle_missed(e["id"], self.db.get_profile(), self.today, strategy=strategy, to_date=to_date)
         print(f"\n>>> pulou {e['date']} {e['day_name']}: estratégia = {r['strategy']}")
         for c in r["changes"]:
             print("    - " + c)
@@ -159,11 +172,29 @@ class Sim:
             print("    não coube: " + ", ".join(r["unrecovered"]))
         return r
 
+    def undo(self, name: str) -> None:
+        e = self.find(name, status=("pulado",))
+        self.schedule.undo(e["id"])
+        print(f"\n>>> desfez o ajuste de {e['date']} {e['day_name']}")
+
+    def balance(self) -> list[dict]:
+        rows = self.schedule.balance(self.db.get_profile(), self.today, self.today)
+        print("\n    saldo da semana: " + "; ".join(f"{b['pt']} {b['projected']:g}/{b['ref']:g}" + (f" (faltam {b['missing']:g})" if b["state"] == "falta" else "")
+                                                   for b in rows))
+        return rows
+
     def free(self, items: list[tuple[str, int]], when: str | None = None, reps: int = 10, load: float = 20.0) -> dict:
         """Treino livre (sem vínculo com a agenda), como o botão 'Treino livre' do app."""
-        body = {"date": f"{when or self.today.isoformat()}T18:00", "day_name": "Treino livre",
+        self._n = getattr(self, "_n", 0) + 1
+        body = {"date": f"{when or self.today.isoformat()}T18:00", "day_name": "Treino livre", "client_id": f"sim-{self._n}",
                 "items": [{"exercise_id": eid, "sets": [{"reps": reps, "load_kg": load} for _ in range(n)]} for eid, n in items]}
-        return self.db.save_session(body)
+        saved = self.db.save_session(body)
+        c = self.schedule.credit_session(saved, self.db.get_profile(), self.today)
+        what = (f"fechou {c['closed']['day_name']} ({c['closed']['label']}, cobertura {c['closed']['coverage']})" if c["closed"]
+                else f"PERGUNTA ({c['question']['kind']}): foi o treino {c['question']['day_name']} de {c['question']['label']}? cobertura {c['question']['coverage']}"
+                if c["question"] else "treino extra" + (f" (o de hoje, {c['kept_open']['day_name']}, continua na agenda)" if c["kept_open"] else ""))
+        print(f"\n>>> treino livre ({c['work_sets']} séries de trabalho): {what}")
+        return c
 
     def done(self, name: str) -> None:
         """Registra o treino planejado como feito (todas as séries)."""
@@ -171,9 +202,8 @@ class Sim:
         body = {"date": f"{e['date']}T18:00", "schedule_id": e["id"], "day_name": e["day_name"],
                 "items": [{"exercise_id": i["exercise_id"], "sets": [{"reps": 8, "load_kg": 30} for _ in range(int(i.get("sets") or 1))]}
                           for i in self.schedule._strength_items(e)]}
-        self.db.save_session(body)
-        e["status"] = "feito"
-        self.db.save_entry(e)
+        saved = self.db.save_session(body)
+        self.schedule.credit_session(saved, self.db.get_profile(), self.today)
 
 
 if __name__ == "__main__":
@@ -181,6 +211,7 @@ if __name__ == "__main__":
     ap.add_argument("--profile", default="andre")
     ap.add_argument("--today", default="2026-11-19")
     ap.add_argument("--skip", action="append", default=[], help="nome (trecho) do treino a pular; pode repetir")
+    ap.add_argument("--strategy", choices=["seguir", "reforcar", "mover"], help="opção escolhida ao pular (padrão: seguir)")
     ap.add_argument("--free", help="treino livre hoje: Exercicio_Id:series,Outro_Id:series")
     ap.add_argument("--list", action="store_true")
     a = ap.parse_args()
@@ -191,9 +222,11 @@ if __name__ == "__main__":
     s = Sim(a.profile, a.today)
     s.show("antes")
     for name in a.skip:
-        s.skip(name)
+        s.options(name)
+        s.skip(name, a.strategy)
     if a.free:
         s.free([(x.split(":")[0], int(x.split(":")[1])) for x in a.free.split(",")])
-        print("\n>>> treino livre registrado")
+    if a.skip or a.free:
+        s.balance()
     if a.skip or a.free:
         s.show("depois")

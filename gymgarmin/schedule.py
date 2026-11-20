@@ -29,9 +29,9 @@ import math
 from collections import defaultdict
 from datetime import date, datetime, timedelta
 
-from . import catalog, clock, db, endurance, generator, load
-from .generator import WEEKDAYS, _cardio_equiv, _default_days, item_time, time_breakdown, weekly_targets, tier_for
-from .muscles import PRIMARY_WEIGHT, muscle_pt
+from . import catalog, clock, credit, db, endurance, generator, load
+from .generator import WEEKDAYS, _cardio_equiv, _default_days, _reps_bounds, item_time, time_breakdown, weekly_targets, tier_for
+from .muscles import PRIMARY_WEIGHT, SECONDARY_WEIGHT, muscle_pt
 from .progression import apply_cycle, cycle_position
 
 
@@ -306,13 +306,51 @@ def _sessions_in_week(ws: date) -> list[dict]:
     return [s for s in db.list_sessions(since=start, limit=500) if s["date"][:10] < end]
 
 
+def _targets(plan: dict | None, profile: dict) -> tuple[str, dict]:
+    """Nível e alvo semanal de séries por músculo (do plano; sem plano, do perfil)."""
+    gen = (plan or {}).get("generator") or {}
+    months = profile.get("training_months")
+    tier = gen.get("tier") or tier_for(months if months is not None else 12)
+    return tier, gen.get("targets") or weekly_targets(tier, profile.get("goal") or "hipertrofia", profile.get("volume_factor") or 1)
+
+
+def _strength_match(sx: dict, e: dict) -> bool:
+    """Sessão sem vínculo fecha a musculação do dia? Treino livre do app: só se cobrir a maior parte do
+    que estava planejado (bíceps e tríceps não "fazem" um treino de perna). Atividade do relógio ou
+    importada (sem séries detalhadas): vale pelo tipo, como sempre."""
+    if sx.get("extra") or sx.get("match_pending"):
+        return False
+    if credit.is_free_workout(sx):
+        cov = credit.coverage(sx, e)
+        return cov is None or cov >= credit.COVER_CLOSE
+    return any(it.get("sets") or it.get("strength_min") for it in sx.get("items", []))
+
+
 def sync_status(entries: list[dict], sessions: list[dict], today: date) -> list[dict]:
-    by_sched = {s.get("schedule_id"): s for s in sessions if s.get("schedule_id")}
+    by_sched: dict = {}
+    for s in sessions:
+        if s.get("schedule_id"):
+            by_sched.setdefault(s["schedule_id"], s)
     by_date = defaultdict(list)
     for s in sessions:
         if not s.get("schedule_id"):
             by_date[s["date"][:10]].append(s)
+    # uma atividade não vale por dois treinos do mesmo tipo; mas musculação + corrida na mesma sessão
+    # fecha a musculação E a corrida do dia
     used: set = set()
+
+    def cls_of(e: dict) -> tuple:
+        k = e.get("kind")
+        return ("forca",) if k == "forca" else ("end",) if k in ("resistencia", "cardio") else ("forca", "end")
+
+    def linked(e: dict) -> dict | None:
+        """Sessão aberta pela agenda: fecha o treino, a não ser que a pessoa tenha feito menos de 25% dele."""
+        sx = by_sched.get(e["id"])
+        if sx and e.get("kind") == "forca" and sx.get("client_id") and credit.has_sets(sx):
+            cov = credit.coverage(sx, e)
+            if cov is not None and cov < credit.COVER_ASK:
+                return None
+        return sx
 
     def matches(e, sess_list, substitute: bool = False):
         """Sessão sem vínculo conta para o treino do dia só se for do mesmo tipo:
@@ -322,8 +360,8 @@ def sync_status(entries: list[dict], sessions: list[dict], today: date) -> list[
                           for it in e.get("items") or [] if it.get("endurance") or it.get("sport"))
         kind = e.get("kind")
         for sx in sess_list:
-            if sx.get("id") in used:
-                continue  # uma atividade não vale por dois treinos
+            if any((sx.get("id"), c) in used for c in cls_of(e)):
+                continue
             its = sx.get("items", [])
             strength_done = any(it.get("sets") or it.get("strength_min") for it in its)
             end_min = defaultdict(float)
@@ -336,20 +374,20 @@ def sync_status(entries: list[dict], sessions: list[dict], today: date) -> list[
                 other = sum(v for k, v in end_min.items() if k not in ("caminhada", e.get("sport")))
                 ok = kind == "resistencia" and other >= max(30, 0.75 * planned_min)
             else:
-                ok = (kind == "forca" and strength_done) \
+                ok = (kind == "forca" and _strength_match(sx, e)) \
                     or (kind == "resistencia" and end_min.get(e.get("sport"), 0) >= max(10, 0.4 * planned_min)) \
                     or (kind == "cardio" and sum(end_min.values()) >= 10) \
                     or (kind not in ("forca", "resistencia", "cardio") and (strength_done or bool(end_min)))
             if ok:
-                used.add(sx.get("id"))
-                return True
-        return False
+                used.update((sx.get("id"), c) for c in cls_of(e))
+                return sx
+        return None
 
     # 1º reserva as atividades dos treinos já feitos; 2º casa pelo tipo exato; 3º aceita troca de modalidade
     for e in entries:
         if e["status"] == "feito" and e["id"] not in by_sched:
             matches(e, by_date.get(e["date"], []))
-    done = set()
+    done: dict = {}
     # mesma modalidade duas vezes no dia (ex.: remo intervalado + contínuo): casa pela duração mais próxima
     pairs = []
     for e in entries:
@@ -357,22 +395,29 @@ def sync_status(entries: list[dict], sessions: list[dict], today: date) -> list[
             planned = sum((it.get("endurance") or {}).get("dur_s", 0) / 60 for it in e.get("items") or [])
             for sx in by_date.get(e["date"], []):
                 mins = sum(float(it.get("duration_min") or 0) for it in sx.get("items", []) if load.sport_of(it) == e.get("sport"))
-                if mins and sx.get("id") not in used:
-                    pairs.append((abs(mins - planned), e["id"], sx.get("id"), mins, planned))
-    for _, eid, sid, mins, planned in sorted(pairs, key=lambda x: x[0]):
-        if eid not in done and sid not in used and mins >= max(10, 0.4 * planned):
-            done.add(eid)
-            used.add(sid)
+                if mins and (sx.get("id"), "end") not in used:
+                    pairs.append((abs(mins - planned), e["id"], sx, mins, planned))
+    for _, eid, sx, mins, planned in sorted(pairs, key=lambda x: x[0]):
+        if eid not in done and (sx.get("id"), "end") not in used and mins >= max(10, 0.4 * planned):
+            done[eid] = (sx, "data")
+            used.add((sx.get("id"), "end"))
     for substitute in (False, True):
         for e in entries:
             if e["status"] in ("planejado", "perdido") and e["id"] not in done:
-                if e["id"] in by_sched or matches(e, by_date.get(e["date"], []), substitute):
-                    done.add(e["id"])
+                sx = linked(e)
+                how = "vinculo"
+                if not sx and e["id"] not in by_sched:
+                    sx, how = matches(e, by_date.get(e["date"], []), substitute), "data"
+                if sx:
+                    done[e["id"]] = (sx, how)
     out = []
     for e in entries:
         status = e["status"]
         if status in ("planejado", "perdido"):
             if e["id"] in done:
+                sx, how = done[e["id"]]
+                cov = credit.coverage(sx, e) if e.get("kind") == "forca" and credit.has_sets(sx) else None
+                e["done_by"] = {"session_id": sx.get("id"), "how": how, "coverage": cov, "prev": status}
                 status = "feito"
             elif _d(e["date"]) < today and status == "planejado":
                 status = "perdido"
@@ -491,206 +536,481 @@ def _place_cardio(lost: float, future: list[dict], origin: str, budget: float, m
     return lost
 
 
-def handle_missed(entry_id: int, profile: dict, today: date | None = None) -> dict:
+# ------------------------------------------------------- pular / treino perdido --
+# Princípio (estudo de 20/11/2026): falta isolada não gera dívida. Uma semana mais leve não faz perder o que
+# foi construído (pausas de 1 semana em treinados não mudaram a hipertrofia: Coleman et al. 2024), a frequência
+# não pesa com o volume igualado (Schoenfeld, Grgic e Krieger 2019) e nenhum app de referência espalha pedaços
+# do treino perdido em treino de outro grupo. Então o padrão é SEGUIR: pular sem mexer nos outros dias.
+# O reforço existe, mas é pequeno e nunca piora o treino que o recebe. Todos os números abaixo são
+# heurísticas de engenharia (conservadoras), não valores da literatura.
+SESSION_CAP = {"iniciante": 8, "intermediario": 10, "avancado": 10, "elite": 10}  # séries fracionadas por músculo
+#   por treino até onde o APP acrescenta (o ganho extra por sessão fica difícil de detectar por volta de 11
+#   séries fracionadas: Remmert et al. 2025, preprint; paramos antes). Não limita o que a pessoa escolhe fazer.
+COMP_PER_EXERCISE = 1        # no máximo +1 série por exercício
+COMP_EXERCISE_MAX_SETS = 5   # e o exercício não passa de 5 séries
+COMP_PER_MUSCLE = 3          # no máximo +3 séries por músculo
+COMP_PER_SESSION = 4         # no máximo +4 séries por treino
+DAY_TOL = 1.10               # o dia (musculação + corrida) pode passar 10% do tempo do perfil
+NEIGHBOR_DIRECT = 4          # 4+ séries diretas do mesmo músculo no dia vizinho bloqueiam o reforço
+#   (repetir peito pesado com 24 h derrubou as repetições; com 48 h não: Miranda et al. 2018)
+LEG_DAY_DIRECT = 6           # treino com 6+ séries diretas de perna é "dia de perna"
+LOWER = {"quadriceps", "hamstrings", "glutes", "calves", "adductors", "abductors"}
+
+
+def _num(v: float) -> str:
+    return f"{round(float(v), 1):g}".replace(".", ",")
+
+
+def _is_leg_item(it: dict) -> bool:
+    ex = catalog.get(it.get("exercise_id")) or {}
+    prim = set(ex.get("primaryMuscles") or [])
+    return bool(prim & LOWER) or ("lower back" in prim and bool(set(ex.get("secondaryMuscles") or []) & LOWER))
+
+
+def _is_leg_day(e: dict) -> bool:
+    return sum(v for m, v in credit.entry_direct(e).items() if m in LOWER) >= LEG_DAY_DIRECT
+
+
+def _active(e: dict) -> bool:
+    return e.get("status") in ("planejado", "feito")
+
+
+def _day_minutes(day_iso: str, entries: list[dict]) -> float:
+    """Tempo total do dia: musculação + corrida (o que conta para a pessoa é o dia, não cada treino)."""
+    return sum(_minutes(e) for e in entries if e["date"] == day_iso and _active(e))
+
+
+def _heavy_end_on(day_iso: str, entries: list[dict]) -> bool:
+    return any(_is_heavy_end(e) for e in entries if e["date"] == day_iso and _active(e))
+
+
+def _direct_on(day_iso: str, entries: list[dict], sessions: list[dict]) -> dict[str, float]:
+    """Séries diretas por músculo num dia: o que foi registrado de verdade + o que está planejado."""
+    out: dict[str, float] = defaultdict(float)
+    real = False
+    for s in sessions:
+        if str(s.get("date"))[:10] == day_iso and credit.has_sets(s):
+            real = True
+            for m, v in credit.session_direct(s).items():
+                out[m] += v
+    for e in entries:
+        if e["date"] != day_iso or e.get("kind") != "forca":
+            continue
+        if e["status"] == "planejado" or (e["status"] == "feito" and not real):
+            for m, v in credit.entry_direct(e).items():
+                out[m] += v
+    return out
+
+
+def _skip_ctx(missed: dict, profile: dict, today: date) -> dict:
+    ws = week_start(_d(missed["date"]))
+    entries = db.list_schedule(ws.isoformat(), (ws + timedelta(days=6)).isoformat())
+    others = [e for e in entries if e["id"] != missed["id"]]
+    plan = db.get_plan(missed["plan_id"]) if missed.get("plan_id") else None
+    gen = (plan or {}).get("generator") or {}
+    months = profile.get("training_months")
+    tier = gen.get("tier") or tier_for(months if months is not None else 12)
+    targets = gen.get("targets") or weekly_targets(tier, profile.get("goal") or "hipertrofia", profile.get("volume_factor") or 1)
+    sessions = _sessions_in_week(ws)
+    future = [e for e in others if e["status"] == "planejado" and _d(e["date"]) >= today]
+    if _d(missed["date"]) == today:
+        future = [e for e in future if _d(e["date"]) > today]
+    return {
+        "ws": ws, "today": today, "entries": entries, "others": others, "future": future, "plan": plan, "tier": tier,
+        "sessions": sessions, "minutes": session_budget(profile, plan), "profile": profile,
+        "balance": credit.week_balance(entries, sessions, targets, today, exclude_id=missed["id"]),
+        "deload": bool((missed.get("cycle") or {}).get("deload")) or any(i.get("taper") for i in missed.get("items") or []),
+        "other_misses": any(e.get("kind") == "forca" and e["status"] in ("pulado", "perdido") and not credit._moved_away(e)
+                            for e in others),
+    }
+
+
+def _affected(missed: dict, ctx: dict) -> list[dict]:
+    """Músculos que o treino pulado treinava de verdade (2+ séries diretas), com o saldo da semana sem ele."""
+    direct = credit.entry_direct(missed, base=True)
+    rows = [ctx["balance"][m] for m, v in direct.items() if v >= 2 and ctx["balance"][m]["ref"] >= credit.MIN_REF]
+    return sorted(rows, key=lambda b: b["projected"] - b["ref"])
+
+
+def _reinforce_ops(missed: dict, ctx: dict, asked: bool) -> tuple[list[dict], dict[int, dict]]:
+    """Plano de reforço: +1 série em exercícios que JÁ existem em treinos que JÁ treinam o músculo.
+
+    Nunca cria exercício, nunca cruza região, nunca passa do teto por treino, nunca cai colado em outro dia
+    forte do músculo, nunca põe perna no dia/véspera de longão ou corrida forte, e respeita o tempo do DIA.
+    Devolve (operações, cópias dos treinos já com o reforço).
+    """
+    if ctx["deload"]:
+        return [], {}
+    bal, cap, limit = ctx["balance"], SESSION_CAP.get(ctx["tier"], 10), ctx["minutes"] * DAY_TOL
+    work = {e["id"]: copy.deepcopy(e) for e in ctx["future"] if e.get("kind") == "forca"}
+    view = [work.get(e["id"], e) for e in ctx["others"]]  # a semana como ficaria (sem o treino pulado)
+    projected = {m: b["projected"] for m, b in bal.items()}
+    missed_direct = credit.entry_direct(missed, base=True)
+    comp = {eid: sum(int(i.get("added") or 0) for i in credit.strength_items(e)) for eid, e in work.items()}
+    ops: list[dict] = []
+
+    def need_of(m: str) -> int:
+        if asked:  # a pessoa pediu: até metade do que o treino pulado dava, sem passar da referência
+            room = min(bal[m]["ref"] - projected[m], 0.5 * missed_direct[m])
+            return min(COMP_PER_MUSCLE, math.ceil(room)) if room >= 1 else 0
+        gap = bal[m]["floor"] - projected[m]  # automático: só se o músculo fica bem abaixo do plano
+        return min(COMP_PER_MUSCLE, math.ceil(gap)) if gap >= credit.MIN_GAP else 0
+
+    for b in _affected(missed, ctx):
+        m = b["key"]
+        need = need_of(m)
+        while need > 0:
+            best = None
+            for e in sorted(work.values(), key=lambda x: (credit.entry_load(x).get(m, 0), x["date"])):
+                load_e, day = credit.entry_load(e), _d(e["date"])
+                if comp[e["id"]] >= COMP_PER_SESSION or credit.entry_direct(e).get(m, 0) < NEIGHBOR_DIRECT:
+                    continue
+                if any(_direct_on((day + timedelta(days=k)).isoformat(), view, ctx["sessions"]).get(m, 0) >= NEIGHBOR_DIRECT
+                       for k in (-1, 1)):
+                    continue
+                run_block = _heavy_end_on(e["date"], view) or _heavy_end_on((day + timedelta(days=1)).isoformat(), view)
+                cands = []
+                for idx, it in enumerate(e["items"]):
+                    ex = catalog.get(it.get("exercise_id")) or {}
+                    if (it.get("phase") or "principal") != "principal" or ex.get("kind") != "strength" or m not in ex["primaryMuscles"]:
+                        continue
+                    if int(it.get("added") or 0) >= COMP_PER_EXERCISE or int(it.get("sets") or 0) >= COMP_EXERCISE_MAX_SETS:
+                        continue
+                    if it.get("superset") or it.get("duration_s") or it.get("added_from"):
+                        continue
+                    if it.get("role") == "main" and _reps_bounds(it.get("reps"))[1] <= 6:
+                        continue  # exercício principal pesado não recebe série de compensação
+                    if _is_leg_item(it) and run_block:
+                        continue
+                    if any(load_e.get(x, 0) + 1 > cap for x in ex["primaryMuscles"]):
+                        continue
+                    if _day_minutes(e["date"], view) + _set_minutes(it) > limit:
+                        continue
+                    cands.append(({"sec": 0, "acc": 1}.get(it.get("role"), 2), len(ex["primaryMuscles"]) > 1, idx))
+                if cands:
+                    best = (e, min(cands)[2])
+                    break
+            if not best:
+                break
+            e, idx = best
+            it = e["items"][idx]
+            it["sets"] = int(it["sets"]) + 1
+            it["added"] = int(it.get("added") or 0) + 1
+            comp[e["id"]] += 1
+            ex = catalog.get(it["exercise_id"])
+            for x in ex["primaryMuscles"]:
+                projected[x] = projected.get(x, 0) + PRIMARY_WEIGHT
+            for x in ex["secondaryMuscles"]:
+                projected[x] = projected.get(x, 0) + SECONDARY_WEIGHT
+            ops.append({"entry_id": e["id"], "exercise_id": it["exercise_id"], "index": idx, "sets": 1, "muscle": m})
+            need -= 1
+    return ops, work
+
+
+def _ops_lines(ops: list[dict], ctx: dict, work: dict[int, dict]) -> list[dict]:
+    """Operações agrupadas por dia, com texto pronto para a tela."""
+    by: dict[int, list[dict]] = defaultdict(list)
+    for o in ops:
+        by[o["entry_id"]].append(o)
+    out = []
+    for eid, lst in by.items():
+        before = next(e for e in ctx["entries"] if e["id"] == eid)
+        names = [catalog.get(o["exercise_id"])["name"] for o in lst]
+        mins = (round(_minutes(before)), round(_minutes(work[eid])))
+        out.append({"entry_id": eid, "date": before["date"], "day_name": before["day_name"],
+                    "lines": [f"+1 série em {n}" for n in names],
+                    "text": f"{_fmt(before['date'])} · {before['day_name']}: " + ", ".join(f"+1 série em {n}" for n in names)
+                            + (f" ({mins[0]} → {mins[1]} min)" if mins[1] != mins[0] else "") + "."})
+    return sorted(out, key=lambda d: d["date"])
+
+
+def _move_days(missed: dict, ctx: dict) -> list[dict]:
+    """Dias possíveis para fazer o treino pulado, cada um com o que já existe nele, bloqueios e avisos."""
+    today, ws, others = ctx["today"], ctx["ws"], ctx["others"]
+    first = max(today + (timedelta(days=1) if _d(missed["date"]) <= today else timedelta()), ws)
+    avail = set(available_days(ctx["profile"]))
+    mine = {m for m, v in credit.entry_direct(missed, base=True).items() if v >= NEIGHBOR_DIRECT}
+    leg, limit, out = _is_leg_day(missed), ctx["minutes"] * DAY_TOL, []
+    for k in range(7):
+        cand = ws + timedelta(days=k)
+        iso = cand.isoformat()
+        if cand < first or iso == missed["date"]:
+            continue
+        same = [e for e in others if e["date"] == iso and _active(e)]
+        label = " + ".join(e["day_name"] for e in same) or "livre"
+        total = _day_minutes(iso, others) + _minutes(missed)
+        reason, warns = None, []
+        if any(e["status"] == "feito" for e in same):
+            reason = "dia já treinado"
+        elif any(e.get("kind") == "forca" for e in same):
+            reason = "já tem musculação neste dia"
+        elif len([e for e in same if e.get("kind") != "cardio"]) >= 2:
+            reason = "dia cheio"
+        elif any(_is_heavy_end(e) for e in same):
+            reason = "dia de longão ou corrida forte"
+        elif leg and _heavy_end_on((cand + timedelta(days=1)).isoformat(), others):
+            reason = "véspera de longão ou corrida forte (treino de perna)"
+        if not reason:
+            clash = sorted({muscle_pt(m) for d in (-1, 1) for m, v in
+                            _direct_on((cand + timedelta(days=d)).isoformat(), others, ctx["sessions"]).items()
+                            if m in mine and v >= NEIGHBOR_DIRECT})
+            if clash:
+                warns.append(f"{', '.join(clash)} em dias seguidos")
+            if total > limit:
+                warns.append(f"o dia fica com ~{round(total)} min")
+            if any(e.get("kind") == "cardio" for e in same):
+                warns.append("o cardio do dia vira finalizador")
+            if cand.weekday() not in avail:
+                warns.append("não é um dia de treino do seu perfil")
+            if cand == today:
+                warns.append("é hoje")
+        # distância até outro treino forte dos mesmos músculos (quanto maior, melhor a recuperação)
+        dist = min([abs((_d(e["date"]) - cand).days) for e in others if e.get("kind") == "forca" and _active(e)
+                    and any(credit.entry_direct(e).get(m, 0) >= NEIGHBOR_DIRECT for m in mine)] or [7])
+        out.append({"date": iso, "label": f"{_fmt(iso)} · {label}" + (f" · ~{round(_day_minutes(iso, others))} min" if same else ""),
+                    "ok": not reason, "reason": reason, "warnings": warns, "minutes": round(total),
+                    "recommendable": not reason and not warns and not same, "score": dist})
+    return out
+
+
+def _apply_move(missed: dict, to_iso: str, ctx: dict, undo_info: dict) -> list[str]:
+    """Cria o treino no novo dia. Dia com cardio: o cardio vira finalizador e o dia de cardio é substituído."""
+    others, budget = ctx["others"], ctx["minutes"] * DAY_TOL
+    new = {k: copy.deepcopy(v) for k, v in missed.items()
+           if k not in ("id", "undo", "skip_result", "garmin_workout_id", "garmin_outdated", "garmin_fmt", "done_by", "partial")}
+    new.update(date=to_iso, status="planejado", moved_from=missed["date"], changes=[])
+    lines, fin_added = [], 0
+    for cardio_day in [e for e in others if e["date"] == to_iso and e["status"] == "planejado" and e.get("kind") == "cardio"]:
+        slack = budget - _minutes(new)
+        for c in _cardio_items(cardio_day):
+            if slack >= 10 and c.get("duration_min"):
+                mins = int(min(c["duration_min"], slack) // 5 * 5)
+                fin = {**copy.deepcopy(c), "finisher": True, "duration_min": mins, "notes": "cardio do dia (virou finalizador)"}
+                posts = [i for i in new["items"] if i.get("phase") == "pos"]
+                new["items"].insert(new["items"].index(posts[0]) if posts else len(new["items"]), fin)
+                slack -= mins
+                fin_added += mins
+        note = f"Substituído pelo treino {missed['day_name']} (movido)"
+        undo_info["status_changes"].append({"entry_id": cardio_day["id"], "from": cardio_day["status"], "to": "substituido"})
+        undo_info["notes"].append({"entry_id": cardio_day["id"], "text": note})
+        cardio_day["status"] = "substituido"
+        _note(cardio_day, note)
+        db.save_entry(cardio_day)
+    _note(new, f"Movido de {_fmt(missed['date'])}")
+    saved = db.save_entry(new)
+    undo_info["created"].append(saved["id"])
+    lines.append(f"{missed['day_name']} foi movido para {_fmt(saved['date'])}"
+                 + (f" ({fin_added} min do cardio do dia viraram finalizador)" if fin_added else "") + ".")
+    return lines
+
+
+def _calm(ctx: dict) -> str:
+    """A frase que explica por que não precisa correr atrás (muda se já houve outra falta na semana)."""
+    if ctx["deload"]:
+        return "Semana leve: nada a repor. Volte ao normal na próxima."
+    if ctx["other_misses"]:
+        return ("Com mais de uma falta, a semana fica mais leve para esses músculos. Uma semana assim não faz perder o que "
+                "foi construído; retome o plano normal na próxima, sem dobrar treino.")
+    return "Uma falta isolada não muda o resultado de forma perceptível: o que conta é a sequência das próximas semanas."
+
+
+def _skip_options(missed: dict, ctx: dict) -> dict:
+    """As opções de "Não vou treinar", com a consequência de cada uma e UMA recomendação com o motivo."""
+    affected = _affected(missed, ctx)
+    closing = "; ".join(f"{b['pt']} fecha a semana com {_num(b['projected'])} de {_num(b['ref'])} séries" for b in affected[:3])
+    seguir = {"id": "seguir", "title": "Só pular", "available": True,
+              "text": "Os outros dias ficam como estão." + (f" {closing}." if closing else ""), "note": _calm(ctx)}
+    opts, days, auto_ops = [seguir], [], []
+    if missed.get("kind") == "forca" and credit.strength_items(missed):
+        auto_ops, _ = _reinforce_ops(missed, ctx, asked=False)
+        ops, work = _reinforce_ops(missed, ctx, asked=True)
+        ref = {"id": "reforcar", "title": "Reforçar um pouco o próximo treino parecido", "available": bool(ops)}
+        if ops:
+            lines = _ops_lines(ops, ctx, work)
+            ref.update(text=" ".join(d["text"] for d in lines) + " Os outros treinos não mudam.", days=lines)
+        elif ctx["deload"]:
+            ref["reason"] = "Semana leve: não precisa repor."
+        elif not any(credit.entry_direct(e).get(b["key"], 0) >= NEIGHBOR_DIRECT for e in ctx["future"] if e.get("kind") == "forca"
+                     for b in affected):
+            ref["reason"] = "Não há outro treino desses músculos nesta semana."
+        elif not any(b["ref"] - b["projected"] >= 1 for b in affected):
+            ref["reason"] = "A semana já fica no volume planejado sem este treino."
+        else:
+            ref["reason"] = "Os próximos treinos desses músculos já estão no limite (séries por treino, dias seguidos ou tempo do dia)."
+        opts.append(ref)
+        days = _move_days(missed, ctx)
+        okd = [d for d in days if d["ok"]]
+        mv = {"id": "mover", "title": "Fazer em outro dia", "available": bool(okd)}
+        best = max((d for d in days if d["recommendable"]), key=lambda d: (d["score"], -_d(d["date"]).toordinal()), default=None)
+        if best:
+            mv.update(text=f"Dia livre: {_fmt(best['date'])}. O treino inteiro vai para lá, sem mexer nos outros.", to_date=best["date"])
+        elif okd:
+            mv["text"] = "Não há dia totalmente livre; dá para escolher um dia, com os avisos de cada um."
+        else:
+            mv["reason"] = "Não sobrou dia possível nesta semana."
+        opts.append(mv)
+    elif missed.get("kind") == "cardio" and _cardio_items(missed):
+        opts.append({"id": "reforcar", "title": "Repor o cardio nos outros dias", "available": True,
+                     "text": "Os minutos de cardio viram finalizadores (até 20 min por treino), dentro do tempo do dia."})
+    # ---- uma recomendação só
+    rec, why = "seguir", "Uma falta isolada não precisa ser reposta."
+    mover = next((o for o in opts if o["id"] == "mover"), None)
+    if ctx["deload"]:
+        why = "Semana leve: não precisa repor."
+    elif ctx["other_misses"]:
+        why = "Já houve outra falta nesta semana: o melhor é seguir com os treinos que restam, sem empilhar."
+    elif mover and mover.get("to_date"):
+        rec, why = "mover", "Existe um dia livre: o treino inteiro cabe lá sem atrapalhar os outros."
+    elif len(auto_ops) >= 2:
+        rec, why = "reforcar", "Sem este treino, um músculo fica bem abaixo do planejado na semana."
+    for o in opts:
+        o["recommended"] = o["id"] == rec
+    run = next((e for e in ctx["others"] if e["date"] == missed["date"] and e.get("kind") == "resistencia"
+                and e["status"] == "planejado"), None) if missed.get("kind") != "resistencia" else None
+    return {"options": opts, "recommended": rec, "why": why, "move_days": days,
+            "muscles": [{k: b[k] for k in ("key", "pt", "done", "scheduled", "projected", "ref")} for b in affected],
+            "run": {"id": run["id"], "name": run["day_name"]} if run else None}
+
+
+def handle_missed(entry_id: int, profile: dict, today: date | None = None, strategy: str | None = None,
+                  to_date: str | None = None, dry_run: bool = False, skip_endurance: bool = False) -> dict:
+    """"Não vou treinar" / ajustar treino perdido.
+
+    dry_run → só as opções com a prévia (nada é gravado). Sem `strategy` vale "seguir" (não mexe em nenhum
+    outro dia). "mover" leva o treino inteiro para `to_date` (ou para o melhor dia livre). "reforcar" soma
+    poucas séries em treinos que já treinam os mesmos músculos.
+    """
     today = today or clock.today()
     missed = db.get_entry(entry_id)
     if not missed:
         raise ValueError("Treino da agenda não encontrado")
     if missed["status"] == "feito":
         raise ValueError("Este treino já foi feito")
+    if missed["status"] not in ("planejado", "perdido"):
+        raise ValueError("Este treino já foi ajustado")
+    if missed.get("kind") == "resistencia":
+        return _skip_endurance(missed, profile, today, dry_run, strategy)
+    ctx = _skip_ctx(missed, profile, today)
+    preview = _skip_options(missed, ctx)
+    head = {"entry": {"id": missed["id"], "day_name": missed["day_name"], "date": missed["date"], "status": missed["status"]}}
+    if dry_run:
+        return {"dry_run": True, **head, **preview}
+    strategy = strategy or "seguir"
+    opt = next((o for o in preview["options"] if o["id"] == strategy), None)
+    if not opt:
+        raise ValueError("Opção inválida para este treino")
+    undo_info = {"v": 2, "ops": [], "created": [], "status_changes": [], "notes": [], "linked": [], "snapshots": []}
+    changes: list[str] = []
+    days: list[dict] = []
+    if strategy == "mover":
+        target = to_date or opt.get("to_date")
+        day = next((d for d in preview["move_days"] if d["date"] == target), None) if target else None
+        if not day or not day["ok"]:
+            raise ValueError("Não dá para mover para esse dia" + (f": {day['reason']}" if day and day.get("reason") else ""))
+        changes += _apply_move(missed, target, ctx, undo_info)
+        if day["warnings"]:
+            changes.append("Atenção: " + "; ".join(day["warnings"]) + ".")
+    elif strategy == "reforcar" and missed.get("kind") == "cardio":
+        before = {e["id"]: copy.deepcopy(e) for e in ctx["future"]}
+        lost = _cardio_equiv([{"items": _cardio_items(missed)}])
+        machine = next((i["exercise_id"] for i in _cardio_items(missed)), "cardio_bike_vertical")
+        left = _place_cardio(lost, ctx["future"], missed["day_name"], ctx["minutes"] * DAY_TOL, machine, changes)
+        for e in ctx["future"]:
+            if e["items"] != before[e["id"]]["items"]:
+                undo_info["snapshots"].append(before[e["id"]])
+                db.save_entry(e)
+        if left >= 10:
+            changes.append(f"~{int(left)} min de cardio não couberam e ficam dispensados.")
+    elif strategy == "reforcar":
+        ops, work = _reinforce_ops(missed, ctx, asked=True)
+        if not ops:
+            raise ValueError(opt.get("reason") or "Não há onde reforçar nesta semana")
+        days = _ops_lines(ops, ctx, work)
+        for o in ops:
+            e = next(x for x in ctx["future"] if x["id"] == o["entry_id"])
+            it = e["items"][o["index"]]
+            it["sets"] = int(it["sets"]) + 1
+            it["added"] = int(it.get("added") or 0) + 1
+            it["comp_v"], it["comp_from"] = 2, missed["id"]
+            note = f"+1 série em {catalog.get(it['exercise_id'])['name']} (reforço: {missed['day_name']} não feito)"
+            _note(e, note)
+            undo_info["notes"].append({"entry_id": e["id"], "text": note})
+            undo_info["ops"].append({"entry_id": e["id"], "exercise_id": it["exercise_id"], "sets": 1})
+        for eid in {o["entry_id"] for o in ops}:
+            db.save_entry(next(x for x in ctx["future"] if x["id"] == eid))
+        changes += [d["text"] for d in days]
+    else:
+        changes.append("Nada mudou nos outros dias.")
+    if strategy != "mover" and missed.get("kind") == "forca":
+        def gained(m: str) -> float:  # o que o reforço devolveu ao músculo (séries fracionadas)
+            exs = [catalog.get(o["exercise_id"]) for o in undo_info["ops"]]
+            return sum(PRIMARY_WEIGHT if m in x["primaryMuscles"] else SECONDARY_WEIGHT if m in x["secondaryMuscles"] else 0 for x in exs)
+        changes += [f"{b['pt']}: {_num(b['projected'] + gained(b['key']))} de {_num(b['ref'])} séries nesta semana."
+                    for b in _affected(missed, ctx)[:3]]
+        changes.append(_calm(ctx))
+    missed["status"] = "pulado"
+    if skip_endurance and preview.get("run"):
+        try:
+            r = handle_missed(preview["run"]["id"], profile, today)
+            undo_info["linked"].append(preview["run"]["id"])
+            changes += [f"{preview['run']['name']}: {c}" for c in r["changes"]]
+        except ValueError:
+            pass
+    missed["undo"] = undo_info
+    missed["skip_result"] = {"strategy": strategy, "changes": changes, "at": clock.now().isoformat(timespec="seconds")}
+    db.save_entry(missed)
+    title = {"mover": "Treino remarcado", "reforcar": "Semana reajustada"}.get(strategy, "Treino pulado")
+    return {"strategy": strategy, "title": title, "changes": changes, "days": days, "unrecovered": [], "can_undo": True,
+            "muscles": preview["muscles"], **head}
+
+
+def _skip_endurance(missed: dict, profile: dict, today: date, dry_run: bool, strategy: str | None = None) -> dict:
+    """Corrida/bike/natação. Leve → só pula. Longão ou forte → "reajustar" (dia seguro, ou a próxima leve
+    assume o papel dela) ou "seguir" (só pula). Sem `strategy` vale a recomendada."""
+    it = _end_item(missed)
+    end = (it or {}).get("endurance") or {}
+    easy = not it or (end.get("role") == "leve" and not end.get("hard"))
+    head = {"id": missed["id"], "day_name": missed["day_name"], "date": missed["date"], "status": missed["status"]}
+    opts = [{"id": "seguir", "title": "Só pular", "available": True, "recommended": easy,
+             "text": "Sessão leve: não precisa compensar." if easy else "As outras sessões ficam como estão."}]
+    if not easy:
+        opts.insert(0, {"id": "reajustar", "title": "Remarcar esta sessão", "available": True, "recommended": True,
+                        "text": "Procuro um dia seguro para ela (sem colar em outra sessão forte nem em treino de perna). "
+                                "Se não houver, a próxima sessão leve assume o papel dela."})
+    rec = "seguir" if easy else "reajustar"
+    if dry_run:
+        return {"dry_run": True, "entry": head, "options": opts, "recommended": rec, "move_days": [], "muscles": [], "run": None,
+                "why": "Sessão leve perdida não muda o condicionamento." if easy else
+                       "Longão e sessão forte são as que mais contam na semana: vale remarcar se houver dia seguro."}
+    strategy = strategy or rec
+    if strategy not in [o["id"] for o in opts]:
+        raise ValueError("Opção inválida para esta sessão")
     ws = week_start(_d(missed["date"]))
     entries = db.list_schedule(ws.isoformat(), (ws + timedelta(days=6)).isoformat())
     snapshot = [copy.deepcopy(e) for e in entries if e["id"] != missed["id"]]
-    plan = db.get_plan(missed["plan_id"]) if missed.get("plan_id") else None
-    budget = session_budget(profile, plan) * 1.15  # compensação pode alongar um pouco a sessão
-    changes: list[str] = []
-    unrecovered: list[str] = []
-    created: list[int] = []
-    strategy = "redistribuir"
-    moved_cardio_left = 0.0
-    moved_cardio_machine = "cardio_bike_vertical"
-
     missed["status"] = "pulado"
     others = [e for e in entries if e["id"] != missed["id"]]
     future = [e for e in others if e["status"] == "planejado" and _d(e["date"]) >= today]
     if _d(missed["date"]) == today:
         future = [e for e in future if _d(e["date"]) > today]
-
-    if missed.get("kind") == "resistencia":
-        strategy, changes, unrecovered, created = _missed_endurance(missed, others, future, profile, ws, today)
-        for e in others:
-            if e.get("changes") != next((x.get("changes") for x in snapshot if x["id"] == e["id"]), None) or \
-                    e["items"] != next((x["items"] for x in snapshot if x["id"] == e["id"]), None):
-                db.save_entry(e)
-        missed["undo"] = {"snapshot": snapshot, "created": created}
-        missed["skip_result"] = {"strategy": strategy, "changes": changes, "at": clock.now().isoformat(timespec="minutes")}
-        db.save_entry(missed)
-        return {"strategy": strategy, "changes": changes, "unrecovered": unrecovered}
-
-    # ---------- 1) mover para um dia livre
-    if missed.get("kind") == "forca" and _strength_items(missed):
-        taken = {e["date"] for e in others if e["status"] in ("planejado", "feito") and e.get("kind") == "forca"}
-        first = max(today + (timedelta(days=1) if _d(missed["date"]) <= today else timedelta()), ws)
-        for wd in available_days(profile):
-            cand = ws + timedelta(days=wd)
-            if cand < first or cand.isoformat() == missed["date"] or cand.isoformat() in taken:
-                continue
-            neighbors = [e for e in others if e.get("kind") == "forca" and e["status"] in ("planejado", "feito")
-                         and abs((_d(e["date"]) - cand).days) == 1]
-            if any(_conflict(missed, n) for n in neighbors):
-                continue
-            same_day = [e for e in others if e["date"] == cand.isoformat() and e["status"] in ("planejado", "feito")
-                        and e.get("kind") != "cardio"]
-            if len(same_day) >= 2 or any(e["status"] == "feito" for e in same_day) or \
-                    any(_is_heavy_end(e) for e in same_day):
-                continue  # dia cheio, já treinado ou com sessão forte/longa de resistência
-            new = {k: copy.deepcopy(v) for k, v in missed.items() if k not in ("id", "undo", "garmin_workout_id", "garmin_outdated")}
-            new.update(date=cand.isoformat(), status="planejado", moved_from=missed["date"], changes=[])
-            cardio_day = next((e for e in others if e["date"] == cand.isoformat() and e["status"] == "planejado"
-                               and e.get("kind") == "cardio"), None)
-            fin_added = 0
-            if cardio_day:
-                slack = budget - _minutes(new)
-                total_c = _cardio_equiv([{"items": _cardio_items(cardio_day)}])
-                for c in _cardio_items(cardio_day):
-                    moved_cardio_machine = c["exercise_id"]
-                    if slack >= 10 and c.get("duration_min"):
-                        mins = int(min(c["duration_min"], slack) // 5 * 5)
-                        fin = {**copy.deepcopy(c), "finisher": True, "duration_min": mins,
-                               "notes": "cardio do dia (virou finalizador)"}
-                        posts = [i for i in new["items"] if i.get("phase") == "pos"]
-                        idx = new["items"].index(posts[0]) if posts else len(new["items"])
-                        new["items"].insert(idx, fin)
-                        slack -= mins
-                        fin_added += mins
-                moved_cardio_left = max(0.0, total_c - fin_added)
-                cardio_day["status"] = "substituido"
-                _note(cardio_day, f"Substituído pelo treino {missed['day_name']} (movido)")
-                db.save_entry(cardio_day)
-            _note(new, f"Movido de {_fmt(missed['date'])}")
-            saved = db.save_entry(new)
-            created.append(saved["id"])
-            changes.append(f"{missed['day_name']} foi movido para {_fmt(saved['date'])}"
-                           + (f" ({fin_added} min do cardio do dia viraram finalizador)" if fin_added else "") + ".")
-            strategy = "mover"
-            break
-
-    # ---------- 2) redistribuir volume de força
-    if strategy == "redistribuir" and _strength_items(missed):
-        months = profile.get("training_months")
-        gen = (plan or {}).get("generator") or {}
-        targets = gen.get("targets") or weekly_targets(tier_for(months if months is not None else 12),
-                                                       profile.get("goal") or "hipertrofia", profile.get("volume_factor") or 1)
-        projected: dict[str, float] = defaultdict(float)
-        for e in others:
-            if e["status"] in ("planejado", "feito"):
-                for m, v in _load(e).items():
-                    projected[m] += v
-        missed_direct: dict[str, float] = defaultdict(float)
-        for it in _strength_items(missed):
-            for m in catalog.get(it["exercise_id"])["primaryMuscles"]:
-                missed_direct[m] += int(it.get("sets") or 0)
-        deficits = sorted(((targets.get(m, 0) - projected[m], m) for m in missed_direct if targets.get(m, 0) - projected[m] > 0.5),
-                          reverse=True)
-        strength_future = [e for e in future if e.get("kind") == "forca"]
-        moved_ex: set[str] = set()
-        for deficit, m in deficits:
-            need = math.ceil(min(deficit, missed_direct[m]) * 0.75)
-            placed = 0
-            while need > 0:
-                done = False
-                for e in sorted(strength_future, key=lambda x: _minutes(x)):
-                    for it in _strength_items(e):
-                        if m in catalog.get(it["exercise_id"])["primaryMuscles"] and it.get("added", 0) < 2 and it["sets"] < 6:
-                            if _minutes(e) + _set_minutes(it) <= budget:
-                                it["sets"] += 1
-                                it["added"] = it.get("added", 0) + 1
-                                _note(e, f"+1 série em {catalog.get(it['exercise_id'])['name']} (compensa {missed['day_name']})")
-                                need -= 1
-                                placed += 1
-                                done = True
-                                break
-                    if done:
-                        break
-                if not done:
-                    src = next((i for i in _strength_items(missed) if i["exercise_id"] not in moved_ex
-                                and m in catalog.get(i["exercise_id"])["primaryMuscles"]), None)
-                    if src:
-                        for e in sorted(strength_future, key=lambda x: _minutes(x)):
-                            if any(i["exercise_id"] == src["exercise_id"] for i in e["items"]):
-                                continue
-                            sets = max(2, min(need, 3))
-                            add = {**copy.deepcopy(src), "sets": sets, "added_from": missed["day_name"], "approach_sets": False,
-                                   "notes": f"veio do treino {missed['day_name']}"}
-                            if _minutes(e) + item_time(add)["total"] / 60 <= budget:
-                                posts = [i for i in e["items"] if i.get("phase") == "pos" or i.get("finisher")]
-                                idx = e["items"].index(posts[0]) if posts else len(e["items"])
-                                e["items"].insert(idx, add)
-                                moved_ex.add(src["exercise_id"])
-                                _note(e, f"+ {catalog.get(src['exercise_id'])['name']} {sets} séries (do treino {missed['day_name']})")
-                                need -= sets
-                                placed += sets
-                                done = True
-                                break
-                if not done:
-                    # troca: tira 1 série de um músculo que está sobrando na semana para abrir espaço
-                    for e in sorted(strength_future, key=lambda x: _minutes(x)):
-                        tgt = next((it for it in _strength_items(e) if m in catalog.get(it["exercise_id"])["primaryMuscles"]
-                                    and it.get("added", 0) < 2 and it["sets"] < 6), None)
-                        if not tgt:
-                            continue
-                        donor = next((it for it in sorted(_strength_items(e), key=lambda x: -x["sets"])
-                                      if it is not tgt and it.get("role") in ("acc", "sec") and it["sets"] > 2
-                                      and m not in catalog.get(it["exercise_id"])["primaryMuscles"]
-                                      and all(projected[x] - 1 >= targets.get(x, 0)
-                                              for x in catalog.get(it["exercise_id"])["primaryMuscles"])), None)
-                        if not donor:
-                            continue
-                        donor["sets"] -= 1
-                        if _minutes(e) + _set_minutes(tgt) <= budget:
-                            for x in catalog.get(donor["exercise_id"])["primaryMuscles"]:
-                                projected[x] -= 1
-                            tgt["sets"] += 1
-                            tgt["added"] = tgt.get("added", 0) + 1
-                            _note(e, f"−1 série em {catalog.get(donor['exercise_id'])['name']} (volume já sobrando) → "
-                                     f"+1 em {catalog.get(tgt['exercise_id'])['name']}")
-                            need -= 1
-                            placed += 1
-                            done = True
-                            break
-                        donor["sets"] += 1
-                if not done:
-                    break
-            if placed:
-                changes.append(f"{muscle_pt(m)}: {placed} séries redistribuídas na semana.")
-            if need >= 2:
-                unrecovered.append(f"{muscle_pt(m)} ({need} séries)")
-        if not deficits:
-            changes.append("O volume da semana continua dentro do alvo sem esse treino — nada precisou ser compensado.")
-
-    # ---------- 3) cardio perdido
-    if strategy == "redistribuir" and _cardio_items(missed):
-        lost = _cardio_equiv([{"items": _cardio_items(missed)}])
-        machine = next((i["exercise_id"] for i in _cardio_items(missed)), "cardio_bike_vertical")
-        left = _place_cardio(lost, [x for x in future if x["status"] == "planejado"], missed["day_name"], budget, machine, changes)
-        if left >= 10:
-            unrecovered.append(f"cardio (~{int(left)} min)")
-    if moved_cardio_left >= 5:
-        left = _place_cardio(moved_cardio_left, [x for x in future if x["status"] == "planejado" and x["id"] not in created],
-                             "cardio substituído", budget, moved_cardio_machine, changes)
-        if left >= 10:
-            unrecovered.append(f"cardio (~{int(left)} min)")
-
+    if strategy == "seguir":
+        result, unrecovered, created = "seguir" if not easy else "dispensar", [], []
+        changes = ["Sessão leve perdida: não precisa compensar — o que constrói o condicionamento é a consistência das "
+                   "próximas semanas, não recuperar cada quilômetro."] if easy else \
+                  ["Nada mudou nos outros dias. Uma sessão perdida não se repõe em dobro: siga o plano."]
+    else:
+        result, changes, unrecovered, created = _missed_endurance(missed, others, future, profile, ws, today)
+    changed = []
     for e in others:
-        if e.get("changes") != next((s.get("changes") for s in snapshot if s["id"] == e["id"]), None) or \
-                e["items"] != next((s["items"] for s in snapshot if s["id"] == e["id"]), None):
+        snap = next((x for x in snapshot if x["id"] == e["id"]), None)
+        if snap and (e.get("changes") != snap.get("changes") or e["items"] != snap["items"] or e.get("day_name") != snap.get("day_name")):
+            changed.append(snap)
             db.save_entry(e)
-    if unrecovered:
-        changes.append("Não coube nesta semana: " + ", ".join(unrecovered) + ". Priorize na próxima.")
-    missed["undo"] = {"snapshot": snapshot, "created": created}
-    missed["skip_result"] = {"strategy": strategy, "changes": changes, "at": clock.now().isoformat(timespec="minutes")}
+    missed["undo"] = {**_empty_undo(created), "snapshots": changed}
+    missed["skip_result"] = {"strategy": result, "changes": changes, "at": clock.now().isoformat(timespec="seconds")}
     db.save_entry(missed)
-    return {"strategy": strategy, "changes": changes, "unrecovered": unrecovered}
+    return {"strategy": result, "title": "Sessão pulada" if result in ("dispensar", "seguir") else "Semana reajustada", "changes": changes,
+            "days": [], "unrecovered": unrecovered, "can_undo": True, "muscles": [], "entry": {**head, "status": "pulado"}}
 
 
 def _end_item(e: dict) -> dict | None:
@@ -728,7 +1048,11 @@ def _missed_endurance(missed: dict, others: list[dict], future: list[dict], prof
         near = [e for e in active_entries if abs((_d(e["date"]) - cand).days) == 1]
         if any(_is_heavy_end(e) for e in near) and sport in endurance.LEG_SPORTS:
             continue
-        new = {k: copy.deepcopy(v) for k, v in missed.items() if k not in ("id", "undo", "garmin_workout_id", "garmin_outdated")}
+        if sport in endurance.LEG_SPORTS and any(e.get("kind") == "forca" and _is_leg_day(e) and 0 <= (cand - _d(e["date"])).days <= 1
+                                                 for e in active_entries):
+            continue  # longão/forte no dia do treino de perna ou no dia seguinte: pernas ainda cansadas
+        new = {k: copy.deepcopy(v) for k, v in missed.items()
+               if k not in ("id", "undo", "skip_result", "garmin_workout_id", "garmin_outdated", "garmin_fmt", "done_by", "partial")}
         new.update(date=cand.isoformat(), status="planejado", moved_from=missed["date"], changes=[])
         _note(new, f"Movido de {_fmt(missed['date'])}")
         saved = db.save_entry(new)
@@ -768,47 +1092,398 @@ def _missed_endurance(missed: dict, others: list[dict], future: list[dict], prof
     return "dispensar", changes, unrecovered, created
 
 
+def _empty_undo(created: list | None = None) -> dict:
+    return {"v": 2, "ops": [], "created": list(created or []), "status_changes": [], "notes": [], "linked": [], "snapshots": []}
+
+
+def _revert_ops(e: dict) -> None:
+    """Tira só o que o ajuste do treino `e` mudou nos outros treinos (séries de reforço, avisos, trocas de status)."""
+    u = e.get("undo") or {}
+    touched: dict[int, dict] = {}
+
+    def get(eid: int) -> dict | None:
+        if eid not in touched:
+            x = db.get_entry(eid)
+            if not x or x["status"] == "feito":
+                return None  # treino já feito não é mexido
+            touched[eid] = x
+        return touched[eid]
+
+    for snap in u.get("snapshots", []):
+        cur = db.get_entry(snap["id"])
+        if cur and cur["status"] == snap["status"]:  # feito/pulado depois do ajuste: não é mexido
+            touched[snap["id"]] = copy.deepcopy(snap)
+    for op in u.get("ops", []):
+        x = get(op["entry_id"])
+        it = next((i for i in (x or {}).get("items", []) if i.get("exercise_id") == op["exercise_id"]
+                   and i.get("comp_from") == e["id"] and int(i.get("added") or 0) >= op["sets"]), None)
+        if not it:
+            continue
+        it["sets"] = int(it["sets"]) - op["sets"]
+        it["added"] = int(it["added"]) - op["sets"]
+        if it["added"] <= 0:
+            for k in ("added", "comp_v", "comp_from"):
+                it.pop(k, None)
+    for sc in u.get("status_changes", []):
+        x = get(sc["entry_id"])
+        if x and x["status"] == sc["to"]:
+            x["status"] = sc["from"]
+    for n in u.get("notes", []):
+        x = get(n["entry_id"])
+        if x and n["text"] in (x.get("changes") or []):
+            x["changes"].remove(n["text"])
+    for x in touched.values():
+        if x.get("garmin_workout_id"):
+            x["garmin_outdated"] = True
+        db.save_entry(x)
+
+
+def _drop_created(u: dict) -> None:
+    for cid in u.get("created", []):
+        c = db.get_entry(cid)
+        if c and c["status"] != "feito":
+            db.delete_entry(cid)
+
+
 def undo(entry_id: int) -> None:
+    """Desfaz o ajuste de um treino pulado: só o que ESSE ajuste mudou (não o retrato da semana inteira)."""
     e = db.get_entry(entry_id)
     if not e or not e.get("undo"):
         raise ValueError("Nada para desfazer")
-    for cid in e["undo"].get("created", []):
-        db.delete_entry(cid)
-    for snap in e["undo"].get("snapshot", []):
-        cur = db.get_entry(snap["id"])
-        if cur and cur["status"] != "feito":
-            db.save_entry(snap)
+    u = e["undo"]
+    if any((c := db.get_entry(cid)) and c["status"] == "feito" for cid in u.get("created", [])):
+        raise ValueError("O treino movido já foi feito; não há o que desfazer.")
+    if u.get("v") == 2:
+        _drop_created(u)
+        _revert_ops(e)
+        for lid in u.get("linked", []):
+            le = db.get_entry(lid)
+            if le and le["status"] == "pulado" and le.get("undo"):
+                undo(lid)
+    else:  # ajuste antigo (retrato da semana inteira): só é seguro se nada mais novo mexeu na semana
+        ws = week_start(_d(e["date"]))
+        at = (e.get("skip_result") or {}).get("at") or ""
+        newer = next((x for x in db.list_schedule(ws.isoformat(), (ws + timedelta(days=6)).isoformat())
+                      if x["id"] != e["id"] and x["status"] == "pulado" and ((x.get("skip_result") or {}).get("at") or "") > at), None)
+        if newer:
+            raise ValueError(f"Desfaça primeiro o ajuste de {newer['day_name']} ({_fmt(newer['date'])}).")
+        _drop_created(u)
+        for snap in u.get("snapshot", []):
+            cur = db.get_entry(snap["id"])
+            if cur and cur["status"] != "feito":
+                db.save_entry(snap)
+    e = db.get_entry(entry_id) or e
     e.pop("undo", None)
     e.pop("skip_result", None)
     e["status"] = "planejado"
     db.save_entry(e)
 
 
-def move(entry_id: int, to: str) -> dict:
+def move(entry_id: int, to: str, today: date | None = None) -> dict:
+    """Mover manualmente: valida o básico e devolve TODOS os avisos (a escolha é da pessoa)."""
     e = db.get_entry(entry_id)
     if not e:
         raise ValueError("Treino não encontrado")
+    if e["status"] not in ("planejado", "perdido"):
+        raise ValueError("Só dá para mover um treino que ainda não foi feito nem pulado")
+    dest = _d(to)
+    if week_start(dest) != week_start(_d(e["date"])):
+        raise ValueError("Só dá para mover dentro da mesma semana")
+    if today and dest < today:
+        raise ValueError("Escolha um dia de hoje em diante")
     old = e["date"]
-    e["date"] = _d(to).isoformat()
+    e["date"] = dest.isoformat()
     e["status"] = "planejado"
     _note(e, f"Movido manualmente de {_fmt(old)}")
     saved = db.save_entry(e)
-    ws = week_start(_d(to))
-    warn = [x for x in db.list_schedule(ws.isoformat(), (ws + timedelta(days=6)).isoformat())
-            if x["id"] != entry_id and x.get("kind") == "forca" and x["status"] in ("planejado", "feito")
-            and abs((_d(x["date"]) - _d(to)).days) <= 1 and _conflict(saved, x)]
-    same = [x for x in db.list_schedule(saved["date"], saved["date"]) if x["status"] in ("planejado", "feito")]
+    ws = week_start(dest)
+    week = [x for x in db.list_schedule(ws.isoformat(), (ws + timedelta(days=6)).isoformat()) if x["id"] != entry_id]
     msgs = []
-    if warn:
-        msgs.append(f"fica colado em {warn[0]['day_name']} ({_fmt(warn[0]['date'])}), que treina os mesmos músculos")
-    if len(same) > 2:
-        msgs.append(f"{_fmt(saved['date'])} ficou com {len(same)} treinos — considere outro dia")
-    return {"entry": saved, "warning": ("Atenção: " + "; ".join(msgs) + ".") if msgs else None}
+    if saved.get("kind") == "forca":
+        mine = {m for m, v in credit.entry_direct(saved).items() if v >= NEIGHBOR_DIRECT}
+        for x in sorted(week, key=lambda x: x["date"]):
+            if x.get("kind") != "forca" or not _active(x) or abs((_d(x["date"]) - dest).days) != 1:
+                continue
+            both = sorted(muscle_pt(m) for m, v in credit.entry_direct(x).items() if m in mine and v >= NEIGHBOR_DIRECT)
+            if both:
+                msgs.append(f"fica colado em {x['day_name']} ({_fmt(x['date'])}), que treina os mesmos músculos ({', '.join(both)})")
+        if _is_leg_day(saved) and (_heavy_end_on(dest.isoformat(), week) or _heavy_end_on((dest + timedelta(days=1)).isoformat(), week)):
+            msgs.append("treino de perna no dia ou na véspera de longão/corrida forte")
+    same = [x for x in week if x["date"] == saved["date"] and _active(x)]
+    if len(same) + 1 > 2:
+        msgs.append(f"{_fmt(saved['date'])} ficou com {len(same) + 1} treinos — considere outro dia")
+    elif same:
+        plan = db.get_plan(saved["plan_id"]) if saved.get("plan_id") else None
+        total = _day_minutes(saved["date"], week) + _minutes(saved)
+        if total > session_budget(db.get_profile(), plan) * DAY_TOL + 10:
+            msgs.append(f"o dia fica com ~{round(total)} min")
+    return {"entry": saved, "warning": ("Atenção: " + "; ".join(msgs) + ".") if msgs else None, "warnings": msgs}
+
+
+# -------------------------------------------- reajuste antigo (regra anterior a 20/11/2026) --
+
+def _legacy_items(e: dict) -> list[dict]:
+    return [i for i in credit.strength_items(e) if (i.get("added") or i.get("added_from")) and i.get("comp_v") != 2]
+
+
+def legacy_compensation(entries: list[dict], today: date) -> dict | None:
+    """Séries/exercícios que a regra antiga espalhou pela semana ao pular um treino (para oferecer a limpeza)."""
+    days = []
+    for e in sorted(entries, key=lambda x: x["date"]):
+        if e.get("kind") != "forca" or e["status"] != "planejado" or _d(e["date"]) < today or e.get("legacy_kept"):
+            continue
+        lines = []
+        for it in _legacy_items(e):
+            name = catalog.get(it["exercise_id"])["name"]
+            lines.append(f"{name} ({it.get('sets')} séries) veio do treino {it['added_from']}" if it.get("added_from")
+                         else f"{name}: +{it['added']} série{'s' if int(it['added']) > 1 else ''}")
+        if lines:
+            days.append({"entry_id": e["id"], "date": e["date"], "label": f"{_fmt(e['date'])} · {e['day_name']}", "lines": lines})
+    return {"days": days} if days else None
+
+
+def remove_compensation(ws: date, today: date, keep: bool = False) -> dict:
+    """Volta ao plano original os treinos que receberam reforço da regra antiga (ou marca "manter como está")."""
+    entries = db.list_schedule(ws.isoformat(), (ws + timedelta(days=6)).isoformat())
+    removed, changed = 0, []
+    for e in entries:
+        if e.get("kind") != "forca" or e["status"] != "planejado" or _d(e["date"]) < today or not _legacy_items(e):
+            continue
+        if keep:
+            e["legacy_kept"] = True
+            db.save_entry(e)
+            continue
+        items = []
+        for it in e["items"]:
+            if it.get("comp_v") != 2 and it.get("added_from"):
+                removed += int(it.get("sets") or 0)
+                continue
+            if it.get("comp_v") != 2 and it.get("added"):
+                removed += int(it["added"])
+                it["sets"] = max(1, int(it.get("sets") or 0) - int(it["added"]))
+                it.pop("added", None)
+            items.append(it)
+        e["items"] = items
+        e["changes"] = [c for c in e.get("changes") or [] if not any(k in c for k in ("(compensa ", "(do treino ", "(volume já sobrando)"))]
+        _note(e, "Reforço do ajuste antigo removido: voltou ao plano original")
+        db.save_entry(e)
+        changed.append(e["id"])
+    if not keep:
+        for e in entries:  # o "desfazer" desses treinos não pode trazer o reforço de volta (era um retrato da semana)
+            if e["status"] == "pulado" and e.get("undo") and e["undo"].get("v") != 2:
+                e["undo"] = _empty_undo(e["undo"].get("created"))
+                db.save_entry(e)
+    return {"removed_sets": removed, "entries": changed}
+
+
+# ---------------------------------------------------------------- crédito da sessão --
+
+def _close(e: dict, session: dict, how: str, cov: float | None) -> dict:
+    e["done_by"] = {"session_id": session.get("id"), "how": how, "coverage": cov, "prev": e["status"]}
+    e["status"] = "feito"
+    if cov is not None and cov < credit.COVER_CLOSE:
+        e["partial"] = True
+    else:
+        e.pop("partial", None)
+    return db.save_entry(e)
+
+
+def _unskip(e: dict, today: date) -> dict:
+    """O treino pulado acabou sendo feito: o ajuste que o pulo fez na semana deixa de valer."""
+    u = e.get("undo") or {}
+    if u:
+        _drop_created(u)
+        if u.get("v") == 2:
+            _revert_ops(e)
+        else:
+            remove_compensation(week_start(_d(e["date"])), today)
+    e = db.get_entry(e["id"]) or e
+    e.pop("undo", None)
+    e.pop("skip_result", None)
+    return e
+
+
+def _entry_brief(e: dict, cov: float | None = None) -> dict:
+    return {"entry_id": e["id"], "day_name": e["day_name"], "date": e["date"], "label": _fmt(e["date"]),
+            "coverage": cov, "status": e["status"], "partial": bool(e.get("partial"))}
+
+
+def balance(profile: dict, day: date, today: date | None = None) -> list[dict]:
+    """O que falta na semana, por músculo (feito de verdade + agenda, contra a referência da semana)."""
+    today = today or clock.today()
+    ws = week_start(day)
+    entries = db.list_schedule(ws.isoformat(), (ws + timedelta(days=6)).isoformat())
+    if not any(e.get("kind") == "forca" for e in entries):
+        return []
+    targets = _targets(schedule_plan(profile), profile)[1]
+    return credit.balance_list(credit.week_balance(entries, _sessions_in_week(ws), targets, today))
+
+
+def credit_session(session: dict, profile: dict, today: date | None = None) -> dict:
+    """Depois de salvar uma sessão: que treino da agenda ela fecha (pelo CONTEÚDO, não só pela data) e o saldo da semana.
+
+    - Aberta pela agenda (schedule_id): fecha o treino; se a pessoa fez menos de 25% dele, o treino continua
+      na agenda e o app pergunta.
+    - Treino livre: cobre ≥ 70% do treino de hoje → fecha o de hoje; senão, cobre ≥ 70% de um treino pulado ou
+      perdido da semana → fecha esse (e desfaz o ajuste do pulo); cobre ≥ 70% de um treino futuro, ou entre 25%
+      e 70% do de hoje → o app PERGUNTA; abaixo disso é treino extra e o planejado continua na agenda.
+    """
+    today = today or clock.today()
+    day = _d(str(session["date"])[:10])
+    ws = week_start(day)
+    entries = db.list_schedule(ws.isoformat(), (ws + timedelta(days=6)).isoformat())
+    load_ = credit.session_load(session)
+    out: dict = {"session_id": session.get("id"), "work_sets": credit.work_sets(session), "closed": None, "question": None,
+                 "extra": False, "kept_open": None,
+                 "added": [{"key": m, "pt": muscle_pt(m), "sets": round(v, 1)}
+                           for m, v in sorted(load_.items(), key=lambda x: -x[1]) if v >= 1][:6]}
+    flags: dict = {}
+    sid = session.get("schedule_id")
+    mp = session.get("match_pending")
+    if session.get("extra") and not sid:      # decisão já tomada (reenvio do mesmo treino): não reabre
+        out["extra"] = True
+    elif isinstance(mp, dict) and not sid:
+        e = db.get_entry(int(mp.get("entry_id") or 0))
+        if e and e["status"] in ("planejado", "perdido"):
+            out["question"] = {"kind": mp.get("kind"), **_entry_brief(e, mp.get("coverage"))}
+    elif sid:
+        e = db.get_entry(int(sid))
+        if e and e["status"] == "feito":
+            out["closed"] = _entry_brief(e, (e.get("done_by") or {}).get("coverage"))
+        elif e:
+            cov = credit.coverage(session, e) if e.get("kind") == "forca" else None
+            thin = cov is not None and cov < credit.COVER_ASK and session.get("client_id") and credit.has_sets(session)
+            if thin:
+                out["kept_open"] = _entry_brief(e, cov)
+            else:
+                if e["status"] == "pulado":
+                    e = _unskip(e, today)
+                out["closed"] = _entry_brief(_close(e, session, "vinculo", cov), cov)
+    elif credit.is_free_workout(session):
+        iso = day.isoformat()
+        linked = {s.get("schedule_id") for s in _sessions_in_week(ws) if s.get("schedule_id")}
+        strength = [e for e in entries if e.get("kind") == "forca" and credit.strength_items(e) and not credit._moved_away(e)]
+        scored = sorted(((credit.coverage(session, e) or 0.0, e) for e in strength
+                         if e["status"] in ("planejado", "perdido", "pulado")), key=lambda x: (-x[0], x[1]["date"]))
+        c_today, e_today = next(((c, e) for c, e in scored if e["date"] == iso and e["status"] != "pulado"), (0.0, None))
+        rest = [(c, e) for c, e in scored if e is not e_today and c >= credit.COVER_CLOSE]
+        missed_hit = next(((c, e) for c, e in rest if e["status"] in ("pulado", "perdido")), None)
+        future_hit = next(((c, e) for c, e in rest if e["status"] == "planejado"), None)
+        # treino do dia que a regra antiga já tinha marcado como feito por causa desta sessão (sem registro de quem fechou)
+        old = next((e for e in strength if e["date"] == iso and e["status"] == "feito" and not e.get("done_by")
+                    and e["id"] not in linked), None)
+        c_old = (credit.coverage(session, old) or 0.0) if old else 0.0
+        if e_today and c_today >= credit.COVER_CLOSE:
+            flags["schedule_id"] = e_today["id"]
+            out["closed"] = _entry_brief(_close(e_today, session, "livre", c_today), c_today)
+        elif old and c_old >= credit.COVER_ASK:
+            flags["schedule_id"] = old["id"]
+            out["closed"] = _entry_brief(_close(old, session, "livre", c_old), c_old)
+        elif missed_hit:
+            c, e = missed_hit
+            was_skipped = e["status"] == "pulado"
+            if was_skipped:
+                e = _unskip(e, today)
+            flags["schedule_id"] = e["id"]
+            out["closed"] = {**_entry_brief(_close(e, session, "livre", c), c), "was_skipped": was_skipped, "other_day": e["date"] != iso}
+        elif future_hit:
+            flags["match_pending"] = {"entry_id": future_hit[1]["id"], "kind": "futuro", "coverage": future_hit[0]}
+            out["question"] = {"kind": "futuro", **_entry_brief(future_hit[1], future_hit[0])}
+        elif e_today and c_today >= credit.COVER_ASK:
+            flags["match_pending"] = {"entry_id": e_today["id"], "kind": "hoje", "coverage": c_today}
+            out["question"] = {"kind": "hoje", **_entry_brief(e_today, c_today)}
+        else:
+            flags["extra"] = True
+            out["extra"] = True
+            if e_today:
+                out["kept_open"] = _entry_brief(e_today, c_today)
+        if session.get("id"):
+            keep = {k: v for k, v in session.items() if k not in ("extra", "match_pending")}
+            db.save_session({**keep, **flags}, session_id=session["id"])
+    out["balance"] = balance(profile, day, today)
+    return out
+
+
+def free_workout_state(profile: dict, today: date | None = None) -> list[dict]:
+    """Treinos livres da semana: decide os que ainda não têm decisão (salvos antes do crédito por conteúdo)
+    e devolve as perguntas em aberto ("esse treino livre foi o treino X?"), uma por sessão."""
+    today = today or clock.today()
+    out = []
+    for s in sorted(_sessions_in_week(week_start(today)), key=lambda x: x["date"]):
+        if not credit.is_free_workout(s) or s.get("extra"):
+            continue
+        mp = s.get("match_pending")
+        if not isinstance(mp, dict):
+            q = credit_session(s, profile, today).get("question")
+            if q:
+                out.append({"session_id": s["id"], "session_date": s["date"], "work_sets": credit.work_sets(s), **q})
+            continue
+        e = db.get_entry(int(mp.get("entry_id") or 0))
+        if not e or e["status"] not in ("planejado", "perdido"):
+            # o treino em dúvida já foi resolvido de outro jeito: a sessão fica como extra
+            db.save_session({**{k: v for k, v in s.items() if k != "match_pending"}, "extra": True}, session_id=s["id"])
+            continue
+        out.append({"session_id": s["id"], "session_date": s["date"], "work_sets": credit.work_sets(s), "kind": mp.get("kind"),
+                    **_entry_brief(e, mp.get("coverage"))})
+    return out
+
+
+def match_session(session_id: int, profile: dict, schedule_id: int | None = None, today: date | None = None) -> dict:
+    """Resposta da pessoa: "foi o treino X" (schedule_id) ou "é um extra" (sem schedule_id). Troca a decisão anterior."""
+    today = today or clock.today()
+    s = db.get_session(session_id)
+    if not s:
+        raise ValueError("Treino não encontrado")
+    day = _d(str(s["date"])[:10])
+    target = None
+    if schedule_id:
+        target = db.get_entry(int(schedule_id))
+        if not target or week_start(_d(target["date"])) != week_start(day):
+            raise ValueError("Treino da agenda não encontrado nesta semana")
+        if target["status"] == "feito" and (target.get("done_by") or {}).get("session_id") != session_id:
+            raise ValueError("Esse treino já foi feito")
+    reopen_for_session(s, today)
+    s = {k: v for k, v in s.items() if k not in ("match_pending", "extra", "schedule_id")}
+    closed = None
+    if target:
+        target = db.get_entry(target["id"]) or target
+        cov = credit.coverage(s, target) if target.get("kind") == "forca" else None
+        if target["status"] == "pulado":
+            target = _unskip(target, today)
+        closed = _entry_brief(_close(target, s, "decisao", cov), cov)
+        s["schedule_id"] = target["id"]
+    else:
+        s["extra"] = True
+    db.save_session(s, session_id=session_id)
+    return {"closed": closed, "extra": bool(s.get("extra")), "balance": balance(profile, day, today)}
+
+
+def reopen_for_session(session: dict, today: date | None = None, min_cover: float | None = None) -> list[int]:
+    """Sessão apagada (ou editada até não cobrir mais o treino): o treino que ela tinha fechado volta para a agenda."""
+    today = today or clock.today()
+    ws = week_start(_d(str(session["date"])[:10]))
+    others = {s.get("schedule_id") for s in _sessions_in_week(ws) if s.get("id") != session.get("id")}
+    out = []
+    for e in db.list_schedule(ws.isoformat(), (ws + timedelta(days=6)).isoformat()):
+        by = e.get("done_by") or {}
+        mine = by.get("session_id") == session.get("id") if by else (session.get("schedule_id") == e["id"] and e["id"] not in others)
+        if e["status"] != "feito" or not mine or session.get("id") is None:
+            continue
+        if min_cover is not None:
+            cov = credit.coverage(session, e) if e.get("kind") == "forca" else None
+            if by.get("how") == "decisao" or cov is None or cov >= min_cover:
+                continue
+        e["status"] = "planejado" if _d(e["date"]) >= today else "perdido"
+        e.pop("done_by", None)
+        e.pop("partial", None)
+        db.save_entry(e)
+        out.append(e["id"])
+    return out
 
 
 # ------------------------------------------------------------- metas da semana --
 
-def week_goals(entries: list[dict], profile: dict, ws: date) -> dict:
+def week_goals(entries: list[dict], profile: dict, ws: date, today: date | None = None) -> dict:
     from .analysis import cardio_summary
 
     sessions = _sessions_in_week(ws)
@@ -818,12 +1493,17 @@ def week_goals(entries: list[dict], profile: dict, ws: date) -> dict:
     plan = schedule_plan(profile)
     gen = (plan or {}).get("generator") or {}
     target_cardio = float(profile.get("cardio_target_min") or gen.get("cardio_target") or 150)
-    planned = [e for e in entries if e["status"] not in ("substituido",)]
-    done_sets = sum(len(it.get("sets") or []) for s in sessions for it in s.get("items", []) if it.get("sets"))
+    # o que conta como "planejado": fora o que foi substituído, pulado ou movido para outro dia (a cópia é que vale)
+    planned = [e for e in entries if e["status"] not in ("substituido", "pulado")]
+    done_sets = sum(credit.work_sets(s) for s in sessions)  # só séries de trabalho (aquecimento não conta)
     planned_sets = sum(int(i.get("sets") or 0) for e in planned for i in _strength_items(e))
+    extras = sum(1 for s in sessions if s.get("extra"))
+    has_strength = any(e.get("kind") == "forca" for e in entries)
+    muscles = credit.balance_list(credit.week_balance(entries, sessions, _targets(plan, profile)[1], today or clock.today())) \
+        if has_strength else []
     minutes_done = sum(time_breakdown(e.get("items", []))["total"] for e in entries if e["status"] == "feito")
     end_goals = {}
-    plan_end = [e for e in planned if e.get("kind") == "resistencia" and e["status"] != "pulado"]
+    plan_end = [e for e in planned if e.get("kind") == "resistencia"]
     if plan_end:
         from .sports import anchors_of
 
@@ -859,10 +1539,10 @@ def week_goals(entries: list[dict], profile: dict, ws: date) -> dict:
                                     "name": endurance.sp.SPORTS[sport_key]["name"]}
     return {
         "endurance": end_goals,
-        "sessions": {"done": sum(1 for e in entries if e["status"] == "feito") or len(sessions),
-                     "planned": sum(1 for e in planned if e["status"] != "pulado")},
+        "sessions": {"done": sum(1 for e in entries if e["status"] == "feito") if entries else len(sessions),
+                     "planned": len(planned), "extra": extras},
         "cardio": {"done": cardio["who_equivalent"], "target": round(target_cardio)},
         "sets": {"done": done_sets, "planned": planned_sets},
-        "minutes": {"done": round(minutes_done), "planned": round(sum(time_breakdown(e.get("items", []))["total"]
-                                                                       for e in planned if e["status"] != "pulado"))},
+        "minutes": {"done": round(minutes_done), "planned": round(sum(time_breakdown(e.get("items", []))["total"] for e in planned))},
+        "muscles": muscles,
     }

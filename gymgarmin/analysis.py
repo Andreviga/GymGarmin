@@ -66,10 +66,28 @@ def _classify(sets: float, lm: dict, days_since: float | None) -> str:
     return "excesso"
 
 
+WARMUP_SHARE = 0.60  # série com até 60% da carga mais pesada do exercício, feita antes dela, é aquecimento
+
+
 def _hard_sets(item: dict) -> list[dict]:
-    """Séries efetivas de um item registrado (ignora aquecimento e séries não feitas)."""
-    sets = item.get("sets") or []
-    return [s for s in sets if s.get("done", True) and not s.get("warmup")]
+    """Séries de trabalho de um item registrado (ignora aquecimento e séries não feitas).
+
+    Aquecimento marcado (`warmup: true`) nunca conta. Sem marca, a série é tratada como aquecimento quando
+    tem carga de até 60% da mais pesada do exercício E vem antes dela (rampa de subida); série leve DEPOIS
+    da pesada (drop set, back-off) continua contando. `warmup: false` força a contar.
+    """
+    sets = [s for s in (item.get("sets") or []) if s.get("done", True)]
+    loads = [float(s.get("load_kg") or 0) for s in sets]
+    top = max(loads, default=0.0)
+    first_top = loads.index(top) if top > 0 else -1
+    out = []
+    for i, s in enumerate(sets):
+        w = s.get("warmup")
+        if w is None:
+            w = top > 0 and i < first_top and 0 < loads[i] <= WARMUP_SHARE * top
+        if not w:
+            out.append(s)
+    return out
 
 
 def session_muscle_load(session: dict) -> dict[str, dict]:

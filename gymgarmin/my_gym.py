@@ -144,6 +144,37 @@ def delete_mine(user_id: int, mid: str) -> bool:
 
 # ------------------------------------------------------- trocar exercício ----
 
+_STATIONS: set | None = None
+
+
+def station_ids() -> set:
+    """Estações e movimentos de circuito (burpee, wall ball…): não são sugestão para "treinar o músculo X"."""
+    global _STATIONS
+    if _STATIONS is None:
+        from pathlib import Path
+        f = Path(__file__).resolve().parent / "data" / "extra_exercises.json"
+        _STATIONS = {e["id"] for e in json.loads(f.read_text())} if f.exists() else set()
+    return _STATIONS
+
+
+def rank_for_muscle(items: list[dict], muscle: str, user_id: int | None = None) -> list[dict]:
+    """Ordena exercícios para quem quer treinar UM músculo: primeiro os que têm esse músculo como principal,
+    os aparelhos da academia da pessoa, os que o próprio gerador usa e os mais comuns; estações de circuito,
+    pliometria e alongamento vão para o fim."""
+    from .generator import PATTERNS
+
+    curated = {e for ids in PATTERNS.values() for e in ids}
+    mine = {m["exercise_id"] for m in _mine(user_id)}
+    stations = station_ids()
+
+    def key(e: dict):
+        odd = e["id"] in stations or e.get("equipment") == "other" or e.get("category") in ("plyometrics", "stretching", "cardio")
+        return ((e.get("primaryMuscles") or [None])[0] != muscle, odd, e["id"] not in mine, e["id"] not in curated,
+                not e.get("popular"), e["name"])
+
+    return sorted(items, key=key)
+
+
 def alternatives(exercise_id: str, user_id: int | None = None, limit: int = 14) -> list[str]:
     """Exercícios que fazem o 'mesmo' trabalho: mesmo padrão de movimento do gerador e mesmos músculos principais."""
     from .generator import PATTERNS
@@ -161,9 +192,7 @@ def alternatives(exercise_id: str, user_id: int | None = None, limit: int = 14) 
     same_pattern = [e for ids in PATTERNS.values() if exercise_id in ids for e in ids]
     prim = set(ex.get("primaryMuscles") or [])
     by_muscle = []
-    from pathlib import Path
-    extra_f = Path(__file__).resolve().parent / "data" / "extra_exercises.json"
-    stations = {e["id"] for e in json.loads(extra_f.read_text())} if extra_f.exists() else set()  # burpee, wall ball…
+    stations = station_ids()  # burpee, wall ball…
     main_muscle = (ex.get("primaryMuscles") or [None])[0]
     for m in prim:
         for c in catalog.search(muscle=m, limit=80):

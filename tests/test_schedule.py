@@ -104,30 +104,56 @@ def test_skip_moves_to_free_day(fresh_db):
     kinds = {e["date"]: e["kind"] for e in week}
     assert list(kinds.values()).count("forca") == 4 and "cardio" in kinds.values()
     first = next(e for e in week if e["kind"] == "forca")
-    res = schedule.handle_missed(first["id"], prof, MONDAY)
+    # a prévia não grava nada e mostra os dias possíveis; mover é escolha explícita
+    opts = schedule.handle_missed(first["id"], prof, MONDAY, dry_run=True)
+    assert db.get_entry(first["id"])["status"] == "planejado"
+    mover = next(o for o in opts["options"] if o["id"] == "mover")
+    assert mover["available"]
+    to = mover.get("to_date") or next(d["date"] for d in opts["move_days"] if d["ok"])
+    res = schedule.handle_missed(first["id"], prof, MONDAY, strategy="mover", to_date=to)
     assert res["strategy"] == "mover", res
     after = schedule.ensure_week(prof, MONDAY, MONDAY)
-    assert any(e.get("moved_from") == first["date"] for e in after)
+    assert any(e.get("moved_from") == first["date"] and e["date"] == to for e in after)
     schedule.undo(first["id"])
     restored = schedule.ensure_week(prof, MONDAY, MONDAY)
     assert {e["date"]: e["status"] for e in restored} == {e["date"]: e["status"] for e in week}
+    assert len(restored) == len(week)
 
 
-def test_skip_redistributes_when_no_free_day(fresh_db):
+def test_skip_default_changes_nothing_else_and_reinforce_is_small(fresh_db):
+    """Falta isolada não gera dívida: o padrão é só pular. O reforço é opcional e pequeno."""
     prof, plan = _setup({"training_months": 14, "goal": "hipertrofia", "available_days": [0, 2, 4],
                          "session_minutes": 75})
     week = schedule.ensure_week(prof, MONDAY, MONDAY)
-    before = {e["id"]: sum(i.get("sets") or 0 for i in e["items"]) for e in week}
+    before = {e["id"]: [(i["exercise_id"], i.get("sets")) for i in e["items"]] for e in week}
     first = week[0]
     res = schedule.handle_missed(first["id"], prof, MONDAY)
-    assert res["strategy"] == "redistribuir"
+    assert res["strategy"] == "seguir" and res["changes"] and res["can_undo"]
     after = {e["id"]: e for e in schedule.ensure_week(prof, MONDAY, MONDAY)}
-    added = sum(sum(i.get("sets") or 0 for i in after[k]["items"]) - before[k] for k in before if k != first["id"])
-    assert added > 0 and res["changes"]
+    assert after[first["id"]]["status"] == "pulado"
     for k, e in after.items():
         if k != first["id"]:
-            assert generator.time_breakdown(e["items"])["total"] <= 75 * 1.15 + 0.5
-    assert after[first["id"]]["status"] == "pulado"
+            assert [(i["exercise_id"], i.get("sets")) for i in e["items"]] == before[k]  # nada mudou nos outros dias
+    schedule.undo(first["id"])
+    # agora pedindo o reforço: só +1 série em exercício que já existe, no máximo 4 por treino
+    opts = schedule.handle_missed(first["id"], prof, MONDAY, dry_run=True)
+    ref = next(o for o in opts["options"] if o["id"] == "reforcar")
+    if ref["available"]:
+        res = schedule.handle_missed(first["id"], prof, MONDAY, strategy="reforcar")
+        assert res["strategy"] == "reforcar" and res["days"]
+        after = {e["id"]: e for e in schedule.ensure_week(prof, MONDAY, MONDAY)}
+        total = 0
+        for k, e in after.items():
+            if k == first["id"]:
+                continue
+            assert [i["exercise_id"] for i in e["items"]] == [x for x, _ in before[k]]  # nenhum exercício novo
+            diffs = [int(i.get("sets") or 0) - int(n or 0) for i, (_, n) in zip(e["items"], before[k])]
+            assert all(d in (0, 1) for d in diffs) and sum(diffs) <= schedule.COMP_PER_SESSION
+            total += sum(diffs)
+        assert total > 0
+        schedule.undo(first["id"])
+        back = {e["id"]: [(i["exercise_id"], i.get("sets")) for i in e["items"]] for e in schedule.ensure_week(prof, MONDAY, MONDAY)}
+        assert back == before
 
 
 def test_missed_detection_and_done(fresh_db):
