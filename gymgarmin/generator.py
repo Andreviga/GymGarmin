@@ -894,9 +894,9 @@ def generate(profile: dict, seed: int = 0, recent: dict | None = None, today=Non
     _fit_time([d for d in days if d["kind"] == "cardio"], budget)
     adj = _balance(days, targets, strength_budget)
     added = _add_complements(days, targets, strength_budget, picker, tier, reps, rest_mult)
+    comp_at = len(rationale) if added else None  # a frase é escrita no fim, só com o que continuar no treino
     if added:
         adj += _balance(days, targets, strength_budget)
-        rationale.append("Complementos adicionados onde sobrou tempo: " + ", ".join(added) + ".")
     if adj:
         rationale.append(f"Balanceamento de volume: {adj} ajustes de séries para aproximar cada músculo do alvo semanal "
                          "e manter puxar ≥ empurrar.")
@@ -924,6 +924,10 @@ def generate(profile: dict, seed: int = 0, recent: dict | None = None, today=Non
                 break
 
     days.sort(key=lambda d: d["weekday"])
+    if comp_at is not None:
+        kept = [f"{catalog.get(i['exercise_id'])['name']} ({_short(d['name'])})" for d in days for i in d["items"] if i.get("complement")]
+        if kept:
+            rationale.insert(comp_at, "Complementos adicionados onde sobrou tempo: " + ", ".join(kept) + ".")
     for d in days:
         d["time"] = time_breakdown(d["items"], _b(d, budget))
     week_cardio = _cardio_equiv(days)
@@ -1101,12 +1105,19 @@ MUSCLE_PATTERN = {
 
 
 COMPLEMENT_SAME_REGION = True  # complemento de superior não entra em dia de perna (nem o contrário)
-_UPPER_M = {"chest", "lats", "middle back", "shoulders", "biceps", "triceps", "traps", "forearms", "neck"}
-_LOWER_M = {"quadriceps", "hamstrings", "glutes", "calves", "adductors", "abductors"}
+# Só os grupos GRANDES ficam presos à região do dia: o problema é um supino/remada no meio do treino de perna.
+# Complemento pequeno e isolado (trapézio, antebraço, panturrilha, abdômen, lombar) pode entrar onde sobrar tempo,
+# como sempre se fez em academia; sem isso esses músculos ficavam sem série direta em planos superior/inferior.
+_UPPER_M = {"chest", "lats", "middle back", "shoulders", "biceps", "triceps"}
+_LOWER_M = {"quadriceps", "hamstrings", "glutes", "adductors", "abductors"}
+_TEMPLATE_REGION = {"UP_A": "superior", "UP_B": "superior", "PUSH": "superior", "PULL": "superior",
+                    "LO_A": "inferior", "LO_B": "inferior", "LEGS": "inferior", "FB_A": "misto", "FB_B": "misto", "FB_C": "misto"}
 
 
 def _day_region(d: dict) -> str:
-    """superior / inferior / misto, pelo que o treino já tem (séries diretas dos exercícios principais)."""
+    """superior / inferior / misto: pelo molde do dia (Empurrar, Pernas, Full body…); sem molde, pelo que o treino tem."""
+    if d.get("template") in _TEMPLATE_REGION:
+        return _TEMPLATE_REGION[d["template"]]
     up = lo = 0
     for it in d["items"]:
         ex = catalog.get(it.get("exercise_id")) or {}

@@ -119,17 +119,21 @@ def test_partial_free_workout_asks_and_the_answer_decides(fresh_db):
 
 
 def test_free_workout_of_a_future_day_asks_before_taking_it(fresh_db):
+    """Segunda, a pessoa faz o treino de perna de terça: o app pergunta em vez de tirar o treino da terça sozinho."""
     prof, _ = _setup(UL4)
     week = _week(prof)
-    thu = next(e for e in week if e["date"] == (MONDAY + timedelta(days=3)).isoformat())
-    s = _free(_items_of(thu), MONDAY)
+    tue = next(e for e in week if e["date"] == (MONDAY + timedelta(days=1)).isoformat())
+    s = _free(_items_of(tue), MONDAY)
     c = schedule.credit_session(s, prof, MONDAY)
-    # cobre o treino de quinta, mas hoje é segunda: o app pergunta em vez de tirar o treino da quinta sozinho
-    if c["question"]:
-        assert c["question"]["kind"] == "futuro" and c["question"]["entry_id"] == thu["id"]
-        assert db.get_entry(thu["id"])["status"] == "planejado"
-    else:  # (planos em que os dois superiores se parecem muito: fecha o de hoje)
-        assert c["closed"]["entry_id"] == week[0]["id"]
+    assert c["question"] and c["question"]["kind"] == "futuro" and c["question"]["entry_id"] == tue["id"]
+    assert not c["closed"] and not c["extra"]
+    assert db.get_entry(tue["id"])["status"] == "planejado" and db.get_entry(week[0]["id"])["status"] == "planejado"
+    pend = schedule.free_workout_state(prof, MONDAY)
+    assert [(p["session_id"], p["entry_id"], p["kind"]) for p in pend] == [(s["id"], tue["id"], "futuro")]
+    r = schedule.match_session(s["id"], prof, tue["id"], today=MONDAY)
+    done = db.get_entry(tue["id"])
+    assert r["closed"]["entry_id"] == tue["id"] and done["status"] == "feito" and done["done_by"]["how"] == "decisao"
+    assert schedule.free_workout_state(prof, MONDAY) == []
 
 
 def test_doing_a_skipped_workout_later_closes_it_and_drops_the_reinforcement(fresh_db):
@@ -202,13 +206,15 @@ def test_dry_run_writes_nothing_and_recommends_one_option(fresh_db):
 
 def test_reinforcement_guards(fresh_db):
     """Nunca cria exercício, nunca sai dos músculos do treino pulado, +1 por exercício, ≤ 4 por treino, nada no principal pesado."""
+    total_ops = 0
     for prof_in in (UL4, {"training_months": 30, "goal": "forca", "available_days": [0, 2, 4], "session_minutes": 75},
                     {"training_months": 40, "goal": "hipertrofia", "available_days": [0, 1, 2, 3, 4], "session_minutes": 75}):
         for e in db.list_schedule("2026-11-16", "2026-11-22"):
             db.delete_entry(e["id"])
         prof, _ = _setup(prof_in)
         week = _week(prof)
-        for target in [e for e in week if e["kind"] == "forca"][:2]:
+        seen_ops = 0
+        for target in [e for e in week if e["kind"] == "forca"]:
             before = {e["id"]: copy.deepcopy(e) for e in _week(prof)}
             ctx = schedule._skip_ctx(target, prof, MONDAY)
             ops, work = schedule._reinforce_ops(target, ctx, asked=True)
@@ -228,6 +234,9 @@ def test_reinforcement_guards(fresh_db):
                 per[o["entry_id"]] = per.get(o["entry_id"], 0) + 1
             assert all(n <= schedule.COMP_PER_SESSION for n in per.values())
             assert len(ops) == len({(o["entry_id"], o["index"]) for o in ops})  # no máximo +1 por exercício
+            seen_ops += len(ops)
+        total_ops += seen_ops
+    assert total_ops > 0, "nenhum reforço exercitado: o teste não estaria verificando nada"
 
 
 def test_deload_week_never_reinforces(fresh_db):
@@ -243,26 +252,27 @@ def test_deload_week_never_reinforces(fresh_db):
         schedule.handle_missed(first["id"], prof, MONDAY, strategy="reforcar")
 
 
-def test_two_skips_undo_independently(fresh_db):
-    prof, _ = _setup({**UL4, "available_days": [0, 1, 2, 3, 4], "training_months": 40, "session_minutes": 75})
+@pytest.mark.parametrize("order", [(0, 1), (1, 0)])
+def test_two_skips_undo_independently(fresh_db, order):
+    """Dois pulos que reforçam o mesmo treino: desfazer um não tira o reforço do outro, em qualquer ordem."""
+    prof, _ = _setup({"training_months": 14, "goal": "hipertrofia", "available_days": [0, 2, 4], "session_minutes": 60})
     week = _week(prof)
     before = _shape(week)
-    a, b = [e for e in week if e["kind"] == "forca"][:2]
-
-    def do(e, day):
-        o = schedule.handle_missed(e["id"], prof, day, dry_run=True)
-        ok = next(x for x in o["options"] if x["id"] == "reforcar")["available"]
-        schedule.handle_missed(e["id"], prof, day, strategy="reforcar" if ok else "seguir")
-
-    do(a, MONDAY)
-    do(b, MONDAY + timedelta(days=1))
-    schedule.undo(a["id"])  # desfazer o primeiro não apaga o ajuste do segundo
-    mid = db.get_entry(b["id"])
-    assert mid["status"] == "pulado" and mid.get("undo")
-    schedule.undo(b["id"])
-    after = _shape(_week(prof, MONDAY))
-    assert {k: v[2] for k, v in after.items()} == {k: v[2] for k, v in before.items()}
-    assert all(v[1] == "planejado" for v in after.values())
+    a, b, target = week[0], week[1], week[2]
+    for e in (a, b):
+        r = schedule.handle_missed(e["id"], prof, MONDAY, strategy="reforcar")
+        assert r["strategy"] == "reforcar" and r["days"]
+    marks = lambda owner: sorted((x["id"], i["exercise_id"]) for x in _week(prof) for i in x["items"] if i.get("comp_from") == owner)  # noqa: E731
+    mine = {a["id"]: marks(a["id"]), b["id"]: marks(b["id"])}
+    assert mine[a["id"]] and mine[b["id"]] and any(eid == target["id"] for eid, _ in mine[a["id"]] + mine[b["id"]])
+    first, second = (a, b)[order[0]], (a, b)[order[1]]
+    schedule.undo(first["id"])
+    assert marks(first["id"]) == [] and marks(second["id"]) == mine[second["id"]]  # o reforço do outro continua
+    assert db.get_entry(second["id"])["status"] == "pulado"
+    schedule.undo(second["id"])
+    after = _week(prof)
+    assert _shape(after) == before
+    assert not any(c for e in after for c in (e.get("changes") or []) if "reforço" in c)
 
 
 def test_move_validations_and_all_warnings(fresh_db):
@@ -367,12 +377,28 @@ def test_legacy_undo_refuses_when_a_newer_adjustment_changed_other_workouts(fres
 # ------------------------------------------------------------------------------- API ---
 @pytest.fixture()
 def client(tmp_path, monkeypatch):
+    from datetime import datetime
     monkeypatch.setenv("GYMGARMIN_HOME", str(tmp_path))
     monkeypatch.setenv("GYMGARMIN_DB", str(tmp_path / "a.sqlite3"))
     from gymgarmin.app import app
 
-    with TestClient(app) as c:
-        yield c
+    clock.freeze(datetime(2026, 11, 16, 12, 0))  # segunda: os testes não dependem do dia em que rodam
+    try:
+        with TestClient(app) as c:
+            yield c
+    finally:
+        clock.freeze(None)
+
+
+def _partial(entry: dict) -> list[dict]:
+    """Um pedaço do treino que cai na faixa da pergunta (cobertura entre 25% e 70%)."""
+    its = [i for i in entry["items"] if (i.get("phase") or "principal") == "principal" and i.get("sets") and not i.get("duration_min")]
+    for k in range(1, len(its)):
+        body = [{"exercise_id": i["exercise_id"], "sets": [{"reps": 10, "load_kg": 20}] * int(i["sets"])} for i in its[:k]]
+        cov = credit.coverage({"items": body}, entry)
+        if credit.COVER_ASK <= cov < credit.COVER_CLOSE:
+            return body
+    raise AssertionError("nenhum pedaço do treino cai na faixa da pergunta")
 
 
 def test_api_skip_options_free_workout_credit_and_match(client):
@@ -380,41 +406,38 @@ def test_api_skip_options_free_workout_credit_and_match(client):
                                      "session_minutes": 60})
     client.post("/api/generator/apply", json={})
     sch = client.get("/api/schedule").json()
-    assert sch["goals"]["muscles"] and sch["pending"] == [] and sch["legacy"] is None
+    assert sch["today"] == "2026-11-16" and sch["goals"]["muscles"] and sch["pending"] == [] and sch["legacy"] is None
     today = sch["today"]
-    todays = [e for e in sch["entries"] if e["date"] == today and e["kind"] == "forca" and e["status"] == "planejado"]
-    later = [e for e in sch["entries"] if e["date"] > today and e["kind"] == "forca" and e["status"] == "planejado"]
-    if later:  # opções com prévia, depois a escolha
-        e = later[-1]
-        pre = client.post(f"/api/schedule/{e['id']}/skip", json={"dry_run": True}).json()
-        assert pre["dry_run"] and pre["options"][0]["id"] == "seguir"
-        assert client.get("/api/schedule").json()["entries"] == sch["entries"]
-        r = client.post(f"/api/schedule/{e['id']}/skip", json={"strategy": "seguir"}).json()
-        assert r["strategy"] == "seguir" and r["changes"]
-        assert client.post(f"/api/schedule/{e['id']}/skip", json={}).status_code == 400  # já ajustado
-        assert client.post(f"/api/schedule/{e['id']}/undo").status_code == 200
-    if todays:
-        e = todays[0]
-        its = [i for i in e["items"] if (i.get("phase") or "principal") == "principal" and i.get("sets") and not i.get("duration_min")]
-        half = its[:max(1, round(len(its) * 0.45))]
-        body = {"date": today + "T18:00", "day_name": "Treino livre", "client_id": "api-free-1",
-                "items": [{"exercise_id": i["exercise_id"], "sets": [{"reps": 10, "load_kg": 20}] * int(i["sets"])} for i in half]}
-        saved = client.post("/api/sessions", json=body).json()
-        cr = saved["credit"]
-        assert cr["work_sets"] > 0 and cr["balance"]
-        if cr["question"]:
-            pend = client.get("/api/schedule").json()["pending"]
-            assert pend and pend[0]["session_id"] == saved["id"]
-            m = client.post(f"/api/sessions/{saved['id']}/match", json={"schedule_id": e["id"]}).json()
-            assert m["closed"]["entry_id"] == e["id"]
-            now = {x["id"]: x for x in client.get("/api/schedule").json()["entries"]}
-            assert now[e["id"]]["status"] == "feito" and now[e["id"]]["partial"]
-            assert client.delete(f"/api/sessions/{saved['id']}").status_code == 200
-            assert {x["id"]: x for x in client.get("/api/schedule").json()["entries"]}[e["id"]]["status"] == "planejado"
+    e = next(x for x in sch["entries"] if x["date"] == today and x["kind"] == "forca" and x["status"] == "planejado")
+    last = [x for x in sch["entries"] if x["date"] > today and x["kind"] == "forca" and x["status"] == "planejado"][-1]
+    # opções com prévia (nada gravado), depois a escolha
+    pre = client.post(f"/api/schedule/{last['id']}/skip", json={"dry_run": True}).json()
+    assert pre["dry_run"] and pre["options"][0]["id"] == "seguir"
+    assert client.get("/api/schedule").json()["entries"] == sch["entries"]
+    r = client.post(f"/api/schedule/{last['id']}/skip", json={"strategy": "seguir"}).json()
+    assert r["strategy"] == "seguir" and r["changes"]
+    assert client.post(f"/api/schedule/{last['id']}/skip", json={}).status_code == 400  # já ajustado
+    assert client.post(f"/api/schedule/{last['id']}/undo").status_code == 200
+    # cliente antigo (app em cache): pular sem corpo continua funcionando e devolve o que ele lê
+    old = client.post(f"/api/schedule/{last['id']}/skip").json()
+    assert old["strategy"] == "seguir" and isinstance(old["changes"], list)
+    assert client.post(f"/api/schedule/{last['id']}/undo").status_code == 200
+    # treino livre pela metade: o servidor pergunta; a resposta fecha; apagar a sessão reabre
+    saved = client.post("/api/sessions", json={"date": today + "T18:00", "day_name": "Treino livre", "client_id": "api-free-1",
+                                               "items": _partial(e)}).json()
+    cr = saved["credit"]
+    assert cr["work_sets"] > 0 and cr["balance"] and cr["question"]["kind"] == "hoje" and cr["question"]["entry_id"] == e["id"]
+    pend = client.get("/api/schedule").json()["pending"]
+    assert [p["session_id"] for p in pend] == [saved["id"]]
+    m = client.post(f"/api/sessions/{saved['id']}/match", json={"schedule_id": e["id"]}).json()
+    assert m["closed"]["entry_id"] == e["id"]
+    now = {x["id"]: x for x in client.get("/api/schedule").json()["entries"]}
+    assert now[e["id"]]["status"] == "feito" and now[e["id"]]["partial"]
+    assert client.delete(f"/api/sessions/{saved['id']}").status_code == 200
+    assert {x["id"]: x for x in client.get("/api/schedule").json()["entries"]}[e["id"]]["status"] == "planejado"
     assert client.post("/api/schedule/legacy", json={"keep": True}).status_code == 200
 
 
-# ------------------------------------------------------------------------- gerador ---
 def test_generator_gives_the_same_plan_in_every_process():
     """A prévia e o treino aplicado têm de ser o mesmo plano (antes a divisão variava de um processo para outro)."""
     import subprocess
@@ -446,6 +469,21 @@ def test_complements_stay_in_the_region_of_the_day():
                     prim = set(catalog.get(it["exercise_id"])["primaryMuscles"])
                     assert not (reg == "inferior" and prim & generator._UPPER_M), (d["name"], it["exercise_id"])
                     assert not (reg == "superior" and prim & generator._LOWER_M), (d["name"], it["exercise_id"])
+
+
+def test_full_body_day_is_mixed_and_small_muscles_may_go_anywhere():
+    one = generator.generate({"training_months": 2, "goal": "hipertrofia", "available_days": [0], "session_minutes": 90})
+    fb = next(d for d in one["days"] if d["kind"] == "forca")
+    assert generator._day_region(fb) == "misto"
+    comp = [set(catalog.get(i["exercise_id"])["primaryMuscles"]) for i in fb["items"] if i.get("complement")]
+    assert any(c & generator._LOWER_M or "calves" in c for c in comp)  # perna também recebe complemento no corpo inteiro
+    ul = generator.generate({"training_months": 14, "goal": "hipertrofia", "available_days": [0, 1, 3, 4], "session_minutes": 60})
+    assert generator._weekly_volume(ul["days"]).get("traps", 0) >= 2  # trapézio não fica zerado no superior/inferior
+    said = " ".join(x for x in ul["rationale"] if "Complementos" in x)
+    for d in ul["days"]:
+        for i in d["items"]:
+            if i.get("complement"):
+                assert catalog.get(i["exercise_id"])["name"] in said  # o "por que assim" cita só o que está no treino
 
 
 def test_api_exercises_ranked_for_training_a_muscle(client):

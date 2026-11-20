@@ -169,7 +169,8 @@ def rank_for_muscle(items: list[dict], muscle: str, user_id: int | None = None) 
 
     def key(e: dict):
         odd = e["id"] in stations or e.get("equipment") == "other" or e.get("category") in ("plyometrics", "stretching", "cardio")
-        return ((e.get("primaryMuscles") or [None])[0] != muscle, odd, e["id"] not in mine, e["id"] not in curated,
+        known = e["id"] in mine or e["id"] in curated or bool(e.get("popular"))  # traduzido e comum (não exercício de especialista)
+        return (odd, not known, (e.get("primaryMuscles") or [None])[0] != muscle, e["id"] not in mine, e["id"] not in curated,
                 not e.get("popular"), e["name"])
 
     return sorted(items, key=key)
@@ -194,7 +195,7 @@ def alternatives(exercise_id: str, user_id: int | None = None, limit: int = 14) 
     by_muscle = []
     stations = station_ids()  # burpee, wall ball…
     main_muscle = (ex.get("primaryMuscles") or [None])[0]
-    for m in prim:
+    for m in ex.get("primaryMuscles") or []:  # lista (ordem fixa): a sugestão não muda de um toque para outro
         for c in catalog.search(muscle=m, limit=80):
             if c["kind"] != ex["kind"] or (c.get("primaryMuscles") or [None])[0] != main_muscle:
                 continue
