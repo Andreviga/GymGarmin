@@ -411,7 +411,7 @@ def delete_plan(plan_id: int, user_id: int | None = None) -> None:
 
 def _session_row(r) -> dict:
     d = json.loads(r["data"])
-    return {"id": r["id"], "date": r["date"], "plan_id": r["plan_id"], "day_name": r["day_name"], **d}
+    return {"id": r["id"], "date": r["date"], "plan_id": r["plan_id"], "day_name": r["day_name"], "created_at": r["created_at"], **d}
 
 
 def list_sessions(user_id: int | None = None, since: str | None = None, limit: int = 500) -> list[dict]:

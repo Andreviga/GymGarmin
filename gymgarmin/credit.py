@@ -51,6 +51,19 @@ def work_sets(session: dict) -> int:
                if (catalog.get(it.get("exercise_id")) or {}).get("kind") == "strength")
 
 
+def logged_sets(session: dict) -> int:
+    """Séries de musculação registradas na sessão, para a meta da semana: inclui exercício que o relógio não
+    reconheceu (fora do catálogo). Não entra em cobertura nem em saldo por músculo (não se sabe o músculo)."""
+    detect = analysis.detect_warmup(session)
+    n = 0
+    for it in session.get("items", []):
+        ex = catalog.get(it.get("exercise_id"))
+        if not it.get("sets") or (ex and ex.get("kind") in ("cardio", "stretching")):
+            continue
+        n += len(analysis._hard_sets(it, detect))
+    return n
+
+
 def is_free_workout(session: dict) -> bool:
     """Treino registrado pelo app, com séries, sem vínculo com a agenda (o botão "Treino livre")."""
     return bool(session.get("client_id")) and not session.get("schedule_id") and has_sets(session)

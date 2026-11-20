@@ -6,7 +6,7 @@ potência e TSS medidos. Assim a carga (CTL/ATL), o histórico e a agenda não c
 """
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from . import load
 
@@ -28,6 +28,13 @@ def kinds(session: dict) -> set[str]:
 def _time(s: dict) -> datetime | None:
     try:
         return datetime.fromisoformat(str(s.get("date"))[:19])
+    except ValueError:
+        return None
+
+
+def _saved_at(s: dict) -> datetime | None:
+    try:
+        return datetime.fromisoformat(str(s.get("created_at"))[:19]) if s.get("created_at") else None
     except ValueError:
         return None
 
@@ -54,10 +61,13 @@ def find_twin(new: dict, sessions: list[dict]) -> dict | None:
             continue
         t1, t2 = _time(s), _time(new)
         gap = abs((t1 - t2).total_seconds()) if t1 and t2 else 0
-        # treino livre que o app já decidiu que NÃO era o treino do dia ("extra" / pergunta em aberto): só é a
-        # mesma atividade do relógio se for no mesmo horário; horas depois é outro treino (o do dia, feito com o relógio)
-        if (s.get("extra") or s.get("match_pending")) and gap > 2 * 3600:
-            continue
+        # treino livre que o app já avaliou ("extra" ou pergunta em aberto): a atividade do relógio é o MESMO treino
+        # quando começou antes de a pessoa salvar o treino no app (inclusive treino anotado horas depois); se o relógio
+        # começou bem depois de o treino do app estar salvo, é outro treino (o do dia, feito só com o relógio)
+        if s.get("extra") or s.get("match_pending"):
+            saved = _saved_at(s) or t1
+            if t2 and saved and t2 > saved + timedelta(minutes=30):
+                continue
         if best is None or gap < best_gap:
             best, best_gap = s, gap
     return best

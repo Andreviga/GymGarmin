@@ -1401,20 +1401,30 @@ def remove_compensation(ws: date, today: date, keep: bool = False) -> dict:
             continue
         before = n_sets(e)
         src = original.get(e["id"])
-        if src and not _has_legacy(src):
-            e["items"] = copy.deepcopy(src["items"])
-            e["changes"] = list(src.get("changes") or [])
-        else:
-            items = []
-            for it in e["items"]:
-                if it.get("comp_v") != 2 and it.get("added_from"):
-                    continue
-                if it.get("comp_v") != 2 and it.get("added"):
-                    it["sets"] = max(1, int(it.get("sets") or 0) - int(it["added"]))
-                    it.pop("added", None)
-                items.append(it)
-            e["items"] = items
-            e["changes"] = [c for c in e.get("changes") or [] if c not in _legacy_notes(e)]
+        src = src if src and not _has_legacy(src) else None
+        had_cardio = any("cardio" in n for n in _legacy_notes(e))
+        orig_by_ex: dict = {}
+        for it in (src or {}).get("items", []):
+            orig_by_ex.setdefault(it.get("exercise_id"), []).append(it)
+        items = []
+        for it in e["items"]:
+            if it.get("comp_v") != 2 and it.get("added_from"):
+                continue  # exercício transplantado do treino pulado
+            if it.get("comp_v") != 2 and it.get("added"):
+                it["sets"] = max(1, int(it.get("sets") or 0) - int(it["added"]))
+                it.pop("added", None)
+            o = (orig_by_ex.get(it.get("exercise_id")) or [None]).pop(0) if src else None
+            if o is not None and it.get("comp_v") != 2:
+                # o mesmo exercício existia antes do ajuste: volta o que a regra antiga mexia (séries do "doador", minutos de cardio)
+                if o.get("sets") is not None and it.get("sets") is not None:
+                    it["sets"] = o["sets"]
+                if had_cardio and o.get("duration_min") is not None and it.get("duration_min") is not None:
+                    it["duration_min"] = o["duration_min"]
+            elif o is None and src and had_cardio and it.get("notes") == "cardio compensado":
+                continue  # finalizador de cardio criado pela regra antiga
+            items.append(it)
+        e["items"] = items
+        e["changes"] = [c for c in e.get("changes") or [] if c not in _legacy_notes(e)]
         removed += max(0, before - n_sets(e))
         _note(e, "Ajuste antigo removido: voltou ao plano original")
         db.save_entry(e)
@@ -1588,6 +1598,15 @@ def free_workout_state(profile: dict, today: date | None = None) -> list[dict]:
     """Treinos livres da semana: decide os que ainda não têm decisão (salvos antes do crédito por conteúdo)
     e devolve as perguntas em aberto ("esse treino livre foi o treino X?"), uma por sessão."""
     today = today or clock.today()
+    # a semana virou e a pergunta ficou sem resposta: o treino que a pessoa fez não pode ficar "perdido" para sempre
+    for s in _sessions_in_week(week_start(today) - timedelta(days=7)):
+        mp = s.get("match_pending")
+        if isinstance(mp, dict):
+            e = db.get_entry(int(mp.get("entry_id") or 0))
+            if e and e["status"] in ("planejado", "perdido"):
+                match_session(s["id"], profile, e["id"], today=today, how="semana_virou")
+            else:
+                db.save_session({**{k: v for k, v in s.items() if k != "match_pending"}, "extra": True}, session_id=s["id"])
     out = []
     for s in sorted(_sessions_in_week(week_start(today)), key=lambda x: x["date"]):
         if not credit.is_free_workout(s) or s.get("extra"):
@@ -1614,7 +1633,8 @@ def free_workout_state(profile: dict, today: date | None = None) -> list[dict]:
     return out
 
 
-def match_session(session_id: int, profile: dict, schedule_id: int | None = None, today: date | None = None) -> dict:
+def match_session(session_id: int, profile: dict, schedule_id: int | None = None, today: date | None = None,
+                  how: str = "decisao") -> dict:
     """Resposta da pessoa: "foi o treino X" (schedule_id) ou "é um extra" (sem schedule_id). Troca a decisão anterior."""
     today = today or clock.today()
     s = db.get_session(session_id)
@@ -1636,7 +1656,7 @@ def match_session(session_id: int, profile: dict, schedule_id: int | None = None
         cov = credit.coverage(s, target) if target.get("kind") == "forca" else None
         if target["status"] == "pulado":
             target = _unskip(target, today)
-        closed = _entry_brief(_close(target, s, "decisao", cov), cov)
+        closed = _entry_brief(_close(target, s, how, cov), cov)
         s["schedule_id"] = target["id"]
     else:
         s["extra"] = True
@@ -1686,7 +1706,7 @@ def week_goals(entries: list[dict], profile: dict, ws: date, today: date | None 
     target_cardio = float(profile.get("cardio_target_min") or gen.get("cardio_target") or 150)
     # o que conta como "planejado": fora o que foi substituído, pulado ou movido para outro dia (a cópia é que vale)
     planned = [e for e in entries if e["status"] not in ("substituido", "pulado")]
-    done_sets = sum(credit.work_sets(s) for s in sessions)  # só séries de trabalho (aquecimento não conta)
+    done_sets = sum(credit.logged_sets(s) for s in sessions)  # séries de trabalho (aquecimento não conta)
     planned_sets = sum(int(i.get("sets") or 0) for e in planned for i in _strength_items(e))
     extras = sum(1 for s in sessions if s.get("extra"))
     has_strength = any(e.get("kind") == "forca" for e in entries)

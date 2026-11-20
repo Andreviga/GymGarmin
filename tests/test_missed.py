@@ -867,3 +867,66 @@ def test_prefill_survives_a_session_saved_without_load(client):
         assert it["suggestion"]["load_kg"]  # a sessão com carga é a base (a sem carga não apaga o histórico)
     finally:
         clock.freeze(None)
+
+
+# ------------------------------------------- regressões achadas com a semana real (relógio) ---
+def test_watch_activity_is_the_same_workout_when_it_started_before_the_app_session_was_saved():
+    from gymgarmin import dedupe
+    sets = [{"exercise_id": "Leg_Extensions", "sets": [{"reps": 10, "load_kg": 60}] * 4}]
+    watch = {"date": "2026-11-20T05:30", "source": "garmin", "garmin_activity_id": 7,
+             "items": [{"exercise_id": "Garmin_musculacao", "strength_min": 60, "duration_min": 60}]}
+    # treino anotado no app horas depois (12:30, salvo 13:36) e já com a pergunta em aberto: é o mesmo treino do relógio
+    logged_later = {"id": 3, "date": "2026-11-20T12:30", "created_at": "2026-11-20T13:36:07", "client_id": "a",
+                    "match_pending": {"entry_id": 6, "kind": "hoje", "coverage": 0.64}, "items": sets}
+    assert dedupe.find_twin(watch, [logged_later]) == logged_later
+    assert dedupe.find_twin(watch, [{**logged_later, "match_pending": None, "extra": True}]) is not None
+    # treino extra salvo de manhã; à noite, outro treino só com o relógio: não é o mesmo
+    morning = {"id": 4, "date": "2026-11-20T07:00", "created_at": "2026-11-20T07:25:00", "client_id": "b", "extra": True, "items": sets}
+    assert dedupe.find_twin({**watch, "date": "2026-11-20T19:00"}, [morning]) is None
+
+
+def test_unanswered_question_is_settled_when_the_week_turns(fresh_db):
+    prof, _ = _setup(UL4)
+    today_e = _week(prof)[0]
+    s = _free(_items_of(today_e, 0.45), MONDAY)
+    assert schedule.credit_session(s, prof, MONDAY)["question"]["kind"] == "hoje"
+    nxt = MONDAY + timedelta(days=7)
+    assert schedule.free_workout_state(prof, nxt) == []
+    e = db.get_entry(today_e["id"])
+    assert e["status"] == "feito" and e["partial"] and e["done_by"]["how"] == "semana_virou"  # não fica "perdido" para sempre
+    assert not db.get_session(s["id"]).get("match_pending")
+
+
+def test_strength_sets_goal_counts_sets_the_watch_could_not_name(fresh_db):
+    prof, _ = _setup(UL4)
+    _week(prof)
+    watch = db.save_session({"date": MONDAY.isoformat() + "T06:00", "source": "garmin", "garmin_activity_id": 31,
+                             "items": [{"exercise_id": "Garmin_desconhecido", "sets": [{"reps": 12, "load_kg": 80}] * 12},
+                                       {"exercise_id": "Seated_Cable_Rows", "sets": [{"reps": 12, "load_kg": 45}] * 2},
+                                       {"exercise_id": "cardio_esteira_corrida", "duration_min": 20}]})
+    assert credit.logged_sets(watch) == 14 and credit.work_sets(watch) == 2
+    goals = schedule.week_goals(_week(prof), prof, MONDAY, MONDAY)
+    assert goals["sets"]["done"] == 14
+
+
+def test_back_to_original_plan_keeps_an_exercise_swapped_after_the_old_adjustment(fresh_db):
+    prof, _ = _setup(UL4)
+    upper_a, leg, upper_b, orig = _legacy_week(prof)
+    e = db.get_entry(upper_b["id"])
+    its = credit.strength_items(e)
+    swapped = its[-1]
+    old_id, swapped["exercise_id"] = swapped["exercise_id"], "Machine_Bicep_Curl" if swapped["exercise_id"] != "Machine_Bicep_Curl" else "Cable_Hammer_Curls_-_Rope_Attachment"
+    donor = its[1]
+    donor["sets"] = int(donor["sets"]) - 1                    # a regra antiga tirou 1 série deste (sem marca)
+    e["changes"].append(f"−1 série em {catalog.get(donor['exercise_id'])['name']} (volume já sobrando)")
+    db.save_entry(e)
+    schedule.remove_compensation(MONDAY, MONDAY)
+    now = db.get_entry(upper_b["id"])
+    ids = [i["exercise_id"] for i in now["items"]]
+    assert swapped["exercise_id"] in ids and old_id not in ids                       # a troca feita depois continua
+    by = {i["exercise_id"]: i for i in now["items"]}
+    o = {i["exercise_id"]: i for i in orig[upper_b["id"]]["items"]}
+    assert by[donor["exercise_id"]]["sets"] == o[donor["exercise_id"]]["sets"]       # a série do doador voltou
+    first = credit.strength_items(now)[0]
+    assert first["sets"] == o[first["exercise_id"]]["sets"] and not first.get("added")  # o reforço saiu
+    assert not schedule._has_legacy(now)
