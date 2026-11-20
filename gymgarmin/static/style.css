@@ -780,3 +780,33 @@ body:has(.wz) .tabbar { display: none; }
 body:has(.wz) { padding-bottom: 0; }
 .wz-nav { bottom: 0; padding-bottom: calc(10px + env(safe-area-inset-bottom)); }
 .wz { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
+
+/* foco */
+.fc-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0; }
+.fc-chips .wz-chip { min-height: 42px; font-size: 14px; }
+.fc-skills { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; margin-top: 4px; }
+.fc-skills .wz-opt { min-height: 72px; padding: 10px 12px; box-shadow: none; }
+.fc-skills .wz-opt b { font-size: 15px; }
+.fc-what { background: var(--brand-soft); border-radius: 14px; padding: 12px 14px; margin: 12px 0; }
+.fc-what ul { margin: 6px 0 0; padding-left: 18px; }
+.fc-what li { margin: 4px 0; font-size: 14px; }
+.fc-cur { background: var(--ok-bg); color: var(--ink); border-radius: 12px; padding: 10px 12px; margin-bottom: 10px; font-size: 14px; }
+.focus-chip { display: flex; align-items: center; gap: 6px; padding: 12px 14px; margin-bottom: 14px; border-radius: var(--radius); background: var(--brand-soft);
+  color: var(--ink) !important; font-weight: 700; text-decoration: none !important; }
+.focus-chip span { margin-left: auto; }
+.focus-chip.done { background: var(--warn-bg); }
+.fc-m { margin: 10px 0 14px; }
+.fc-bars { position: relative; display: flex; align-items: flex-end; gap: 6px; height: 90px; margin-top: 8px; border-bottom: 1px solid var(--line); }
+.fc-bar { flex: 1; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; position: relative; }
+.fc-bar i { display: block; width: 100%; background: var(--brand); border-radius: 6px 6px 0 0; min-height: 2px; }
+.fc-bar.pre i { background: var(--ring-bg); }
+.fc-bar em { position: absolute; top: -2px; font-style: normal; font-size: 11px; color: var(--ink-2); }
+.fc-target { position: absolute; left: 0; right: 0; border-top: 2px dashed var(--ok); }
+.focus-pill { background: var(--brand-soft); color: var(--brand); }
+.fc-bar em { position: static; height: 16px; line-height: 16px; }
+
+.wg { background: var(--bg); border-radius: 14px; padding: 12px 14px; margin: 10px 0; }
+.wg ol { padding-left: 20px; margin: 6px 0; }
+.wg li { margin: 6px 0; }
+.wg-what { background: var(--info-bg); border-radius: 12px; padding: 10px 12px; margin-top: 8px; line-height: 1.5; }
+.net-off { background: var(--warn-bg); color: var(--ink); border-radius: 12px; padding: 10px 12px; margin: 0 0 12px; font-size: 14px; font-weight: 600; }

@@ -16,7 +16,7 @@ from fastapi.staticfiles import StaticFiles
 
 from datetime import date, timedelta
 
-from . import auth, coach, gallery, ingest, my_gym, training_rules
+from . import auth, coach, focus, gallery, ingest, my_gym, training_rules
 from . import (analysis, calibration, catalog, clock, db, dedupe, health, endurance, garmin_export, garmin_sync, generator, history, limitations,
                load, plans_io, progression, readiness, schedule, sports, templates)
 from .muscles import EQUIPMENT_PT, HR_ZONES, MUSCLES, hr_max, zone_bpm
@@ -849,6 +849,8 @@ def get_profile():
 def put_profile(body: dict = Body(...)):
     body.pop("hr_max_calc", None)
     body.pop("_from_garmin", None)
+    if "focus" in body:
+        body["focus"] = focus.normalize(body.get("focus"))
     if body.get("training_months") not in (None, ""):
         body["level"] = generator.TIERS[generator.tier_for(body["training_months"])]["level"]
     return db.save_profile(body)
@@ -904,6 +906,25 @@ def _me_ids() -> tuple[int, str | None, bool]:
 
 
 # ------------------------------------------------------- minha academia ----
+
+@app.get("/api/focus/options")
+def focus_options():
+    return focus.options()
+
+
+@app.get("/api/focus/progress")
+def focus_progress():
+    prof = _profile()
+    f = focus.active(prof)
+    if not f:
+        return {"focus": None}
+    plan = next((p for p in db.list_plans() if p.get("id") == prof.get("schedule_plan_id")), None) or {}
+    targets = (plan.get("generator") or {}).get("targets")
+    applied = (plan.get("generator") or {}).get("focus")
+    out = focus.progress(f, db.list_sessions(limit=400), targets)
+    out["applied"] = bool(applied and applied.get("muscles") == f["muscles"] and applied.get("skills") == f["skills"])
+    return out
+
 
 @app.get("/api/my-gym/machines")
 def my_gym_list():

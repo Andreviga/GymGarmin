@@ -30,6 +30,7 @@ import math
 from collections import defaultdict
 
 from . import catalog, clock, endurance
+from . import focus as focus_mod
 from . import training_rules
 from .limitations import check_exercise, max_zone
 from .muscles import HR_ZONES, MUSCLES, PRIMARY_WEIGHT, SECONDARY_WEIGHT
@@ -876,6 +877,9 @@ def generate(profile: dict, seed: int = 0, recent: dict | None = None, today=Non
                 targets[m] = round(targets[m] * 0.8, 1)
         rationale.append(f"{leg_end} sessões de resistência com as pernas na semana → volume de musculação das pernas "
                          "−20% para não comprometer a recuperação (efeito de interferência).")
+    foc = focus_mod.active(p, today)
+    if foc:
+        rationale += focus_mod.adjust_targets(targets, foc)
     cardio_from_days = min(cardio_target, len(cardio_days) * min(60, budget - 5))
     if wp:
         cardio_from_days = _cardio_equiv([d for d in days if d.get("kind") == "resistencia"])
@@ -895,6 +899,13 @@ def generate(profile: dict, seed: int = 0, recent: dict | None = None, today=Non
     if adj:
         rationale.append(f"Balanceamento de volume: {adj} ajustes de séries para aproximar cada músculo do alvo semanal "
                          "e manter puxar ≥ empurrar.")
+
+    if foc:
+        ctx = {"ok": lambda e: _ok(e, lims, equipment), "tier": tier, "tier_key": tier_key, "reps": reps, "picker": picker,
+               "acc_rest": training_rules.rest_for("acc", tier_key, goal["rest"], p.get("rest_pref")), "max_zone": mz,
+               "endurance_on": bool(wp), "cardio_machine": _cardio_machine(lims, cardio_prefs, 0, hiit=True)}
+        rationale += focus_mod.apply(days, foc, ctx)
+        _fit_time([d for d in days if d["kind"] == "forca"], strength_budget, all_days=days, targets=targets)
 
     # ---- cardio: finalizadores até a meta
     _cardio_fill(days, cardio_target, budget, lims, cardio_prefs, mz, goal)
@@ -944,6 +955,7 @@ def generate(profile: dict, seed: int = 0, recent: dict | None = None, today=Non
             "cycle_weeks": tier["cycle_weeks"], "ramp_sets": tier["ramp_sets"], "seed": seed,
             "session_minutes": budget, "available_days": avail, "targets": targets, "same_session": combine,
             "cardio_target": cardio_target, "cardio_planned_equiv": week_cardio, "rpe": tier["rpe"],
+            **({"focus": {k: foc[k] for k in ("muscles", "skills", "level", "lift", "weeks", "start")}} if foc else {}),
         },
         **({"endurance_plan": {"start": week0.isoformat(), "tier": tier_key, "sessions": sess_override, "max_hard": max_hard,
                                "start_volumes": {k: v for k, v in (recent or {}).items() if k in (p.get("endurance") or {}).get("sports", {})} or None,
@@ -994,7 +1006,7 @@ def _fit_time(days: list[dict], budget: float, protect_post: bool = False,
             guard += 1
             items = d["items"]
             vol = _weekly_volume(all_days or days)
-            by_surplus = lambda xs: sorted(xs, key=lambda i: -_surplus_ratio(i, vol, targets))  # noqa: E731
+            by_surplus = lambda xs: sorted(xs, key=lambda i: (bool(i.get("focus")), -_surplus_ratio(i, vol, targets)))  # noqa: E731
             post = [i for i in items if i.get("phase") == "pos"]
             if protect_post and len(post) > 4:
                 items.remove(post[-1])
@@ -1002,15 +1014,25 @@ def _fit_time(days: list[dict], budget: float, protect_post: bool = False,
             accs = [i for i in items if i.get("role") == "acc"]
             secs = [i for i in items if i.get("role") == "sec"]
             mains = [i for i in items if i.get("role") == "main"]
-            mob = [i for i in items if i.get("phase") == "preparo" and i.get("duration_s")]
+            mob = sorted([i for i in items if i.get("phase") == "preparo" and i.get("duration_s")], key=lambda i: bool(i.get("focus")), reverse=True)
             warm = next((i for i in items if i.get("phase") == "preparo" and i.get("duration_min")), None)
-            fin = [i for i in items if i.get("finisher")]
+            fin = [i for i in items if i.get("finisher") and not i.get("focus")]
             if fin:
                 f = fin[-1]
                 if float(f.get("duration_min") or 0) > 10:
                     f["duration_min"] = float(f["duration_min"]) - 5
                 else:
                     items.remove(f)
+                continue
+            cand = next((i for i in by_surplus(accs) if i["sets"] > 2 and not i.get("focus")), None) \
+                or next((i for i in by_surplus(secs) if i["sets"] > 2 and not i.get("focus")), None)
+            if cand:
+                cand["sets"] -= 1
+                continue
+            # com foco: o que não é foco sai antes de mexer no foco (o foco ocupa o lugar dos outros acessórios)
+            nonf = [i for i in accs + secs if not i.get("focus")]
+            if nonf and any(i.get("focus") for i in items) and len([i for i in mains + secs if not i.get("focus")]) >= 1:
+                items.remove(by_surplus(nonf)[0])
                 continue
             cand = next((i for i in by_surplus(accs) if i["sets"] > 2), None) \
                 or next((i for i in by_surplus(secs) if i["sets"] > 2), None)
@@ -1031,7 +1053,7 @@ def _fit_time(days: list[dict], budget: float, protect_post: bool = False,
                 warm["duration_min"] = 3
                 continue
             if accs and len(mains) + len(secs) >= 3:
-                items.remove(accs[0])
+                items.remove(by_surplus(accs)[0])
                 continue
             if len(mob) > 1:
                 items.remove(mob[-1])
@@ -1047,7 +1069,7 @@ def _fit_time(days: list[dict], budget: float, protect_post: bool = False,
                 items.remove(post[-1])
                 continue
             if secs and len(mains) >= 2:
-                items.remove(secs[0])
+                items.remove(by_surplus(secs)[0])
                 continue
             break
 
@@ -1268,6 +1290,8 @@ def _cardio_fill(days, target, budget, lims, prefs, mz, goal) -> None:
                 continue
             fin = next((i for i in d["items"] if i.get("finisher")), None)
             if fin:
+                if fin.get("intervals"):  # intervalado do foco de fôlego: não vira zona 2
+                    continue
                 if fin["duration_min"] < 25 and slack >= 5:
                     fin["duration_min"] += 5
                     progressed = True

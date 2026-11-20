@@ -181,7 +181,7 @@ function itemLine(it) {
   if (it.intervals) d = `${it.warmup_min || 0}′ + ${it.intervals.repeats}× (${it.intervals.work_s}s Z${it.intervals.work_zone} / ${it.intervals.rest_s}s) + ${it.cooldown_min || 0}′`;
   else if (it.duration_min) d = `${it.duration_min} min${it.zone ? " Z" + it.zone : ""}`;
   else if (it.sets) d = `${it.sets}×${it.reps || (it.duration_s ? it.duration_s + "s" : "")}${it.rest_s && it.phase !== "preparo" && it.phase !== "pos" ? ` · ${it.rest_s}s` : ""}${it.rir && !it.deload ? ` · RIR ${String(it.rir).split(" ")[0]}` : ""}`;
-  const tags = [it.ramp && RAMP_TXT[it.ramp] ? `<span class="pill muted small">${RAMP_TXT[it.ramp]}</span>` : it.ramp ? `<span class="pill">+${it.ramp} série</span>` : "", it.deload ? `<span class="pill warn">deload</span>` : "", it.added ? `<span class="pill warn">+${it.added}</span>` : "", it.added_from ? `<span class="pill warn">compensação</span>` : "", it.finisher ? `<span class="pill muted">finalizador</span>` : "", it.superset ? `<span class="pill small" title="Bi-set: faça uma série de cada, emendadas, e descanse depois do segundo">bi-set ${it.superset}</span>` : "", it.rotated_from ? `<span class="pill muted small" title="Variação deste ciclo: estímulo novo para o músculo; no próximo ciclo volta o exercício de antes">variação do ciclo</span>` : ""].join(" ");
+  const tags = [it.focus ? `<span class="pill focus-pill small">🎯 foco</span>` : "", it.ramp && RAMP_TXT[it.ramp] ? `<span class="pill muted small">${RAMP_TXT[it.ramp]}</span>` : it.ramp ? `<span class="pill">+${it.ramp} série</span>` : "", it.deload ? `<span class="pill warn">deload</span>` : "", it.added ? `<span class="pill warn">+${it.added}</span>` : "", it.added_from ? `<span class="pill warn">compensação</span>` : "", it.finisher ? `<span class="pill muted">finalizador</span>` : "", it.superset ? `<span class="pill small" title="Bi-set: faça uma série de cada, emendadas, e descanse depois do segundo">bi-set ${it.superset}</span>` : "", it.rotated_from ? `<span class="pill muted small" title="Variação deste ciclo: estímulo novo para o músculo; no próximo ciclo volta o exercício de antes">variação do ciclo</span>` : ""].join(" ");
   return `<li class="mline">${mediaHtml(it.exercise_id, "s")}<span><span data-ex="${esc(it.exercise_id)}" style="cursor:pointer">${name}</span> <span class="muted">${esc(d)}</span> ${tags}</span></li>`;
 }
 
@@ -199,8 +199,9 @@ function meter(label, done, target, unit = "") {
 
 async function viewHoje(weekDate) {
   const athletePromise = weekDate ? Promise.resolve("") : athleteCards().catch(() => "");
-  const [sch, rd, gst] = await Promise.all([api(`/api/schedule${weekDate ? `?date=${weekDate}` : ""}`),
-    weekDate ? Promise.resolve(null) : api("/api/readiness").catch(() => null), api("/api/garmin/status").catch(() => null)]);
+  const [sch, rd, gst, prof] = await Promise.all([api(`/api/schedule${weekDate ? `?date=${weekDate}` : ""}`),
+    weekDate ? Promise.resolve(null) : api("/api/readiness").catch(() => null), api("/api/garmin/status").catch(() => null),
+    api("/api/profile").catch(() => null)]);
   if (!sch.plan) {
     const incomplete = profileMissing(state.profile || await api("/api/profile").catch(() => ({}))).length > 0;
     view.innerHTML = `${pageHead("Hoje")}${firstStepsHtml(false)}${installCardHtml("hoje")}<section class="today-card">
@@ -226,7 +227,7 @@ async function viewHoje(weekDate) {
   sch._sel = sel;
   const adjusted = plannedToday.some((e) => e.readiness_backup);
   view.innerHTML = `${weekDate ? pageHead(`Semana de ${ddmm(sch.week_start)}`) : pageHead("Hoje", true, sch.today)}
-  ${weekDate ? "" : firstStepsHtml(true) + statsHtml(rd, g, adjusted, plannedToday.length > 0) + garminSyncCard(sch, gst) + installCardHtml("hoje")}${athleteHtml}
+  ${weekDate ? "" : firstStepsHtml(true) + statsHtml(rd, g, adjusted, plannedToday.length > 0) + focusChip(prof) + garminSyncCard(sch, gst) + installCardHtml("hoje")}${athleteHtml}
   ${missed.length ? `<div class="rec alerta"><b>Treino perdido:</b> ${missed.map((e) => `${e.weekday} ${ddmm(e.date)} – ${esc(e.day_name)}`).join(", ")}.
      <div class="row gap wrap" style="margin-top:6px">${missed.map((e) => `<button class="btn sm" data-skip="${e.id}">Ajustar a semana (${e.weekday})</button>`).join("")}</div></div>` : ""}
   <section class="week">
@@ -974,15 +975,58 @@ async function accountCard() {
       <button class="btn sm" type="submit">Salvar senha</button></form></details>
     <p><button class="btn ghost sm" id="logout">Sair</button></p></div>${admin}`;
 }
+// passo a passo por marca: o caminho é sempre "app do relógio → Apple Saúde (iPhone) ou Health Connect (Android) → HAX"
+const WATCHES = [
+  ["garmin", "Garmin"], ["apple", "Apple Watch"], ["amazfit", "Amazfit"], ["xiaomi", "Xiaomi / Redmi"], ["samsung", "Samsung Galaxy"],
+  ["pixel", "Pixel / Fitbit"], ["polar", "Polar"], ["huawei", "Huawei"], ["outro", "Outro"],
+];
+const WATCH_APP = {
+  amazfit: ["Zepp", "Perfil → Contas de terceiros (Vincular contas)", "Health Connect", "Apple Saúde"],
+  xiaomi: ["Mi Fitness", "Perfil → Dados de terceiros", "Health Connect", "Apple Saúde"],
+  samsung: ["Samsung Health", "⋮ → Configurações → Health Connect", "Health Connect", null],
+  pixel: ["Fitbit", "Perfil (sua foto) → Health Connect", "Health Connect", null],
+  polar: ["Polar Flow", "Configurações → Apps conectados", "Health Connect", "Apple Saúde"],
+  huawei: ["Huawei Health", "Eu → Configurações → Compartilhamento de dados", null, "Apple Saúde"],
+  outro: ["do relógio", "Configurações / Perfil → Apps ou contas conectadas", "Health Connect", "Apple Saúde"],
+};
+function watchGuide(brand) {
+  const ios = isIOS();
+  if (!brand) return `<p class="small muted">Escolha a marca para ver o passo a passo.</p>`;
+  if (brand === "garmin") return `<div class="wg"><b>Garmin: conexão direta (a mais completa)</b>
+    <p class="small">Em <b>Garmin Connect</b> (logo acima) entre com o e-mail e a senha da Garmin. O HAX <b>manda o treino para o relógio</b> (com aquecimento, séries e descanso) e <b>traz de volta</b> treinos, sono, VFC e Body Battery para ajustar o dia.</p></div>`;
+  const tail = (where) => `<li>Toque em <b>Gerar código pessoal</b> (aqui embaixo) e copie.</li>${ios
+    ? `<li>No iPhone, crie o atalho do HAX (abra <b>iPhone (Apple Saúde) — app Atalhos</b> logo abaixo). Ele leva ${where} para o HAX todo dia.</li>`
+    : `<li>Baixe e instale o app <b>HAX Sync</b> (botão em <b>Android (Health Connect)</b> abaixo), cole o código e toque em <b>Sincronizar</b>. Ele envia sozinho a cada poucas horas.</li>`}`;
+  if (brand === "apple") return `<div class="wg"><b>Apple Watch</b><ol class="small">${tail("treinos, sono, FC de repouso, VFC e passos")}</ol>${ios ? "" : `<p class="small muted">O Apple Watch só funciona com iPhone.</p>`}</div>`;
+  const [app, menu, hc, ah] = WATCH_APP[brand];
+  const hub = ios ? ah : hc;
+  if (!hub) {
+    return `<div class="wg"><b>${esc((WATCHES.find((w) => w[0] === brand) || [])[1])}</b>
+      <p class="small">${brand === "huawei"
+        ? "No Android, o app Huawei Health não compartilha com o Health Connect. Opções: use o <b>treino guiado</b> do HAX no celular (registra tudo na hora) ou um app de terceiros que faça a ponte (ex.: Health Sync, pago). No iPhone funciona pelo Apple Saúde."
+        : `O app ${esc(app)} não envia para o Apple Saúde no iPhone. Use o <b>treino guiado</b> do HAX no celular para registrar os treinos.`}</p></div>`;
+  }
+  return `<div class="wg"><b>${esc((WATCHES.find((w) => w[0] === brand) || [])[1])} no ${ios ? "iPhone" : "Android"}</b><ol class="small">
+    <li>No app <b>${esc(app)}</b>: ${esc(menu)} → <b>${esc(hub)}</b> → permita tudo (treinos, frequência cardíaca, sono, passos).</li>
+    ${!ios && hub === "Health Connect" ? `<li>Android 13 ou anterior: se pedir, instale o <b>Health Connect</b> pela Play Store (no Android 14+ ele já vem no sistema).</li>` : ""}
+    ${tail("o que o relógio gravou")}</ol>
+    <p class="small muted">Os nomes dos menus mudam um pouco entre versões do app. Procure por “${esc(hub)}”.</p></div>`;
+}
+
 async function devicesCard() {
   const me = state.me || {};
   if (!me.logged_in) return "";
   const st = await api("/api/account/ingest").catch(() => ({}));
   const last = st.last;
   const url = `${location.origin}/api/ingest`;
-  return `<div class="card" id="devices"><h2>Outros relógios (iPhone / Android)</h2>
-    <p class="small">Apple Watch, Xiaomi, Amazfit, Galaxy, Pixel…: o celular manda treinos, sono, FC de repouso e passos para a sua conta.
-      Primeiro gere seu <b>código pessoal</b> (é como uma senha só para isso).</p>
+  let brand = ""; try { brand = localStorage.getItem("gg_watch_brand") || (state.profile && state.profile.watch_brand) || ""; } catch (_) { /* sem storage */ }
+  return `<div class="card" id="devices"><h2>Qual é o seu relógio?</h2>
+    <div class="fc-chips" id="wb-list">${WATCHES.map(([k, t]) => `<button type="button" class="wz-chip ${brand === k ? "on" : ""}" data-wb="${k}">${esc(t)}</button>`).join("")}</div>
+    <div id="wb-guide">${watchGuide(brand)}</div>
+    <div class="wg-what small"><b>O que funciona com cada um</b><br>
+      <b>Garmin</b>: o treino vai para o relógio e volta com os dados. <b>Outras marcas</b>: o relógio grava normalmente e treinos, sono, FC de repouso e passos chegam ao HAX pelo Apple Saúde/Health Connect; para seguir o treino série a série, use o <b>treino guiado</b> no celular (só a Garmin aceita treino enviado de fora).</div>
+    <h3 style="margin-top:14px">Código pessoal e apps</h3>
+    <p class="small">O código é como uma senha só para o celular mandar dados para a sua conta.</p>
     <div class="row gap wrap"><button class="btn sm" id="ing-new">${st.has_token ? "Gerar código novo" : "Gerar código pessoal"}</button>
       ${st.has_token ? `<button class="btn sm ghost" id="ing-del">Desligar</button>` : ""}</div>
     <div id="ing-token"></div>
@@ -1006,6 +1050,14 @@ async function devicesCard() {
   </div>`;
 }
 function bindDevices() {
+  const wl = $("#wb-list");
+  if (wl) wl.onclick = (e) => {
+    const b = e.target.closest("[data-wb]"); if (!b) return;
+    try { localStorage.setItem("gg_watch_brand", b.dataset.wb); } catch (_) { /* */ }
+    api("/api/profile", { method: "PUT", body: { watch_brand: b.dataset.wb } }).catch(() => {});
+    $$("[data-wb]", wl).forEach((x) => x.classList.toggle("on", x === b));
+    $("#wb-guide").innerHTML = watchGuide(b.dataset.wb);
+  };
   const n = $("#ing-new");
   if (n) n.onclick = async () => {
     if ($("#ing-del") && !confirm("Gerar um código novo? O antigo para de funcionar (atualize o atalho/app).")) return;
@@ -1160,7 +1212,7 @@ function planItemHtml(it, i, n) {
   const f = (k, label, type = "text", extra = "", cls = "") => `<div class="${cls}"><label>${label}</label><input data-f="${k}" data-i="${i}" type="${type}" value="${esc(it[k] ?? "")}" ${extra}></div>`;
   const note = (label) => `<div class="wide"><label>${label}</label><textarea data-f="notes" data-i="${i}" rows="1" class="autogrow">${esc(it.notes ?? "")}</textarea></div>`;
   const tags = [it.phase === "preparo" ? `<span class="pill muted">aquecimento</span>` : it.phase === "pos" ? `<span class="pill muted">volta à calma</span>` : "",
-    it.finisher ? `<span class="pill muted">finalizador</span>` : "", limBadge(it._lim)].filter(Boolean).join(" ");
+    it.finisher ? `<span class="pill muted">finalizador</span>` : "", it.focus ? `<span class="pill focus-pill">🎯 foco</span>` : "", limBadge(it._lim)].filter(Boolean).join(" ");
   const sub = isCardio ? `${it.duration_min || "?"} min · Z${it.zone || 2}` : timed ? `${it.sets || 1} × ${it.duration_s || "?"} s` : `${it.sets || "?"} × ${it.reps || "?"}${it.load_kg ? ` · ${it.load_kg} kg` : ""}`;
   return `<div class="plan-item${it.phase ? " pi-" + it.phase : ""}">
     <div class="pi-head">
@@ -1631,6 +1683,99 @@ async function fxSwap(it, toId, alsoPlan) {
   }
 }
 
+/* ---- foco: músculo ou aptidão (volume, frequência, ordem, técnica e blocos próprios) ---- */
+const FOCUS_SKILL_TXT = {
+  forca: "o levantamento escolhido 2× por semana: um dia pesado (3–5 reps, 3 min de descanso) e um de técnica",
+  potencia: "saltos/arremessos logo após o aquecimento, com poucas repetições e descanso completo",
+  folego: "um intervalado 4×4 min (ou finalizador 6×1 min) por semana — dos que mais sobem o VO₂máx",
+  resistencia: "acessórios com 15–20 repetições e descanso curto",
+  mobilidade: "+2 exercícios de mobilidade no aquecimento de todo treino",
+  core: "um exercício de estabilidade do tronco em todo treino",
+  postura: "costas altas e deltoide posterior nos treinos de superior + mobilidade torácica",
+  pegada: "caminhada do fazendeiro / punho 2× por semana, no fim do treino",
+  equilibrio: "exercício unilateral de perna 2× por semana + 30 s em um pé",
+};
+async function loadFocusBox(p) {
+  const box = $("#focus-box"); if (!box) return;
+  let opt; try { opt = await api("/api/focus/options"); } catch (e) { box.innerHTML = `<p class="pill bad">${esc(e.message)}</p>`; return; }
+  const cur = p.focus || null;
+  const st = { muscles: [...((cur && cur.muscles) || [])], skills: [...((cur && cur.skills) || [])], level: (cur && cur.level) || "forte", lift: (cur && cur.lift) || "agachamento", weeks: (cur && cur.weeks) || 8 };
+  const week = cur ? Math.max(1, Math.floor((Date.now() - new Date(cur.start + "T12:00").getTime()) / (7 * 864e5)) + 1) : 0;
+  const mName = Object.fromEntries(opt.muscles.map((m) => [m.id, m.name]));
+  const render = () => {
+    const what = [
+      ...st.muscles.map((m) => `<li><b>${esc(mName[m])}</b>: mais séries por semana (faixa alta, sem passar do que dá para recuperar), em 2–3 dias, no começo do treino e com myo-reps na última série</li>`),
+      ...st.skills.map((s) => `<li><b>${esc((opt.skills.find((x) => x.id === s) || {}).label)}</b>: ${FOCUS_SKILL_TXT[s]}</li>`),
+      ...(st.muscles.length && st.level === "forte" ? ["<li>O resto do corpo fica em <b>manutenção</b> (~1/3 do volume já mantém a massa) para sobrar tempo e recuperação</li>"] : []),
+    ];
+    box.innerHTML = `${cur ? `<div class="fc-cur"><b>Foco atual:</b> ${esc(cur.label || "")} · semana ${Math.min(week, cur.weeks)} de ${cur.weeks}${week > cur.weeks ? " · <b>bloco terminou</b>: veja o resultado em Progresso e escolha o próximo" : ""}</div>` : ""}
+      <p class="small muted">Quer melhorar algo específico? Escolha até 2 músculos e/ou 2 aptidões. O app mexe em várias coisas ao mesmo tempo e acompanha o progresso por um bloco de semanas.</p>
+      <label>Músculos (até 2)</label>
+      <div class="fc-chips">${opt.muscles.map((m) => `<button type="button" class="wz-chip ${st.muscles.includes(m.id) ? "on" : ""}" data-fm="${esc(m.id)}">${esc(m.name)}</button>`).join("")}</div>
+      <label style="margin-top:12px">Aptidões (até 2)</label>
+      <div class="fc-skills">${opt.skills.map((s) => `<button type="button" class="wz-opt ${st.skills.includes(s.id) ? "on" : ""}" data-fs="${esc(s.id)}"><b>${s.icon} ${esc(s.label)}</b><span>${esc(s.desc)}</span></button>`).join("")}</div>
+      ${st.skills.includes("forca") ? `<div class="field" style="margin-top:10px"><label>Qual levantamento?</label><select id="fc-lift">${opt.lifts.map((l) => `<option value="${l.id}" ${st.lift === l.id ? "selected" : ""}>${esc(l.name)}</option>`).join("")}</select></div>` : ""}
+      ${st.muscles.length ? `<label style="margin-top:12px">Intensidade do foco</label><div class="wz-row">${[["forte", "Forte"], ["leve", "Leve"]].map(([v, t]) => `<button type="button" class="wz-chip ${st.level === v ? "on" : ""}" data-fl="${v}">${t}</button>`).join("")}</div>
+        <p class="small muted" style="margin-top:-4px">${st.level === "forte" ? "Forte: o foco ganha volume e o resto vai para manutenção." : "Leve: o foco ganha um pouco mais e o resto continua igual."}</p>` : ""}
+      <label style="margin-top:6px">Duração do bloco</label><div class="wz-row">${[6, 8, 12].map((w) => `<button type="button" class="wz-chip ${+st.weeks === w ? "on" : ""}" data-fw="${w}">${w} semanas</button>`).join("")}</div>
+      ${what.length ? `<div class="fc-what"><b>O que vai mudar no seu treino</b><ul>${what.join("")}</ul></div>` : ""}
+      <button class="btn block" id="fc-save" ${st.muscles.length || st.skills.length ? "" : "disabled"}>🎯 Montar treino com este foco</button>
+      ${cur ? `<button class="act" id="fc-clear" style="margin-top:10px">Tirar o foco (voltar ao equilibrado)</button>` : ""}`;
+  };
+  render();
+  box.onclick = async (e) => {
+    const t = e.target.closest("button"); if (!t) return;
+    const tog = (arr, v) => (arr.includes(v) ? arr.filter((x) => x !== v) : arr.length >= 2 ? (toast("Até 2 — tire um para escolher outro"), arr) : [...arr, v]);
+    if (t.dataset.fm) { st.muscles = tog(st.muscles, t.dataset.fm); return render(); }
+    if (t.dataset.fs) { st.skills = tog(st.skills, t.dataset.fs); return render(); }
+    if (t.dataset.fl) { st.level = t.dataset.fl; return render(); }
+    if (t.dataset.fw) { st.weeks = +t.dataset.fw; return render(); }
+    if (t.id === "fc-clear") {
+      if (!confirm("Tirar o foco? O treino volta ao equilibrado quando você gerar de novo.")) return;
+      await api("/api/profile", { method: "PUT", body: { focus: null } }); state.profile = null; toast("Foco removido"); openGenerator();
+    }
+    if (t.id === "fc-save") {
+      const same = cur && JSON.stringify(cur.muscles) === JSON.stringify(st.muscles) && JSON.stringify(cur.skills) === JSON.stringify(st.skills);
+      const lift = $("#fc-lift", box); if (lift) st.lift = lift.value;
+      t.disabled = true;
+      try {
+        await api("/api/profile", { method: "PUT", body: { focus: { ...st, ...(same ? { start: cur.start } : {}) } } });
+        state.profile = null; toast("Foco salvo — veja a prévia do treino 👇"); openGenerator();
+      } catch (err) { t.disabled = false; toast(err.message, 5000); }
+    }
+  };
+  box.onchange = (e) => { if (e.target.id === "fc-lift") st.lift = e.target.value; };
+}
+
+// Hoje: lembrete do bloco de foco
+function focusChip(p) {
+  const f = p && p.focus; if (!f) return "";
+  const week = Math.max(1, Math.floor((Date.now() - new Date(f.start + "T12:00").getTime()) / (7 * 864e5)) + 1);
+  return week > f.weeks
+    ? `<a class="focus-chip done" href="#perfil/foco">🎯 Bloco de foco terminou (${esc(f.label || "")}) — veja o resultado e escolha o próximo ›</a>`
+    : `<a class="focus-chip" href="#analise">🎯 Foco: ${esc(f.label || "")} · semana ${week} de ${f.weeks} <span aria-hidden="true">›</span></a>`;
+}
+
+function focusCard(fp) {
+  if (!fp || !fp.focus) return "";
+  const f = fp.focus; const ms = f.muscles || [];
+  const bars = ms.map((m) => {
+    const tgt = fp.targets[m]; const ws = fp.weeks.slice(-6);
+    if (!ws.some((w) => w.sets[m])) return `<div class="fc-m"><b>${esc(fp.names[m])}</b> <span class="small muted">· alvo ${tgt || "—"} séries por semana</span><p class="small muted" style="margin:4px 0 0">Ainda sem séries registradas — a cada treino o gráfico semanal aparece aqui.</p></div>`;
+    const max = Math.max(tgt || 0, ...ws.map((w) => w.sets[m] || 0), 1);
+    return `<div class="fc-m"><b>${esc(fp.names[m])}</b> <span class="small muted">séries por semana${tgt ? ` · alvo ${tgt}` : ""}</span>
+      <div class="fc-bars">${ws.map((w) => `<span class="fc-bar ${addDays(w.week, 6) >= f.start.slice(0, 10) ? "" : "pre"}" title="semana de ${esc(ddmm(w.week))}"><em>${w.sets[m] || 0}</em><i style="height:calc((100% - 16px) * ${((w.sets[m] || 0) / max).toFixed(3)})"></i></span>`).join("")}
+        ${tgt ? `<span class="fc-target" style="bottom:calc((100% - 16px) * ${(tgt / max).toFixed(3)})"></span>` : ""}</div></div>`;
+  }).join("");
+  const lifts = fp.lifts.map((l) => `<li><b>${esc(l.name)}</b>: força estimada ${l.first} → ${l.last} kg <span class="${l.change_pct >= 0 ? "ok-txt" : "muted"}">(${l.change_pct >= 0 ? "+" : ""}${l.change_pct}%)</span></li>`).join("");
+  const week = Math.max(1, Math.floor((Date.now() - new Date(f.start + "T12:00").getTime()) / (7 * 864e5)) + 1);
+  return `<div class="card focus-card"><h2>🎯 Seu foco: ${esc(fp.label)}</h2>
+    <p class="small muted">Semana ${Math.min(week, f.weeks)} de ${f.weeks}${week > f.weeks ? " — bloco terminou: mantenha se ainda está evoluindo, ou troque o foco em Perfil" : ""}. Barras cinzas: as 2 semanas antes do foco, para comparar.</p>
+    ${fp.applied ? "" : `<div class="rec atencao">O foco ainda não está no seu treino. <a href="#perfil/foco">Gerar o treino com foco</a></div>`}
+    ${bars}${lifts ? `<ul class="list small">${lifts}</ul>` : (ms.length ? `<p class="small muted">A evolução de força aparece depois de 2 treinos registrados com os exercícios do foco.</p>` : "")}
+    ${(f.skills || []).length ? `<p class="small">Aptidões no treino (marcadas com “foco”): ${esc(f.skills.map((s) => FOCUS_SKILL_TXT[s]).join("; "))}.</p>` : ""}</div>`;
+}
+
 async function loadMyGym() {
   const box = $("#mygym-box"); if (!box) return;
   let list = [];
@@ -1997,10 +2142,11 @@ $("#timer").addEventListener("click", (e) => {
 
 /* ------------------------------------------------------------- ANÁLISE -- */
 async function viewAnalise() {
-  const [rep, sessions, hist, ld] = await Promise.all([api("/api/report/weekly"), api("/api/sessions?limit=30"),
-    api("/api/history").catch(() => ({ exercises: [], recent_prs: [] })), api("/api/load?days=90").catch(() => null)]);
+  const [rep, sessions, hist, ld, fp] = await Promise.all([api("/api/report/weekly"), api("/api/sessions?limit=30"),
+    api("/api/history").catch(() => ({ exercises: [], recent_prs: [] })), api("/api/load?days=90").catch(() => null),
+    api("/api/focus/progress").catch(() => null)]);
   const c = rep.cardio;
-  view.innerHTML = `
+  view.innerHTML = `${focusCard(fp)}
   <a class="card link-card row between gap" href="#saude"><span><b>😴 Saúde e sono</b><br><span class="small muted">Sono, recuperação, FC de repouso, HRV, VO2máx e o efeito dos treinos — pelo relógio</span></span><span class="chev">›</span></a>
   ${loadCard(ld)}
   ${historyCard(hist)}
@@ -2594,6 +2740,7 @@ async function viewPerfil(openSec) {
       <p class="small muted">“Ajuste de volume” multiplica as séries por músculo: reduza se não estiver recuperando, aumente se estagnou recuperando bem.</p></details>
     <button class="btn ghost block" id="prof-regen" type="button" style="margin-top:12px">🔄 Gerar meu treino de novo</button>
     <p class="small muted">Mudou algo aqui? Salve e gere de novo: você vê a prévia antes de trocar. Histórico, cargas, aparelhos fotografados e as trocas “usar sempre” continuam.</p>`, miss.some((m) => ["training_months", "available_days", "goal"].includes(m[0])))}
+  ${sect("foco", "🎯", "Foco: músculo ou aptidão", p.focus ? esc(p.focus.label || "foco ativo") : "melhorar algo específico (opcional)", `<div id="focus-box"><div class="sk"><span class="sk-line"></span></div></div>`)}
   ${sect("limites", "🩹", "Limitações e lesões", lims.length ? lims.map((l) => (state.meta.limitations.find((x) => x.id === l.key) || {}).label || l.key).join(", ") : "nenhuma marcada",
     `<p class="small muted">O app marca exercícios como <span class="pill warn">cuidado</span> ou <span class="pill bad">evitar</span>, troca os que não servem e limita a zona do cardio. Não substitui orientação de um profissional.</p>
     <ul class="list">${state.meta.limitations.map((l) => `<li><label class="row gap" style="color:var(--ink);font-size:15px;margin:0"><input type="checkbox" data-lim="${l.id}" ${ul[l.id] ? "checked" : ""}> <span class="grow">${esc(l.label)}</span>
@@ -2604,7 +2751,7 @@ async function viewPerfil(openSec) {
     `<p class="small">Corrida, ciclismo, natação, remo, caminhada e trilha: meta de volume ou prova com tempo alvo, zonas por ritmo, potência ou FC.</p>
     <a class="btn ghost block" href="#esportes">Configurar esportes e provas</a>`)}
   ${sect("academia", "🏟️", "Minha academia", "fotos e regulagem dos aparelhos que você usa", `<div id="mygym-box"><div class="sk"><span class="sk-line"></span></div></div>`)}
-  ${sect("relogios", "⌚", "Relógios", g.connected ? `Garmin conectado${g.display_name ? "" : ""}` : g.needs_reconnect ? "Garmin: reconectar" : "Garmin, Apple, Android",
+  ${sect("relogios", "⌚", "Relógios", g.connected ? `Garmin conectado${g.display_name ? "" : ""}` : g.needs_reconnect ? "Garmin: reconectar" : "Garmin, Apple Watch, Amazfit, Xiaomi, Samsung…",
     `<h3>Garmin</h3>
     ${!g.library_installed ? `<p class="pill bad">Biblioteca garminconnect não instalada no servidor: <code>pip install "garminconnect>=0.3.20"</code></p>` : ""}
     ${g.storage_error ? `<p class="pill bad">${esc(g.storage_error)}</p>` : ""}
@@ -2638,8 +2785,9 @@ async function viewPerfil(openSec) {
   let dirty = false;
   const updSave = () => { const bar = $(".savebar"); if (bar) bar.hidden = !(dirty || ["dados", "treino", "limites"].some((id) => ($(`#sec-${id}`) || {}).open)); };
   $$(".sect").forEach((d) => d.addEventListener("toggle", updSave));
-  view.addEventListener("input", () => { dirty = true; updSave(); });
-  view.addEventListener("change", () => { dirty = true; updSave(); });
+  const own = (e) => e.target.closest && e.target.closest("#focus-box, #mygym-box");  // têm botão próprio de salvar
+  view.addEventListener("input", (e) => { if (own(e)) return; dirty = true; updSave(); });
+  view.addEventListener("change", (e) => { if (own(e)) return; dirty = true; updSave(); });
   updSave();
   api("/api/generator/options").then((o) => {
     const el = $("#cm-list"); if (!el) return;
@@ -2703,6 +2851,7 @@ async function viewPerfil(openSec) {
   };
   const rg = $("#prof-regen"); if (rg) rg.onclick = () => openGenerator();
   const fo = $("#fam-open"); if (fo) fo.onclick = () => openFamily();
+  loadFocusBox(p);
   loadMyGym();
   if (state.me && state.me.user && state.me.user.is_admin) api("/api/dev/queue").then((q) => { const el = $("#dev-count"); if (el) el.textContent = q.pending.length ? `${q.pending.length} ${q.pending.length === 1 ? "foto" : "fotos"} para aprovar` : "nenhuma foto na fila · adicionar aparelhos"; }).catch(() => {});
 }
@@ -2794,6 +2943,7 @@ async function doRoute(ctl) {
     await render();
     clearTimeout(skel); SWR.mode = null;
     view.dataset.route = name; view.setAttribute("aria-busy", "false");
+    netBanner();
     view.classList.remove("enter"); void view.offsetWidth; view.classList.add("enter");
     window.scrollTo(0, 0);
     if (SWR.used.size) refreshInBackground(seq, [...SWR.used], render);
@@ -2869,6 +3019,14 @@ async function sendOutbox(box) {
   if (sent) { toast(`${sent} treino${sent > 1 ? "s" : ""} guardado${sent > 1 ? "s" : ""} sem internet enviado${sent > 1 ? "s" : ""} ✔`); if (!location.hash || location.hash.startsWith("#hoje")) route(); }
 }
 window.addEventListener("online", flushOutbox);
+// sem internet: a tela abre com o que está guardado no celular, com um aviso claro no topo
+function netBanner() {
+  const off = navigator.onLine === false; const b = $("#view .net-off");
+  if (off && !b) view.insertAdjacentHTML("afterbegin", `<div class="net-off" role="status">📡 Sem internet: mostrando o que já estava salvo no celular. Treinos feitos agora são enviados quando a conexão voltar.</div>`);
+  if (!off && b) b.remove();
+}
+window.addEventListener("offline", netBanner);
+window.addEventListener("online", netBanner);
 (async () => {
   const conv = location.hash.match(/^#convite\/([\w-]+)/);
   let me = null;
