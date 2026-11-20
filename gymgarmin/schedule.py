@@ -941,7 +941,9 @@ def handle_missed(entry_id: int, profile: dict, today: date | None = None, strat
     preview = _skip_options(missed, ctx)
     head = {"entry": {"id": missed["id"], "day_name": missed["day_name"], "date": missed["date"], "status": missed["status"]}}
     if dry_run:
-        return {"dry_run": True, **head, **preview}
+        asked = next(({"session_id": s["id"], "coverage": (s.get("match_pending") or {}).get("coverage"), "work_sets": credit.work_sets(s)}
+                      for s in ctx["sessions"] if isinstance(s.get("match_pending"), dict) and s["match_pending"].get("entry_id") == missed["id"]), None)
+        return {"dry_run": True, **head, **preview, "pending": asked}
     strategy = strategy or "seguir"
     opt = next((o for o in preview["options"] if o["id"] == strategy), None)
     if not opt:
@@ -1425,6 +1427,17 @@ def remove_compensation(ws: date, today: date, keep: bool = False) -> dict:
             items.append(it)
         e["items"] = items
         e["changes"] = [c for c in e.get("changes") or [] if c not in _legacy_notes(e)]
+        backup = e.get("readiness_backup")
+        if backup and backup.get("items"):  # "desfazer ajuste de prontidão" não pode devolver o reforço antigo
+            kept = []
+            for it in backup["items"]:
+                if it.get("comp_v") != 2 and it.get("added_from"):
+                    continue
+                if it.get("comp_v") != 2 and it.get("added"):
+                    it["sets"] = max(1, int(it.get("sets") or 0) - int(it["added"]))
+                    it.pop("added", None)
+                kept.append(it)
+            backup["items"] = kept
         removed += max(0, before - n_sets(e))
         _note(e, "Ajuste antigo removido: voltou ao plano original")
         db.save_entry(e)

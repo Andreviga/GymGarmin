@@ -386,15 +386,30 @@ async function flows(page, base, persona, tag) {
       n = await page.locator("[data-dropitem]").count();
       if (n !== 1) issue("treino livre: não tirou o exercício errado", W(`${n} restantes`));
     }
+    // modo lista: a carga digitada na 1ª série vale para as seguintes ainda vazias
+    const l1 = page.locator("input[data-s='load_kg']").first();
+    if (await l1.count()) {
+      await l1.fill("50"); await l1.press("Tab"); await page.waitForTimeout(80);
+      const l2 = await page.locator("input[data-s='load_kg']").nth(1).inputValue();
+      if (l2 !== "50") issue("treino livre (lista): a carga da 1ª série não passou para a 2ª", W(`2ª série = "${l2}"`));
+    }
     // modo guiado: também dá para tirar
     await click("#to-focus", "Treinar um exercício por vez");
     if (!(await page.locator("[data-fx='drop']").count())) issue("modo guiado: sem botão de tirar o exercício", W("treino livre"));
     await audit(page, W("treino livre guiado"));
-    if (await page.locator("[data-fx='set']").count()) {
-      await click("[data-st='load_kg:2.5']", "+2,5 kg");
-      await click("[data-fx='set']", "série feita (livre)");
-      await click("[data-fx='r-skip']", "Estou pronto");
+    // toca "feita" em todas as séries: o descanso com a série editável aparece em TODAS, inclusive na última do exercício
+    let nSets = 0;
+    for (let k = 0; k < 8 && (await page.locator("[data-fx='set']").count()); k++) {
+      await click("[data-fx='set']", "série feita (livre)"); nSets++;
+      if (!(await page.locator(".fx-rest .fx-just [data-lv='load_kg']").count())) { issue("treino livre guiado: depois de marcar a série não dá para ajustar carga/repetições", W(`série ${nSets}`)); break; }
+      if (!(await page.locator(".fx-rest #fx-clock").count())) issue("treino livre guiado: sem cronômetro depois da série", W(`série ${nSets}`));
+      await page.locator(".fx-just [data-lst='load_kg:2.5']").click(); await page.waitForTimeout(40);
+      if (k === 0) await audit(page, W("treino livre guiado: descanso"));
+      await click("[data-fx='r-skip']", "Estou pronto / Terminei");
     }
+    if (nSets < 2) issue("treino livre guiado: não percorreu as séries", W(`${nSets} séries`));
+    const kept = await page.evaluate(() => { const d = JSON.parse(localStorage.getItem("gg_session") || "{}"); const it = (d.items || [])[0] || {}; return (it.sets || []).map((x) => x.load_kg); });
+    if (kept.some((v) => v == null)) issue("treino livre guiado: série marcada ficou sem carga depois do ajuste no descanso", W(JSON.stringify(kept)));
     await click("[data-fx='list']", "Ver lista");
     await click("#s-finish", "Finalizar treino livre");
     await page.waitForSelector(".saved-card", { timeout: 5000 }).catch(() => issue("treino livre: tela de resumo não apareceu", W("treino livre")));

@@ -196,10 +196,12 @@ def apply(days: list[dict], f: dict, ctx: dict) -> list[str]:
     for m in f["muscles"]:
         have = [d for d in strength if any(m in _prim(i) for i in _principal(d))]
         others = [d for d in strength if d not in have]
-        # primeiro os dias da mesma região do músculo (peito num dia de superior, não no treino de perna)
+        # o dia extra do foco fica na mesma região do músculo: peito num dia de superior, nunca no treino de perna.
+        # Sem dia da mesma região sobrando, a frequência fica como está e o volume extra entra nos dias que já treinam o músculo.
         other_region = lambda d: (m in UPPER and _is_lower_day(d)) or (m in LOWER and not _is_lower_day(d))  # noqa: E731
-        others.sort(key=lambda d: (other_region(d), any(abs(x["weekday"] - d["weekday"]) in (1, 6) and _muscle_load(x["items"]).get(m, 0) >= 4
-                                                        for x in have), len(d["items"])))
+        others = [d for d in others if not other_region(d)]
+        others.sort(key=lambda d: (any(abs(x["weekday"] - d["weekday"]) in (1, 6) and _muscle_load(x["items"]).get(m, 0) >= 4
+                                       for x in have), len(d["items"])))
         added = 0
         for d in others[:max(0, min_freq - len(have))]:
             used = {i["exercise_id"] for i in d["items"]}

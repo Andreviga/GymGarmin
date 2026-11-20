@@ -930,3 +930,41 @@ def test_back_to_original_plan_keeps_an_exercise_swapped_after_the_old_adjustmen
     first = credit.strength_items(now)[0]
     assert first["sets"] == o[first["exercise_id"]]["sets"] and not first.get("added")  # o reforço saiu
     assert not schedule._has_legacy(now)
+
+
+def test_focus_never_adds_the_muscle_to_a_day_of_the_other_region():
+    from gymgarmin import focus
+    for prof in ({"training_months": 40, "goal": "hipertrofia", "available_days": [0, 1, 3, 4], "session_minutes": 75},
+                 {"training_months": 72, "goal": "hipertrofia", "available_days": [0, 1, 2, 3, 4, 5], "session_minutes": 90},
+                 {"training_months": 14, "goal": "hipertrofia", "available_days": [0, 1, 3, 4], "session_minutes": 60}):
+        for m in ("chest", "lats", "shoulders", "quadriceps", "glutes"):
+            plan = generator.generate({**prof, "focus": {"muscles": [m], "skills": [], "level": "forte", "weeks": 8, "start": "2026-11-16"}}, 0,
+                                      today=date(2026, 11, 16))
+            for d in plan["days"]:
+                if d["kind"] != "forca":
+                    continue
+                for it in d["items"]:
+                    if "mais um dia" in (it.get("notes") or ""):
+                        lower_day = focus._is_lower_day(d)
+                        assert not (m in focus.UPPER and lower_day), (prof["available_days"], m, d["name"])
+                        assert not (m in focus.LOWER and not lower_day), (prof["available_days"], m, d["name"])
+
+
+def test_cleanup_also_cleans_the_readiness_backup_and_skip_preview_mentions_the_pending_free_workout(fresh_db):
+    prof, _ = _setup(UL4)
+    upper_a, leg, upper_b, _ = _legacy_week(prof)
+    e = db.get_entry(leg["id"])
+    e["readiness_backup"] = {"items": copy.deepcopy(e["items"]), "day_name": e["day_name"]}  # prontidão guardou o treino com o supino
+    db.save_entry(e)
+    schedule.remove_compensation(MONDAY, MONDAY)
+    now = db.get_entry(leg["id"])
+    assert not any(i.get("added_from") for i in now["items"]) and not any(i.get("added_from") for i in now["readiness_backup"]["items"])
+    # treino livre com pergunta em aberto para o treino de hoje: a prévia do pulo avisa
+    schedule.undo(upper_a["id"])
+    today_e = db.get_entry(upper_a["id"])
+    s = _free(_items_of(today_e, 0.45), MONDAY)
+    assert schedule.credit_session(s, prof, MONDAY)["question"]["entry_id"] == today_e["id"]
+    pre = schedule.handle_missed(today_e["id"], prof, MONDAY, dry_run=True)
+    assert pre["pending"]["session_id"] == s["id"] and pre["pending"]["coverage"]
+    other = schedule.handle_missed(upper_b["id"], prof, MONDAY, dry_run=True)
+    assert other["pending"] is None

@@ -509,6 +509,9 @@ async function openSkip(id, sch) {
   const draw = () => {
     body.innerHTML = `<h2>${missed ? "Treino perdido" : "Não vou treinar"}</h2>
       <p class="muted" style="margin:-6px 0 12px">${esc(pre.entry.day_name)} · ${esc(dname(pre.entry.date))}</p>
+      ${pre.pending ? `<div class="rec atencao"><b>Você registrou um treino livre que pode ser este.</b>
+        <p class="small" style="margin:4px 0 8px">${pre.pending.coverage != null ? `Ele cobriu cerca de ${pctTxt0(pre.pending.coverage)} deste treino. ` : ""}Se foi ele, marque como feito em vez de pular.</p>
+        <button class="btn sm" id="sk-was">Sim, foi esse treino</button></div>` : ""}
       <div class="opts" role="radiogroup" aria-label="O que fazer com este treino">${pre.options.map((o) => `<button class="opt ${st.strategy === o.id ? "on" : ""}" role="radio" aria-checked="${st.strategy === o.id}" data-opt="${o.id}" ${o.available ? "" : "disabled"}>
         <span class="opt-h"><b>${esc(missed && o.id === "seguir" ? "Seguir em frente" : o.title)}</b>${o.recommended ? `<span class="pill ok">recomendado</span>` : ""}</span>
         <span class="small">${esc(o.available ? (o.text || "") : (o.reason || "Indisponível"))}</span>${o.available && o.note && st.strategy === o.id ? `<span class="small muted">${esc(o.note)}</span>` : ""}</button>`).join("")}</div>
@@ -526,6 +529,12 @@ async function openSkip(id, sch) {
     const o = e.target.closest("[data-opt]"); if (o) { st.strategy = o.dataset.opt; return draw(); }
     const to = e.target.closest("[data-to]"); if (to) { st.to = to.dataset.to; return draw(); }
     if (e.target.id === "sk-cancel") return closeModal();
+    if (e.target.id === "sk-was" && pre.pending) {
+      st.busy = true;
+      try { const r = await answerMatch(`${pre.pending.session_id}:${id}`); closeModal(); toast(r.closed ? `${r.closed.day_name} marcado como feito` : "Pronto", 3500); (sch._again || viewHoje)(); }
+      catch (err) { st.busy = false; toast(err.message, 5000); }
+      return;
+    }
     if (e.target.id !== "sk-go") return;
     e.target.disabled = true; st.busy = true; e.target.textContent = "Enviando…";
     try {
@@ -1444,7 +1453,8 @@ const fmtSets = (v) => (Math.round(v * 2) / 2).toLocaleString("pt-BR");
 // item novo num treino em andamento (livre ou guiado)
 function newSessionItem(ex) {
   return ex.kind === "cardio" ? { exercise_id: ex.id, name: ex.name, kind: "cardio", plan: {}, duration_min: 10, zone: 2, images: ex.images, limitation: ex.limitation, added: true }
-    : { exercise_id: ex.id, name: ex.name, kind: ex.kind, plan: { rest_s: 90 }, sets: [1, 2, 3].map(() => ({ reps: 10, load_kg: null, done: false })), images: ex.images, limitation: ex.limitation, timed: ex.timed, added: true };
+    : { exercise_id: ex.id, name: ex.name, kind: ex.kind, plan: { rest_s: 90 }, sets: [1, 2, 3].map(() => ({ reps: 10, load_kg: null, done: false })), images: ex.images, limitation: ex.limitation, timed: ex.timed, added: true,
+      pm: ex.kind === "strength" ? ex.primaryMuscles || [] : [], sm: ex.kind === "strength" ? ex.secondaryMuscles || [] : [] };
 }
 // tirar um exercício do treino em andamento (selecionou o aparelho errado)
 function removeSessionItem(i) {
@@ -1603,11 +1613,15 @@ function renderSession() {
 // treino livre: atalhos para o que ainda falta na semana (o app não escolhe por você, só mostra)
 function missingChipsHtml(s) {
   if (s.schedule_id || s.plan_id) return "";
-  const miss = (s.missing || []).filter((m) => m.missing >= 2);
+  // desconta o que já foi marcado neste treino (músculo principal conta 1 série; auxiliar, meia)
+  const got = {};
+  s.items.forEach((it) => { const n = (it.sets || []).filter((x) => x.done).length; if (!n) return;
+    (it.pm || []).forEach((m) => { got[m] = (got[m] || 0) + n; }); (it.sm || []).forEach((m) => { got[m] = (got[m] || 0) + n / 2; }); });
+  const miss = (s.missing || []).map((m) => ({ ...m, missing: m.missing - (got[m.key] || 0) })).filter((m) => m.missing >= 1);
   if (!miss.length) return s.items.length ? "" : `<p class="muted" style="margin:4px 2px 12px">Toque em “+ Adicionar exercício” para começar. O que você fizer entra na conta da semana.</p>`;
   return `<section class="card miss-card"><b>O que ainda falta nesta semana</b>
     <p class="small muted" style="margin:2px 0 8px">Séries que a agenda não vai cobrir. Toque num músculo para escolher o exercício:</p>
-    <div class="chips">${miss.slice(0, 8).map((m) => `<button class="chip" data-miss="${esc(m.key)}">${esc(m.pt)} <b>${fmtSets(m.missing)}</b></button>`).join("")}</div></section>`;
+    <div class="chips">${miss.map((m) => `<button class="chip" data-miss="${esc(m.key)}">${esc(m.pt)} <b>${fmtSets(m.missing)}</b></button>`).join("")}</div></section>`;
 }
 
 function sessionItemHtml(it, i) {
@@ -1665,7 +1679,16 @@ function bindSession() {
     const el = e.target;
     if (el.id === "s-date") s.date = el.value;
     if (el.id === "s-notes") s.notes = el.value;
-    if (el.dataset.s) { const v = el.value === "" ? null : parseFloat(el.value.replace(",", ".")); s.items[+el.dataset.i].sets[+el.dataset.j][el.dataset.s] = v; }
+    if (el.dataset.s) {
+      const v = el.value === "" ? null : parseFloat(el.value.replace(",", ".")); const it = s.items[+el.dataset.i]; const j = +el.dataset.j;
+      const old = it.sets[j][el.dataset.s]; it.sets[j][el.dataset.s] = Number.isFinite(v) ? v : null;
+      if (el.dataset.s === "load_kg" && e.type === "change") {  // ao sair do campo: leva a carga para as séries seguintes ainda vazias/iguais
+        const from = el.dataset.was === undefined ? old : (el.dataset.was === "" ? null : +el.dataset.was);
+        fxCarry(it, j, "load_kg", from, it.sets[j].load_kg);
+        it.sets.forEach((y, k) => { if (k > j && !y.done) { const inp = $(`input[data-s="load_kg"][data-i="${el.dataset.i}"][data-j="${k}"]`); if (inp) inp.value = y.load_kg ?? ""; } });
+        delete el.dataset.was;
+      } else if (el.dataset.s === "load_kg" && el.dataset.was === undefined) el.dataset.was = old ?? "";
+    }
     if (el.dataset.c) { s.items[+el.dataset.i][el.dataset.c] = el.value === "" ? null : +String(el.value).replace(",", "."); }
     if (el.dataset.t) { s.items[+el.dataset.i][el.dataset.t] = el.value; }
     if (el.dataset.c || el.dataset.t) { const pe = $(`#pace-${el.dataset.i}`); if (pe) pe.textContent = paceTxt(s.items[+el.dataset.i]); }
@@ -1745,7 +1768,9 @@ function questionHtml(q) {
       <button class="btn sm ghost" data-match="${q.session_id}:extra">Não, foi um extra</button></div></div>`;
 }
 function missListHtml(rows, limit = 6) {
-  return `<ul class="miss-list">${rows.slice(0, limit).map((b) => `<li><span class="grow">${esc(b.pt)}<span class="small muted"> · ${fmtSets(b.projected)} de ${fmtSets(b.ref)} séries</span></span><b>faltam ${fmtSets(b.missing)}</b></li>`).join("")}</ul>`;
+  const more = rows.slice(limit);
+  return `<ul class="miss-list">${rows.slice(0, limit).map((b) => `<li><span class="grow">${esc(b.pt)}<span class="small muted"> · ${fmtSets(b.projected)} de ${fmtSets(b.ref)} séries</span></span><b>faltam ${fmtSets(b.missing)}</b></li>`).join("")}</ul>
+    ${more.length ? `<p class="small muted" style="margin:6px 0 0">E também: ${more.map((b) => `${esc(b.pt)} (${fmtSets(b.missing)})`).join(", ")}.</p>` : ""}`;
 }
 function balanceAfterHtml(rows) {
   if (!rows || !rows.length) return "";
@@ -1761,7 +1786,7 @@ async function answerMatch(val) {
 function showSaved(saved, cr, prTxt) {
   const closedTxt = (c) => `Fechou o treino <b>${esc(c.day_name)}</b> (${esc(c.label)})${c.coverage != null ? `: cobriu ${pctTxt0(c.coverage)} do planejado` : ""}.${c.was_skipped ? " Ele estava como pulado; o ajuste do pulo foi desfeito." : ""}`;
   const head = cr.closed ? closedTxt(cr.closed)
-    : cr.extra ? `Contou como <b>treino extra</b>.${cr.kept_open ? ` O treino de hoje (${esc(cr.kept_open.day_name)}) continua na agenda.` : ""}`
+    : cr.extra ? `Contou como <b>treino extra</b>.${cr.kept_open ? ` O treino de ${cr.kept_open.date === localISO().slice(0, 10) ? "hoje" : esc(cr.kept_open.label)} (${esc(cr.kept_open.day_name)}) continua ${cr.kept_open.status === "perdido" ? "como perdido" : "na agenda"}.` : ""}`
     : cr.kept_open ? `Você fez ${pctTxt0(cr.kept_open.coverage)} do treino <b>${esc(cr.kept_open.day_name)}</b>: ele continua na agenda.` : "";
   view.innerHTML = `<section class="today-card saved-card"><div class="eyebrow">Treino salvo ✓</div>
     <div class="tc-title">${cr.work_sets ? `${cr.work_sets} ${cr.work_sets === 1 ? "série de trabalho" : "séries de trabalho"}` : "Treino registrado"}</div>
@@ -2103,8 +2128,9 @@ function fxPlanTxt(it) {
   const p = it.plan || {};
   if (it.endurance) return endSummary(it.endurance);
   if (it.kind === "cardio") return `${it.duration_min || p.duration_min || ""} min · zona ${it.zone || p.zone || 2}`;
-  const what = p.reps ? `${esc(String(p.reps))} reps` : `${p.duration_s || 30} s`;
-  return `${p.sets > 1 ? p.sets + " × " : ""}${what}${fxPh(it) === "principal" ? ` · descanso ${p.rest_s ?? 90} s` : ""}${p.rir && !p.deload ? ` · sobrar ${esc(p.rir)} reps` : ""}`;
+  const free = !p.reps && !p.duration_s && !it.timed;  // adicionado na hora: séries livres, sem alvo de repetições
+  const what = p.reps ? `${esc(String(p.reps))} reps` : free ? "" : `${p.duration_s || 30} s`;
+  return `${p.sets > 1 ? p.sets + " × " : ""}${what}${fxPh(it) === "principal" ? `${what ? " · " : ""}descanso ${p.rest_s ?? 90} s` : ""}${p.rir && !p.deload ? ` · sobrar ${esc(p.rir)} reps` : ""}`;
 }
 
 // som, vibração e tela acesa
@@ -2134,7 +2160,7 @@ function fxTick() {
       const sec = $(".fx-rest"); if (!sec) return renderFocus();
       sec.classList.add("over"); const lbl = $("#fx-rest-lbl"); if (lbl) lbl.textContent = "Descanso terminado";
       $$(".fx-rest [data-when=rest]").forEach((x) => { x.hidden = true; }); $$(".fx-rest [data-when=over]").forEach((x) => { x.hidden = false; });
-      const go = $(".fx-rest .fx-skip"); if (go) go.textContent = "▶ Começar";
+      const go = $(".fx-rest .fx-skip"); if (go && s.items[fxOrder(s)[s.fx]]) go.textContent = "▶ Começar";
     }
     if (el) el.textContent = "+" + mmss(Math.floor(over / 1000));
     return;
@@ -2162,7 +2188,7 @@ function fxSetDone() {
   let rest;
   if (c.w) rest = (it.warmup || []).some((y) => !y.done && !y.skip) ? WARM_REST : WARM_LAST_REST;
   else { rest = (it.plan || {}).rest_s ?? 90; if (it.sets.every((y) => y.done)) s.fx = fxNextPos(s, order, s.fx); }
-  if (rest > 0 && s.fx < order.length) { s.restTotal = rest; s.restEnd = Date.now() + rest * 1000; s.restOver = false; fxLast = null; }
+  if (rest > 0) { s.restTotal = rest; s.restEnd = Date.now() + rest * 1000; s.restOver = false; fxLast = null; }
   store("gg_session", s); renderFocus();
   if (s.restEnd) window.scrollTo(0, 0);
 }
@@ -2197,7 +2223,7 @@ function renderFocus() {
     const left = Math.max(0, Math.ceil((s.restEnd - Date.now()) / 1000));
     const just = fxJustHtml(s);
     const clock = `<div class="fx-clock" id="fx-clock">${s.restOver ? "+" + mmss(Math.floor((Date.now() - s.restEnd) / 1000)) : mmss(left)}</div>`;
-    const go = `<button class="btn ${just ? "" : "block"} fx-skip" data-fx="r-skip">${s.restOver ? "▶ Começar" : "Estou pronto"}</button>`;
+    const go = `<button class="btn ${just ? "" : "block"} fx-skip" data-fx="r-skip">${!it ? "Terminei" : s.restOver ? "▶ Começar" : "Estou pronto"}</button>`;
     // com a série recém-feita editável em cima, o cronômetro e o botão ficam juntos numa barra fixa embaixo (sempre visíveis)
     body = `<section class="fx-rest ${s.restOver ? "over" : ""} ${just ? "has-just" : ""}">${just}
       <div class="eyebrow" id="fx-rest-lbl" aria-live="polite">${s.restOver ? "Descanso terminado" : "Descanso"}</div>
@@ -2280,7 +2306,7 @@ function renderFocus() {
         <div class="fx-setmini"><button class="act" data-fx="skip">Pular</button><button class="act drop-ex" data-fx="drop">🗑 Tirar do treino</button></div></section>`;
     }
   }
-  view.innerHTML = top + body + (s.restEnd ? "" : tools);
+  view.innerHTML = top + body + (s.restEnd && it ? "" : tools);  // no descanso depois da última série dá para pôr mais um exercício
   bindFocus();
 }
 
