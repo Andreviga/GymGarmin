@@ -1961,7 +1961,7 @@ def _health_report(today: date) -> dict:
             times.setdefault(t.date(), []).append(t.hour + t.minute / 60)
     days = _health_days(today, 56)
     try:  # o cartão de passos é um extra: se algo nele falhar, o resto do painel de saúde continua
-        sv = steps.summary(days, sessions, steps.load_tags(db.kv_get(STEP_TAGS_KEY)), today)
+        sv = steps.summary(days, sessions, steps.load_tags(db.kv_get(STEP_TAGS_KEY)), today, ask=_steps_can_ask())
         txt = steps.activity_text(sv)
     except Exception:  # noqa: BLE001
         sv, txt = None, None

@@ -154,3 +154,13 @@ def test_exercise_only_points_to_a_machine_that_has_media(monkeypatch):
     be = gallery.by_exercise()
     assert be["Horizontal_Leg_Press_Unilateral"] == "mx_leg_press_horizontal" and be["Kneeling_Hip_Extension_Machine"] == "mx_kneeling_glute_isolator"
     assert be.get("Split_Squat_with_Dumbbells") != "mx_espaldar" and be.get("Sit-Up") != "mx_espaldar"
+
+
+def test_spreadsheet_import_prefers_the_common_exercise_for_vague_names():
+    row = catalog.best_match("Remada aberta")
+    assert row["rotation"] is not False and row["availability_br"] != "rara"           # não cai no aparelho raro novo
+    assert catalog.best_match("Leg press 90")["id"] == catalog.best_match("Leg press 90 graus")["id"]
+    assert catalog.best_match("Leg press 90")["availability_br"] != "rara"            # o mesmo que a busca põe em primeiro
+    # nome exato de aparelho raro continua valendo, e quando nada comum serve o raro ainda é melhor que "não encontrado"
+    assert catalog.best_match("Leg press vertical")["name"] == "Leg press vertical"
+    assert catalog.best_match("Posterior de ombro") is not None

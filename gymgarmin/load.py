@@ -65,8 +65,9 @@ def endurance_stress(item: dict, anchors: dict) -> dict:
         if is_light(item):
             return {**base, "tss": round(mins / 60 * LIGHT_TSS_H, 1), "method": "leve"}
         # a conta por FC não desconta o repouso: 6 h de veleiro a 84 bpm dariam mais carga que um treino forte.
-        # Na zona 1–2 vale um teto por hora (o mesmo nível da caminhada leve); sem FC, assume zona 1.
-        zone = int(item.get("zone") or 1) if item.get("avg_hr") else 1
+        # Na zona 1–2 vale um teto por hora (o mesmo nível da caminhada leve). Atividade que veio do relógio sem FC
+        # assume zona 1; a anotada à mão usa a zona que a pessoa escolheu (HIIT forte não pode valer o mesmo que yoga).
+        zone = 1 if item.get("activity_type") and not item.get("avg_hr") else int(item.get("zone") or 1)
         raw = endurance_stress({**item, "_raw": True, "zone": zone}, anchors)
         cap = GENERIC_CAP_H.get(zone)
         tss = raw["tss"]

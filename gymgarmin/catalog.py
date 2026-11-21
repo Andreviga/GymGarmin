@@ -460,6 +460,7 @@ def best_match(name: str) -> dict | None:
     translated = _translate(n)
     words = [w for w in translated.split() if len(w) > 2]
     best, best_s = None, 0.0
+    usual, usual_s = None, 0.0  # o melhor entre os exercícios do dia a dia (nem raros, nem "só por escolha")
     for it in all_exercises():
         sc = _score(it, n, translated)
         if sc >= 4:
@@ -469,4 +470,8 @@ def best_match(name: str) -> dict | None:
             sc = hits / len(words) * 3 if hits / len(words) >= 0.6 else 0
         if sc > best_s:
             best, best_s = it, sc
-    return best
+        if sc > usual_s and it.get("rotation") is not False and it.get("availability_br") != "rara":
+            usual, usual_s = it, sc
+    # nome vago ("remada aberta", "leg press 90") vai para o exercício comum quando ele casa com todas as palavras;
+    # aparelho raro só ganha pelo nome exato (acima) ou quando nada comum serve
+    return usual if usual is not None and usual_s >= 4 else best

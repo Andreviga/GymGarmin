@@ -381,3 +381,42 @@ def test_cardio_machine_list_hides_generic_activities_unless_searched(client):
     assert "cardio_eliptico" in ids and not any(i.startswith("atividade_") for i in ids)
     found = client.get("/api/exercises?kind=cardio&q=yoga").json()
     assert found and found[0]["id"] == "atividade_mobilidade" and found[0]["equipment_pt"] == "Atividade"
+
+
+# ------------------------------------------------------------------ achados da revisão: segunda rodada ---
+def test_health_screen_holds_the_question_like_the_today_screen(client):
+    _seed({2: 19400})
+    assert client.get("/api/health").json()["steps"]["pending"]
+    db.kv_set(garmin_sync.SYNC_KEY, json.dumps({"last_run": "2026-11-16T08:00:00", "last_ok": True, "last_ok_at": "2026-11-16T08:00:00", "pending": 12}))
+    h = client.get("/api/health").json()["steps"]
+    assert h["pending"] == [] and h["has_data"]            # treinos do relógio ainda chegando: não pergunta em tela nenhuma
+    assert h["today"] == TODAY.isoformat()                 # "ontem/anteontem" sai da data do servidor
+
+
+def test_note_only_says_it_counted_while_the_estimated_walk_exists(client):
+    _seed({2: 19400})
+    day = (TODAY - timedelta(days=2)).isoformat()
+    r = client.post("/api/steps/tag", json={"date": day, "tag": "festival"}).json()
+    assert r["recent_event"]["counted"] is True
+    assert client.delete(f"/api/sessions/{r['session_id']}").status_code == 200
+    ev = client.get("/api/steps").json()["recent_event"]
+    assert ev["tag"] == "festival" and ev["counted"] is False   # apagou a caminhada estimada: a tela não diz mais que contou
+
+
+def test_late_night_is_not_a_short_night():
+    late_long = {"sleep": {"start": "01:00", "duration_h": 8.5}}
+    late_short = {"sleep": {"start": "03:10", "duration_h": 4.2}}
+    assert steps._late_night(late_long) and not steps._short_night(late_long)
+    assert steps._late_night(late_short) and steps._short_night(late_short)
+    assert not steps._short_night({"sleep": {"start": "23:00"}}) and not steps._short_night(None)
+
+
+def test_hand_logged_activity_uses_the_zone_the_person_chose():
+    hr = {"hrmax": 190}
+    def tss(eid, mins, **kw):
+        return load.session_stress({"items": [{"exercise_id": eid, "duration_min": mins, **kw}]}, hr)["tss"]
+    easy, hard = tss("atividade_coletivo", 90, zone=2), tss("atividade_coletivo", 90, zone=4)
+    assert hard > 2 * easy and hard == tss("cardio_eliptico", 90, zone=4)     # zona 4 à mão vale como cardio na zona 4
+    assert tss("atividade_hiit", 45, zone=4) > 4 * tss("atividade_mobilidade", 45)   # HIIT forte não vale o mesmo que yoga
+    # do relógio sem FC continua na zona 1, mesmo que o item traga outra zona por padrão
+    assert tss("atividade_aquatica", 360, zone=2, activity_type="sailing_v2") <= 100

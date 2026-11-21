@@ -30,6 +30,8 @@ async function api(path, opts = {}) {
   const signal = opts.signal || (isGet && route.ctl ? route.ctl.signal : undefined);
   const o = { ...opts, signal, headers: { "Content-Type": "application/json", ...(act ? { "X-GG-Athlete": String(act.id) } : {}), ...(opts.headers || {}) } };
   if (o.body && typeof o.body !== "string") o.body = JSON.stringify(o.body);
+  const gen = SWR.gen || 0;
+  if (!isGet) SWR.gen = gen + 1;
   let r;
   try { r = await fetch(path, o); } catch (e0) {
     if (e0 && e0.name === "AbortError") throw e0;
@@ -44,8 +46,8 @@ async function api(path, opts = {}) {
   }
   const ct = r.headers.get("content-type") || "";
   const out = ct.includes("json") ? await r.json() : await r.text();
-  if (!isGet) { if (SWR.mem.size) swrClear(); }
-  else if (ct.includes("json") && !SWR.skip.test(path)) { SWR.mem.delete(ck); SWR.mem.set(ck, clone(out)); swrSave(); }
+  if (!isGet) { SWR.gen = (SWR.gen || 0) + 1; if (SWR.mem.size) swrClear(); }
+  else if (ct.includes("json") && !SWR.skip.test(path) && gen === (SWR.gen || 0)) { SWR.mem.delete(ck); SWR.mem.set(ck, clone(out)); swrSave(); }
   return out;
 }
 
@@ -2619,10 +2621,36 @@ function watchReviewCard(w) {
 }
 const setTxt = (x) => `${x.reps}×${x.load_kg ? fmtKg(x.load_kg).replace(" kg", "") : "—"}`;
 async function openWatchReview(w0, onDone) {
-  let w = w0, changed = false, busy = false;
+  let w = w0, changed = false, busy = false, top = 0;
+  const at = location.hash;
   const splits = new Set();  // "sessão:item:posição" onde a pessoa mandou dividir um bloco
   try { w = await api("/api/watch/review"); } catch (_) { /* usa o que a tela já tinha */ }
-  const finish = () => { if (changed && onDone) onDone(); };
+  const finish = () => { if (changed && onDone && location.hash === at) onDone(); };
+  const scroller = () => $("#modal .modal-card");
+  // As divisões que a pessoa fez valem até ela dar nome ao bloco. Depois de uma resposta os números de item mudam;
+  // cada divisão é reencontrada pela ordem das séries sem nome do treino (e conferida pelas repetições/carga).
+  const flat = (s) => s.blocks.flatMap((b) => b.sets.map((x) => ({ item: b.item, i: x.i, sig: `${x.reps}|${x.load_kg}` })));
+  const keepSplits = (t) => {  // t = o que a resposta mexe: {session_id, item, from, to} (bloco que ganha nome) ou {session_id} (treino todo)
+    const old = [...splits].map((k) => {
+      const [sid, item, i] = k.split(":").map(Number); const s = w.sessions.find((x) => x.session_id === sid); const seq = s ? flat(s) : [];
+      const o = seq.findIndex((x) => x.item === item && x.i === i);
+      return o > 0 ? { sid, o, sig: seq[o].sig, prev: seq[o - 1].sig } : null; }).filter(Boolean);
+    let cut = null;
+    if (t && t.to != null) {
+      const s = w.sessions.find((x) => x.session_id === t.session_id); const seq = s ? flat(s) : [];
+      const a = seq.findIndex((x) => x.item === t.item && x.i === t.from);
+      if (a >= 0) cut = [a, a + seq.filter((x) => x.item === t.item && x.i >= t.from && x.i < t.to).length];
+    }
+    return (nw) => {
+      splits.clear();
+      old.forEach((p) => {
+        let o = p.o;
+        if (t && t.session_id === p.sid) { if (!cut || (o >= cut[0] && o <= cut[1])) return; if (o > cut[1]) o -= cut[1] - cut[0]; }
+        const s = ((nw && nw.sessions) || []).find((x) => x.session_id === p.sid); const seq = s ? flat(s) : [];
+        if (o > 0 && seq[o] && seq[o].sig === p.sig && seq[o - 1].sig === p.prev) splits.add(`${p.sid}:${seq[o].item}:${seq[o].i}`);
+      });
+    };
+  };
   // blocos como a pessoa vê: os do servidor, divididos onde ela tocou
   const blocksOf = (s) => s.blocks.flatMap((b) => {
     const cuts = b.sets.map((x) => x.i).filter((i, k) => k > 0 && splits.has(`${s.session_id}:${b.item}:${i}`));
@@ -2655,13 +2683,15 @@ async function openWatchReview(w0, onDone) {
       ${!w.categories.length && !w.sessions.length ? `<p class="ok-txt">✓ Nada pendente: o que o relógio gravou já tem exercício.</p>` : ""}
       <button class="btn ghost block" id="wr-close" style="margin-top:14px">Fechar</button>`);
     closeModal.hook = finish;  // fechar no ×, tocando fora ou no botão: a tela de trás se atualiza
+    scroller().scrollTop = top;  // redesenhar não joga a pessoa de volta para o topo
     const expectOf = (k) => { const [sid, item, from, to] = k.split(":").map(Number); const s = w.sessions.find((x) => x.session_id === sid);
       const b = s && blocksOf(s).find((x) => x.item === item && x.from === from && x.to === to);
       return { session_id: sid, item, from, to, expect: b ? b.sets.map((x) => [x.reps, x.load_kg]) : null }; };
-    const call = async (path, payload, okMsg) => {
+    const call = async (path, payload, okMsg, touched) => {
       if (busy) return; busy = true; body.classList.add("busy");  // um pedido por vez: dois toques seguidos não se atropelam
-      try { const r = await api(path, { method: "POST", body: payload }); changed = true; w = r; splits.clear(); toast(okMsg(r), 3500); }
-      catch (err) { toast(err.message, 5000); try { w = await api("/api/watch/review"); splits.clear(); } catch (_) { /* fica como está */ } }
+      const remap = keepSplits(touched);
+      try { const r = await api(path, { method: "POST", body: payload }); changed = true; w = r; remap(w); toast(okMsg(r), 3500); }
+      catch (err) { toast(err.message, 5000); try { w = await api("/api/watch/review"); remap(w); } catch (_) { /* fica como está */ } }
       busy = false; body.classList.remove("busy"); draw();
     };
     const catMsg = (r) => `Anotado: ${r.exercise.name}${r.changed ? ` (${r.changed} ${r.changed === 1 ? "treino atualizado" : "treinos atualizados"})` : ""}`;
@@ -2670,21 +2700,22 @@ async function openWatchReview(w0, onDone) {
       const t = e.target.closest("button"); if (!t || t.disabled || busy) return;
       if (t.id === "wr-close") return closeModal();
       const d = t.dataset;
+      top = scroller().scrollTop;
       if (d.wsplit) { splits.add(d.wsplit); return draw(); }
       if (d.wcat) return call("/api/watch/category", { category: d.wcat, exercise_id: d.ex }, catMsg);
-      if (d.wlab) return call("/api/watch/label", { ...expectOf(d.wlab), exercise_id: d.ex }, labMsg);
-      if (d.wdis) return call("/api/watch/dismiss", { session_id: +d.wdis }, () => "Ok, não pergunto mais sobre esse treino");
-      if (d.wask) return call("/api/watch/dismiss", { session_id: +d.wask, undo: true }, () => "Voltei a perguntar sobre esse treino");
-      if (d.wun) { const [sid, item] = d.wun.split(":").map(Number); return call("/api/watch/unlabel", { session_id: sid, item }, () => "Desfeito: as séries voltaram a ficar sem nome"); }
+      if (d.wlab) { const b = expectOf(d.wlab); return call("/api/watch/label", { ...b, exercise_id: d.ex }, labMsg, b); }
+      if (d.wdis) return call("/api/watch/dismiss", { session_id: +d.wdis }, () => "Ok, não pergunto mais sobre esse treino", { session_id: +d.wdis });
+      if (d.wask) return call("/api/watch/dismiss", { session_id: +d.wask, undo: true }, () => "Voltei a perguntar sobre esse treino", { session_id: +d.wask });
+      if (d.wun) { const [sid, item] = d.wun.split(":").map(Number); return call("/api/watch/unlabel", { session_id: sid, item }, () => "Desfeito: as séries voltaram a ficar sem nome", { session_id: sid }); }
       // "Outro…": o seletor de exercício abre por cima. Escolheu: grava e volta para cá; fechou sem escolher: volta para cá também
-      const pick = (path, payload, okMsg) => {
+      const pick = (path, payload, okMsg, touched) => {
         let picked = false;
         closeModal.hook = null;
-        pickExercise("strength", (ex) => { picked = true; call(path, { ...payload, exercise_id: ex.id }, okMsg); });
+        pickExercise("strength", (ex) => { picked = true; call(path, { ...payload, exercise_id: ex.id }, okMsg, touched); });
         closeModal.hook = () => { if (!picked) setTimeout(draw, 0); };
       };
       if (d.wcatPick) return pick("/api/watch/category", { category: d.wcatPick }, catMsg);
-      if (d.wlabPick) return pick("/api/watch/label", expectOf(d.wlabPick), labMsg);
+      if (d.wlabPick) { const b = expectOf(d.wlabPick); return pick("/api/watch/label", b, labMsg, b); }
     };
   };
   draw();
@@ -3083,10 +3114,14 @@ function machineBrandsHtml(m) {
   const linked = new Set(bm.map((b) => b.brand));
   const plain = (m.brands || []).filter((b) => !linked.has(b) && ![...linked].some((l) => l.includes(b) || b.includes(l)));
   if (!bm.length && !plain.length) return m.is_new && m.confirmed === false ? `<p class="small muted">Sem fabricante confirmado para este aparelho.</p>` : "";
-  const seen = new Set();
-  const links = bm.filter((b) => { const k = b.brand + "|" + b.url; if (seen.has(k)) return false; seen.add(k); return true; }).slice(0, 10)
-    .map((b) => `<a href="${esc(b.url)}" target="_blank" rel="noopener">${esc(b.brand)}${b.model ? ` <span class="muted">(${esc(b.model)})</span>` : ""}</a>`);
-  return `<h3>Fabricantes</h3><p class="small mx-brands">${[...links, ...plain.map(esc)].join(" · ")}</p>
+  const seen = new Set(), byBrand = new Map();
+  bm.forEach((b) => { const k = b.brand + "|" + b.url; if (seen.has(k)) return; seen.add(k); if (!byBrand.has(b.brand)) byBrand.set(b.brand, []); byBrand.get(b.brand).push(b); });
+  const links = [], cut = [];  // até 2 páginas por marca e 14 no total; marca que não coube continua na lista, como texto
+  byBrand.forEach((list, brand) => {
+    if (links.length >= 14) return cut.push(brand);
+    list.slice(0, 2).forEach((b) => links.push(`<a href="${esc(b.url)}" target="_blank" rel="noopener">${esc(b.brand)}${b.model ? ` <span class="muted">(${esc(b.model)})</span>` : ""}</a>`));
+  });
+  return `<h3>Fabricantes</h3><p class="small mx-brands">${[...links, ...cut.map(esc), ...plain.map(esc)].join(" · ")}</p>
     ${bm.length ? `<p class="small muted">Páginas dos fabricantes encontradas em busca (nov/2026); modelos e endereços podem mudar.</p>` : ""}`;
 }
 async function showMachine(id) {
@@ -3148,7 +3183,7 @@ function stepsWhen(day, today) {
 }
 function stepsAskHtml(s, today, { note = true } = {}) {
   if (!s) return "";
-  today = today || localISO().slice(0, 10);
+  today = today || s.today || localISO().slice(0, 10);  // "ontem/anteontem" pela data do servidor (fuso de Brasília)
   const lab = Object.fromEntries((s.options || []).map((o) => [o.id, o.label]));
   const short = Object.fromEntries((s.options || []).map((o) => [o.id, o.short]));
   const q = (s.pending || []).map((p) => {
@@ -3158,8 +3193,8 @@ function stepsAskHtml(s, today, { note = true } = {}) {
       <div class="row gap wrap">${order.map((id, i) => `<button class="btn sm ${i ? "ghost" : ""}" data-stag="${p.date}:${id}">${esc(short[id] || lab[id])}</button>`).join("")}</div></div>`;
   }).join("");
   const ev = s.recent_event;
-  const walked = ev && ["festival", "passeio", "caminhada"].includes(ev.tag);
-  const noteHtml = note && ev && !q ? `<div class="rec small steps-note"><b>${stepsWhen(ev.date, today)}: ${esc(ev.label.toLowerCase())}</b> (${fmtN(ev.steps)} passos${ev.late_night ? ", e a noite foi curta" : ""}).
+  const walked = ev && ev.counted;  // a caminhada estimada ainda está no histórico (a pessoa pode ter apagado)
+  const noteHtml = note && ev && !q ? `<div class="rec small steps-note"><b>${stepsWhen(ev.date, today)}: ${esc(ev.label.toLowerCase())}</b> (${fmtN(ev.steps)} passos${ev.short_night ? ", e a noite foi curta" : ev.late_night ? ", e você foi dormir tarde" : ""}).
     ${walked ? "Já entrou na sua carga como caminhada leve." : "Não conta como treino, mas explica um cansaço a mais."} Se as pernas estiverem pesadas hoje, baixe a carga ou encurte o treino: um dia mais leve não atrapalha a semana.</div>` : "";
   return q + noteHtml;
 }
@@ -3177,7 +3212,7 @@ const fmtDur = (min) => (min >= 60 ? `${Math.floor(min / 60)} h${min % 60 ? ` ${
 function stepsChart(s) {
   const ser = s.series || [];
   if (ser.length < 3) return "";
-  const W = 340, H = 130, L = 34, Rm = 8, T = 10, B = 20;
+  const W = 340, H = 130, L = 46, Rm = 8, T = 10, B = 20;  // margem que cabe "12,5 mil"
   const hi = Math.max(...ser.map((p) => p.total), s.baseline || 0, 1000);
   const X = (i) => L + ((i + 0.5) / ser.length) * (W - L - Rm);
   const Y = (v) => T + (1 - v / (hi * 1.08)) * (H - T - B);
@@ -3538,6 +3573,7 @@ function route() {
 async function doRoute(ctl) {
   route.lastHash = location.hash; route.again = false;
   const [name, a, b] = (location.hash.slice(1) || "hoje").split("/");
+  closeModal.hook = null;                 // ...e quem abriu a janela não é avisado: a tela dele já não é a que está na frente
   if (!$("#modal").hidden) closeModal();  // trocar de tela fecha a janela aberta (não fica por cima da tela nova)
   if (name !== "treinar") fxLeave();
   $$(".tabbar a").forEach((el) => el.classList.toggle("active", el.dataset.tab === ({ plano: "planilhas", exercicios: "planilhas", aparelhos: "planilhas", evolucao: "analise", saude: "analise", esportes: "perfil", coach: "perfil", dev: "perfil", bemvindo: "hoje" }[name] || name)));

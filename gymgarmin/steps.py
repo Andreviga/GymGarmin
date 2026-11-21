@@ -158,6 +158,15 @@ def _late_night(rec: dict | None) -> bool:
     return bool(start) and "00:45" <= str(start)[:5] < "07:00"
 
 
+SHORT_NIGHT_H = 6.0
+
+
+def _short_night(rec: dict | None) -> bool:
+    """Dormir tarde não é dormir pouco: depois de festa é comum acordar tarde. Curta = menos de 6 h de sono medido."""
+    dur = ((rec or {}).get("sleep") or {}).get("duration_h")
+    return bool(dur) and 1 <= float(dur) < SHORT_NIGHT_H
+
+
 def hint(next_day: dict | None, d: date) -> str:
     """Palpite do que foi (só define qual opção aparece primeiro): noite longa ou sexta/sábado → evento."""
     return "festival" if _late_night(next_day) or d.weekday() in (4, 5) else "passeio"
@@ -194,10 +203,12 @@ def summary(days: dict[str, dict], sessions: list[dict], tags: dict, today: date
         age = (today - date.fromisoformat(r["date"])).days
         t = tags.get(r["date"]) or {}
         if 1 <= age <= 2 and t.get("tag") in ("festival", "passeio", "caminhada", "trabalho"):
+            nxt = days.get((date.fromisoformat(r["date"]) + timedelta(days=1)).isoformat())
             recent = {"date": r["date"], "tag": t["tag"], "label": TAGS[t["tag"]]["name"], "steps": r["total"], "days_ago": age,
-                      "late_night": _late_night(days.get((date.fromisoformat(r["date"]) + timedelta(days=1)).isoformat()))}
+                      "late_night": _late_night(nxt), "short_night": _short_night(nxt),
+                      "counted": bool(t.get("session_id"))}  # a caminhada estimada ainda existe (não foi apagada)?
     cut = (today - timedelta(days=56)).isoformat()
-    return {"has_data": bool(rows), "baseline": round(base) if base is not None else None,
+    return {"has_data": bool(rows), "today": today.isoformat(), "baseline": round(base) if base is not None else None,
             "threshold": round(threshold(base)) if base is not None else None,
             "avg7": {"total": avg(week, "total"), "workout": avg(week, "workout"), "daily": avg(week, "daily", True)},
             "avg_prev": {"daily": avg(prev, "daily", True), "total": avg(prev, "total")},
