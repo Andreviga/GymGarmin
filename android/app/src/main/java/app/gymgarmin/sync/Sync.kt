@@ -19,15 +19,28 @@ import java.util.Locale
 import java.util.concurrent.TimeUnit
 
 object Sync {
-    const val DEFAULT_SERVER = "https://gymgarmin.vercel.app"
+    const val DEFAULT_SERVER = "https://haxfit.vercel.app"
+    /** Endereços antigos do app (o projeto mudou de nome): quem tinha um deles salvo passa para o atual. */
+    private val OLD_SERVERS = listOf("gymgarmin.vercel.app")
 
     fun prefs(ctx: Context) = ctx.getSharedPreferences("gymgarmin", Context.MODE_PRIVATE)
+
+    /** Endereço do HAX salvo, já trocando o antigo pelo atual (e gravando a troca). */
+    fun server(ctx: Context): String {
+        val p = prefs(ctx)
+        val saved = (p.getString("server", DEFAULT_SERVER) ?: DEFAULT_SERVER).trim().trimEnd('/')
+        if (saved.isEmpty() || OLD_SERVERS.any { saved.contains(it, ignoreCase = true) }) {
+            p.edit().putString("server", DEFAULT_SERVER).apply()
+            return DEFAULT_SERVER
+        }
+        return saved
+    }
 
     /** Lê o Health Connect e envia. Retorna a mensagem para mostrar na tela. */
     suspend fun run(ctx: Context, days: Long? = null): String {
         val p = prefs(ctx)
         val token = p.getString("token", "")?.trim().orEmpty()
-        val server = (p.getString("server", DEFAULT_SERVER) ?: DEFAULT_SERVER).trim().trimEnd('/')
+        val server = server(ctx)
         if (token.isEmpty()) throw IllegalStateException("Cole o código pessoal (HAX → Perfil → Outros relógios).")
         val since = p.getLong("last_ok", 0L)
         // primeira vez (ou primeira vez desta versão do app): 30 dias; depois, desde o último envio com folga de 2 dias.

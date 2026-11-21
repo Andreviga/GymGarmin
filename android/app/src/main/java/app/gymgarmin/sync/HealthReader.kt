@@ -30,7 +30,7 @@ import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import kotlin.reflect.KClass
 
-/** Lê o Health Connect e monta o JSON que o GymGarmin recebe em /api/ingest. */
+/** Lê o Health Connect e monta o JSON que o HAX recebe em /api/ingest. */
 class HealthReader(context: Context) {
     private val client = HealthConnectClient.getOrCreate(context)
     private val zone: ZoneId = ZoneId.systemDefault()
@@ -98,7 +98,7 @@ class HealthReader(context: Context) {
             else -> "OTHER_WORKOUT_$t"
         }
 
-        const val APP_VERSION = "1.2"
+        const val APP_VERSION = "1.3"
     }
 
     suspend fun grantedAll(): Boolean =

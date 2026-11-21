@@ -11,7 +11,7 @@ from pathlib import Path
 
 from fastapi import Body, FastAPI, Header, HTTPException, Query, Request
 from starlette.concurrency import run_in_threadpool
-from fastapi.responses import FileResponse, JSONResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from datetime import date, timedelta
@@ -2602,6 +2602,12 @@ def restore(body: dict = Body(...)):
 
 
 # ------------------------------------------------------------- estático ----
+
+@app.get("/static/gymgarmin-sync.apk", include_in_schema=False)
+def old_apk():
+    """Link antigo do app Android (antes do nome HAX): leva ao arquivo novo."""
+    return RedirectResponse("/static/hax-sync.apk", status_code=301)
+
 
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
 

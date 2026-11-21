@@ -209,3 +209,10 @@ def test_short_warm_up_recorded_by_the_watch_does_not_become_the_logged_workout(
     assert c.post("/api/ingest", headers=h, json={"source": "android", "days": [], "workouts": [w2]}).json()["imported"][0]["merged"] is False
     m2 = {**main, "id": "main2", "start": "2026-11-15T18:20:00-03:00"}
     assert c.post("/api/ingest", headers=h, json={"source": "android", "days": [], "workouts": [m2]}).json()["imported"][0]["session_id"] == mine2["id"]
+
+
+def test_android_app_download_uses_the_hax_name_and_the_old_link_still_works(c):
+    old = c.get("/static/gymgarmin-sync.apk", follow_redirects=False)
+    assert old.status_code == 301 and old.headers["location"] == "/static/hax-sync.apk"
+    new = c.get("/static/hax-sync.apk")
+    assert new.status_code == 200 and new.content[:2] == b"PK" and len(new.content) > 100_000

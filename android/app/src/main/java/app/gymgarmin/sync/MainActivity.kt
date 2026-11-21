@@ -1,6 +1,8 @@
 package app.gymgarmin.sync
 
 import android.content.Intent
+import android.content.res.ColorStateList
+import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
 import android.text.InputType
@@ -9,6 +11,7 @@ import android.view.ViewGroup.LayoutParams.MATCH_PARENT
 import android.view.ViewGroup.LayoutParams.WRAP_CONTENT
 import android.widget.Button
 import android.widget.EditText
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
@@ -43,9 +46,18 @@ class MainActivity : ComponentActivity() {
             text = s; textSize = size; if (bold) setTypeface(typeface, android.graphics.Typeface.BOLD)
             setPadding(0, (8 * dp).toInt(), 0, (4 * dp).toInt())
         }
-        fun button(s: String, onClick: () -> Unit) = Button(this).apply { text = s; setOnClickListener { onClick() } }
+        fun button(s: String, onClick: () -> Unit) = Button(this).apply {
+            text = s; setOnClickListener { onClick() }
+            backgroundTintList = ColorStateList.valueOf(BRAND); setTextColor(Color.WHITE)  // azul do HAX
+        }
+        window.statusBarColor = BRAND
 
-        col.addView(text("HAX Sync", 24f, true))
+        // topo: logo do HAX + nome
+        val head = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+        head.addView(ImageView(this).apply { setImageResource(R.drawable.hax_logo); contentDescription = "HAX" },
+            LinearLayout.LayoutParams((48 * dp).toInt(), (48 * dp).toInt()).apply { marginEnd = (12 * dp).toInt() })
+        head.addView(text("HAX Sync", 24f, true))
+        col.addView(head)
         col.addView(text("Manda treinos, sono, FC de repouso e passos do Health Connect (Xiaomi, Samsung, Amazfit, Google…) para a sua conta do HAX."))
         if (intent?.action == "androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" || intent?.action == "android.intent.action.VIEW_PERMISSION_USAGE") {
             col.addView(text("Por que o app pede essas permissões: ele só LÊ seus treinos e dados de saúde e envia para a sua própria conta do HAX, para montar seus treinos e acompanhar sua recuperação. Nada é compartilhado com outras pessoas.", 15f))
@@ -59,7 +71,7 @@ class MainActivity : ComponentActivity() {
         col.addView(token)
         col.addView(text("Endereço do app", 14f, true))
         server = EditText(this).apply {
-            setText(p.getString("server", Sync.DEFAULT_SERVER)); inputType = InputType.TYPE_TEXT_VARIATION_URI
+            setText(Sync.server(this@MainActivity)); inputType = InputType.TYPE_TEXT_VARIATION_URI
         }
         col.addView(server)
         col.addView(button("1. Dar permissões do Health Connect") { askPermissions() })
@@ -68,7 +80,8 @@ class MainActivity : ComponentActivity() {
         col.addView(status)
         p.getString("last_err", null)?.let { col.addView(text("Último erro automático: $it", 13f)) }
         col.addView(text("Depois do primeiro envio, o app manda sozinho a cada ~6 horas (com internet).", 13f))
-        setContentView(ScrollView(this).apply { addView(col, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT)) })
+        // Android 15 desenha atrás da barra de status: o conteúdo começa abaixo dela
+        setContentView(ScrollView(this).apply { fitsSystemWindows = true; addView(col, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT)) })
         col.gravity = Gravity.TOP
     }
 
@@ -120,4 +133,8 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun say(s: String) { status.text = s }
+
+    companion object {
+        val BRAND = Color.parseColor("#2448D6")
+    }
 }
