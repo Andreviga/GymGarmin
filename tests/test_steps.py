@@ -210,3 +210,19 @@ def test_fill_steps_of_runs_imported_before(client):
     it = db.get_session(s["id"])["items"][0]
     assert it["steps"] == 6600 and it["cadence"] == 165
     assert app_mod._fill_activity_steps({"9001": {"steps": 7000}}) == 0  # já tinha: não mexe
+
+
+def test_generic_activity_does_not_stand_in_for_a_planned_run(monkeypatch):
+    """Jogo de futebol no dia da corrida planejada: entra na carga, mas a corrida não vira 'feita' por troca de modalidade."""
+    monkeypatch.setattr(db, "save_entry", lambda e: e)
+    day = "2026-11-14"
+    run = {"id": 7, "date": day, "kind": "resistencia", "sport": "corrida", "status": "planejado", "day_name": "Corrida leve",
+           "items": [{"exercise_id": "corrida_rua", "sport": "corrida", "endurance": {"dur_s": 2400}}]}
+    game = {"id": 60, "date": f"{day}T20:00", "source": "garmin", "garmin_activity_id": 1,
+            "items": [{"exercise_id": "atividade_coletivo", "duration_min": 70, "zone": 4, "avg_hr": 152}]}
+    bike = {"id": 61, "date": f"{day}T07:00", "source": "garmin", "garmin_activity_id": 2,
+            "items": [{"exercise_id": "ciclismo_estrada", "sport": "ciclismo", "duration_min": 60}]}
+    assert schedule.sync_status([dict(run)], [game], TODAY)[0]["status"] == "perdido"
+    assert schedule.sync_status([dict(run)], [bike], TODAY)[0]["status"] == "feito"  # outra modalidade de resistência continua valendo
+    cardio = {"id": 8, "date": day, "kind": "cardio", "status": "planejado", "day_name": "Cardio", "items": [{"exercise_id": "cardio_eliptico", "duration_min": 20}]}
+    assert schedule.sync_status([dict(cardio)], [game], TODAY)[0]["status"] == "feito"  # cardio livre: o jogo conta

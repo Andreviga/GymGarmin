@@ -382,10 +382,12 @@ def sync_status(entries: list[dict], sessions: list[dict], today: date) -> list[
                 if it.get("light"):
                     continue  # yoga, pilates, alongamento: registro leve, não é o cardio nem a corrida do dia
                 if sp_ or (catalog.get(it.get("exercise_id")) or {}).get("kind") == "cardio":
-                    end_min[sp_ or "cardio"] += float(it.get("duration_min") or 0)
+                    generic = str(it.get("exercise_id") or "").startswith("atividade_")  # futebol, tênis, dança…
+                    end_min[sp_ or ("atividade" if generic else "cardio")] += float(it.get("duration_min") or 0)
             if substitute:
-                # trocou de modalidade mas treinou de verdade (caminhada não substitui corrida/bike/natação)
-                other = sum(v for k, v in end_min.items() if k not in ("caminhada", e.get("sport")))
+                # trocou de modalidade mas treinou de verdade (caminhada não substitui corrida/bike/natação;
+                # um jogo de futebol ou de tênis também não é o treino de corrida/remo que estava planejado)
+                other = sum(v for k, v in end_min.items() if k not in ("caminhada", "atividade", e.get("sport")))
                 ok = kind == "resistencia" and other >= max(30, 0.75 * planned_min)
             else:
                 ok = (kind == "forca" and _strength_match(sx, e)) \

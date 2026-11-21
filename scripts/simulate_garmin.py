@@ -259,7 +259,7 @@ def add_activity(w: World, rng, start: datetime, typ: str, minutes: float, *, di
     if delay_h is None:
         delay_h = rng.uniform(0.1, 3)
     end = start + timedelta(minutes=minutes)
-    imp = typ in load_types() or typ == "strength_training"
+    imp = typ in load_types() or typ == "strength_training" or garmin_sync.importable_type(typ)  # yoga, tênis… entram como atividade genérica
     w.acts.append({"id": new_id(w), "start": start, "visible": end + timedelta(hours=delay_h), "type": typ,
                    "summary": summary, "sets": sets, "importable": imp, "entry_id": entry, "kind": kind,
                    "name": name or typ})
