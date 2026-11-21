@@ -94,7 +94,7 @@ class AuthMiddleware:
                         return await resp(scope, receive, send)
                     atok = db.set_current_user(aid)
                     auth.set_acting(acc["user_id"])
-                    if scope["path"].startswith(("/api/health", "/api/checkin")) and \
+                    if scope["path"].startswith(("/api/health", "/api/checkin", "/api/steps")) and \
                             db.kv_get(f"coach_share_health:{acc['user_id']}") == "0":
                         resp = JSONResponse({"detail": "Este atleta não compartilha saúde e sono com o coach."}, status_code=403)
                         return await resp(scope, receive, send)
@@ -364,6 +364,11 @@ def _ingest_sync(body) -> dict:
     except ValueError as e:
         raise HTTPException(400, str(e)) from e
     today = clock.today()
+    if r.get("imported"):  # chegou treino de verdade: confere os dias de muitos passos que a pessoa já explicou
+        try:
+            _reconcile_step_events(today)
+        except Exception:  # noqa: BLE001 - opcional
+            pass
     if today.isoformat() in r["days"]:  # sono da noite chegou: prontidão do dia sem Garmin
         try:
             known = json.loads(db.kv_get(f"health:{today.isoformat()}") or "{}")
@@ -723,6 +728,8 @@ def exercises(q: str = "", muscle: str | None = None, equipment: str | None = No
     lims = _profile().get("limitations") or []
     ov = db.garmin_overrides()
     found = catalog.search(q, muscle, equipment, kind, level, limit=1000 if train and muscle and not q else limit * 2)
+    if kind == "cardio" and not q.strip():  # lista de aparelhos de cardio: futebol, yoga etc. só aparecem quando a pessoa busca pelo nome
+        found = [e for e in found if not e.get("activity")]
     if train and muscle and not q:  # "quero treinar este músculo": os exercícios certos primeiro
         mkey = catalog.MUSCLE_SEARCH_PT.get(catalog.strip_accents(muscle), muscle)
         found = my_gym.rank_for_muscle(found, mkey)[:limit * 2]
@@ -1265,6 +1272,18 @@ def del_session(session_id: int):
     s = db.get_session(session_id)
     if s:
         schedule.reopen_for_session(s)  # o treino que esta sessão tinha fechado volta para a agenda
+        try:  # veio do relógio/celular: fica marcado como apagado, senão a próxima sincronização traria de volta
+            garmin_sync.forget_activity(s.get("garmin_activity_id"))
+            ingest.forget_workout(s.get("ext_id"))
+        except Exception:  # noqa: BLE001
+            pass
+        if steps.is_event(s):  # caminhada estimada pelos passos: a marca do dia fica (não pergunta de novo), sem a sessão
+            tags = steps.load_tags(db.kv_get(STEP_TAGS_KEY))
+            t = tags.get(str(s.get("date"))[:10])
+            if t and t.get("session_id") == session_id:
+                t.pop("session_id", None)
+                t.pop("minutes", None)
+                db.kv_set(STEP_TAGS_KEY, json.dumps(tags))
     db.delete_session(session_id)
     return {"ok": True}
 
@@ -1539,6 +1558,8 @@ def _run_sync(trigger: str) -> dict:
         raise HTTPException(501, str(e)) from e
     try:
         _fill_activity_steps(r.pop("activity_steps", None) or {})
+        if r.get("imported"):
+            _reconcile_step_events()
     except Exception:  # noqa: BLE001 - opcional
         pass
     if garmin_sync.current() is not None:  # mesmo se a importação parou num 429, a prontidão é outra chamada
@@ -1813,10 +1834,74 @@ def _health_days(today: date, days: int = 56) -> dict[str, dict]:
     return out
 
 
+def _steps_can_ask() -> bool:
+    """Só pergunta "o que foi?" quando os treinos do relógio já chegaram: com a importação pela metade (primeira
+    sincronização, fila pendente, última tentativa com erro) a corrida de ontem ainda não está aqui e pareceria dia a dia."""
+    try:
+        st = garmin_sync.sync_state()
+    except Exception:  # noqa: BLE001
+        return True
+    if not st.get("last_run"):
+        return True  # sem Garmin (Apple / Health Connect mandam treino e passos juntos)
+    return bool(st.get("last_ok")) and not st.get("pending") and bool(st.get("backfill_done"))
+
+
 def _steps_view(today: date) -> dict:
     since = (today - timedelta(days=STEP_WINDOW)).isoformat()
     return steps.summary(_health_days(today, STEP_WINDOW), db.list_sessions(since=since, limit=2000),
-                         steps.load_tags(db.kv_get(STEP_TAGS_KEY)), today)
+                         steps.load_tags(db.kv_get(STEP_TAGS_KEY)), today, ask=_steps_can_ask())
+
+
+def _drop_step_event(s: dict) -> None:
+    """Apaga a caminhada estimada de um dia e devolve à agenda o treino que ela tinha fechado."""
+    try:
+        schedule.reopen_for_session(s)
+    except Exception:  # noqa: BLE001 - a agenda é um extra aqui
+        pass
+    db.delete_session(s["id"])
+
+
+def _reconcile_step_events(today: date | None = None) -> int:
+    """Chegou do relógio um treino de verdade num dia que a pessoa já tinha explicado (festival, caminhada…):
+    a caminhada estimada é recalculada com o que sobra do dia a dia, ou sai se o treino real já explica os passos."""
+    today = today or clock.today()
+    tags = steps.load_tags(db.kv_get(STEP_TAGS_KEY))
+    if not any(t.get("session_id") for t in tags.values()):
+        return 0
+    days = _health_days(today, STEP_WINDOW)
+    sessions = db.list_sessions(since=(today - timedelta(days=STEP_WINDOW)).isoformat(), limit=2000)
+    changed = 0
+    for day, t in list(tags.items()):
+        ev = next((s for s in sessions if steps.is_event(s) and str(s.get("date"))[:10] == day), None)
+        if not t.get("session_id") or not ev or day not in days:
+            continue
+        others = [s for s in sessions if s is not ev]
+        rows = steps.split(days, others)
+        row = next((r for r in rows if r["date"] == day), None)
+        if not row:
+            continue
+        base = steps.baseline(rows, before=day, tags=tags)
+        if base is None:
+            base = steps.baseline(rows, tags=tags) or 0
+        extra = max(0, row["daily"] - base)
+        had = float((ev.get("items") or [{}])[0].get("steps") or 0)
+        if abs(extra - had) <= max(1000, 0.15 * had):
+            continue  # nada de novo nesse dia
+        new = steps.event_session(day, extra, t.get("tag"))
+        _drop_step_event(ev)
+        sessions = others
+        if new:
+            saved = db.save_session(new)
+            sessions = others + [saved]
+            t.update(session_id=saved["id"], minutes=new["duration_min"], extra=round(extra), steps=row["daily"])
+        else:  # o treino que chegou já explica o dia: a marca fica (não pergunta de novo), sem caminhada estimada
+            t.pop("session_id", None)
+            t.pop("minutes", None)
+            t.update(extra=round(extra), steps=row["daily"], explained=True)
+        changed += 1
+    if changed:
+        db.kv_set(STEP_TAGS_KEY, json.dumps(tags))
+    return changed
 
 
 @app.get("/api/steps")
@@ -1835,14 +1920,21 @@ def steps_tag(body: dict = Body(...)):
         raise HTTPException(400, "Data inválida") from e
     if tag is not None and tag not in steps.TAGS:
         raise HTTPException(400, "Opção desconhecida")
-    if d > today or (today - d).days > STEP_WINDOW - steps.BASE_DAYS:
+    tags = steps.load_tags(db.kv_get(STEP_TAGS_KEY))
+    if d > today or (tag is not None and (today - d).days > STEP_WINDOW - steps.BASE_DAYS):
         raise HTTPException(400, "Só dá para marcar dias das últimas semanas")
     days = _health_days(today, STEP_WINDOW)
     sessions = db.list_sessions(since=(today - timedelta(days=STEP_WINDOW)).isoformat(), limit=2000)
-    tags = steps.load_tags(db.kv_get(STEP_TAGS_KEY))
-    for s in [s for s in sessions if steps.is_event(s) and str(s.get("date"))[:10] == day]:
-        db.delete_session(s["id"])  # a caminhada estimada da resposta anterior sai; a nova (se houver) entra abaixo
-        sessions.remove(s)
+    old = [s for s in sessions if steps.is_event(s) and str(s.get("date"))[:10] == day]
+    prev_id = (tags.get(day) or {}).get("session_id")
+    if prev_id and not any(s.get("id") == prev_id for s in old):  # marca antiga, fora da janela: busca pela ligação guardada
+        s_old = db.get_session(prev_id)
+        if s_old and steps.is_event(s_old):
+            old.append(s_old)
+    for s in old:
+        _drop_step_event(s)  # a caminhada estimada da resposta anterior sai; a nova (se houver) entra abaixo
+        if s in sessions:
+            sessions.remove(s)
     tags.pop(day, None)
     created = None
     if tag:

@@ -377,10 +377,13 @@ def sync_status(entries: list[dict], sessions: list[dict], today: date) -> list[
             its = sx.get("items", [])
             strength_done = any(it.get("sets") or it.get("strength_min") for it in its)
             end_min = defaultdict(float)
+            # yoga/alongamento não é o cardio nem a corrida do dia — a não ser que o planejado seja a própria yoga
+            planned_light = bool(e.get("items")) and all(load.is_light(i) for i in e.get("items") or []
+                                                         if (i.get("phase") or "principal") == "principal")
             for it in its:
                 sp_ = load.sport_of(it)
-                if it.get("light"):
-                    continue  # yoga, pilates, alongamento: registro leve, não é o cardio nem a corrida do dia
+                if load.is_light(it) and not planned_light:
+                    continue
                 if sp_ or (catalog.get(it.get("exercise_id")) or {}).get("kind") == "cardio":
                     generic = str(it.get("exercise_id") or "").startswith("atividade_")  # futebol, tênis, dança…
                     end_min[sp_ or ("atividade" if generic else "cardio")] += float(it.get("duration_min") or 0)

@@ -32,6 +32,9 @@ SPIKE_EXTRA = 5000     # …e pelo menos 5 mil passos acima dele…
 SPIKE_MIN = 9000       # …e nunca menos que 9 mil: só então vale perguntar
 ASK_DAYS = 10          # só pergunta sobre dias recentes (depois disso a pessoa não lembra)
 MIN_EVENT_STEPS = 1500  # abaixo disso não vale criar uma caminhada estimada
+MIN_VALID_STEPS = 500   # dia fechado com menos que isso = relógio fora do pulso: não entra no costume nem nas médias
+NORMAL_MARGIN = 1.25    # depois de um "dia normal"/"trabalho", só pergunta de novo acima desse dia com 25% de folga
+NORMAL_DAYS = 60
 MAX_EVENT_MIN = 360
 SOURCE = "passos"      # sessões criadas a partir dos passos (caminhada estimada do evento)
 
@@ -113,7 +116,7 @@ def split(days: dict[str, dict], sessions: list[dict]) -> list[dict]:
         workout = min(total, raw)
         out.append({"date": d, "total": round(total), "workout": round(workout), "daily": round(total - workout),
                     "parts": {k: round(v) for k, v in parts.items()}, "event": events.get(d),
-                    "estimated": d in guessed, "goal": days[d].get("step_goal")})
+                    "estimated": d in guessed, "goal": days[d].get("step_goal"), "valid": total >= MIN_VALID_STEPS})
     return out
 
 
@@ -127,9 +130,18 @@ def baseline(rows: list[dict], before: str | None = None, tags: dict | None = No
     Dias de evento confirmado (festival, passeio, caminhada) ficam fora; "dia normal" e "trabalho" ficam dentro:
     se a pessoa diz que aquilo é rotina, a régua sobe e o app pergunta menos."""
     tags = tags or {}
-    vals = [r["daily"] for r in rows if (before is None or r["date"] < before) and not r.get("event") and not _is_event_tag(tags, r["date"])]
+    vals = [r["daily"] for r in rows if (before is None or r["date"] < before) and r.get("valid", True)
+            and not r.get("event") and not _is_event_tag(tags, r["date"])]
     vals = vals[-BASE_DAYS:]
     return float(statistics.median(vals)) if len(vals) >= MIN_BASE_DAYS else None
+
+
+def normal_ceiling(rows: list[dict], tags: dict, day: str) -> float:
+    """O maior dia a dia que a pessoa já disse ser normal (ou trabalho) nos 60 dias antes de `day`: abaixo dele
+    (com folga) o app não pergunta de novo — é assim que a resposta "dia normal" passa a valer."""
+    lo = (date.fromisoformat(day) - timedelta(days=NORMAL_DAYS)).isoformat()
+    vals = [r["daily"] for r in rows if lo <= r["date"] < day and (tags.get(r["date"]) or {}).get("tag") in ("nada", "trabalho")]
+    return max(vals, default=0.0)
 
 
 def threshold(base: float) -> float:
@@ -151,26 +163,30 @@ def hint(next_day: dict | None, d: date) -> str:
     return "festival" if _late_night(next_day) or d.weekday() in (4, 5) else "passeio"
 
 
-def summary(days: dict[str, dict], sessions: list[dict], tags: dict, today: date) -> dict:
-    """Tudo o que as telas precisam: série de 28 dias, médias, costume e os dias que pedem uma pergunta."""
+def summary(days: dict[str, dict], sessions: list[dict], tags: dict, today: date, ask: bool = True) -> dict:
+    """Tudo o que as telas precisam: série de 28 dias, médias, costume e os dias que pedem uma pergunta.
+
+    `ask=False` (ex.: a importação de treinos do relógio ainda não terminou) segura as perguntas: uma corrida que
+    ainda não chegou pareceria "dia a dia" e viraria pergunta à toa."""
     rows = split(days, sessions)
-    base = baseline(rows, tags=tags)
+    closed = [r for r in rows if r["date"] < today.isoformat()]  # hoje ainda está em andamento: fora do costume e das médias
+    base = baseline(closed, tags=tags)
     pending = []
-    for r in rows:
+    for r in closed if ask else []:
         d = date.fromisoformat(r["date"])
-        if r["date"] in tags or r.get("event") or (today - d).days > ASK_DAYS or d >= today:
-            continue  # hoje ainda está em andamento: só pergunta sobre dias fechados
+        if r["date"] in tags or r.get("event") or (today - d).days > ASK_DAYS or not r.get("valid", True):
+            continue
         b = baseline(rows, before=r["date"], tags=tags)
         if b is None:
-            b = base
-        if is_spike(r["daily"], b):
+            continue  # poucos dias válidos antes desse: ainda não há "costume" para comparar
+        if is_spike(r["daily"], b) and r["daily"] > NORMAL_MARGIN * normal_ceiling(rows, tags, r["date"]):
             nxt = days.get((d + timedelta(days=1)).isoformat())
             pending.append({**r, "baseline": round(b), "extra": round(r["daily"] - b), "hint": hint(nxt, d)})
-    week = [r for r in rows if 0 <= (today - date.fromisoformat(r["date"])).days < 7]
-    prev = [r for r in rows if 7 <= (today - date.fromisoformat(r["date"])).days < 35]
+    week = [r for r in closed if 1 <= (today - date.fromisoformat(r["date"])).days <= 7]
+    prev = [r for r in closed if 8 <= (today - date.fromisoformat(r["date"])).days <= 35]
 
     def avg(rs, k, skip_events=False):
-        vals = [r[k] for r in rs if not (skip_events and (r.get("event") or _is_event_tag(tags, r["date"])))]
+        vals = [r[k] for r in rs if r.get("valid", True) and not (skip_events and (r.get("event") or _is_event_tag(tags, r["date"])))]
         return round(statistics.mean(vals)) if vals else None
 
     recent = None  # evento ontem ou anteontem: contexto para o treino de hoje

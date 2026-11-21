@@ -257,7 +257,8 @@ def cardio_summary(sessions: list[dict], start: datetime, end: datetime, profile
             mins = float(it.get("duration_min") or 0)
             if mins <= 0:
                 continue
-            zone = int(it.get("zone") or 2)
+            easy = bool(it.get("light")) or it.get("exercise_id") == "atividade_mobilidade"  # yoga/alongamento: sempre leve
+            zone = 1 if easy else int(it.get("zone") or 2)
             intensity = HR_ZONES.get(zone, HR_ZONES[2])["intensity"]
             by_zone[zone] += mins
             by_machine[ex["name"]] += mins

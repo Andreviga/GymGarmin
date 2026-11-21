@@ -324,7 +324,7 @@ def _load() -> tuple[list[dict], dict[str, dict]]:
             "category": "cardio",
             "category_pt": "Cardio",
             "equipment": "cardio machine",
-            "equipment_pt": EQUIPMENT_PT["cardio machine"],
+            "equipment_pt": "Atividade" if c.get("activity") else EQUIPMENT_PT["cardio machine"],
             "level": "beginner",
             "level_pt": LEVEL_PT["beginner"],
             "force": None, "force_pt": None, "mechanic": None, "mechanic_pt": None,

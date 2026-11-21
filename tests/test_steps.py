@@ -226,3 +226,158 @@ def test_generic_activity_does_not_stand_in_for_a_planned_run(monkeypatch):
     assert schedule.sync_status([dict(run)], [bike], TODAY)[0]["status"] == "feito"  # outra modalidade de resistência continua valendo
     cardio = {"id": 8, "date": day, "kind": "cardio", "status": "planejado", "day_name": "Cardio", "items": [{"exercise_id": "cardio_eliptico", "duration_min": 20}]}
     assert schedule.sync_status([dict(cardio)], [game], TODAY)[0]["status"] == "feito"  # cardio livre: o jogo conta
+
+
+# ------------------------------------------------------------------ achados da revisão ---
+def test_watch_off_the_wrist_days_do_not_become_the_baseline():
+    vals = {ago: 11500 for ago in range(17, 40)}
+    vals.update({ago: 0 for ago in range(3, 17)})   # 14 dias com o relógio em casa
+    vals.update({2: 12400, 1: 11800, 0: 300})
+    s = steps.summary(_days(vals), [], {}, TODAY)
+    assert s["pending"] == [] and s["baseline"] == 11500           # 0 passos não é "costume"
+    assert s["avg7"]["daily"] == round((12400 + 11800) / 2)        # médias só com dias válidos e fechados
+
+
+def test_today_in_progress_does_not_pull_the_week_average_down():
+    vals = {ago: 8000 for ago in range(1, 40)}
+    vals[0] = 350  # 8h da manhã
+    s = steps.summary(_days(vals), [], {}, TODAY)
+    assert s["avg7"]["daily"] == 8000 and s["avg_prev"]["daily"] == 8000 and s["baseline"] == 8000
+    assert s["series"][-1]["total"] == 350  # hoje continua no gráfico
+
+
+def test_normal_day_answer_stops_the_same_question_next_week():
+    vals, sessions = _routine({2: 12300, 9: 12000})   # todo sábado ~12 mil (feira, parque)
+    d = lambda ago: (TODAY - timedelta(days=ago)).isoformat()  # noqa: E731
+    assert {p["date"] for p in steps.summary(_days(vals), sessions, {}, TODAY)["pending"]} == {d(2), d(9)}
+    tags = {d(9): {"tag": "nada"}}
+    assert steps.summary(_days(vals), sessions, tags, TODAY)["pending"] == []       # 12,3 mil não passa de 12 mil × 1,25
+    vals[2] = 19000
+    assert [p["date"] for p in steps.summary(_days(vals), sessions, tags, TODAY)["pending"]] == [d(2)]  # bem acima do "normal": pergunta
+    assert steps.summary(_days(vals), sessions, tags, TODAY, ask=False)["pending"] == []
+
+
+def test_no_question_while_watch_import_is_incomplete(client):
+    _seed({2: 19400})
+    assert client.get("/api/steps").json()["pending"]
+    from gymgarmin import garmin_sync as gs
+    db.kv_set(gs.SYNC_KEY, json.dumps({"last_run": "2026-11-16T08:00:00", "last_ok": True, "last_ok_at": "2026-11-16T08:00:00", "pending": 12}))
+    assert client.get("/api/steps").json()["pending"] == []     # fila de atividades por importar
+    db.kv_set(gs.SYNC_KEY, json.dumps({"last_run": "2026-11-16T08:00:00", "last_ok": True, "last_ok_at": "2026-11-16T08:00:00", "pending": 0, "backfill_done": True}))
+    assert client.get("/api/steps").json()["pending"]
+
+
+def test_real_walk_arriving_later_replaces_the_estimate(client):
+    from gymgarmin import app as app_mod
+
+    _seed({2: 19400})
+    day = (TODAY - timedelta(days=2)).isoformat()
+    r = client.post("/api/steps/tag", json={"date": day, "tag": "caminhada"}).json()
+    est = r["session_id"]
+    assert est and app_mod._reconcile_step_events() == 0  # nada chegou ainda: fica como está
+    # o relógio sincroniza depois a caminhada de verdade (150 min, 14.800 passos)
+    db.save_session({"date": f"{day}T09:00", "source": "garmin", "garmin_activity_id": 777,
+                     "items": [{"exercise_id": "caminhada_rua", "sport": "caminhada", "duration_min": 150, "steps": 14800, "zone": 2}]})
+    assert app_mod._reconcile_step_events() == 1
+    assert db.get_session(est) is None and not any(s.get("source") == "passos" for s in db.list_sessions(limit=500))
+    s = client.get("/api/steps").json()
+    row = next(x for x in s["series"] if x["date"] == day)
+    assert row["parts"] == {"caminhada": 14800} and s["pending"] == [] and s["tags"][day].get("explained") and "minutes" not in s["tags"][day]
+
+
+def test_undo_reopens_the_cardio_and_deleting_from_history_unlinks_the_tag(client):
+    _seed({2: 19400})
+    day = (TODAY - timedelta(days=2)).isoformat()
+    e = db.save_entry({"date": day, "kind": "cardio", "status": "perdido", "day_name": "Cardio", "plan_id": None,
+                       "items": [{"exercise_id": "cardio_eliptico", "duration_min": 20}]})
+    r = client.post("/api/steps/tag", json={"date": day, "tag": "caminhada"}).json()
+    client.get(f"/api/schedule?date={day}")
+    assert db.get_entry(e["id"])["status"] == "feito"            # a caminhada que a pessoa afirmou ter feito fechou o cardio
+    client.post("/api/steps/tag", json={"date": day, "tag": None})
+    assert db.get_entry(e["id"])["status"] == "perdido"          # desfez: o cardio volta
+    # apagar a estimada pela lixeira do histórico: a marca fica, sem dizer que contou na carga
+    r = client.post("/api/steps/tag", json={"date": day, "tag": "festival"}).json()
+    assert client.delete(f"/api/sessions/{r['session_id']}").status_code == 200
+    t = client.get("/api/steps").json()["tags"][day]
+    assert t["tag"] == "festival" and "session_id" not in t and "minutes" not in t
+
+
+def test_undo_works_for_every_listed_tag_even_old_ones(client):
+    _seed({2: 19400})
+    old = (TODAY - timedelta(days=50)).isoformat()
+    sid = db.save_session(steps.event_session(old, 9000, "festival"))["id"]
+    db.kv_set("day_tags", json.dumps({old: {"tag": "festival", "steps": 14000, "extra": 9000, "session_id": sid, "minutes": 106}}))
+    assert old in client.get("/api/steps").json()["tags"]
+    assert client.post("/api/steps/tag", json={"date": old, "tag": "passeio"}).status_code == 400   # marcar de novo tão longe: não
+    r = client.post("/api/steps/tag", json={"date": old, "tag": None})
+    assert r.status_code == 200 and old not in r.json()["tags"] and db.get_session(sid) is None
+
+
+# ------------------------------------------------------------------ achados da revisão: outras atividades ---
+def test_long_idle_activity_is_not_worth_a_hard_workout():
+    hr = {"hrmax": 190}
+    def tss(eid, mins, **kw):
+        return load.session_stress({"items": [{"exercise_id": eid, "duration_min": mins, **kw}]}, hr)["tss"]
+    sail = tss("atividade_aquatica", 360, avg_hr=84, zone=1)
+    golf = tss("atividade_outra", 270, avg_hr=96, zone=1)
+    other = tss("atividade_outra", 600)                      # 10 h sem FC
+    game = tss("atividade_coletivo", 70, avg_hr=152, zone=4)  # pelada de verdade
+    run = tss("corrida_rua", 45, sport="corrida", avg_hr=150)
+    assert sail <= 100 and golf <= 75 and other <= 100 and game > 60 and run > 40
+    assert sail < game + 40 and golf < game             # um dia de vela não pesa mais que o jogo
+    yoga_watch = tss("atividade_mobilidade", 30, light=True, zone=1)
+    yoga_hand = tss("atividade_mobilidade", 30)          # anotada à mão no app: mesma carga leve
+    assert yoga_watch == yoga_hand == 7.5
+
+
+def test_planned_yoga_closes_with_yoga_but_yoga_never_closes_cardio(monkeypatch):
+    monkeypatch.setattr(db, "save_entry", lambda e: e)
+    day = "2026-11-14"
+    yoga_plan = {"id": 7, "date": day, "kind": "cardio", "status": "planejado", "day_name": "Yoga",
+                 "items": [{"exercise_id": "atividade_mobilidade", "duration_min": 60}]}
+    cardio = {"id": 8, "date": day, "kind": "cardio", "status": "planejado", "day_name": "Cardio zona 2",
+              "items": [{"exercise_id": "cardio_eliptico", "duration_min": 55}]}
+    by_hand = {"id": 70, "date": f"{day}T07:00", "client_id": "x", "items": [{"exercise_id": "atividade_mobilidade", "duration_min": 30}]}
+    by_watch = {"id": 71, "date": f"{day}T07:00", "source": "garmin", "garmin_activity_id": 3,
+                "items": [{"exercise_id": "atividade_mobilidade", "duration_min": 60, "light": True, "zone": 1}]}
+    assert schedule.sync_status([dict(yoga_plan)], [by_watch], TODAY)[0]["status"] == "feito"
+    assert schedule.sync_status([dict(cardio)], [by_hand], TODAY)[0]["status"] == "perdido"   # yoga anotada à mão não é o cardio
+    assert schedule.sync_status([dict(cardio)], [by_watch], TODAY)[0]["status"] == "perdido"
+    from gymgarmin import analysis
+    c = analysis.cardio_summary([by_hand], datetime(2026, 11, 9), datetime(2026, 11, 16), {"weight_kg": 75})
+    assert c["moderate"] == 0 and c["light"] == 30    # não entra nos minutos da OMS
+
+
+def test_activity_types_classified_by_whole_words():
+    k = garmin_sync.activity_kind
+    from gymgarmin import ingest, sports
+    for name in ("Esportes Aquáticos", "Esportes na Neve", "Esporte coletivo", "HKWorkoutActivityTypePaddleSports"):
+        assert ingest.garmin_type(name), name                 # "esport" não é e-sports
+    assert k("e_sport") is None and k("esports") is None and k("snowmobiling_ws") is None and k("sky_diving") is None
+    assert k("overland") is None and k("atv") is None and k("rc_drone") is None and k("nap") is None
+    assert k("waterskiing") == "atividade_aquatica" and k("artes_marciais") == "atividade_luta" and k("karatê") == "atividade_luta"
+    assert k("desaquecimento") == "atividade_mobilidade" and k("taichi") == "atividade_mobilidade"
+    for t in ("e_bike_mountain", "enduro_mtb", "downhill_biking", "bmx"):
+        assert sports.GARMIN_TYPE_TO_SPORT[t] == "ciclismo"
+    assert garmin_sync.endurance_item({"activityType": {"typeKey": "golf"}, "duration": 16200}, 190)["zone"] == 1   # sem FC: zona 1
+
+
+def test_deleted_watch_activity_does_not_come_back(client):
+    from gymgarmin import ingest
+    s = db.save_session({"date": "2026-11-14T09:00", "source": "garmin", "garmin_activity_id": 4242,
+                         "items": [{"exercise_id": "atividade_outra", "duration_min": 40, "zone": 1}]})
+    assert client.delete(f"/api/sessions/{s['id']}").status_code == 200
+    assert garmin_sync._skipped()["4242"] == {"final": True, "why": "apagada"}
+    w = {"id": "w9", "type": "Ioga", "start": "2026-11-15T07:00:00-03:00", "duration_min": "30"}
+    got, _ = ingest.save_workouts([w], "apple", 190)
+    assert len(got) == 1
+    client.delete(f"/api/sessions/{got[0]['session_id']}")
+    again, _ = ingest.save_workouts([w], "apple", 190)
+    assert again == []                                         # o celular reenvia tudo: o apagado não volta
+
+
+def test_cardio_machine_list_hides_generic_activities_unless_searched(client):
+    ids = [e["id"] for e in client.get("/api/exercises?kind=cardio&limit=200").json()]
+    assert "cardio_eliptico" in ids and not any(i.startswith("atividade_") for i in ids)
+    found = client.get("/api/exercises?kind=cardio&q=yoga").json()
+    assert found and found[0]["id"] == "atividade_mobilidade" and found[0]["equipment_pt"] == "Atividade"

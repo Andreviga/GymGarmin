@@ -43,8 +43,36 @@ def _hr_if(avg_hr: float, anchors: dict) -> float | None:
     return avg_hr / lthr
 
 
+LIGHT_ACTIVITY = "atividade_mobilidade"   # yoga, pilates, alongamento: sempre leve, venha do relógio, do celular ou anotada à mão
+LIGHT_TSS_H = 15
+GENERIC_CAP_H = {1: 16, 2: 30}            # atividade genérica (futebol, vela, golfe…) na zona 1–2: teto de carga por hora
+GENERIC_Z1_MAX = 100                      # um dia inteiro de atividade parada (vela, golfe, esqui de passeio) não passa disto
+
+
+def is_light(item: dict) -> bool:
+    return bool(item.get("light")) or item.get("exercise_id") == LIGHT_ACTIVITY
+
+
+def is_generic(item: dict) -> bool:
+    return str(item.get("exercise_id") or "").startswith("atividade_")
+
+
 def endurance_stress(item: dict, anchors: dict) -> dict:
     """Estresse de um item de cardio/modalidade já feito (ou planejado)."""
+    if is_generic(item) and not item.get("tss") and not item.get("_raw"):
+        mins = float(item.get("duration_min") or 0)
+        base = {"sport": None, "minutes": round(mins, 1), "km": round(float(item.get("distance_km") or 0), 2)}
+        if is_light(item):
+            return {**base, "tss": round(mins / 60 * LIGHT_TSS_H, 1), "method": "leve"}
+        # a conta por FC não desconta o repouso: 6 h de veleiro a 84 bpm dariam mais carga que um treino forte.
+        # Na zona 1–2 vale um teto por hora (o mesmo nível da caminhada leve); sem FC, assume zona 1.
+        zone = int(item.get("zone") or 1) if item.get("avg_hr") else 1
+        raw = endurance_stress({**item, "_raw": True, "zone": zone}, anchors)
+        cap = GENERIC_CAP_H.get(zone)
+        tss = raw["tss"]
+        if cap is not None:
+            tss = min(tss, mins / 60 * cap, GENERIC_Z1_MAX if zone == 1 else tss)
+        return {**raw, "tss": round(tss, 1), "method": "atividade" if cap is not None else raw["method"]}
     sport = sport_of(item)
     minutes = float(item.get("duration_min") or 0)
     if not minutes and item.get("intervals"):

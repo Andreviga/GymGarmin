@@ -42,7 +42,8 @@ SPORTS: dict[str, dict] = {
             "mtb": ("ciclismo_mtb", ("cycling", "mountain"), "cycling"),
         },
         "garmin_types": ["cycling", "road_biking", "indoor_cycling", "virtual_ride", "mountain_biking",
-                         "gravel_cycling", "cyclocross", "track_cycling", "e_bike_fitness", "recumbent_cycling"],
+                         "gravel_cycling", "cyclocross", "track_cycling", "e_bike_fitness", "recumbent_cycling",
+                         "e_bike_mountain", "enduro_mtb", "e_enduro_mtb", "downhill_biking", "bmx"],
     },
     "natacao": {
         "name": "Natação", "anchor": "css", "unit": "m", "impact": "baixo", "legs": False,

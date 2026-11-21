@@ -23,6 +23,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import re
 import time
 import os
 import secrets
@@ -552,19 +553,23 @@ def needs_detail(type_key: str | None) -> bool:
 
 # Outras atividades do relógio → atividade genérica do catálogo (tempo, FC e calorias contam na carga da semana).
 # A ordem importa: a primeira regra que casa vence. Palavras em inglês (Garmin, Apple, Health Connect) e português.
-NOT_WORKOUT = ("breath", "meditat", "meditaç", "respira", "motor", "driving", "racing", "flying", "e_sport", "esport", "gaming", "navigat",
-               "transition", "incident", "multi_sport", "multisport", "sleep", "nap", "hunting", "fishing", "pesca", "mind")
+NOT_WORKOUT = ("breath", "meditat", "meditaç", "respira", "motor", "motocross", "driving", "racing", "flying", "gaming", "navigat",
+               "transition", "incident", "multi_sport", "multisport", "sleep", "hunting", "fishing", "pesca", "mind",
+               "snowmobil", "overland", "drone", "sky_div", "skydiv", "parachut", "paraglid", "hang_glid", "wingsuit")
+# palavras curtas só valem inteiras ("esport" pegava "Esportes Aquáticos"; "nap" pegaria outras)
+NOT_WORKOUT_WORDS = re.compile(r"(^|[^a-z])(e[_ -]?sports?|nap|atv|utv)($|[^a-z])")
 ACTIVITY_RULES = [
-    (("yoga", "ioga", "pilates", "stretch", "along", "mobili", "flexib", "barre", "tai_chi", "tai chi", "cooldown"), "atividade_mobilidade"),
+    (("yoga", "ioga", "pilates", "stretch", "along", "mobili", "flexib", "barre", "tai_chi", "tai chi", "taichi", "cooldown", "cool_down",
+      "desaquec", "recovery", "recupera"), "atividade_mobilidade"),
     (("soccer", "football", "futebol", "futsal", "basket", "basquet", "volley", "volei", "vôlei", "handball", "handebol", "rugby",
       "hockey", "lacrosse", "baseball", "softball", "cricket", "ultimate", "team"), "atividade_coletivo"),
     (("tennis", "tenis", "tênis", "padel", "paddel", "pickleball", "squash", "racquet", "racket", "raquete", "badminton"), "atividade_raquete"),
-    (("boxing", "boxe", "martial", "mma", "wrestl", "judo", "judô", "karate", "caratê", "jiu", "kickbox", "muay", "fight", "combat",
-      "luta", "capoeira", "fencing", "esgrima"), "atividade_luta"),
+    (("boxing", "boxe", "martial", "marcia", "mma", "wrestl", "judo", "judô", "karat", "caratê", "jiu", "kickbox", "muay", "fight", "combat",
+      "luta", "capoeira", "fencing", "esgrima", "taekwon"), "atividade_luta"),
     (("danc", "dança", "zumba"), "atividade_danca"),
     (("rock_climb", "indoor_climb", "climbing", "boulder", "escalada"), "atividade_escalada"),
     (("surf", "paddl", "kayak", "caiaque", "canoe", "canoa", "sail", "vela", "kite", "wake", "raft", "snorkel", "diving",
-      "mergulho", "boating", "water_sport", "water sport"), "atividade_aquatica"),
+      "mergulho", "boating", "water_sport", "water sport", "waterski", "water_ski", "aquatic", "aquátic"), "atividade_aquatica"),
     (("ski", "esqui", "snowboard", "snow", "skat", "patin"), "atividade_neve_patins"),
     (("hiit", "bootcamp", "cardio", "aerob", "aeróbic", "fitness_equipment", "circuit", "interval", "tabata", "step_"), "atividade_hiit"),
 ]
@@ -584,7 +589,7 @@ ACTIVITY_LIGHT_TSS_H = 15  # yoga, pilates, alongamento: carga fixa e baixa por 
 def activity_kind(type_key: str | None) -> str | None:
     """Tipo do relógio → atividade genérica do catálogo; None quando não é treino (meditação, dirigir…) ou não há tipo."""
     t = (type_key or "").lower().strip()
-    if not t or any(k in t for k in NOT_WORKOUT):
+    if not t or any(k in t for k in NOT_WORKOUT) or NOT_WORKOUT_WORDS.search(t):
         return None
     for keys, act in ACTIVITY_RULES:
         if any(k in t for k in keys):
@@ -651,6 +656,8 @@ def endurance_item(activity: dict, hr_max: int | None = None) -> dict | None:
     act = activity_kind(type_key)
     if act:
         item = {"exercise_id": act, **base, "activity_type": type_key}
+        if not avg:
+            item["zone"] = 1
         label = ACTIVITY_NAMES_PT.get(type_key)
         if label:
             item["_name"] = label
@@ -766,6 +773,15 @@ def _skipped() -> dict:
         return json.loads(db.kv_get(SKIP_KEY) or "{}")
     except ValueError:
         return {}
+
+
+def forget_activity(activity_id) -> None:
+    """A pessoa apagou no app um treino que veio do relógio: a sincronização não o traz de volta."""
+    if not activity_id:
+        return
+    d = _skipped()
+    d[str(activity_id)] = {"final": True, "why": "apagada"}
+    _save_skipped(d)
 
 
 def _save_skipped(d: dict) -> None:

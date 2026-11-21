@@ -1113,7 +1113,7 @@ async function devicesCard() {
     <div class="row gap wrap"><button class="btn sm" id="ing-new">${st.has_token ? "Gerar código novo" : "Gerar código pessoal"}</button>
       ${st.has_token ? `<button class="btn sm ghost" id="ing-del">Desligar</button>` : ""}</div>
     <div id="ing-token"></div>
-    <p class="small ${last ? "" : "muted"}">${last ? `Último envio: <b>${fmtDate(last.at)}</b> (${last.source === "android" ? "Android" : "iPhone"}) · ${last.days.length} dia(s) de saúde · ${last.workouts} treino(s) novo(s)${last.skipped ? ` · ${last.skipped} ignorado(s) (tipo não usado, ex.: ioga)` : ""}` : "Nenhum envio recebido ainda."}</p>
+    <p class="small ${last ? "" : "muted"}">${last ? `Último envio: <b>${fmtDate(last.at)}</b> (${last.source === "android" ? "Android" : "iPhone"}) · ${last.days.length} dia(s) de saúde · ${last.workouts} treino(s) novo(s)${last.skipped ? ` · ${last.skipped} ignorado(s) (muito curto ou não é treino, ex.: meditação)` : ""}` : "Nenhum envio recebido ainda."}</p>
     <details><summary><b>iPhone (Apple Saúde) — app Atalhos</b></summary><div class="small">
       <ol>
         <li>Abra o app <b>Atalhos</b> → <b>+</b> (novo atalho) → nome "HAX".</li>

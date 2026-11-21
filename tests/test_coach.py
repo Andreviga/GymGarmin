@@ -72,6 +72,9 @@ def test_triage_flags_from_checkin_sleep_and_missed(env):
     ath2 = c.get("/api/coach/athletes").json()["athletes"][0]
     assert not {"bem_estar", "dor_joelho", "fc_repouso"} & {f["code"] for f in ath2["flags"]}
     assert c.get("/api/health", headers={"X-GG-Athlete": str(aid)}).status_code == 403
+    # passos também são dado do relógio: o coach não vê nem responde "o que foi" pela atleta
+    assert c.get("/api/steps", headers={"X-GG-Athlete": str(aid)}).status_code == 403
+    assert c.post("/api/steps/tag", json={"date": "2026-11-17", "tag": "festival"}, headers={"X-GG-Athlete": str(aid)}).status_code == 403
 
 
 def test_tension_area_swaps_exercises_and_athlete_sees_changes(env):

@@ -259,9 +259,27 @@ def workout_session(w: dict, source: str, hr_max: int | None) -> dict | None:
             "duration_min": round(dur, 1), "garmin_summary": summ}
 
 
+DELETED_KEY = "ingest_deleted"
+
+
+def deleted_ids() -> list[str]:
+    try:
+        d = json.loads(db.kv_get(DELETED_KEY) or "[]")
+        return d if isinstance(d, list) else []
+    except ValueError:
+        return []
+
+
+def forget_workout(ext_id: str | None) -> None:
+    if not ext_id or str(ext_id).startswith("passos:"):
+        return
+    db.kv_set(DELETED_KEY, json.dumps(([x for x in deleted_ids() if x != ext_id] + [ext_id])[-300:]))
+
+
 def save_workouts(workouts: list[dict], source: str, hr_max: int | None, merge=None) -> tuple[list[dict], int]:
     since = (clock.today() - timedelta(days=60)).isoformat()
     known = {s.get("ext_id") for s in db.list_sessions(since=since, limit=2000) if s.get("ext_id")}
+    known |= set(deleted_ids())  # treino do celular que a pessoa apagou no app não volta no próximo envio
     imported, skipped = [], 0
     for w in workouts[:MAX_WORKOUTS]:
         s = workout_session(w, source, hr_max)
