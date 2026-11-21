@@ -18,7 +18,7 @@ from datetime import date, timedelta
 
 from . import auth, coach, focus, gallery, ingest, my_gym, training_rules
 from . import (analysis, calibration, catalog, clock, db, dedupe, health, endurance, garmin_export, garmin_sync, generator, history, limitations,
-               load, plans_io, progression, readiness, schedule, sports, steps, templates)
+               load, plans_io, progression, readiness, schedule, sports, steps, templates, watch_labels)
 from .muscles import EQUIPMENT_PT, HR_ZONES, MUSCLES, hr_max, zone_bpm
 
 STATIC = Path(__file__).resolve().parent / "static"
@@ -1333,6 +1333,79 @@ def session_prefill(plan_id: int, idx: int):
 
 # ----------------------------------------------------- evolução de cargas ----
 
+# ---- séries do relógio sem nome: conferir categorias e dar nome aos blocos
+
+def _watch_prefs() -> dict:
+    return watch_labels.load_prefs(db.kv_get(watch_labels.PREFS_KEY))
+
+
+def _watch_review() -> dict:
+    today = clock.today()
+    lo = (today - timedelta(days=watch_labels.REVIEW_DAYS + 7)).isoformat()
+    plan_ids = [it.get("exercise_id") for p in db.list_plans() for d in p.get("days", []) for it in d.get("items", [])]
+    return watch_labels.review(db.list_sessions(limit=5000), db.list_schedule(lo, today.isoformat()), _watch_prefs(), today, plan_ids)
+
+
+def _strength_exercise(exercise_id) -> dict:
+    ex = catalog.get(str(exercise_id or ""))
+    if not ex or ex.get("kind") != "strength" or ex["id"] in garmin_sync.WATCH_ONLY_IDS:
+        raise HTTPException(400, "Escolha um exercício de força do catálogo")
+    return ex
+
+
+@app.get("/api/watch/review")
+def watch_review():
+    return _watch_review()
+
+
+@app.post("/api/watch/category")
+def watch_category(body: dict = Body(...)):
+    """"Quando o relógio diz só 'rosca', é este exercício": vale para os treinos já importados e para os próximos."""
+    cat = str(body.get("category") or "").upper()
+    if not cat or cat == "UNKNOWN":
+        raise HTTPException(400, "Categoria inválida")
+    ex = _strength_exercise(body.get("exercise_id"))
+    changed = watch_labels.apply_category(db.list_sessions(limit=5000), cat, ex["id"])
+    for s in changed:
+        db.save_session(s, session_id=s["id"])
+    prefs = _watch_prefs()
+    prefs.setdefault("categories", {})[cat] = ex["id"]
+    db.kv_set(watch_labels.PREFS_KEY, json.dumps(prefs))
+    return {"changed": len(changed), "exercise": {"id": ex["id"], "name": ex["name"]}, **_watch_review()}
+
+
+@app.post("/api/watch/label")
+def watch_label(body: dict = Body(...)):
+    """Dá nome a um bloco de séries que o relógio gravou sem exercício: {session_id, item, from, to, exercise_id}."""
+    ex = _strength_exercise(body.get("exercise_id"))
+    try:
+        sid, item, a, b = (int(body.get(k)) for k in ("session_id", "item", "from", "to"))
+    except (TypeError, ValueError) as e:
+        raise HTTPException(400, "Bloco de séries inválido") from e
+    s = db.get_session(sid)
+    if not s:
+        raise HTTPException(404, "Treino não encontrado")
+    try:
+        watch_labels.apply_label(s, item, a, b, ex["id"])
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from e
+    db.save_session(s, session_id=s["id"])
+    return {"exercise": {"id": ex["id"], "name": ex["name"]}, **_watch_review()}
+
+
+@app.post("/api/watch/dismiss")
+def watch_dismiss(body: dict = Body(...)):
+    """"Não lembro": para de perguntar sobre esse treino (as séries continuam contando no volume)."""
+    try:
+        sid = int(body.get("session_id"))
+    except (TypeError, ValueError) as e:
+        raise HTTPException(400, "Treino inválido") from e
+    prefs = _watch_prefs()
+    prefs["dismissed"] = ([x for x in prefs.get("dismissed") or [] if x != sid] + [sid])[-200:]
+    db.kv_set(watch_labels.PREFS_KEY, json.dumps(prefs))
+    return _watch_review()
+
+
 @app.get("/api/history")
 def history_overview():
     """Exercícios com histórico (tendência, recordes) e recordes dos últimos 30 dias."""
@@ -1461,7 +1534,7 @@ def _run_sync(trigger: str) -> dict:
     try:
         r = garmin_sync.sync(db.save_session, db.garmin_imported_ids(), plan_ids,
                              hr_max(p.get("age"), p.get("hr_max")), trigger=trigger, merge=_merge_garmin,
-                             until=t0 + SYNC_BUDGET_S)
+                             until=t0 + SYNC_BUDGET_S, cat_prefs=watch_labels.category_prefs(_watch_prefs()))
     except garmin_sync.GarminUnavailable as e:
         raise HTTPException(501, str(e)) from e
     try:

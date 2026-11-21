@@ -386,6 +386,10 @@ def overview(sessions: list[dict], today: date | None = None, bodyweight: float 
                                    "prs": p["prs"], "best_set": p["best_set"], "value": p["value"],
                                    "max_reps": p["max_reps"], "max_duration_s": p["max_duration_s"],
                                    "metric": p["metric"], "rep_pr": p.get("rep_pr")})
+    # exercício que só aparece porque o relógio informou a categoria ("rosca"): a tela avisa que é palpite
+    guessed = {it.get("exercise_id") for s in sessions for it in s.get("items") or [] if it.get("guess") and it.get("sets")}
+    for r in rows:
+        r["watch_guess"] = r["exercise_id"] in guessed
     rows.sort(key=lambda r: r["summary"].get("last_date") or "", reverse=True)
     recent_prs.sort(key=lambda r: r["date"], reverse=True)
     return {"exercises": rows, "recent_prs": recent_prs[:20]}

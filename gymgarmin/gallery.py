@@ -162,7 +162,7 @@ def search(q: str = "", category: str | None = None) -> list[dict]:
     order = {"comum": 0, "média": 1, "rara": 2}
     items.sort(key=lambda i: (not i["has_video"], order.get(i["availability_br"] or "", 3), i["name"]))
     for i in items:
-        i.pop("_search", None)
+        i["s"] = i.pop("_search", "")  # a tela filtra por aqui: nome, apelidos ("leg press 90"), marcas e exercícios
     return items
 
 

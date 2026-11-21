@@ -201,7 +201,12 @@ label.chip { display: inline-flex; align-items: center; color: var(--ink); font-
 .hist-val b { color: var(--ink); min-width: 4.5em; text-align: right; }
 .spark { width: 80px; height: 24px; }
 .hist-chart { width: 100%; height: auto; display: block; margin: 6px 0; }
-.steps-q .btn { flex: 1 1 auto; }
+.steps-q .btn { flex: 1 1 40%; }
+.wr-cat, .wr-sess { padding: 10px 0; border-bottom: 1px solid var(--line); }
+.wr-cat:last-child, .wr-sess:last-child { border-bottom: 0; }
+.wr-block { margin: 8px 0 0; padding: 8px 10px; background: var(--info-bg); border-radius: 10px; }
+.wr-sets { font-variant-numeric: tabular-nums; margin-bottom: 6px; word-spacing: 2px; }
+.mx-brands a { white-space: normal; }
 .steps-tags li { padding: 6px 0; border-bottom: 1px solid var(--line); align-items: center; }
 .steps-tags li:last-child { border-bottom: 0; }
 .hist-chart .grid { stroke: var(--line); stroke-width: 1; }

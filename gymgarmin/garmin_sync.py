@@ -458,8 +458,12 @@ def remap_imported(sessions: list[dict], preferred_ids: set[str] | None = None) 
 
 
 def activity_to_session(activity: dict, exercise_sets: dict | None, preferred_ids: set[str] | None = None,
-                        hr_max: int | None = None) -> dict:
-    """Converte uma atividade do Garmin (com séries) em sessão do GymGarmin."""
+                        hr_max: int | None = None, cat_prefs: dict | None = None) -> dict:
+    """Converte uma atividade do Garmin (com séries) em sessão do GymGarmin.
+
+    `cat_prefs` = o que a pessoa já disse sobre cada categoria do relógio ("rosca" = rosca martelo):
+    vale quando o relógio não informa o nome do exercício, e o item deixa de ser palpite."""
+    prefs = cat_prefs or {}
     start = activity.get("startTimeLocal") or activity.get("startTimeGMT") or clock.now().isoformat()
     session = {
         "date": str(start).replace(" ", "T"),
@@ -478,7 +482,9 @@ def activity_to_session(activity: dict, exercise_sets: dict | None, preferred_id
             exs = sorted(s.get("exercises") or [], key=lambda e: -(e.get("probability") or 0))
             cat = exs[0].get("category") if exs else None
             name = exs[0].get("name") if exs else None
-            eid = rev.get((cat, name)) or rev.get((cat, None)) or UNKNOWN_ID
+            exact = rev.get((cat, name)) if name else None
+            chosen = None if exact else prefs.get(cat)
+            eid = exact or chosen or rev.get((cat, None)) or UNKNOWN_ID
             w = s.get("weight")
             load = (w / 1000.0 if w and w > 500 else w) or 0
             entry = {"reps": s.get("repetitionCount") or 0, "load_kg": round(load, 1),
@@ -489,6 +495,8 @@ def activity_to_session(activity: dict, exercise_sets: dict | None, preferred_id
                 current = {"exercise_id": eid, "sets": [entry], "garmin": {"category": cat, "name": name}}
                 if eid == UNKNOWN_ID:
                     current["_name"] = UNKNOWN_NAME
+                elif chosen:
+                    current["labeled"] = "categoria"  # a pessoa já confirmou o que essa categoria é para ela
                 elif not name or (cat, name) not in rev:
                     current["guess"] = True  # o relógio só disse a categoria: confira e troque se precisar
                 session["items"].append(current)
@@ -690,7 +698,8 @@ def session_from_summary(a: dict, hr_max: int | None = None) -> dict:
     return activity_to_session({k: v for k, v in flat.items() if v is not None}, None, None, hr_max)
 
 
-def import_activity(activity_id: int, preferred_ids: set[str] | None = None, hr_max: int | None = None) -> dict:
+def import_activity(activity_id: int, preferred_ids: set[str] | None = None, hr_max: int | None = None,
+                    cat_prefs: dict | None = None) -> dict:
     api = client()
     act = api.get_activity(str(activity_id))
     summary = act.get("summaryDTO") or {}
@@ -709,7 +718,7 @@ def import_activity(activity_id: int, preferred_ids: set[str] | None = None, hr_
     sets = None
     if "strength" in str((flat["activityType"] or {}).get("typeKey", "")):
         sets = api.get_activity_exercise_sets(activity_id)
-    return activity_to_session(flat, sets, preferred_ids, hr_max)
+    return activity_to_session(flat, sets, preferred_ids, hr_max, cat_prefs)
 
 
 # ---------------------------------------------------------------------------
@@ -768,7 +777,8 @@ def _save_skipped(d: dict) -> None:
 
 
 def sync(save_session, imported_ids: set, preferred_ids: set[str] | None = None, hr_max: int | None = None,
-         trigger: str = "manual", now: datetime | None = None, merge=None, until: float | None = None) -> dict:
+         trigger: str = "manual", now: datetime | None = None, merge=None, until: float | None = None,
+         cat_prefs: dict | None = None) -> dict:
     """Importa as atividades novas do Garmin como sessões.
 
     `save_session` grava a sessão (db.save_session); `imported_ids` são os IDs já
@@ -828,7 +838,7 @@ def sync(save_session, imported_ids: set, preferred_ids: set[str] | None = None,
             done += 1
             aid = str(a["activity_id"])
             try:
-                session = (import_activity(a["activity_id"], preferred_ids, hr_max) if needs_detail(a.get("type"))
+                session = (import_activity(a["activity_id"], preferred_ids, hr_max, cat_prefs) if needs_detail(a.get("type"))
                            else session_from_summary(a, hr_max))
             except Exception as e:  # noqa: BLE001
                 if _is_rate_limit(e) or _is_auth_error(e) or "connection" in type(e).__name__.lower():

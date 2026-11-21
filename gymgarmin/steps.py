@@ -37,14 +37,14 @@ SOURCE = "passos"      # sessões criadas a partir dos passos (caminhada estimad
 
 # `tss_h`: carga por hora da caminhada estimada (andar devagar ≈ 16/h; caminhada de verdade ≈ 25/h; corrida leve ≈ 45/h)
 TAGS = {
-    "festival": {"label": "Festival, show ou festa", "session": True, "zone": 1, "tss_h": 16, "spm": EVENT_SPM,
+    "festival": {"label": "Festival, show ou festa", "short": "Festival ou festa", "session": True, "zone": 1, "tss_h": 16, "spm": EVENT_SPM,
                  "name": "Festival, show ou festa"},
-    "passeio": {"label": "Passeio, viagem ou turismo", "session": True, "zone": 1, "tss_h": 16, "spm": EVENT_SPM,
+    "passeio": {"label": "Passeio, viagem ou turismo", "short": "Passeio ou viagem", "session": True, "zone": 1, "tss_h": 16, "spm": EVENT_SPM,
                 "name": "Passeio ou viagem"},
-    "caminhada": {"label": "Caminhada ou trilha que não registrei", "session": True, "zone": 2, "tss_h": 25, "spm": WALK_SPM,
+    "caminhada": {"label": "Caminhada ou trilha que não registrei", "short": "Caminhada sem registro", "session": True, "zone": 2, "tss_h": 25, "spm": WALK_SPM,
                   "name": "Caminhada não registrada"},
-    "trabalho": {"label": "Trabalho ou dia inteiro em pé", "session": False, "name": "Dia inteiro em pé"},
-    "nada": {"label": "Nada de especial, foi um dia normal", "session": False, "name": "Dia normal"},
+    "trabalho": {"label": "Trabalho ou dia inteiro em pé", "short": "Trabalho em pé", "session": False, "name": "Dia inteiro em pé"},
+    "nada": {"label": "Nada de especial, foi um dia normal", "short": "Dia normal", "session": False, "name": "Dia normal"},
 }
 
 
@@ -188,7 +188,7 @@ def summary(days: dict[str, dict], sessions: list[dict], tags: dict, today: date
             "estimated": any(r["estimated"] for r in rows[-28:]),
             "series": rows[-28:], "pending": pending[-2:][::-1], "recent_event": recent,
             "tags": {d: {**t, "label": (TAGS.get(t.get("tag")) or {}).get("label")} for d, t in tags.items() if d >= cut},
-            "options": [{"id": k, "label": v["label"]} for k, v in TAGS.items()]}
+            "options": [{"id": k, "label": v["label"], "short": v["short"]} for k, v in TAGS.items()]}
 
 
 def event_session(day: str, extra_steps: float, tag: str) -> dict | None:

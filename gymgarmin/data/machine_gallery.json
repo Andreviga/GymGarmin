@@ -8907,23 +8907,27 @@
    "Technogym",
    "Precor",
    "Nautilus",
-   "Hoist"
+   "Hoist",
+   "Total Health"
   ],
   "brand_models": [
    {
     "brand": "Movement",
     "model": "Leg Extension/Leg Curl Axis LC",
-    "url": "https://www.movement.com.br/produto/leg-extension-leg-curl-axis/"
+    "url": "https://www.movement.com.br/produto/leg-extension-leg-curl-axis/",
+    "checked": true
    },
    {
     "brand": "Movement",
     "model": "Leg Extension/Seated Leg Curl New Idea",
-    "url": "https://www.movement.com.br/produto/leg-extension-leg-curl-new-idea/"
+    "url": "https://www.movement.com.br/produto/leg-extension-leg-curl-new-idea/",
+    "checked": true
    },
    {
     "brand": "Movement",
     "model": "Edge+ Leg Extension/Leg Curl",
-    "url": "https://en.movement.com.br/product/edge-plus-flexor-extensor-weight-training-station/"
+    "url": "https://en.movement.com.br/product/edge-plus-flexor-extensor-weight-training-station/",
+    "checked": true
    },
    {
     "brand": "Physicus",
@@ -8954,6 +8958,12 @@
     "brand": "Hoist",
     "model": "HD-3400 Leg Extension/Leg Curl (HD Dual Series)",
     "url": "https://www.hoistfitness.com/qr/commercial/hd-dual-series/hd-3400"
+   },
+   {
+    "brand": "Total Health",
+    "model": "Leg Extension/Curl Machine (Máquina Extensora/Flexora Conjugada)",
+    "url": "https://totalhealth.com.br/leg-extensioncurl-machine-maquina-extensoraflexora-conjugada",
+    "checked": true
    }
   ],
   "existing_exercise_ids": [
@@ -9011,8 +9021,9 @@
   "how_to_recognize": "Parece uma cadeira extensora comum, com encosto e pilha de pesos (pino) ao lado, mas o braço com o rolo tem um seletor/trava que muda o ponto de partida (perna dobrada para a extensora, perna esticada para a flexora) e costuma haver um apoio sobre as coxas ou um segundo rolo. A placa de instruções mostra dois exercícios: quadríceps e posteriores.",
   "videos": [],
   "photos": [],
-  "confirmed": false,
-  "added": "2026-11"
+  "confirmed": true,
+  "added": "2026-11",
+  "check_note": "Confirmado em Movement (Axis LC e Edge+) e em Total Health, que não estava na lista; nome usual no Brasil: 'extensora/flexora conjugada'. A página da Physicus não apareceu na busca restrita aos sites brasileiros."
  },
  {
   "machine_id": "mx_adductor_abductor_combo",
@@ -9053,7 +9064,9 @@
    "Matrix",
    "Technogym",
    "Life Fitness",
-   "Precor"
+   "Precor",
+   "Lion Fitness",
+   "Total Health"
   ],
   "brand_models": [
    {
@@ -9074,12 +9087,14 @@
    {
     "brand": "Kikos",
     "model": "Cadeira Adutora e Abdutora Kikos Pro Dual T7475 (torre 110 kg)",
-    "url": "https://www.kikos.com.br/cadeira-adutora-e-abdutora-kikos-pro-dual-t7475-torre-110kg.html"
+    "url": "https://www.kikos.com.br/cadeira-adutora-e-abdutora-kikos-pro-dual-t7475-torre-110kg.html",
+    "checked": true
    },
    {
     "brand": "Kikos",
     "model": "Cadeira Adutora e Abdutora Kikos Pro Dual TTDS7475",
-    "url": "https://www.kikos.com.br/cadeira-adutora-e-abdutora-kikos-pro-dual-ttds7475.html"
+    "url": "https://www.kikos.com.br/cadeira-adutora-e-abdutora-kikos-pro-dual-ttds7475.html",
+    "checked": true
    },
    {
     "brand": "Matrix",
@@ -9105,6 +9120,24 @@
     "brand": "Precor",
     "model": "Vitality VSL008BP Inner/Outer Thigh (listado na página da série)",
     "url": "https://www.precor.com/en-US/strength/selectorized/vitality"
+   },
+   {
+    "brand": "Lion Fitness",
+    "model": "Adutor/Abdutor Conj. Iridium",
+    "url": "https://lionfitness.com.br/produto/adutor-abdutor-conj-iridium",
+    "checked": true
+   },
+   {
+    "brand": "Lion Fitness",
+    "model": "Adutor/Abdutor Conj. PRÓ",
+    "url": "https://lionfitness.com.br/produto/adutor-abdutor-conj-pro/",
+    "checked": true
+   },
+   {
+    "brand": "Total Health",
+    "model": "Hip Abductor / Addutor Machine (Máquina Abdutora / Adutora Conjugada)",
+    "url": "https://totalhealth.com.br/hip-abductor-addutor-machine-maquina-abdutora-adutora-conjugada",
+    "checked": true
    }
   ],
   "existing_exercise_ids": [
@@ -9158,8 +9191,9 @@
   "how_to_recognize": "Cadeira com encosto, apoios para os pés e dois braços com almofadas na altura dos joelhos. A diferença para a adutora ou a abdutora simples: as almofadas giram (têm pino/trava no eixo) para ficar por dentro ou por fora dos joelhos, e a placa mostra os dois exercícios (parte interna e externa da coxa). Pilha de pesos com pino, ao lado ou à frente do usuário.",
   "videos": [],
   "photos": [],
-  "confirmed": false,
-  "added": "2026-11"
+  "confirmed": true,
+  "added": "2026-11",
+  "check_note": "Confirmado em três fabricantes brasileiros (Kikos, Lion Fitness, Total Health; os dois últimos não estavam na lista); nome usual: 'adutora/abdutora conjugada'. A página Axis LC da Movement não apareceu na busca."
  },
  {
   "machine_id": "mx_lever_leg_press",
@@ -9221,17 +9255,20 @@
    {
     "brand": "Lion Fitness",
     "model": "Leg Press Articulado RB G2",
-    "url": "https://lionfitness.com.br/produto/leg-press-articulado-rb-g2/"
+    "url": "https://lionfitness.com.br/produto/leg-press-articulado-rb-g2/",
+    "checked": true
    },
    {
     "brand": "Physicus",
     "model": "Leg Press 45º Articulado",
-    "url": "https://www.physicus.com.br/produtos/item/leg-press-45o-articulado"
+    "url": "https://www.physicus.com.br/produtos/item/leg-press-45o-articulado",
+    "checked": true
    },
    {
     "brand": "Kikos",
     "model": "Leg Press Unilateral Kikos Pro Plate Load PR75",
-    "url": "https://www.kikos.com.br/leg-press-unilateral-kikos-pro-plate-load-pr75.html"
+    "url": "https://www.kikos.com.br/leg-press-unilateral-kikos-pro-plate-load-pr75.html",
+    "checked": true
    },
    {
     "brand": "Hammer Strength",
@@ -9323,8 +9360,9 @@
   "how_to_recognize": "Banco com encosto inclinado, parecido com um leg press sentado, mas SEM pilha de pesos e sem trilho comprido: uma ou duas plataformas de pé presas a braços de alavanca que giram num eixo, com pinos de anilha nas laterais ou em cima dos braços. Braços que se movem separados indicam o modelo iso-lateral. Diferença do leg 45°: não existe carrinho deslizando em trilho inclinado.",
   "videos": [],
   "photos": [],
-  "confirmed": false,
-  "added": "2026-11"
+  "confirmed": true,
+  "added": "2026-11",
+  "check_note": "'Leg press articulado' confirmado em Physicus, Lion Fitness e Kikos (este como 'leg press unilateral plate load'). Da Total Health só apareceu o manual https://totalhealth.com.br/manual/609RRX.pdf, cujo título é apenas o nome do arquivo; a página 'Seated Leg Press Unilateral' não veio como resultado."
  },
  {
   "machine_id": "mx_horizontal_calf",
@@ -9370,17 +9408,20 @@
    {
     "brand": "Life Fitness",
     "model": "Insignia Series Calf Extension",
-    "url": "https://shop.lifefitness.com/products/insignia-series-calf-extension"
+    "url": "https://shop.lifefitness.com/products/insignia-series-calf-extension",
+    "checked": true
    },
    {
     "brand": "Hammer Strength",
     "model": "Select Horizontal Calf",
-    "url": "https://shop.lifefitness.com/products/hammer-strength-select-horizontal-calf"
+    "url": "https://shop.lifefitness.com/products/hammer-strength-select-horizontal-calf",
+    "checked": true
    },
    {
     "brand": "Hammer Strength",
     "model": "Plate-Loaded Super Horizontal Calf",
-    "url": "https://www.lifefitness.com/en-us/catalog/strength-training/plate-loaded/plate-loaded-super-horizontal-calf"
+    "url": "https://www.lifefitness.com/en-us/catalog/strength-training/plate-loaded/plate-loaded-super-horizontal-calf",
+    "checked": true
    },
    {
     "brand": "Matrix",
@@ -9395,12 +9436,20 @@
    {
     "brand": "Precor",
     "model": "Resolute RSL0623 Seated Calf Extension (ficha em PDF)",
-    "url": "https://static.precor.com/sell-sheet/all/RSL/RSL0623-Seated-Calf-Extension-NA.pdf"
+    "url": "https://static.precor.com/sell-sheet/all/RSL/RSL0623-Seated-Calf-Extension-NA.pdf",
+    "checked": true
    },
    {
     "brand": "Kikos",
     "model": "Panturrilha Horizontal HF 2026 (Linha Hammer Force Kikos Pro, de anilhas)",
-    "url": "https://www.kikos.com.br/catalog/product/view/_ignore_category/1/id/1305/s/panturrilha-horizontal-hf-2026-linha-hammer-force-kikos-pro-i014561/"
+    "url": "https://www.kikos.com.br/catalog/product/view/_ignore_category/1/id/1305/s/panturrilha-horizontal-hf-2026-linha-hammer-force-kikos-pro-i014561/",
+    "checked": true
+   },
+   {
+    "brand": "Hammer Strength",
+    "model": "Select Horizontal Calf",
+    "url": "https://www.lifefitness.com/en-nl/catalog/strength-training/selectorized/hammer-strength-select-horizontal-calf",
+    "checked": true
    }
   ],
   "existing_exercise_ids": [
@@ -9441,8 +9490,9 @@
   "how_to_recognize": "Banco com encosto e, na frente, uma plataforma pequena só para a ponta dos pés, que gira em arco (não é a plataforma larga do leg press); pessoa sentada com as pernas quase retas. Não tem almofada sobre as coxas (isso é a panturrilha sentada clássica) nem ombreiras (panturrilha em pé). Pilha de pesos ao lado ou, na versão articulada, pinos de anilha.",
   "videos": [],
   "photos": [],
-  "confirmed": false,
-  "added": "2026-11"
+  "confirmed": true,
+  "added": "2026-11",
+  "check_note": "'Panturrilha horizontal' confirmada na Kikos (único fabricante brasileiro com esse nome) e em Life Fitness/Hammer Strength e Precor. Apareceu também 'Calf Extension Next' da Movement (https://www.movement.com.br/produto/calf-extension-next/), mas a busca não descreveu o aparelho; vale conferir se é o mesmo tipo."
  },
  {
   "machine_id": "mx_iso_leg_extension",
@@ -9483,22 +9533,38 @@
    {
     "brand": "Hammer Strength",
     "model": "Plate-Loaded Iso-Lateral Leg Extension",
-    "url": "https://www.lifefitness.com/en-us/catalog/strength-training/plate-loaded/iso-lateral-leg-extension"
+    "url": "https://www.lifefitness.com/en-us/catalog/strength-training/plate-loaded/iso-lateral-leg-extension",
+    "checked": true
    },
    {
     "brand": "Hammer Strength",
     "model": "MTS Iso-Lateral Leg Extension (versão com duas pilhas de pesos)",
-    "url": "https://www.lifefitness.com/en-us/catalog/strength-training/selectorized/hammer-strength-mts-iso-lateral-leg-extension"
+    "url": "https://www.lifefitness.com/en-us/catalog/strength-training/selectorized/hammer-strength-mts-iso-lateral-leg-extension",
+    "checked": true
    },
    {
     "brand": "Kikos",
     "model": "Extensora Unilateral HF 2022 (Linha Hammer Force Kikos Pro)",
-    "url": "https://www.kikos.com.br/catalog/product/view/_ignore_category/1/id/1304/s/extensora-unilateral-hf-2022-linha-hammer-force-kikos-pro-i014560/"
+    "url": "https://www.kikos.com.br/catalog/product/view/_ignore_category/1/id/1304/s/extensora-unilateral-hf-2022-linha-hammer-force-kikos-pro-i014560/",
+    "checked": true
    },
    {
     "brand": "Movement",
     "model": "Seated Leg Extension Next",
-    "url": "https://www.movement.com.br/produto/seated-leg-extension-next/"
+    "url": "https://www.movement.com.br/produto/seated-leg-extension-next/",
+    "checked": true
+   },
+   {
+    "brand": "Hammer Strength",
+    "model": "Plate-Loaded Leg Extension",
+    "url": "https://www.lifefitness.com/en-us/catalog/strength-training/plate-loaded/plate-loaded-leg-extension",
+    "checked": true
+   },
+   {
+    "brand": "Hammer Strength",
+    "model": "MTS Iso-Lateral Leg Extension (duas pilhas de pesos)",
+    "url": "https://shop.lifefitness.com/products/hammer-strength-mts-leg-extension",
+    "checked": true
    }
   ],
   "existing_exercise_ids": [
@@ -9548,8 +9614,9 @@
   "how_to_recognize": "Cadeira extensora sem a pilha de pesos única: dois braços separados, cada um com seu rolo e seu pino de anilha (um de cada lado da cadeira), que sobem de forma independente. A versão MTS da Hammer Strength usa duas pilhas de pesos, uma por perna, no lugar das anilhas.",
   "videos": [],
   "photos": [],
-  "confirmed": false,
-  "added": "2026-11"
+  "confirmed": true,
+  "added": "2026-11",
+  "check_note": "Confirmado em Kikos ('extensora unilateral'), Movement e Hammer Strength, mas a busca só diz que a Seated Leg Extension Next é 'articulada de anilhas', sem dizer se os braços são independentes, e a página da Hammer no catálogo dos EUA aparece como 'Product Discontinued'. Os endereços da Hammer Strength que vieram na busca são diferentes dos que estão na lista."
  },
  {
   "machine_id": "mx_iso_lying_leg_curl",
@@ -9589,17 +9656,26 @@
    {
     "brand": "Hammer Strength",
     "model": "Plate-Loaded Iso-Lateral Leg Curl",
-    "url": "https://www.lifefitness.com/en-us/catalog/strength-training/plate-loaded/plate-loaded-iso-lateral-leg-curl"
+    "url": "https://www.lifefitness.com/en-us/catalog/strength-training/plate-loaded/plate-loaded-iso-lateral-leg-curl",
+    "checked": true
    },
    {
     "brand": "Lion Fitness",
     "model": "Flexor Deitado Iso-Lateral Kratos",
-    "url": "https://lionfitness.com.br/produto/flexor-deitado-iso-lateral-kratos"
+    "url": "https://lionfitness.com.br/produto/flexor-deitado-iso-lateral-kratos",
+    "checked": true
    },
    {
     "brand": "Total Health",
     "model": "Mesa Flexora Unilateral 627RRX",
-    "url": "https://totalhealth.com.br/mesa-flexora-unilateral"
+    "url": "https://totalhealth.com.br/mesa-flexora-unilateral",
+    "checked": true
+   },
+   {
+    "brand": "Lion Fitness",
+    "model": "Flexor Deitado Unilateral Optimus",
+    "url": "https://lionfitness.com.br/produto/flexor-deitado-unilateral-optimus",
+    "checked": true
    }
   ],
   "existing_exercise_ids": [
@@ -9657,8 +9733,9 @@
   "how_to_recognize": "Banco para deitar de bruços, com leve dobra no meio (quadril mais alto) e pegadores na frente; atrás, dois braços independentes com rolos de tornozelo, cada um com seu pino de anilha na lateral. Não tem pilha de pesos e os dois rolos sobem separados.",
   "videos": [],
   "photos": [],
-  "confirmed": false,
-  "added": "2026-11"
+  "confirmed": true,
+  "added": "2026-11",
+  "check_note": "As três marcas da lista foram confirmadas nos sites oficiais; nomes usados no Brasil: 'flexor deitado iso-lateral/unilateral' (Lion) e 'mesa flexora unilateral' (Total Health)."
  },
  {
   "machine_id": "mx_dual_platform_leg_press",
@@ -9699,12 +9776,14 @@
    {
     "brand": "Panatta",
     "model": "Super Leg Press 45° Dual System (1FW090)",
-    "url": "https://www.panattasport.com/en/product/1FW090.html"
+    "url": "https://www.panattasport.com/en/product/1FW090.html",
+    "checked": true
    },
    {
     "brand": "Panatta",
     "model": "Super Horizontal Leg Press Dual System",
-    "url": "https://www.panattasport.com/en/free-weight-special/super-horizontal-leg-press-dual-system/"
+    "url": "https://www.panattasport.com/en/free-weight-special/super-horizontal-leg-press-dual-system/",
+    "checked": true
    },
    {
     "brand": "Watson",
@@ -9715,6 +9794,12 @@
     "brand": "Legend Fitness",
     "model": "Unilateral Angle Leg Press (3308)",
     "url": "https://www.legendfitness.com/product/unilateral-angle-leg-press/"
+   },
+   {
+    "brand": "Panatta",
+    "model": "Super Leg Press 45° Dual System (1FW090)",
+    "url": "https://www.panattasport.com/en/free-weight-special/super-leg-press-45-dual-system/",
+    "checked": true
    }
   ],
   "existing_exercise_ids": [
@@ -9780,8 +9865,9 @@
   "how_to_recognize": "Leg press de anilhas (inclinado a 45° ou horizontal) com DUAS plataformas lado a lado, cada uma em seu carrinho/trilho, com seus pinos de anilha e sua trava de segurança; em alguns modelos há uma trava que une as duas. No leg 45° comum a plataforma é uma só.",
   "videos": [],
   "photos": [],
-  "confirmed": false,
-  "added": "2026-11"
+  "confirmed": true,
+  "added": "2026-11",
+  "check_note": "Confirmado na Panatta (duas plataformas usadas juntas ou separadas, cada lado com sua trava); nos sites brasileiros só apareceu o 'Leg Press Unilateral Plate Load PR75' da Kikos, que a busca não mostrou ser de carrinho duplo. O 'Animal Leg Press' da Watson não apareceu."
  },
  {
   "machine_id": "mx_leg_press_hack_combo",
@@ -9822,7 +9908,8 @@
    {
     "brand": "Body-Solid",
     "model": "GLPH1100 Leg Press/Hack Squat",
-    "url": "https://bodysolid.com/body-solid-leg-press-hack-squat"
+    "url": "https://bodysolid.com/body-solid-leg-press-hack-squat",
+    "checked": true
    },
    {
     "brand": "Bells of Steel",
@@ -9838,6 +9925,12 @@
     "brand": "Powerrun",
     "model": "PR008 Leg Press e Hack Squat (página de varejista, não do fabricante)",
     "url": "https://www.casasbahia.com.br/aparelho-leg-press-e-hack-squat-powerrun-pr008-para-academia-e-membros-inferiores-cinza-preto/p/1582606717"
+   },
+   {
+    "brand": "Body-Solid",
+    "model": "GLPH1100 Leg Press/Hack Squat (silver)",
+    "url": "https://bodysolid.com/glph1100-leg-press-hack-squat-silver/",
+    "checked": true
    }
   ],
   "existing_exercise_ids": [
@@ -9889,8 +9982,9 @@
   "how_to_recognize": "Um único trilho inclinado com carrinho que tem, ao mesmo tempo, encosto com OMBREIRAS (para o hack) e uma plataforma de pés na outra ponta, além de um banco baixo para o modo leg press; estrutura mais curta e leve que a das máquinas de academia de rede, com pinos de anilha no carrinho.",
   "videos": [],
   "photos": [],
-  "confirmed": false,
-  "added": "2026-11"
+  "confirmed": true,
+  "added": "2026-11",
+  "check_note": "Confirmado no site da Body-Solid; nenhum dos seis fabricantes brasileiros tem modelo conjugado (vendem hack e leg 45° separados). No Brasil só apareceu o Powerrun PR008 em varejistas (Casas Bahia, Extra), não em site de fabricante — é aparelho de academia caseira."
  },
  {
   "machine_id": "mx_lunge_machine",
@@ -9923,23 +10017,39 @@
   "brands": [
    "Panatta",
    "Booty Builder",
-   "Precor"
+   "Precor",
+   "Watson"
   ],
   "brand_models": [
    {
     "brand": "Panatta",
     "model": "Super Lunge Machine (1FW079)",
-    "url": "https://www.panattasport.com/en/free-weight-special/super-lunge-machine/"
+    "url": "https://www.panattasport.com/en/free-weight-special/super-lunge-machine/",
+    "checked": true
    },
    {
     "brand": "Booty Builder",
     "model": "Reverse Lunge Machine",
-    "url": "https://bootybuilder.com/product/booty-builder-reverse-lunge-machine/"
+    "url": "https://bootybuilder.com/product/booty-builder-reverse-lunge-machine/",
+    "checked": true
    },
    {
     "brand": "Precor",
     "model": "Glutebuilder Glute Lunge (GPL0625)",
-    "url": "https://precor.com/strength/glutebuilder/glute-lunge"
+    "url": "https://precor.com/strength/glutebuilder/glute-lunge",
+    "checked": true
+   },
+   {
+    "brand": "Precor",
+    "model": "Glutebuilder Glute Lunge (GPL0625)",
+    "url": "https://www.precor.com/en-US/strength/glutebuilder/glute-lunge",
+    "checked": true
+   },
+   {
+    "brand": "Watson",
+    "model": "PL Lunge Machine",
+    "url": "https://watsongym.co.uk/product/plate-loaded-lunge-machine/",
+    "checked": true
    }
   ],
   "existing_exercise_ids": [
@@ -9993,8 +10103,9 @@
   "how_to_recognize": "Aparelho de anilhas sem banco nem encosto: a pessoa fica em pé numa plataforma, guiada por ombreiras ou pegadores, e recua uma perna de cada vez. O desenho varia bastante entre as marcas — confirme pela placa, que traz 'Lunge'.",
   "videos": [],
   "photos": [],
-  "confirmed": false,
-  "added": "2026-11"
+  "confirmed": true,
+  "added": "2026-11",
+  "check_note": "As três marcas da lista foram confirmadas, mais a Watson; nenhum fabricante brasileiro tem máquina dedicada de afundo. O que existe aqui é o 'Squat Lunge' articulado (Movement Squat Lunge Next, https://www.movement.com.br/produto/squat-lunge-next/, e Total Health no catálogo), que faz agachamento, afundo e búlgaro — é outro desenho e talvez mereça item próprio."
  },
  {
   "machine_id": "mx_donkey_calf",
@@ -10034,22 +10145,37 @@
    {
     "brand": "Gym80",
     "model": "4380 Pure Kraft Donkey Calf",
-    "url": "https://gym80.de/en/product/4380/"
+    "url": "https://gym80.de/en/product/4380/",
+    "checked": true
    },
    {
     "brand": "Watson",
     "model": "PL Donkey Calf Raise",
-    "url": "https://watsongym.co.uk/product/plate-load-donkey-calf-raise/"
+    "url": "https://watsongym.co.uk/product/plate-load-donkey-calf-raise/",
+    "checked": true
    },
    {
     "brand": "Panatta",
     "model": "Freeweight Special Donkey Calf (página de revendedor)",
-    "url": "https://keystonefitness.ca/product/panatta-freeweight-special-donkey-calf/"
+    "url": "https://keystonefitness.ca/product/panatta-freeweight-special-donkey-calf/",
+    "checked": true
    },
    {
     "brand": "Arsenal Strength",
     "model": "M-1 Selectorized Donkey Calf Raise (página de revendedor)",
     "url": "https://performaxx.com.au/product/arsenal-strength-m1-selectorized-donkey-calf-raise/"
+   },
+   {
+    "brand": "Panatta",
+    "model": "Donkey Calf (Freeweight Special)",
+    "url": "https://www.panattasport.com/en/free-weight-special/donkey-calf",
+    "checked": true
+   },
+   {
+    "brand": "Gym80",
+    "model": "3094 Donkey Calf (Sygnum, pilha de pesos)",
+    "url": "https://gym80.de/en/product/weight-stack-en/sygnum-en/3094-donkey-calf/",
+    "checked": true
    }
   ],
   "existing_exercise_ids": [
@@ -10090,8 +10216,9 @@
   "how_to_recognize": "Pessoa em pé com o tronco inclinado à frente (quadril a cerca de 90°), antebraços apoiados numa almofada com pegadores e uma almofada que desce sobre o quadril/lombar; ponta dos pés num degrau. Diferente da panturrilha em pé (ombreiras, corpo reto) e da sentada (almofada nas coxas, joelhos dobrados).",
   "videos": [],
   "photos": [],
-  "confirmed": false,
-  "added": "2026-11"
+  "confirmed": true,
+  "added": "2026-11",
+  "check_note": "Confirmado em Panatta (agora com a página oficial, no lugar da de revendedor), Watson e Gym80; da Gym80 veio o modelo 3094 de pilha de pesos, não o '4380 Pure Kraft' da lista. Nenhum dos seis fabricantes brasileiros tem 'panturrilha burrinho' — só panturrilha em pé e banco de panturrilha."
  },
  {
   "machine_id": "mx_standing_adductor",
@@ -10122,18 +10249,32 @@
   ],
   "brands": [
    "Booty Builder",
-   "Skelcore"
+   "Skelcore",
+   "Physicus"
   ],
   "brand_models": [
    {
     "brand": "Booty Builder",
     "model": "Selectorized Standing Hip Adduction",
-    "url": "https://bootybuilder.com/product/booty-builder-selectorized-standing-hip-adduction/"
+    "url": "https://bootybuilder.com/product/booty-builder-selectorized-standing-hip-adduction/",
+    "checked": true
    },
    {
     "brand": "Skelcore",
     "model": "Plate Loaded Standing Adductor with Linear Adjustment (SK-STANDADD-01)",
     "url": "https://www.skelcore.com/products/plate-loaded-standing-adductor-with-linear-adjustment"
+   },
+   {
+    "brand": "Booty Builder",
+    "model": "Standing Hip Adduction (de anilhas)",
+    "url": "https://bootybuilder.com/product/booty-builder-standing-hip-adduction/",
+    "checked": true
+   },
+   {
+    "brand": "Physicus",
+    "model": "PHA 31 Máquina Adução e Abdução em Pé Conjugada (faz adução e abdução)",
+    "url": "https://www.physicus.com.br/detalhes/pha31-maquina-aducao-e-abducao-em-pe-conjugada",
+    "checked": true
    }
   ],
   "existing_exercise_ids": [
@@ -10165,8 +10306,9 @@
   "how_to_recognize": "Pessoa EM PÉ, segurando pegadores, com almofadas ou plataformas que resistem ao movimento de fechar as pernas; sem assento. Diferente da cadeira adutora (sentado). O desenho muda entre os fabricantes — confirme pela placa ('Standing Hip Adduction' / 'Standing Adductor').",
   "videos": [],
   "photos": [],
-  "confirmed": false,
-  "added": "2026-11"
+  "confirmed": true,
+  "added": "2026-11",
+  "check_note": "Confirmado na Booty Builder (versões de pilha e de anilhas); no Brasil a Physicus tem a PHA 31, conjugada de adução e abdução em pé, e a Total Health só tem 'abdutora em pé'. Da Skelcore a busca só trouxe o 'Standing Abductor' (abdutora), não a adutora da lista."
  },
  {
   "machine_id": "mx_decline_ab_bench",
@@ -10212,7 +10354,8 @@
    {
     "brand": "Movement",
     "model": "Banco Abdominal Next",
-    "url": "https://www.movement.com.br/produto/banco-abdominal-next/"
+    "url": "https://www.movement.com.br/produto/banco-abdominal-next/",
+    "checked": true
    },
    {
     "brand": "Total Health",
@@ -10222,7 +10365,8 @@
    {
     "brand": "Kikos",
     "model": "Banco Declinado Pro Station TTFW83",
-    "url": "https://www.kikos.com.br/banco-declinado-kikos-pro-station-ttfw83.html"
+    "url": "https://www.kikos.com.br/banco-declinado-kikos-pro-station-ttfw83.html",
+    "checked": true
    },
    {
     "brand": "Technogym",
@@ -10289,8 +10433,9 @@
   "how_to_recognize": "Banco longo e estreito, inclinado com a cabeça mais baixa que o quadril, com um ou dois pares de rolos de espuma na ponta alta para prender pés ou joelhos. Não tem pilha de pesos nem cabos; costuma ter um pino ou 'escadinha' embaixo para mudar a inclinação e, às vezes, uma manopla para ajudar a subir.",
   "videos": [],
   "photos": [],
-  "confirmed": false,
-  "added": "2026-11"
+  "confirmed": true,
+  "added": "2026-11",
+  "check_note": "Movement e Kikos confirmados nos mesmos endereços da lista; a página do AB Board da Total Health não apareceu (só a categoria de bancos). Technogym e Matrix não foram procuradas. O manual da Movement chama o aparelho de 'Decline Abdominal'."
  },
  {
   "machine_id": "mx_ab_wheel",
@@ -10327,17 +10472,26 @@
    {
     "brand": "Kikos",
     "model": "Roda de Exercícios Abdominais",
-    "url": "https://www.kikos.com.br/roda-de-exercicios-abdominais-kikos.html"
+    "url": "https://www.kikos.com.br/roda-de-exercicios-abdominais-kikos.html",
+    "checked": true
    },
    {
     "brand": "Kikos",
     "model": "Roda de Exercício MD1485",
-    "url": "https://www.kikos.com.br/roda-de-exercicio-md1485-kikos.html"
+    "url": "https://www.kikos.com.br/roda-de-exercicio-md1485-kikos.html",
+    "checked": true
    },
    {
     "brand": "Rogue",
     "model": "Ab Wheel",
-    "url": "https://www.roguefitness.com/rogue-ab-wheel"
+    "url": "https://www.roguefitness.com/rogue-ab-wheel",
+    "checked": true
+   },
+   {
+    "brand": "Rogue",
+    "model": "Ab Wheel",
+    "url": "https://www.roguefitness.com/ab-wheel",
+    "checked": true
    }
   ],
   "existing_exercise_ids": [
@@ -10403,8 +10557,9 @@
   "how_to_recognize": "Uma roda pequena (às vezes duas, lado a lado) com um eixo atravessado que serve de manopla para as duas mãos. Acessório solto de chão, sem estrutura, normalmente guardado junto de colchonetes e elásticos.",
   "videos": [],
   "photos": [],
-  "confirmed": false,
-  "added": "2026-11"
+  "confirmed": true,
+  "added": "2026-11",
+  "check_note": "As duas páginas da Kikos confirmadas; a Rogue apareceu em /ab-wheel (título 'Black Ab Roller Wheel'), não no endereço da lista (/rogue-ab-wheel), que não veio na busca: trocar o endereço."
  },
  {
   "machine_id": "mx_espaldar",
@@ -10447,12 +10602,20 @@
    {
     "brand": "Lion Fitness",
     "model": "Espaldar G2",
-    "url": "https://lionfitness.com.br/produto/espaldar-g2"
+    "url": "https://lionfitness.com.br/produto/espaldar-g2",
+    "checked": true
    },
    {
     "brand": "Physicus",
     "model": "Espaldar de Madeira",
-    "url": "https://www.physicus.com.br/produtos/item/espaldar-de-madeira"
+    "url": "https://www.physicus.com.br/produtos/item/espaldar-de-madeira",
+    "checked": true
+   },
+   {
+    "brand": "Physicus",
+    "model": "Espaldar",
+    "url": "https://www.physicus.com.br/produtos/item/espaldar",
+    "checked": true
    }
   ],
   "existing_exercise_ids": [
@@ -10513,8 +10676,9 @@
   "how_to_recognize": "Escada de barras horizontais paralelas (madeira ou aço) presa à parede, mais alta que uma pessoa. Não tem assento, cabos nem pesos; costuma ficar na área de alongamento.",
   "videos": [],
   "photos": [],
-  "confirmed": false,
-  "added": "2026-11"
+  "confirmed": true,
+  "added": "2026-11",
+  "check_note": "Lion confirmada no endereço da lista; a Physicus apareceu em /produtos/item/espaldar (o endereço 'espaldar-de-madeira' da lista não veio como resultado); da Total Health só apareceu a categoria 'Peso Livre / Bancos e Hacks', não a página do produto."
  },
  {
   "machine_id": "mx_glute_4_apoios",
@@ -10557,12 +10721,14 @@
    {
     "brand": "Physicus",
     "model": "Máquina Glúteos Quatro Apoios",
-    "url": "https://www.physicus.com.br/produtos/item/maquina-gluteos-quatro-apoios"
+    "url": "https://www.physicus.com.br/produtos/item/maquina-gluteos-quatro-apoios",
+    "checked": true
    },
    {
     "brand": "Atlantis",
     "model": "Glute machine C122",
-    "url": "https://atlantisstrength.com/gym-equipment/c122"
+    "url": "https://atlantisstrength.com/gym-equipment/c122",
+    "checked": true
    },
    {
     "brand": "gym80",
@@ -10577,7 +10743,20 @@
    {
     "brand": "Hoist",
     "model": "ROC-IT RS-2412 Glute Master",
-    "url": "https://www.hoistfitness.com/products/glute-master"
+    "url": "https://www.hoistfitness.com/products/glute-master",
+    "checked": true
+   },
+   {
+    "brand": "Physicus",
+    "model": "PLP 03 (Linha Plus)",
+    "url": "https://www.physicus.com.br/detalhes/plp03-maquina-gluteos-quatro-apoios",
+    "checked": true
+   },
+   {
+    "brand": "Physicus",
+    "model": "PHA 37 (Linha LT)",
+    "url": "https://www.physicus.com.br/detalhes/pha37-maquina-gluteos-quatro-apoios",
+    "checked": true
    }
   ],
   "existing_exercise_ids": [
@@ -10624,8 +10803,9 @@
   "how_to_recognize": "Máquina baixa em que a pessoa fica 'de quatro': almofada para um joelho, apoio acolchoado para peito/antebraços com manoplas e, atrás, uma plataforma ou rolo que a outra perna empurra para cima e para trás. Tem pilha de pesos com pino. Se a pessoa fica em pé, é o glúteo em pé que já está na galeria.",
   "videos": [],
   "photos": [],
-  "confirmed": false,
-  "added": "2026-11"
+  "confirmed": true,
+  "added": "2026-11",
+  "check_note": "Physicus (três linhas), Atlantis e Hoist confirmadas; gym80 3004 e Panatta Fit Evo não apareceram (da Panatta só veio o 'Master Gluteus Plus', outro aparelho; o resumo da gym80 citou um 'Kneeling Glutes Kick' com número 4360, sem página própria no resultado). A Total Health tem a página 'Glúteo' (https://totalhealth.com.br/gluteo) descrita como de quatro apoios, mas o título não diz isso, então não contei."
  },
  {
   "machine_id": "mx_standing_abductor",
@@ -10667,22 +10847,26 @@
    {
     "brand": "Movement",
     "model": "Standing Abductor Next",
-    "url": "https://en.movement.com.br/product/standing-abductor-next/"
+    "url": "https://en.movement.com.br/product/standing-abductor-next/",
+    "checked": true
    },
    {
     "brand": "Lion Fitness",
     "model": "Abdutor Em Pé Optimus",
-    "url": "https://lionfitness.com.br/produto/abdutor-em-pe-optimus"
+    "url": "https://lionfitness.com.br/produto/abdutor-em-pe-optimus",
+    "checked": true
    },
    {
     "brand": "Booty Builder",
     "model": "Standing Hip Abductor (anilhas)",
-    "url": "https://bootybuilder.com/product/booty-builder-standing-abductor"
+    "url": "https://bootybuilder.com/product/booty-builder-standing-abductor",
+    "checked": true
    },
    {
     "brand": "Booty Builder",
     "model": "Selectorized Standing Abductor (pino)",
-    "url": "https://bootybuilder.com/product/booty-builder-selectorized-standing-abductor/"
+    "url": "https://bootybuilder.com/product/booty-builder-selectorized-standing-abductor/",
+    "checked": true
    },
    {
     "brand": "Panatta",
@@ -10693,6 +10877,18 @@
     "brand": "gym80",
     "model": "4374 Pure Kraft Standing Abduction",
     "url": "https://gym80.de/en/product/plate-loaded-en/pure-kraft-en/4374-pure-kraft-standing-abduction/"
+   },
+   {
+    "brand": "Movement",
+    "model": "Standing Abductor Next",
+    "url": "https://www.movement.com.br/produto/standing-abductor-next/",
+    "checked": true
+   },
+   {
+    "brand": "Booty Builder",
+    "model": "Standing Abductor (anilhas)",
+    "url": "https://bootybuilder.com/product/booty-builder-standing-abductor/",
+    "checked": true
    }
   ],
   "existing_exercise_ids": [
@@ -10733,8 +10929,9 @@
   "how_to_recognize": "Não tem assento: a pessoa fica em pé numa plataforma, inclinada à frente sobre um apoio com manoplas, com duas almofadas na parte de fora das coxas/joelhos presas a braços que abrem para os lados. Carga em anilhas nas laterais (ou torre de pesos nas versões de pino).",
   "videos": [],
   "photos": [],
-  "confirmed": false,
-  "added": "2026-11"
+  "confirmed": true,
+  "added": "2026-11",
+  "check_note": "Movement (também no endereço en. da lista), Lion e Booty Builder confirmadas; Panatta e gym80 não foram procuradas. Dois fabricantes brasileiros vendem o aparelho, então 'média' seria defensável, mas a busca não prova que 'rara' esteja errada."
  },
  {
   "machine_id": "mx_ab_back_dual",
@@ -10766,13 +10963,15 @@
   "brands": [
    "Life Fitness",
    "Cybex",
-   "Panatta"
+   "Panatta",
+   "Matrix"
   ],
   "brand_models": [
    {
     "brand": "Life Fitness",
     "model": "Axiom Series Abdominal / Back Extension",
-    "url": "https://lifefitness.com/pt-br/catalog/forca/seletorizado/axiom-series-abdominal-back-extension"
+    "url": "https://lifefitness.com/pt-br/catalog/forca/seletorizado/axiom-series-abdominal-back-extension",
+    "checked": true
    },
    {
     "brand": "Cybex",
@@ -10782,7 +10981,26 @@
    {
     "brand": "Panatta",
     "model": "Dual Abdominal | Lower Back (linha SEC)",
-    "url": "https://www.panattasport.com/fr/sec/dual-abdominal-lower-back/"
+    "url": "https://www.panattasport.com/fr/sec/dual-abdominal-lower-back/",
+    "checked": true
+   },
+   {
+    "brand": "Life Fitness",
+    "model": "Axiom Series Abdominal / Back Extension",
+    "url": "https://shop.lifefitness.com/products/axiom-series-abdominal-back-extension",
+    "checked": true
+   },
+   {
+    "brand": "Panatta",
+    "model": "Dual Abdominal | Lower Back (linha SEC)",
+    "url": "https://www.panattasport.com/en/sec/dual-abdominal-lower-back/",
+    "checked": true
+   },
+   {
+    "brand": "Matrix",
+    "model": "Versa Ab / Low Back VS-S531",
+    "url": "https://cl.matrixfitness.com/esp/strength/single-station/vs-s531-abdominal-back-extension",
+    "checked": true
    }
   ],
   "existing_exercise_ids": [
@@ -10818,8 +11036,9 @@
   "how_to_recognize": "Máquina sentada com um rolo/almofada num braço que pode ficar na frente do peito ou atrás das costas, apoio de pés com rolos e torre de pesos; o adesivo de instruções mostra dois exercícios (abdominal e lombar).",
   "videos": [],
   "photos": [],
-  "confirmed": false,
-  "added": "2026-11"
+  "confirmed": true,
+  "added": "2026-11",
+  "check_note": "Life Fitness confirmada na loja oficial (o endereço pt-br da lista não apareceu), Panatta confirmada na versão /en/ e a Matrix é marca nova; a Precor Vitality VSL028BP só foi citada a partir da página da linha. Nenhuma das seis marcas brasileiras mostrou máquina conjugada (só lombar e abdominal separados), o que combina com 'rara'."
  },
  {
   "machine_id": "mx_hip_thrust_bench",
@@ -10851,18 +11070,21 @@
   "brands": [
    "Rogue",
    "gym80",
-   "elitefts"
+   "elitefts",
+   "Watson"
   ],
   "brand_models": [
    {
     "brand": "Rogue",
     "model": "Monster Hip Thruster Bench",
-    "url": "https://www.roguefitness.com/monster-hip-thruster-bench"
+    "url": "https://www.roguefitness.com/monster-hip-thruster-bench",
+    "checked": true
    },
    {
     "brand": "Rogue",
     "model": "Monster Lite Hip Thruster Bench",
-    "url": "https://www.roguefitness.com/monster-lite-hip-thruster-bench"
+    "url": "https://www.roguefitness.com/monster-lite-hip-thruster-bench",
+    "checked": true
    },
    {
     "brand": "gym80",
@@ -10873,6 +11095,12 @@
     "brand": "elitefts",
     "model": "Signature Hip Thrust",
     "url": "https://elitefts.com/products/signature-hip-thrust"
+   },
+   {
+    "brand": "Watson",
+    "model": "Hip Thrust Bench",
+    "url": "https://watsongym.co.uk/product/hip-thrust-bench/",
+    "checked": true
    }
   ],
   "existing_exercise_ids": [
@@ -10920,8 +11148,9 @@
   "how_to_recognize": "Almofada baixa e larga na altura das escápulas, presa a um rack ou a uma plataforma no chão, às vezes com pinos para elástico. Usa barra olímpica solta com anilhas: não tem braço de alavanca, cinto, trilho nem torre de pesos, e é isso que a separa da máquina de elevação pélvica.",
   "videos": [],
   "photos": [],
-  "confirmed": false,
-  "added": "2026-11"
+  "confirmed": true,
+  "added": "2026-11",
+  "check_note": "As duas páginas da Rogue confirmadas e a Watson é marca nova (banco solto, com pinos para elástico); gym80 4423 não apareceu e elitefts não foi procurada. Nas marcas brasileiras só apareceram versões guiadas ou de máquina (Movement Guided Hip Thrust e Pelvic Lift Machine Next, Total Health Hip Thrust, Kikos Elevação Pélvica TTPL92I), não o banco simples para barra."
  },
  {
   "machine_id": "mx_lat_pulldown_low_row_combo",
@@ -10964,18 +11193,21 @@
    "Matrix",
    "Life Fitness",
    "Precor",
-   "Rogue"
+   "Rogue",
+   "Atlantis"
   ],
   "brand_models": [
    {
     "brand": "Movement",
     "model": "Edge+ Puxada Alta/Baixa",
-    "url": "https://www.movement.com.br/produto/estacao-de-musculacao-edge-plus-puxada-alta-baixa/"
+    "url": "https://www.movement.com.br/produto/estacao-de-musculacao-edge-plus-puxada-alta-baixa/",
+    "checked": true
    },
    {
     "brand": "Movement",
     "model": "Pulldown/Low Row Axis LC",
-    "url": "https://www.movement.com.br/produto/pulldown-low-row-axis/"
+    "url": "https://www.movement.com.br/produto/pulldown-low-row-axis/",
+    "checked": true
    },
    {
     "brand": "Total Health",
@@ -10990,7 +11222,8 @@
    {
     "brand": "Physicus",
     "model": "Máquina Puxada Alta e Baixa Conjugada",
-    "url": "https://www.physicus.com.br/produtos/item/maquina-puxada-alta-e-baixa-conjugada"
+    "url": "https://www.physicus.com.br/produtos/item/maquina-puxada-alta-e-baixa-conjugada",
+    "checked": true
    },
    {
     "brand": "Matrix",
@@ -11000,22 +11233,44 @@
    {
     "brand": "Life Fitness",
     "model": "Axiom Series Lat Pulldown/Low Row",
-    "url": "https://lifefitness.com/pt-br/catalog/forca/seletorizado/axiom-series-lat-pulldown-low-row"
+    "url": "https://lifefitness.com/pt-br/catalog/forca/seletorizado/axiom-series-lat-pulldown-low-row",
+    "checked": true
    },
    {
     "brand": "Precor",
     "model": "Vitality Pulldown / Seated Row (VSL026BP), ficha oficial em PDF",
-    "url": "https://static.precor.com/sell-sheet/all/VSL/VSL026BP-Pulldown-Seated-Row-NA.pdf"
+    "url": "https://static.precor.com/sell-sheet/all/VSL/VSL026BP-Pulldown-Seated-Row-NA.pdf",
+    "checked": true
    },
    {
     "brand": "Rogue",
     "model": "Monster Lat Pull Down/Low Row (Stand Alone)",
-    "url": "https://www.roguefitness.com/lat-pulldown-low-row-stand-alone"
+    "url": "https://www.roguefitness.com/lat-pulldown-low-row-stand-alone",
+    "checked": true
    },
    {
     "brand": "Rogue",
     "model": "LP-2 Lat Pulldown / Low Row",
-    "url": "https://www.roguefitness.com/rogue-lp-2-lat-pulldown-low-row"
+    "url": "https://www.roguefitness.com/rogue-lp-2-lat-pulldown-low-row",
+    "checked": true
+   },
+   {
+    "brand": "Precor",
+    "model": "Vitality Pulldown / Seated Row (VSL026BP)",
+    "url": "https://www.precor.com/en-US/products/VSL026BP",
+    "checked": true
+   },
+   {
+    "brand": "Life Fitness",
+    "model": "Hammer Strength HD Elite Dual Pulldown and Row",
+    "url": "https://shop.lifefitness.com/products/hammer-strength-hd-elite-dual-pulldown-row-1",
+    "checked": true
+   },
+   {
+    "brand": "Atlantis",
+    "model": "Lat Pulldown / Low Row Combo (Heavy Stack)",
+    "url": "https://www.atlantisstrength.com/en/product/lat-pulldown-low-row-2/",
+    "checked": true
    }
   ],
   "existing_exercise_ids": [
@@ -11100,8 +11355,9 @@
   "how_to_recognize": "Uma única torre de pesos com DUAS saídas de cabo no mesmo lado: polia alta com barra longa sobre um assento com rolos de coxa, e polia baixa perto do chão com plataforma ou barra para os pés (às vezes com um banco baixo e comprido). Se só houver a polia alta, é o puxador simples; se houver duas colunas separadas com polias reguláveis, é o crossover.",
   "videos": [],
   "photos": [],
-  "confirmed": false,
-  "added": "2026-11"
+  "confirmed": true,
+  "added": "2026-11",
+  "check_note": "Movement Axis, Physicus, Precor (página e a ficha em PDF da lista) e Rogue LP-2 confirmadas; não apareceram a Movement Edge+, a página de produto da Total Health (só a categoria de costas e o catálogo em PDF), a Kikos TTDS3031, a Matrix VS-S331, a Life Fitness Axiom (veio o equivalente Hammer Strength) nem a Rogue Stand Alone (veio a versão Rack Mounted). Nome mais usado no Brasil: 'puxada alta e baixa conjugada'."
  },
  {
   "machine_id": "mx_upper_back_rear_delt",
@@ -11138,17 +11394,31 @@
    {
     "brand": "Technogym",
     "model": "Selection 900 Upper Back (MN1P)",
-    "url": "https://www.technogym.com/en-US/product/selection-900-upper-back_MN1P.html"
+    "url": "https://www.technogym.com/en-US/product/selection-900-upper-back_MN1P.html",
+    "checked": true
    },
    {
     "brand": "Panatta",
     "model": "Freeweight Special Back Deltoids (1FW026), de anilhas",
-    "url": "https://www.panattasport.com/en/free-weight-special/back-deltoids/"
+    "url": "https://www.panattasport.com/en/free-weight-special/back-deltoids/",
+    "checked": true
    },
    {
     "brand": "Cybex",
     "model": "Prestige Total Access Row/Rear Delt (fora de linha)",
     "url": "https://www.lifefitness.com/en-us/catalog/cybex/cybex-products/cybex-prestige-strength-total-access-row-rear-delt"
+   },
+   {
+    "brand": "Technogym",
+    "model": "Selection 900 Upper Back (MN1P)",
+    "url": "https://www.technogym.com/en-INT/product/selection-900-upper-back_MN1P.html",
+    "checked": true
+   },
+   {
+    "brand": "Technogym",
+    "model": "Artis Rear Delt Row",
+    "url": "https://www.technogym.com/en-US/product/artis-rear-delt-row_MK46EH.html",
+    "checked": true
    }
   ],
   "existing_exercise_ids": [
@@ -11202,8 +11472,9 @@
   "how_to_recognize": "Parece uma remada sentada com apoio de peito, mas as manoplas ficam altas, na linha dos ombros, e afastadas; o movimento termina com os cotovelos abertos para os lados. Pode ter pilha de pesos com pino ou alavancas com anilhas. A placa costuma trazer 'Upper Back', 'Rear Delt' ou 'Back Deltoids'.",
   "videos": [],
   "photos": [],
-  "confirmed": false,
-  "added": "2026-11"
+  "confirmed": true,
+  "added": "2026-11",
+  "check_note": "Technogym Upper Back confirmada nas versões en-INT e en-IN (o endereço en-US da lista não apareceu) e Panatta no endereço da lista; a Artis Rear Delt Row é modelo novo. Nas marcas brasileiras só apareceu o Pec Fly/Rear Deltoid da Movement, que é o voador invertido e não este aparelho, o que combina com 'rara'."
  },
  {
   "machine_id": "mx_deadlift_machine",
@@ -11242,7 +11513,8 @@
    {
     "brand": "Nautilus",
     "model": "Leverage Deadlift Shrug (9NP-L3006)",
-    "url": "https://www.corehandf.com/products/nautilus-leverage-deadlift-shrug"
+    "url": "https://www.corehandf.com/products/nautilus-leverage-deadlift-shrug",
+    "checked": true
    },
    {
     "brand": "gym80",
@@ -11252,7 +11524,8 @@
    {
     "brand": "Watson",
     "model": "PL Deadlift",
-    "url": "https://watsongym.co.uk/product/plate-loaded-deadlift/"
+    "url": "https://watsongym.co.uk/product/plate-loaded-deadlift/",
+    "checked": true
    },
    {
     "brand": "Atlantis",
@@ -11314,8 +11587,9 @@
   "how_to_recognize": "Estrutura baixa no chão com dois braços de alavanca laterais carregados com anilhas e alças na altura das canelas ou dos joelhos; muitas têm um segundo par de alças mais alto. A pessoa fica em pé no meio, como dentro de uma barra hexagonal. Não tem assento nem apoio de ombros (isso a diferencia do agachamento alavanca e do hack). É muito parecida com a máquina de encolhimento, e alguns modelos fazem as duas funções.",
   "videos": [],
   "photos": [],
-  "confirmed": false,
-  "added": "2026-11"
+  "confirmed": true,
+  "added": "2026-11",
+  "check_note": "Nautilus e Watson confirmadas nos endereços da lista; gym80 4333 não apareceu e a Atlantis PW335 só foi citada a partir de páginas de categoria, sem resultado com o título do aparelho. Nenhuma das seis marcas brasileiras mostrou máquina de levantamento terra, o que combina com 'rara'."
  },
  {
   "machine_id": "mx_dual_pulley_row",
@@ -11356,12 +11630,14 @@
    {
     "brand": "Cybex",
     "model": "Adjustable Dual Handle Low Row",
-    "url": "https://www.lifefitness.com/en-hk/catalog/cybex/cybex-products/cybex-adjustable-dual-handle-low-row"
+    "url": "https://www.lifefitness.com/en-hk/catalog/cybex/cybex-products/cybex-adjustable-dual-handle-low-row",
+    "checked": true
    },
    {
     "brand": "Watson",
     "model": "DS Animal Low Pulley (duas pilhas)",
-    "url": "https://watsongym.co.uk/product/animal-dual-stack-low-pulley/"
+    "url": "https://watsongym.co.uk/product/animal-dual-stack-low-pulley/",
+    "checked": true
    }
   ],
   "existing_exercise_ids": [
@@ -11417,8 +11693,9 @@
   "how_to_recognize": "Banco baixo com apoio para os pés de frente para DUAS polias baixas independentes, cada uma com sua manopla; muitas vezes há duas pilhas de pesos, uma de cada lado. Sem apoio de peito. Se houver só um cabo com triângulo, é a remada baixa comum.",
   "videos": [],
   "photos": [],
-  "confirmed": false,
-  "added": "2026-11"
+  "confirmed": true,
+  "added": "2026-11",
+  "check_note": "Cybex e Watson confirmadas nos endereços da lista; a Life Fitness Signature Series Row não apareceu. Vieram ainda 'Dual Pulley Low - Cybex' (https://www.lifefitness.com/en-us/catalog/cybex/cybex-products/cybex-dual-pulley-low) e a estação PWR Play, que não contei porque o título não deixa claro que é a remada sentada. Nenhuma marca brasileira mostrou esse aparelho, o que combina com 'rara'."
  },
  {
   "machine_id": "mx_dual_handle_pulldown",
@@ -11452,12 +11729,20 @@
    {
     "brand": "Cybex",
     "model": "Dual Handle Lat Pull",
-    "url": "https://www.lifefitness.com/en-us/catalog/cybex/cybex-products/cybex-dual-handle-lat-pull"
+    "url": "https://www.lifefitness.com/en-us/catalog/cybex/cybex-products/cybex-dual-handle-lat-pull",
+    "checked": true
    },
    {
     "brand": "Life Fitness",
     "model": "Signature Series Pulldown, linha de cabos (fora de linha)",
-    "url": "https://www.lifefitness.com/en-hk/catalog/strength-training/cable-machines-functional-trainers/signature-series-pulldown"
+    "url": "https://www.lifefitness.com/en-hk/catalog/strength-training/cable-machines-functional-trainers/signature-series-pulldown",
+    "checked": true
+   },
+   {
+    "brand": "Life Fitness",
+    "model": "Signature Series Pulldown",
+    "url": "https://www.lifefitness.com/en-us/catalog/strength-training/cable-machines-functional-trainers/signature-series-pulldown",
+    "checked": true
    }
   ],
   "existing_exercise_ids": [
@@ -11510,8 +11795,9 @@
   "how_to_recognize": "Assento com almofada de coxas sob uma estrutura com DUAS polias altas lado a lado, cada uma com seu cabo e sua manopla, em vez de uma barra longa única. Tem pilha de pesos com pino. São cabos, não braços de alavanca rígidos.",
   "videos": [],
   "photos": [],
-  "confirmed": false,
-  "added": "2026-11"
+  "confirmed": true,
+  "added": "2026-11",
+  "check_note": "Os dois modelos existem no site da Life Fitness, mas ambos aparecem como fora de linha (Cybex 'Discontinued', Signature 'Product Discontinued'); o endereço en-hk da lista não apareceu, só o en-us equivalente. Nenhuma marca brasileira tem esse aparelho: a busca nos seis sites nacionais só trouxe puxada+remada conjugada (Movement Pulldown/Low Row Axis, Kikos Pulley com Remada, Total Health Dual Pulley 2x1), que é outra coisa."
  },
  {
   "machine_id": "mx_jammer",
@@ -11545,12 +11831,20 @@
    {
     "brand": "Hammer Strength",
     "model": "Ground Base Jammer",
-    "url": "https://www.lifefitness.com/en-us/catalog/strength-training/plate-loaded/ground-base-jammer"
+    "url": "https://www.lifefitness.com/en-us/catalog/strength-training/plate-loaded/ground-base-jammer",
+    "checked": true
    },
    {
     "brand": "elitefts",
     "model": "Jammer",
-    "url": "https://elitefts.com/products/elitefts-jammer"
+    "url": "https://elitefts.com/products/elitefts-jammer",
+    "checked": true
+   },
+   {
+    "brand": "Hammer Strength",
+    "model": "Ground Base Jammer (loja oficial)",
+    "url": "https://shop.lifefitness.com/products/hammer-strength-ground-base-jammer",
+    "checked": true
    }
   ],
   "existing_exercise_ids": [
@@ -11609,8 +11903,9 @@
   "how_to_recognize": "Base larga no chão com dois braços de alavanca longos e independentes, articulados embaixo, com pinos de anilha e manoplas anguladas na altura do peito; a pessoa fica em pé de frente e empurra para a frente e para cima. Sem assento. Na Hammer Strength a placa traz 'Ground Base'.",
   "videos": [],
   "photos": [],
-  "confirmed": false,
-  "added": "2026-11"
+  "confirmed": true,
+  "added": "2026-11",
+  "check_note": "Confirmado nas duas marcas da lista, com os mesmos endereços; não procurei marca brasileira para este item (nenhuma busca nacional feita), então 'rara' fica como estava."
  },
  {
   "machine_id": "mx_chest_back_combo",
@@ -11636,13 +11931,27 @@
    "https://shop.lifefitness.com/products/hammer-strength-plate-loaded-iso-lateral-chest-back"
   ],
   "brands": [
-   "Hammer Strength"
+   "Hammer Strength",
+   "Kikos"
   ],
   "brand_models": [
    {
     "brand": "Hammer Strength",
     "model": "Plate-Loaded Iso-Lateral Chest/Back",
-    "url": "https://www.lifefitness.com/en-us/catalog/strength-training/plate-loaded/plate-loaded-iso-lateral-chest-back"
+    "url": "https://www.lifefitness.com/en-us/catalog/strength-training/plate-loaded/plate-loaded-iso-lateral-chest-back",
+    "checked": true
+   },
+   {
+    "brand": "Hammer Strength",
+    "model": "Plate-Loaded Iso-Lateral Chest/Back (loja oficial)",
+    "url": "https://shop.lifefitness.com/products/hammer-strength-plate-loaded-iso-lateral-chest-back",
+    "checked": true
+   },
+   {
+    "brand": "Kikos",
+    "model": "Supino com Puxada HF 2002 (linha Hammer Force Kikos Pro)",
+    "url": "https://www.kikos.com.br/catalog/product/view/_ignore_category/1/id/1384/s/nossas-lojas",
+    "checked": true
    }
   ],
   "existing_exercise_ids": [
@@ -11694,8 +12003,9 @@
   "how_to_recognize": "Máquina de anilhas da Hammer Strength com DOIS assentos em lados opostos da mesma estrutura e braços de alavanca independentes: de um lado, encosto e manoplas de supino; do outro, assento com almofada de coxas rebatível e manoplas de puxada acima da cabeça.",
   "videos": [],
   "photos": [],
-  "confirmed": false,
-  "added": "2026-11"
+  "confirmed": true,
+  "added": "2026-11",
+  "check_note": "Hammer Strength confirmada; apareceu também a versão brasileira da Kikos, 'Supino com Puxada HF 2002' (linha Hammer Force), que dá o nome usado aqui: 'supino com puxada'. Da Kikos só vi o título do resultado (sem descrição) e o endereço veio em formato estranho, terminando em /s/nossas-lojas."
  },
  {
   "machine_id": "mx_olympic_flat_bench",
@@ -11731,28 +12041,45 @@
   "brands": [
    "Movement",
    "Hammer Strength (Life Fitness)",
-   "Matrix"
+   "Matrix",
+   "Total Health"
   ],
   "brand_models": [
    {
     "brand": "Movement",
     "model": "Next – Banco Supino Reto",
-    "url": "https://www.movement.com.br/produto/banco-supino-reto-next/"
+    "url": "https://www.movement.com.br/produto/banco-supino-reto-next/",
+    "checked": true
    },
    {
     "brand": "Hammer Strength (Life Fitness)",
     "model": "Olympic Flat Bench",
-    "url": "https://www.lifefitness.com/en-eu/catalog/strength-training/benches/olympic-flat-bench"
+    "url": "https://www.lifefitness.com/en-eu/catalog/strength-training/benches/olympic-flat-bench",
+    "checked": true
    },
    {
     "brand": "Matrix",
     "model": "Magnum Breaker Olympic Flat Bench (MG-A678)",
-    "url": "https://us.matrixfitness.com/eng/strength/free-weights/mg-a678-breaker-olympic-flat-bench"
+    "url": "https://us.matrixfitness.com/eng/strength/free-weights/mg-a678-breaker-olympic-flat-bench",
+    "checked": true
    },
    {
     "brand": "Matrix",
     "model": "Magnum Olympic Flat Bench (MG-A78)",
-    "url": "https://world.matrixfitness.com/eng/strength/free-weights/mg-a78-olympic-flat-bench"
+    "url": "https://world.matrixfitness.com/eng/strength/free-weights/mg-a78-olympic-flat-bench",
+    "checked": true
+   },
+   {
+    "brand": "Total Health",
+    "model": "Bench Press (Banco Supino Reto) 401RX",
+    "url": "https://totalhealth.com.br/bench-press-banco-supino-reto",
+    "checked": true
+   },
+   {
+    "brand": "Matrix",
+    "model": "Magnum Breaker Olympic Flat Bench (MG-A678), site Brasil",
+    "url": "https://br.matrixfitness.com/ptb/strength/free-weights/mg-a678-breaker-olympic-flat-bench",
+    "checked": true
    }
   ],
   "existing_exercise_ids": [
@@ -11819,8 +12146,9 @@
   "how_to_recognize": "Banco reto, estreito e fixo, com dois postes verticais atrás da cabeceira que seguram uma barra olímpica comprida em ganchos; pinos para guardar anilhas nos postes ou na base. Não tem pilha de pesos nem cabos. A pessoa fica deitada de barriga para cima com a barra acima do rosto. Diferenças: no inclinado o encosto sobe e há um assento; no declinado a cabeça fica mais baixa e há rolos para prender as pernas; a gaiola (power rack) tem quatro colunas e travas reguláveis.",
   "videos": [],
   "photos": [],
-  "confirmed": false,
-  "added": "2026-11"
+  "confirmed": true,
+  "added": "2026-11",
+  "check_note": "Confirmado em duas marcas brasileiras (Movement e Total Health), além de Hammer Strength e Matrix (inclusive no site brasileiro da Matrix); a Righetto lista o 'Banco Supino Horizontal' FS3060 só na página da linha Free Style, sem página própria."
  },
  {
   "machine_id": "mx_olympic_incline_bench",
@@ -11855,23 +12183,39 @@
   "brands": [
    "Movement",
    "Hammer Strength (Life Fitness)",
-   "Matrix"
+   "Matrix",
+   "Total Health"
   ],
   "brand_models": [
    {
     "brand": "Movement",
     "model": "Next – Banco Supino Inclinado",
-    "url": "https://www.movement.com.br/produto/banco-supino-inclinado-next/"
+    "url": "https://www.movement.com.br/produto/banco-supino-inclinado-next/",
+    "checked": true
    },
    {
     "brand": "Hammer Strength (Life Fitness)",
     "model": "Olympic Incline Bench",
-    "url": "https://lifefitness.com/facility/products/hammer-strength-benches-and-racks/olympic-incline-bench"
+    "url": "https://lifefitness.com/facility/products/hammer-strength-benches-and-racks/olympic-incline-bench",
+    "checked": true
    },
    {
     "brand": "Matrix",
     "model": "Magnum Breaker Olympic Incline Bench (MG-A679)",
-    "url": "https://us.matrixfitness.com/eng/strength/free-weights/mg-a679-breaker-olympic-incline-bench"
+    "url": "https://us.matrixfitness.com/eng/strength/free-weights/mg-a679-breaker-olympic-incline-bench",
+    "checked": true
+   },
+   {
+    "brand": "Total Health",
+    "model": "Incline Press Bench (Banco para Supino Inclinado) 410RX",
+    "url": "https://totalhealth.com.br/incline-press-bench-banco-para-supino-inclinado",
+    "checked": true
+   },
+   {
+    "brand": "Hammer Strength (Life Fitness)",
+    "model": "Olympic Incline Bench (O-IB)",
+    "url": "https://www.lifefitness.com/en-us/catalog/strength-training/benches/olympic-incline-bench",
+    "checked": true
    }
   ],
   "existing_exercise_ids": [
@@ -11922,8 +12266,9 @@
   "how_to_recognize": "Banco com encosto inclinado para trás e um assento pequeno, preso a dois postes altos atrás que seguram a barra olímpica acima da cabeça de quem senta; muitas vezes há um degrau atrás para o ajudante. Sem pilha de pesos. Diferença para o banco de desenvolvimento olímpico: lá o encosto fica quase em pé (perto de 90°).",
   "videos": [],
   "photos": [],
-  "confirmed": false,
-  "added": "2026-11"
+  "confirmed": true,
+  "added": "2026-11",
+  "check_note": "As três marcas da lista confirmadas com os mesmos endereços, mais a Total Health; a Righetto tem o 'Banco supino inclinado' FS3065 só na página da linha Free Style (título da página é a linha, não o aparelho)."
  },
  {
   "machine_id": "mx_adjustable_bench",
@@ -11956,18 +12301,45 @@
   ],
   "brands": [
    "Movement",
-   "Hammer Strength (Life Fitness)"
+   "Hammer Strength (Life Fitness)",
+   "Total Health"
   ],
   "brand_models": [
    {
     "brand": "Movement",
     "model": "Bolt – Banco Ajustável",
-    "url": "https://www.movement.com.br/produto/bolt-banco-ajustavel/"
+    "url": "https://www.movement.com.br/produto/bolt-banco-ajustavel/",
+    "checked": true
    },
    {
     "brand": "Hammer Strength (Life Fitness)",
     "model": "Home Multi-Adjustable Bench (modelo residencial)",
-    "url": "https://shop.lifefitness.com/products/hammer-strength-home-multi-adjustable-bench"
+    "url": "https://shop.lifefitness.com/products/hammer-strength-home-multi-adjustable-bench",
+    "checked": true
+   },
+   {
+    "brand": "Movement",
+    "model": "Next – Banco Ajustável",
+    "url": "https://www.movement.com.br/produto/next-banco-ajustavel/",
+    "checked": true
+   },
+   {
+    "brand": "Movement",
+    "model": "Adjustable Bench Axis LC",
+    "url": "https://www.movement.com.br/produto/adjustable-bench-axis/",
+    "checked": true
+   },
+   {
+    "brand": "Total Health",
+    "model": "Incline Bench (Banco Regulável) 805RX",
+    "url": "https://totalhealth.com.br/incline-bench-banco-regulavel",
+    "checked": true
+   },
+   {
+    "brand": "Hammer Strength (Life Fitness)",
+    "model": "HD Elite Multi-Adjustable Bench (comercial)",
+    "url": "https://www.lifefitness.com/en-us/catalog/strength-training/benches/hd-elite-multi-adjustable-bench",
+    "checked": true
    }
   ],
   "existing_exercise_ids": [
@@ -12044,8 +12416,9 @@
   "how_to_recognize": "Banco solto, sem postes nem suporte de barra: um encosto comprido e um assento curto sobre uma base baixa, com uma escada de encaixes ou um pino sob o encosto para mudar o ângulo; costuma ter rodinhas em uma ponta e alça na outra. Fica perto dos halteres. Se o estofado é uma peça única que não inclina, é o banco reto.",
   "videos": [],
   "photos": [],
-  "confirmed": false,
-  "added": "2026-11"
+  "confirmed": true,
+  "added": "2026-11",
+  "check_note": "Confirmado em Movement (três linhas) e Total Health, mais Hammer Strength; no Brasil aparece como 'banco ajustável' (Movement) ou 'banco regulável' (Total Health, Righetto FS3076 0-90° na página da linha Free Style)."
  },
  {
   "machine_id": "mx_flat_bench",
@@ -12072,13 +12445,28 @@
    "https://www.lifefitness.com/en-gb/catalog/strength-training/benches"
   ],
   "brands": [
-   "Life Fitness"
+   "Life Fitness",
+   "Movement",
+   "Total Health"
   ],
   "brand_models": [
    {
     "brand": "Life Fitness",
     "model": "Flat Bench (catálogo de bancos Life Fitness / Hammer Strength)",
-    "url": "https://www.lifefitness.com/en-eu/catalog/strength-training/benches/flat-bench"
+    "url": "https://www.lifefitness.com/en-eu/catalog/strength-training/benches/flat-bench",
+    "checked": true
+   },
+   {
+    "brand": "Movement",
+    "model": "Next – Banco Reto (Flat Bench)",
+    "url": "https://www.movement.com.br/produto/banco-reto-next/",
+    "checked": true
+   },
+   {
+    "brand": "Total Health",
+    "model": "Flat Bench (Banco Reto) 803RX",
+    "url": "https://totalhealth.com.br/flat-bench-banco-reto",
+    "checked": true
    }
   ],
   "existing_exercise_ids": [
@@ -12156,8 +12544,9 @@
   "how_to_recognize": "Banco baixo e plano, com um único estofado retangular comprido sobre pés fixos; sem encosto, sem postes, sem barra e sem pinos de regulagem. Fica na área de halteres.",
   "videos": [],
   "photos": [],
-  "confirmed": false,
-  "added": "2026-11"
+  "confirmed": true,
+  "added": "2026-11",
+  "check_note": "O item vinha só com Life Fitness; a busca confirmou também Movement (Banco Reto Next) e Total Health (Flat Bench 803RX). Existe ainda 'Banco Reto Bolt' na Movement, mas o resumo cita porta-anilhas, então pode ser o banco de supino com suporte e ficou de fora."
  },
  {
   "machine_id": "mx_bench_90",
@@ -12184,13 +12573,34 @@
    "https://en.movement.com.br/product/bank-90-next/"
   ],
   "brands": [
-   "Movement"
+   "Movement",
+   "Total Health",
+   "Hammer Strength (Life Fitness)"
   ],
   "brand_models": [
    {
     "brand": "Movement",
     "model": "Next – Banco 90° (Bench 90°)",
-    "url": "https://en.movement.com.br/product/bank-90-next/"
+    "url": "https://en.movement.com.br/product/bank-90-next/",
+    "checked": true
+   },
+   {
+    "brand": "Movement",
+    "model": "Next – Banco 90°",
+    "url": "https://www.movement.com.br/produto/banco-90-next/",
+    "checked": true
+   },
+   {
+    "brand": "Total Health",
+    "model": "Utility Bench (Banco 90º) 808RX",
+    "url": "https://totalhealth.com.br/utility-bench-banco-90",
+    "checked": true
+   },
+   {
+    "brand": "Hammer Strength (Life Fitness)",
+    "model": "Utility Bench - 75 Degree (FW-UB75)",
+    "url": "https://www.lifefitness.com/en-us/catalog/strength-training/benches/utility-bench-75-degree",
+    "checked": true
    }
   ],
   "existing_exercise_ids": [
@@ -12249,8 +12659,9 @@
   "how_to_recognize": "Banco pequeno e fixo, com assento curto e encosto alto quase vertical, sem postes, sem barra e sem regulagem aparente; fica na área dos halteres. A pessoa senta ereta com as costas inteiras apoiadas.",
   "videos": [],
   "photos": [],
-  "confirmed": false,
-  "added": "2026-11"
+  "confirmed": true,
+  "added": "2026-11",
+  "check_note": "Confirmado em Movement e Total Health com o nome 'Banco 90°' (na Total Health o encosto real é de 80°); o equivalente da Hammer Strength é o 'Utility Bench 75 Degree', com encosto a 75°. A ficha da Movement marca 'Ajustes: Não', o que bate com a descrição da lista."
  },
  {
   "machine_id": "mx_olympic_decline_bench",
@@ -12281,23 +12692,39 @@
   "brands": [
    "Movement",
    "Hammer Strength (Life Fitness)",
-   "Matrix"
+   "Matrix",
+   "Total Health"
   ],
   "brand_models": [
    {
     "brand": "Movement",
     "model": "Next – Olympic Decline Bench",
-    "url": "https://www.movement.com.br/produto/olympic-decline-bench-next/"
+    "url": "https://www.movement.com.br/produto/olympic-decline-bench-next/",
+    "checked": true
    },
    {
     "brand": "Hammer Strength (Life Fitness)",
     "model": "Olympic Decline Bench",
-    "url": "https://www.lifefitness.com/en-gb/catalog/strength-training/benches/olympic-decline-bench"
+    "url": "https://www.lifefitness.com/en-gb/catalog/strength-training/benches/olympic-decline-bench",
+    "checked": true
    },
    {
     "brand": "Matrix",
     "model": "Magnum Breaker Olympic Decline Bench (MG-A680)",
-    "url": "https://world.matrixfitness.com/eng/strength/free-weights/mg-a680-breaker-olympic-decline-bench"
+    "url": "https://world.matrixfitness.com/eng/strength/free-weights/mg-a680-breaker-olympic-decline-bench",
+    "checked": true
+   },
+   {
+    "brand": "Total Health",
+    "model": "Decline Press Bench (Supino Declinado) 407RX",
+    "url": "https://totalhealth.com.br/decline-press-bench-supino-declinado",
+    "checked": true
+   },
+   {
+    "brand": "Hammer Strength (Life Fitness)",
+    "model": "Olympic Decline Bench (O-DB)",
+    "url": "https://www.lifefitness.com/en-us/catalog/strength-training/benches/olympic-decline-bench",
+    "checked": true
    }
   ],
   "existing_exercise_ids": [
@@ -12347,8 +12774,9 @@
   "how_to_recognize": "Banco comprido inclinado com a cabeceira mais baixa que o assento, rolos acolchoados na ponta alta para prender pernas ou pés e dois postes com ganchos para a barra olímpica acima da cabeceira. Sem pilha de pesos. A pessoa fica deitada com a cabeça mais baixa que o quadril. Não confundir com a prancha abdominal declinada, que não tem suporte de barra.",
   "videos": [],
   "photos": [],
-  "confirmed": false,
-  "added": "2026-11"
+  "confirmed": true,
+  "added": "2026-11",
+  "check_note": "As três marcas da lista confirmadas, mais a Total Health; o endereço en-gb da Life Fitness que está na lista não apareceu, vieram os equivalentes en-us e en-eu. A Righetto tem o 'Banco supino declinado' FS3070 só na página da linha Free Style."
  },
  {
   "machine_id": "mx_olympic_shoulder_bench",
@@ -12377,18 +12805,47 @@
    "https://gr.matrixfitness.com/eng/strength/free-weights/mg-a45-olympic-shoulder-bench"
   ],
   "brands": [
-   "Matrix"
+   "Matrix",
+   "Hammer Strength (Life Fitness)",
+   "Physicus",
+   "Total Health"
   ],
   "brand_models": [
    {
     "brand": "Matrix",
     "model": "Magnum Breaker Olympic Shoulder Bench (MG-A645)",
-    "url": "https://us.matrixfitness.com/eng/strength/free-weights/mg-a645-breaker-olympic-shoulder-bench"
+    "url": "https://us.matrixfitness.com/eng/strength/free-weights/mg-a645-breaker-olympic-shoulder-bench",
+    "checked": true
    },
    {
     "brand": "Matrix",
     "model": "Magnum Olympic Shoulder Bench (MG-A45)",
-    "url": "https://gr.matrixfitness.com/eng/strength/free-weights/mg-a45-olympic-shoulder-bench"
+    "url": "https://gr.matrixfitness.com/eng/strength/free-weights/mg-a45-olympic-shoulder-bench",
+    "checked": true
+   },
+   {
+    "brand": "Matrix",
+    "model": "Magnum Breaker Olympic Shoulder Bench (MG-A645)",
+    "url": "https://uk.matrixfitness.com/eng/strength/free-weights/mg-a645-breaker-olympic-shoulder-bench",
+    "checked": true
+   },
+   {
+    "brand": "Hammer Strength (Life Fitness)",
+    "model": "Olympic Military Bench (O-MB)",
+    "url": "https://www.lifefitness.com/en-nl/catalog/strength-training/benches/olympic-military-bench",
+    "checked": true
+   },
+   {
+    "brand": "Physicus",
+    "model": "Banco para Ombros (desenvolvimento livre, com suporte de barra)",
+    "url": "https://www.physicus.com.br/produtos/item/banco-para-ombros-%7C-desenvolvimento-de-ombros-deltoide-desenvolvimento-livre",
+    "checked": true
+   },
+   {
+    "brand": "Total Health",
+    "model": "Shoulder Press Bench (Banco para Desenvolvimento de Ombros) 201RX",
+    "url": "https://totalhealth.com.br/shoulder-press-bench-banco-para-desenvolvimento-de-ombros",
+    "checked": true
    }
   ],
   "existing_exercise_ids": [
@@ -12440,8 +12897,9 @@
   "how_to_recognize": "Banco com assento curto e encosto alto quase vertical, preso a dois postes altos que seguram a barra olímpica acima e atrás da cabeça de quem está sentado; costuma ter um degrau atrás para o ajudante e pinos para anilhas. Sem pilha de pesos. Diferença para o supino inclinado olímpico: o encosto é bem mais em pé.",
   "videos": [],
   "photos": [],
-  "confirmed": false,
-  "added": "2026-11"
+  "confirmed": true,
+  "added": "2026-11",
+  "check_note": "Matrix confirmada (MG-A645 veio pelo endereço uk, não pelo us da lista; MG-A45 veio com título genérico 'Matrix Fitness', sustentado só pelo endereço e pelo resumo); novas: Hammer Strength 'Olympic Military Bench', Physicus 'Banco para Ombros' (resumo cita suporte de barra) e Total Health 201RX, cujo resumo não cita o suporte de barra, mas as medidas (113 cm de largura, 166 cm de altura, 90 kg) indicam que tem. A Movement não tem banco de desenvolvimento com suporte na linha Next; a Righetto lista 'Banco p/ Desenvolv. c/ suporte' FS3079 só no catálogo em PDF."
  },
  {
   "machine_id": "mx_horizontal_bench_press_machine",
@@ -12474,7 +12932,14 @@
    {
     "brand": "Hammer Strength (Life Fitness)",
     "model": "Plate-Loaded Iso-Lateral Horizontal Bench Press",
-    "url": "https://www.lifefitness.com/en-us/catalog/strength-training/plate-loaded/plate-loaded-iso-lateral-horizontal-bench-press"
+    "url": "https://www.lifefitness.com/en-us/catalog/strength-training/plate-loaded/plate-loaded-iso-lateral-horizontal-bench-press",
+    "checked": true
+   },
+   {
+    "brand": "Hammer Strength (Life Fitness)",
+    "model": "Plate-Loaded Iso-Lateral Horizontal Bench Press (loja oficial)",
+    "url": "https://shop.lifefitness.com/products/hammer-strength-plate-loaded-iso-lateral-horizontal-bench-press",
+    "checked": true
    }
   ],
   "existing_exercise_ids": [
@@ -12523,8 +12988,9 @@
   "how_to_recognize": "Banco quase horizontal dentro de uma estrutura de aço, com dois braços de alavanca independentes que passam por cima do peito de quem está deitado; cada braço tem um pino para anilhas e há pinos de armazenamento na estrutura. Não há barra solta nem pilha de pesos. Diferença para o supino articulado comum: aqui a pessoa fica deitada, não sentada.",
   "videos": [],
   "photos": [],
-  "confirmed": false,
-  "added": "2026-11"
+  "confirmed": true,
+  "added": "2026-11",
+  "check_note": "Hammer Strength confirmada com o mesmo endereço da lista. Há três candidatas brasileiras que NÃO entraram como confirmadas porque nenhuma página diz que a pessoa fica deitada: Kikos 'Supino Horizontal HF 2007' (linha Hammer Force, 109 kg e 107 cm de altura, bem parecido com o da Hammer Strength), Total Health 'Bench Press Horizontal' (https://totalhealth.com.br/bench-press-horizontal) e Physicus 'Supino Reto Multi Articulado'; o nome mais usado aqui seria 'supino horizontal articulado'."
  },
  {
   "machine_id": "mx_preacher_bench",
@@ -12551,8 +13017,66 @@
   ],
   "why": "Apoio inclinado para fazer a rosca Scott com peso livre (barra W ou halter). Difere da Scott na máquina (mx_preacher_curl_machine) porque não tem pilha de pesos nem braço de alavanca: a carga é a barra ou o halter, e a tensão cai perto do topo do movimento.",
   "sources": [],
-  "brands": [],
-  "brand_models": [],
+  "brands": [
+   "Total Health",
+   "Physicus",
+   "Movement",
+   "Hoist",
+   "Panatta",
+   "Life Fitness",
+   "Watson",
+   "Nautilus (Core Health & Fitness)"
+  ],
+  "brand_models": [
+   {
+    "brand": "Total Health",
+    "model": "503RX",
+    "url": "https://totalhealth.com.br/scott-bench-banco-rosca-scott",
+    "checked": true
+   },
+   {
+    "brand": "Physicus",
+    "model": "",
+    "url": "https://www.physicus.com.br/produtos/item/banco-scott",
+    "checked": true
+   },
+   {
+    "brand": "Movement",
+    "model": "Banco Bíceps Next",
+    "url": "https://www.movement.com.br/produto/banco-biceps-next/",
+    "checked": true
+   },
+   {
+    "brand": "Hoist",
+    "model": "HF-4550",
+    "url": "https://www.hoistfitness.com/products/hf-4550-preacher-curl",
+    "checked": true
+   },
+   {
+    "brand": "Panatta",
+    "model": "",
+    "url": "https://www.panattasport.com/en/free-weight-special/preacher-curl-bench/",
+    "checked": true
+   },
+   {
+    "brand": "Life Fitness",
+    "model": "LBR-BC",
+    "url": "https://www.lifefitness.com/en-us/catalog/strength-training/benches/life-fitness-arm-curl-bench",
+    "checked": true
+   },
+   {
+    "brand": "Watson",
+    "model": "",
+    "url": "https://watsongym.co.uk/product/standing-preacher/",
+    "checked": true
+   },
+   {
+    "brand": "Nautilus (Core Health & Fitness)",
+    "model": "9NP-B7515",
+    "url": "https://www.corehandf.com/products/nautilus-benches-racks-standing-preacher-curl",
+    "checked": true
+   }
+  ],
   "existing_exercise_ids": [
    "Preacher_Curl",
    "One_Arm_Dumbbell_Preacher_Curl",
@@ -12636,8 +13160,9 @@
   "how_to_recognize": "Banco pequeno com assento e, à frente dele, um apoio estofado inclinado que desce para longe de quem senta, com um suporte ou ganchos para a barra do outro lado. Não tem pilha de pesos, cabos nem braço de alavanca: é só estrutura e estofado. Na versão em pé o apoio fica mais alto e não há assento.",
   "videos": [],
   "photos": [],
-  "confirmed": false,
-  "added": "2026-11"
+  "confirmed": true,
+  "added": "2026-11",
+  "check_note": "Confirmado em três fabricantes brasileiros (Total Health, Physicus, Movement); a Movement chama de \"Banco Bíceps\" (incluído pelo título e pelo resumo que cita apoio de cotovelo). Kikos só apareceu com a Scott MÁQUINA (CAS40) e o título \"Rosca Scott G2\" da Lion Fitness não deixa claro se é banco ou máquina. Watson, Nautilus e Life Fitness são a versão em pé."
  },
  {
   "machine_id": "mx_single_cable_column",
@@ -12665,8 +13190,51 @@
   ],
   "why": "Uma só coluna com pilha de pesos e uma saída de cabo (regulável na altura, ou uma alta e uma baixa fixas), usada para tríceps no pulley e rosca no cabo. Difere do crossover (mx_cable_crossover) por ter um lado só e do puxador (mx_lat_pulldown) por não ter assento nem apoio de coxa.",
   "sources": [],
-  "brands": [],
-  "brand_models": [],
+  "brands": [
+   "Total Health",
+   "Physicus",
+   "Hoist",
+   "Matrix",
+   "Life Fitness (Cybex)"
+  ],
+  "brand_models": [
+   {
+    "brand": "Total Health",
+    "model": "814RRF",
+    "url": "https://totalhealth.com.br/polia-simples",
+    "checked": true
+   },
+   {
+    "brand": "Physicus",
+    "model": "PLC 42",
+    "url": "https://www.physicus.com.br/detalhes/plc42-maquina-polia-regulavel",
+    "checked": true
+   },
+   {
+    "brand": "Hoist",
+    "model": "CMS-6175",
+    "url": "https://www.hoistfitness.com/products/cms-6175-stand-alone-hi-lo-pulley",
+    "checked": true
+   },
+   {
+    "brand": "Matrix",
+    "model": "MD-AP (Versa)",
+    "url": "https://us.matrixfitness.com/eng/strength/single-station/md-ap-adjustable-pulley",
+    "checked": true
+   },
+   {
+    "brand": "Matrix",
+    "model": "Aura G3-MS24",
+    "url": "https://us.matrixfitness.com/eng/strength/multi-station/adjustable-pulley",
+    "checked": true
+   },
+   {
+    "brand": "Life Fitness (Cybex)",
+    "model": "",
+    "url": "https://www.lifefitness.com/en-us/catalog/cybex/cybex-products/cybex-high-low-station",
+    "checked": true
+   }
+  ],
   "existing_exercise_ids": [
    "Triceps_Pushdown_-_Rope_Attachment",
    "Triceps_Pushdown",
@@ -12730,8 +13298,9 @@
   "how_to_recognize": "Uma única coluna ou torre com pilha de pesos e uma saída de cabo: ou um carro que sobe e desce na coluna (polia ajustável), ou duas saídas fixas, uma no alto e outra perto do chão. Sem banco nem assento; às vezes é presa na parede ou faz parte de uma estação maior. No crossover são duas colunas ligadas por uma travessa; no puxador há assento e rolos para as coxas.",
   "videos": [],
   "photos": [],
-  "confirmed": false,
-  "added": "2026-11"
+  "confirmed": true,
+  "added": "2026-11",
+  "check_note": "Existe e tem dois fabricantes brasileiros; nomes usados no Brasil: \"Polia Simples\" (Total Health) e \"Polia Regulável\" (Physicus). A página da Total Health não deixa claro se a polia regula em altura; a Cybex High Low Station consta como descontinuada. Movement só apareceu com Cross 45º/Wire Cross, que são outro aparelho."
  },
  {
   "machine_id": "mx_triceps_extension_machine",
@@ -12756,8 +13325,23 @@
   ],
   "why": "Isola o tríceps com os braços apoiados num estofado e o cotovelo girando no eixo da máquina. Difere do seated dip (mx_dip_machine), que é um empurrar para baixo multiarticular sem apoio de cotovelo, e do francês na máquina (mx_overhead_triceps_machine), em que os braços ficam acima da cabeça.",
   "sources": [],
-  "brands": [],
-  "brand_models": [],
+  "brands": [
+   "Life Fitness (Hammer Strength)"
+  ],
+  "brand_models": [
+   {
+    "brand": "Life Fitness (Hammer Strength)",
+    "model": "HS-TE",
+    "url": "https://www.lifefitness.com/en-us/catalog/strength-training/selectorized/hammer-strength-select-triceps-extension",
+    "checked": true
+   },
+   {
+    "brand": "Life Fitness (Hammer Strength)",
+    "model": "MTS Iso-Lateral",
+    "url": "https://www.lifefitness.com/en-us/catalog/strength-training/selectorized/mts-iso-lateral-triceps-extension",
+    "checked": true
+   }
+  ],
   "existing_exercise_ids": [
    "Machine_Triceps_Extension"
   ],
@@ -12787,8 +13371,9 @@
   "how_to_recognize": "Máquina sentada com um apoio estofado à frente do tronco onde ficam os braços, e duas manoplas (ou uma barra) presas a um braço de alavanca que gira num eixo ao lado dos cotovelos. Em geral as manoplas começam perto dos ombros e são empurradas para frente e para baixo até estender os braços. Parece a Scott de pino, mas o movimento é de empurrar. Diferença para o seated dip: aqui há apoio de cotovelo e as manoplas não ficam ao lado do quadril.",
   "videos": [],
   "photos": [],
-  "confirmed": false,
-  "added": "2026-11"
+  "confirmed": true,
+  "added": "2026-11",
+  "check_note": "O tipo existe (Hammer Strength Select Triceps Extension, com apoio de braço inclinado), mas nenhum fabricante brasileiro foi confirmado para ESTE tipo: Movement e Total Health chamam a máquina de tríceps de \"Triceps Press\" (tipo mergulho sentado) e os títulos da Physicus (\"Máquina Tríceps\", \"Tríceps Sentado\") e da Kikos (\"Tríceps Kikos Pro Classic CLS42\") não dizem qual dos dois é. A estimativa \"média\" ficou sem confirmação no Brasil; pode ser mais rara do que isso."
  },
  {
   "machine_id": "mx_biceps_triceps_combo",
@@ -12813,8 +13398,51 @@
   ],
   "why": "Uma máquina só para rosca de bíceps e extensão de tríceps, trocando a posição de partida do braço de alavanca ou a pegada; serve para economizar espaço. Difere da Scott de pino e da extensão de tríceps dedicadas por fazer os dois movimentos no mesmo assento.",
   "sources": [],
-  "brands": [],
-  "brand_models": [],
+  "brands": [
+   "Kikos",
+   "Life Fitness",
+   "Nautilus (Core Health & Fitness)",
+   "Hoist",
+   "Matrix"
+  ],
+  "brand_models": [
+   {
+    "brand": "Kikos",
+    "model": "Pro Dual TTDS4042",
+    "url": "https://www.kikos.com.br/biceps-e-triceps-press-kikos-pro-dual-ttds4042.html",
+    "checked": true
+   },
+   {
+    "brand": "Life Fitness",
+    "model": "Axiom Series",
+    "url": "https://shop.lifefitness.com/products/axiom-series-biceps-curl-triceps-extension",
+    "checked": true
+   },
+   {
+    "brand": "Life Fitness",
+    "model": "Axiom Series",
+    "url": "https://www.lifefitness.com/en-us/catalog/strength-training/selectorized/axiom-series-biceps-triceps",
+    "checked": true
+   },
+   {
+    "brand": "Nautilus (Core Health & Fitness)",
+    "model": "Instinct Dual",
+    "url": "https://www.corehandf.com/products/nautilus-instinct-dual-biceps-curl-triceps-extension",
+    "checked": true
+   },
+   {
+    "brand": "Hoist",
+    "model": "HD-3100",
+    "url": "https://www.hoistfitness.com/products/hd-3100-preacher-curl-triceps-extension",
+    "checked": true
+   },
+   {
+    "brand": "Matrix",
+    "model": "Versa VS-S401",
+    "url": "https://us.matrixfitness.com/eng/strength/single-station/vs-s401-bicep-tricep",
+    "checked": true
+   }
+  ],
   "existing_exercise_ids": [
    "Machine_Preacher_Curls",
    "Machine_Triceps_Extension"
@@ -12848,8 +13476,9 @@
   "how_to_recognize": "Parece uma Scott de pino: assento, apoio estofado para os braços e uma barra ou manoplas num braço de alavanca com eixo na altura dos cotovelos, ligado a uma pilha de pesos. O que denuncia a função dupla é o adesivo de instruções mostrando os dois exercícios (bíceps e tríceps) e, em geral, uma trava ou alavanca que muda a posição de partida do braço de alavanca.",
   "videos": [],
   "photos": [],
-  "confirmed": false,
-  "added": "2026-11"
+  "confirmed": true,
+  "added": "2026-11",
+  "check_note": "Existe em várias marcas; no Brasil só a Kikos foi confirmada, e a dela é \"Bíceps e Tríceps Press\" (o lado do tríceps é press, não extensão com cotovelo apoiado). A Physicus só apareceu com máquinas separadas. Precor Vitality tem o modelo, mas só veio como PDF de ficha, sem título do aparelho."
  },
  {
   "machine_id": "mx_standing_biceps_curl_machine",
@@ -12872,8 +13501,17 @@
   ],
   "why": "Reproduz a rosca direta em pé com trajetória guiada e cotovelos apoiados, sem assento. Difere da Scott na máquina porque o braço fica ao lado do tronco (e não à frente), numa posição parecida com a da rosca com barra.",
   "sources": [],
-  "brands": [],
-  "brand_models": [],
+  "brands": [
+   "gym80"
+  ],
+  "brand_models": [
+   {
+    "brand": "gym80",
+    "model": "5903",
+    "url": "https://gym80.de/en/product/5903/",
+    "checked": true
+   }
+  ],
   "existing_exercise_ids": [
    "Machine_Bicep_Curl"
   ],
@@ -12908,8 +13546,9 @@
   "how_to_recognize": "Máquina SEM assento: a pessoa fica em pé, com os cotovelos ou a parte de trás dos braços encostados num apoio estofado junto ao tronco, e sobe uma barra ou duas manoplas presas a um braço de alavanca que gira ao lado dos cotovelos. A carga fica em anilhas ou numa pilha de pesos, conforme o modelo. Não confundir com o banco Scott em pé, que não tem braço de alavanca.",
   "videos": [],
   "photos": [],
-  "confirmed": false,
-  "added": "2026-11"
+  "confirmed": true,
+  "added": "2026-11",
+  "check_note": "Confirmado só na gym80 (5903, com apoio de braço, carga em anilhas; o resumo diz que é da linha de uso externo). A Atlantis cita um modelo em pé (B257) na página de categoria de bíceps, sem resultado próprio; Panatta \"Standing total arms\" é bíceps+tríceps em pé e os outros resultados em pé são bancos, não máquinas. Não fiz busca específica nos fabricantes brasileiros para este item."
  },
  {
   "machine_id": "mx_wrist_curl_machine",
@@ -12934,8 +13573,23 @@
   ],
   "why": "Isola a flexão e a extensão de punho com os antebraços apoiados e o eixo da máquina alinhado ao punho. Difere do gripper (que treina fechar a mão) e do rolo de punho (que enrola uma corda com peso).",
   "sources": [],
-  "brands": [],
-  "brand_models": [],
+  "brands": [
+   "Atlantis"
+  ],
+  "brand_models": [
+   {
+    "brand": "Atlantis",
+    "model": "A201",
+    "url": "https://atlantisstrength.com/gym-equipment/a201",
+    "checked": true
+   },
+   {
+    "brand": "Atlantis",
+    "model": "Multi-Forearm",
+    "url": "https://www.atlantisstrength.com/en/product/multi-forearm/",
+    "checked": true
+   }
+  ],
   "existing_exercise_ids": [
    "Palms-Up_Barbell_Wrist_Curl_Over_A_Bench",
    "Palms-Down_Wrist_Curl_Over_A_Bench"
@@ -12966,8 +13620,9 @@
   "how_to_recognize": "Máquina pequena, em geral usada sentado, com um apoio estofado para os antebraços e uma barra curta ou duas manoplas que giram num eixo alinhado aos punhos; o movimento é curto, só da mão. A carga fica em anilhas num braço de alavanca pequeno ou numa pilha de pesos, conforme o modelo.",
   "videos": [],
   "photos": [],
-  "confirmed": false,
-  "added": "2026-11"
+  "confirmed": true,
+  "added": "2026-11",
+  "check_note": "Só a Atlantis foi confirmada, e é uma máquina de antebraço 4 em 1 com pilha de pesos (rosca punho sentado, barra de enrolar, pronação/supinação e alavanca de pegada), não uma máquina só de rosca punho. Nenhum fabricante brasileiro apareceu: a Physicus só tem \"PHR 05 - Flexionador de Punho\", que é um hand grip de mola."
  },
  {
   "machine_id": "mx_gripper_machine",
@@ -12990,8 +13645,30 @@
   ],
   "why": "Treina a força de fechar a mão com carga progressiva em anilhas. Difere da máquina de rosca de punho (aqui o punho não se move) e do rolo de punho.",
   "sources": [],
-  "brands": [],
-  "brand_models": [],
+  "brands": [
+   "Watson",
+   "Atlantis"
+  ],
+  "brand_models": [
+   {
+    "brand": "Watson",
+    "model": "",
+    "url": "https://watsongym.co.uk/product/standing-plate-load-hand-gripper/",
+    "checked": true
+   },
+   {
+    "brand": "Watson",
+    "model": "",
+    "url": "https://watsongym.co.uk/product/seated-plate-load-hand-gripper/",
+    "checked": true
+   },
+   {
+    "brand": "Atlantis",
+    "model": "S-202",
+    "url": "https://www.atlantisstrength.com/en/product/plate-rack-with-grip-tool/",
+    "checked": true
+   }
+  ],
   "existing_exercise_ids": [
    "Gripper_Machine"
   ],
@@ -13027,8 +13704,9 @@
   "how_to_recognize": "Aparelho compacto de anilhas com duas barras paralelas na altura das mãos, uma fixa e uma móvel, que a pessoa aproxima fechando as mãos; a barra móvel está ligada a um braço de alavanca com pino para anilhas. O movimento é só dos dedos: punho e cotovelo ficam parados.",
   "videos": [],
   "photos": [],
-  "confirmed": false,
-  "added": "2026-11"
+  "confirmed": true,
+  "added": "2026-11",
+  "check_note": "Existe como descrito: a Watson tem gripper de anilhas em pé e sentado; a Atlantis tem um \"Grip Trainer\" de anilhas (o endereço sugere que é acoplado a um suporte de anilhas). A Rogue só apareceu com acessórios de pegada, não com máquina. Não fiz busca específica nos fabricantes brasileiros."
  },
  {
   "machine_id": "mx_wrist_roller",
@@ -13051,8 +13729,24 @@
   ],
   "why": "Um tubo que gira, com uma corda e um peso pendurado: enrolar e desenrolar trabalha os dois lados do antebraço com tensão contínua. Difere da máquina de rosca de punho por não ter eixo guiado nem apoio de antebraço.",
   "sources": [],
-  "brands": [],
-  "brand_models": [],
+  "brands": [
+   "Rogue",
+   "Watson"
+  ],
+  "brand_models": [
+   {
+    "brand": "Rogue",
+    "model": "",
+    "url": "https://www.roguefitness.com/rogue-wrist-roller",
+    "checked": true
+   },
+   {
+    "brand": "Watson",
+    "model": "",
+    "url": "https://watsongym.co.uk/product/thick-grip-wrist-roller/",
+    "checked": true
+   }
+  ],
   "existing_exercise_ids": [
    "Wrist_Roller"
   ],
@@ -13087,75 +13781,9 @@
   "how_to_recognize": "Um tubo ou bastão grosso horizontal que gira, com uma corda ou fita enrolada nele e uma anilha pendurada na ponta. Pode ser solto (seguro com os braços estendidos), encaixado num suporte ou fixo na parede.",
   "videos": [],
   "photos": [],
-  "confirmed": false,
-  "added": "2026-11"
- },
- {
-  "machine_id": "mx_spider_curl_bench",
-  "name": "Banco de rosca spider (peito apoiado)",
-  "name_en": "Spider Curl Bench (Prone Curl Bench)",
-  "aliases": [
-   "banco spider",
-   "rosca spider",
-   "spider curl bench",
-   "prone curl bench"
-  ],
-  "category": "bracos",
-  "is_new": true,
-  "availability_br": "rara",
-  "availability_why": "Estimativa de conhecimento geral, NÃO conferida em site de fabricante (busca na web e páginas oficiais indisponíveis nas duas rodadas): banco de nicho; na maioria das academias a rosca spider é feita num banco inclinado comum.",
-  "tips": [
-   "Braços na vertical e cotovelos parados; suba até contrair bem e desça até estender.",
-   "Peito colado no apoio do começo ao fim.",
-   "Sem o banco próprio, dá para fazer de bruços num banco inclinado comum.",
-   "Erro mais comum: puxar os cotovelos para trás para ajudar a subir, o que vira uma remada."
-  ],
-  "why": "Apoia o peito para o braço ficar pendurado na vertical, tirando o impulso do tronco e mantendo tensão no topo da rosca. Difere do banco Scott, em que o braço fica apoiado num plano inclinado e o esforço maior é embaixo.",
-  "sources": [],
-  "brands": [],
-  "brand_models": [],
-  "existing_exercise_ids": [
-   "Spider_Curl",
-   "Dumbbell_Prone_Incline_Curl"
-  ],
-  "exercises": [
-   {
-    "name": "Rosca spider com barra W",
-    "how": "Peito no apoio, braços pendurados na vertical, flexione os cotovelos sem levá-los para trás e desça até estender.",
-    "muscles": [
-     "biceps"
-    ],
-    "exercise_id": "Spider_Curl"
-   },
-   {
-    "name": "Rosca spider com halteres",
-    "how": "Mesma posição com um halter em cada mão, palmas para cima.",
-    "muscles": [
-     "biceps"
-    ],
-    "exercise_id": "Dumbbell_Prone_Incline_Curl"
-   },
-   {
-    "name": "Rosca spider martelo",
-    "how": "Mesma posição com as palmas viradas uma para a outra.",
-    "muscles": [
-     "biceps"
-    ],
-    "secondary": [
-     "forearms"
-    ]
-   }
-  ],
-  "settings": [
-   "Altura do assento ou do apoio dos joelhos (quando houver): peito inteiro no estofado e braços livres para descer até estender sem a barra tocar no chão ou na estrutura.",
-   "Suporte da barra (quando houver): confira se alcança a barra já apoiado.",
-   "Não tem pilha de pesos: anote a barra ou os halteres usados."
-  ],
-  "how_to_recognize": "Banco em que a pessoa se apoia inclinada para frente, com o peito num estofado inclinado, e os braços pendem livres do outro lado; pode ter assento ou apoio para os joelhos e um suporte para a barra à frente. No banco Scott é o braço que fica apoiado no plano inclinado; aqui o apoio é do peito.",
-  "videos": [],
-  "photos": [],
-  "confirmed": false,
-  "added": "2026-11"
+  "confirmed": true,
+  "added": "2026-11",
+  "check_note": "Existe como descrito: o da Rogue é vendido em versão de mão e versão encaixada no rack; o da Watson usa cabo de aço com mosquetão. É mais acessório do que aparelho. Não fiz busca nos fabricantes brasileiros."
  },
  {
   "machine_id": "mx_functional_rig",
@@ -13180,8 +13808,24 @@
   ],
   "why": "Estrutura grande de colunas e travessas com várias barras fixas, ganchos de barra, alvos de wall ball e pontos para argolas, cordas e fitas; vários alunos treinam ao mesmo tempo. Difere da gaiola/power rack (uma pessoa, barra com travas de segurança) e da estação de barra e paralelas.",
   "sources": [],
-  "brands": [],
-  "brand_models": [],
+  "brands": [
+   "Technogym",
+   "Physicus"
+  ],
+  "brand_models": [
+   {
+    "brand": "Technogym",
+    "model": "OMNIA 8",
+    "url": "https://www.technogym.com/int/omnia-8-omnia-1.html",
+    "checked": true
+   },
+   {
+    "brand": "Physicus",
+    "model": "EFM 800",
+    "url": "https://www.physicus.com.br/produtos/item/estacao-funcional-modular-efm-800",
+    "checked": true
+   }
+  ],
   "existing_exercise_ids": [
    "Pullups",
    "Hanging_Leg_Raise",
@@ -13257,8 +13901,9 @@
   "how_to_recognize": "Estrutura metálica comprida, com várias colunas furadas ligadas por travessas no alto e muitas barras fixas em alturas diferentes (às vezes em escada horizontal), encostada na parede ou no meio da sala; costuma ter ganchos de barra, alvos redondos de wall ball, argolas e fitas penduradas. Sem pilha de pesos.",
   "videos": [],
   "photos": [],
-  "confirmed": false,
-  "added": "2026-11"
+  "confirmed": true,
+  "added": "2026-11",
+  "check_note": "Existe: Technogym Omnia tem o título exato \"Functional Training Rig\"; no Brasil a Physicus vende a \"Estação Funcional Modular EFM 800\" (anunciada para 30 pessoas ao mesmo tempo), nome que não usa \"rig\" nem \"gaiola\". Life Fitness, Precor e Rogue só vieram como páginas de categoria/linha; a Kikos só com gaiola de agachamento (outro aparelho); a Lion Fitness fala de \"rig modular\" no blog, sem página de produto; a Righetto só com um PDF de catálogo \"free-style\"."
  },
  {
   "machine_id": "mx_kneeling_glute_isolator",

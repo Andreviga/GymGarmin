@@ -2414,13 +2414,14 @@ $("#timer").addEventListener("click", (e) => {
 
 /* ------------------------------------------------------------- ANÁLISE -- */
 async function viewAnalise() {
-  const [rep, sessions, hist, ld, fp] = await Promise.all([api("/api/report/weekly"), api("/api/sessions?limit=30"),
+  const [rep, sessions, hist, ld, fp, wr] = await Promise.all([api("/api/report/weekly"), api("/api/sessions?limit=30"),
     api("/api/history").catch(() => ({ exercises: [], recent_prs: [] })), api("/api/load?days=90").catch(() => null),
-    api("/api/focus/progress").catch(() => null)]);
+    api("/api/focus/progress").catch(() => null), api("/api/watch/review").catch(() => null)]);
   const c = rep.cardio;
   view.innerHTML = `${focusCard(fp)}
   <a class="card link-card row between gap" href="#saude"><span><b>😴 Saúde e sono</b><br><span class="small muted">Sono, recuperação, FC de repouso, HRV, VO2máx e o efeito dos treinos — pelo relógio</span></span><span class="chev">›</span></a>
   ${loadCard(ld)}
+  ${watchReviewCard(wr)}
   ${historyCard(hist)}
   <div class="card"><h2>Volume por músculo — últimos 7 dias</h2>${muscleBars(rep.muscles, "sets_7d")}
     <details><summary class="small">Detalhes por músculo</summary><ul class="list small">${rep.muscles.map((m) => `<li><b>${esc(m.pt)}</b>: ${m.sets_7d} séries (${m.direct_7d} diretas, ${m.indirect_7d} indiretas) · média 4 sem. ${m.sets_avg_4w} · ${m.frequency_7d}× na semana · ${m.days_since === null ? "nunca treinado" : `há ${m.days_since} dias`} · tonelagem ${m.tonnage_7d} kg</li>`).join("")}</ul></details></div>
@@ -2436,10 +2437,68 @@ async function viewAnalise() {
       <span class="small muted">${s.items.length} exercícios · ${s.items.reduce((a, it) => a + (it.sets ? it.sets.length : 0), 0)} séries</span></span>
       <button class="icon-btn" data-del="${s.id}" title="Excluir">🗑</button></li>`).join("")}</ul>` : `<p class="empty">Nenhum treino registrado.</p>`}</div>`;
   view.onclick = async (e) => {
+    if (e.target.closest("#wr-open")) return openWatchReview(wr, viewAnalise);
     const h = e.target.closest("[data-hist]"); if (h) { location.hash = `#evolucao/${encodeURIComponent(h.dataset.hist)}`; return; }
     if (e.target.dataset.ex) return showExercise(e.target.dataset.ex);
     if (e.target.dataset.del && confirm("Excluir este registro?")) { await api(`/api/sessions/${e.target.dataset.del}`, { method: "DELETE" }); viewAnalise(); }
   };
+}
+
+/* ---- relógio: séries sem nome e categorias que o app chutou ---- */
+function watchReviewCard(w) {
+  if (!w || (!w.categories.length && !w.sessions.length)) return "";
+  const parts = [];
+  if (w.categories.length) parts.push(`${w.guess_sets} séries em que o relógio disse só o tipo (${w.categories.slice(0, 3).map((c) => esc(c.label.toLowerCase())).join(", ")}${w.categories.length > 3 ? "…" : ""})`);
+  if (w.sessions.length) parts.push(`${w.sessions.reduce((a, s) => a + s.sets, 0)} séries recentes sem nome nenhum`);
+  return `<section class="card wr-card"><h2>Do relógio: falta dizer o exercício</h2>
+    <p class="small" style="margin-top:0">${parts.join(" e ")}. Elas já contam no volume da semana; com o exercício certo passam a contar também na evolução de cargas.</p>
+    <button class="btn block" id="wr-open">Conferir em 1 minuto</button></section>`;
+}
+const setsTxt = (sets) => sets.map((x) => `${x.reps}×${x.load_kg ? fmtKg(x.load_kg).replace(" kg", "") : "—"}`).join("  ");
+function openWatchReview(w, onDone) {
+  let changed = false;
+  const done = () => { closeModal(); if (changed && onDone) onDone(); };
+  const draw = () => {
+    const body = openModal(`<h2>O que o relógio gravou</h2>
+      ${w.categories.length ? `<h3>O relógio disse só o tipo</h3>
+        <p class="small muted" style="margin-top:0">Ele reconhece "rosca" ou "supino", mas não qual. Diga o que costuma ser: vale para os treinos já importados e para os próximos.</p>
+        <div class="stack">${w.categories.map((c) => `<div class="wr-cat"><div><b>${esc(c.label)}</b> <span class="small muted">· ${c.sets} séries em ${c.sessions} ${c.sessions === 1 ? "treino" : "treinos"}</span></div>
+          <div class="small">Hoje conta como <b>${esc(c.current.name)}</b>.</div>
+          <div class="chips" style="margin-top:6px">${c.options.map((o, i) => `<button class="chip ${i ? "" : "on"}" data-wcat="${esc(c.category)}" data-ex="${esc(o.id)}">${i ? esc(o.name) : "✓ É isso mesmo"}</button>`).join("")}
+            <button class="chip" data-wcat-pick="${esc(c.category)}">Outro…</button></div></div>`).join("")}</div>` : ""}
+      ${w.sessions.length ? `<h3>Séries sem nome</h3>
+        <p class="small muted" style="margin-top:0">O app separou onde a carga recomeça (cada bloco deve ser um exercício). Diga qual foi; se não lembrar, tudo bem.</p>
+        ${w.sessions.map((s) => `<div class="wr-sess"><b>${ddmm(s.date)} · ${esc(s.title)}</b>
+          ${s.planned ? `<div class="small muted">Treino planejado no dia: ${esc(s.planned)}</div>` : ""}
+          ${s.blocks.map((b) => `<div class="wr-block"><div class="small wr-sets">${esc(setsTxt(b.sets))}</div>
+            <div class="row gap wrap">${b.suggestion ? `<button class="btn sm" data-wlab="${s.session_id}:${b.item}:${b.from}:${b.to}" data-ex="${esc(b.suggestion.id)}">Foi ${esc(b.suggestion.name)}</button>` : ""}
+              <button class="btn sm ghost" data-wlab-pick="${s.session_id}:${b.item}:${b.from}:${b.to}">${b.suggestion ? "Outro exercício" : "Escolher exercício"}</button></div></div>`).join("")}
+          <button class="act" data-wdis="${s.session_id}" style="margin-top:8px">Não lembro deste treino</button></div>`).join("")}` : ""}
+      ${!w.categories.length && !w.sessions.length ? `<p class="ok-txt">✓ Tudo conferido. As séries do relógio já contam na evolução de cargas.</p>` : ""}
+      <button class="btn ghost block" id="wr-close" style="margin-top:14px">Fechar</button>`);
+    body.onclick = async (e) => {
+      const t = e.target.closest("button"); if (!t || t.disabled) return;
+      if (t.id === "wr-close") return done();
+      const d = t.dataset;
+      const send = async (path, payload, okMsg) => {
+        t.disabled = true;
+        try { const r = await api(path, { method: "POST", body: payload }); changed = true; w = r; toast(okMsg(r), 3500); draw(); }
+        catch (err) { t.disabled = false; toast(err.message, 5000); }
+      };
+      const catMsg = (r) => `Anotado: ${r.exercise.name}${r.changed ? ` (${r.changed} ${r.changed === 1 ? "treino atualizado" : "treinos atualizados"})` : ""}`;
+      if (d.wcat) return send("/api/watch/category", { category: d.wcat, exercise_id: d.ex }, catMsg);
+      if (d.wlab) { const [sid, item, from, to] = d.wlab.split(":").map(Number); return send("/api/watch/label", { session_id: sid, item, from, to, exercise_id: d.ex }, (r) => `Anotado: ${r.exercise.name}`); }
+      if (d.wdis) return send("/api/watch/dismiss", { session_id: +d.wdis }, () => "Ok, não pergunto mais sobre esse treino");
+      const reopen = async (path, payload, okMsg) => {
+        try { const r = await api(path, { method: "POST", body: payload }); changed = true; w = r; toast(okMsg(r), 3500); }
+        catch (err) { toast(err.message, 5000); }
+        draw();
+      };
+      if (d.wcatPick) return pickExercise("strength", (ex) => reopen("/api/watch/category", { category: d.wcatPick, exercise_id: ex.id }, catMsg));
+      if (d.wlabPick) { const [sid, item, from, to] = d.wlabPick.split(":").map(Number); return pickExercise("strength", (ex) => reopen("/api/watch/label", { session_id: sid, item, from, to, exercise_id: ex.id }, (r) => `Anotado: ${r.exercise.name}`)); }
+    };
+  };
+  draw();
 }
 
 /* ------------------------------------------------- EVOLUÇÃO DE CARGAS -- */
@@ -2785,7 +2844,7 @@ async function viewAparelhos(openId) {
   const last = store("gg_mx_filter") || {};
   const data = await api(`/api/machines`);
   view.innerHTML = `<div class="ex-search">
-    <input id="mx-q" type="search" placeholder="Buscar: leg press, pêndulo, remada, glúteo…" value="${esc(last.q || "")}" autocomplete="off">
+    <input id="mx-q" type="search" placeholder="Buscar: leg press 90, glúteo, marca do aparelho…" value="${esc(last.q || "")}" autocomplete="off">
     <div class="chip-row" id="mx-chips"><button type="button" class="fchip ${!last.c ? "on" : ""}" data-c="">Todos</button>${data.categories.map((c) => `<button type="button" class="fchip ${last.c === c.key ? "on" : ""}" data-c="${c.key}">${esc(c.pt)}</button>`).join("")}</div>
   </div>
   <p class="small muted" id="mx-count"></p>
@@ -2795,7 +2854,8 @@ async function viewAparelhos(openId) {
     const q = $("#mx-q").value.trim(); const c = ($(".fchip.on", view) || {}).dataset ? $(".fchip.on", view).dataset.c : "";
     store("gg_mx_filter", { q, c });
     const norm = (x) => x.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
-    const items = data.items.filter((m) => (!c || m.category === c) && (!q || norm(`${m.name} ${m.name_en || ""}`).includes(norm(q))));
+    const words = norm(q).split(/\s+/).filter(Boolean);  // nome, apelido ("leg press 90"), marca ("total health") ou exercício
+    const items = data.items.filter((m) => { if (c && m.category !== c) return false; const hay = m.s || norm(`${m.name} ${m.name_en || ""}`); return words.every((w) => hay.includes(w)); });
     $("#mx-count").textContent = `${items.length} aparelho${items.length === 1 ? "" : "s"}`;
     $("#mx-list").innerHTML = items.map((m) => `<li class="mx-card" data-machine="${esc(m.id)}">
       <span class="mx-img" data-machine="${esc(m.id)}">${m.thumb ? `<img loading="lazy" src="${esc(m.thumb)}" alt="" data-machine="${esc(m.id)}">` : pictoHtml(CAT_PICTO[m.category] || "dumbbell", "tile")}
@@ -2828,7 +2888,7 @@ function machineBrandsHtml(m) {
   const links = bm.filter((b) => { const k = b.brand + "|" + b.url; if (seen.has(k)) return false; seen.add(k); return true; }).slice(0, 10)
     .map((b) => `<a href="${esc(b.url)}" target="_blank" rel="noopener">${esc(b.brand)}${b.model ? ` <span class="muted">(${esc(b.model)})</span>` : ""}</a>`);
   return `<h3>Fabricantes</h3><p class="small mx-brands">${[...links, ...plain.map(esc)].join(" · ")}</p>
-    ${m.confirmed === false ? `<p class="small muted">Marcas e modelos vistos na busca; a página do fabricante não foi aberta para conferir.</p>` : ""}`;
+    ${bm.length ? `<p class="small muted">Páginas dos fabricantes encontradas em busca (nov/2026); modelos e endereços podem mudar.</p>` : ""}`;
 }
 async function showMachine(id) {
   const m = await api(`/api/machines/${encodeURIComponent(id)}`);
@@ -2891,11 +2951,12 @@ function stepsAskHtml(s, today, { note = true } = {}) {
   if (!s) return "";
   today = today || localISO().slice(0, 10);
   const lab = Object.fromEntries((s.options || []).map((o) => [o.id, o.label]));
+  const short = Object.fromEntries((s.options || []).map((o) => [o.id, o.short]));
   const q = (s.pending || []).map((p) => {
     const order = [p.hint, ...Object.keys(lab).filter((id) => id !== p.hint)].filter((id) => lab[id]);
     return `<div class="rec atencao q-card steps-q"><b>${stepsWhen(p.date, today)} você deu ${fmtN(p.daily)} passos fora dos treinos. O que foi?</b>
       <p class="small" style="margin:4px 0 8px">Seu costume é perto de ${fmtN(p.baseline)} por dia${p.workout ? ` (os ${fmtN(p.workout)} passos do treino desse dia já estão fora da conta)` : ""}. Com a resposta o app conta o esforço certo e não confunde esse dia com a sua rotina.</p>
-      <div class="row gap wrap">${order.map((id, i) => `<button class="btn sm ${i ? "ghost" : ""}" data-stag="${p.date}:${id}">${esc(lab[id])}</button>`).join("")}</div></div>`;
+      <div class="row gap wrap">${order.map((id, i) => `<button class="btn sm ${i ? "ghost" : ""}" data-stag="${p.date}:${id}">${esc(short[id] || lab[id])}</button>`).join("")}</div></div>`;
   }).join("");
   const ev = s.recent_event;
   const walked = ev && ["festival", "passeio", "caminhada"].includes(ev.tag);
