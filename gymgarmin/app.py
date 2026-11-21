@@ -1299,9 +1299,11 @@ def create_session(body: dict = Body(...)):
 def _saved_extra(saved: dict) -> dict:
     """O que ficou salvo, para a tela mostrar na hora (exercícios, séries, cargas) e com quem."""
     try:
-        v = partners._session_view(saved, _profile().get("weight_kg"))
+        acc = auth.current_account()
+        shared = partners.shared_minutes(int(acc["user_id"]), saved) if acc and saved.get("with_partner") else None
+        v = partners._session_view(saved, _profile().get("weight_kg"), minutes=shared)
         pid = saved.get("with_partner")
-        return {"summary": {"items": v["items"], "registered": partners.registered_view(saved),
+        return {"summary": {"items": v["items"], "registered": partners.registered_view(saved, shared),
                             "partner_name": partners.first_name(partners._names().get(int(pid), "")) if pid else None}}
     except Exception:  # noqa: BLE001 — o resumo é só para a tela: nunca impede o treino de ser salvo
         return {}

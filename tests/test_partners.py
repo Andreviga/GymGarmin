@@ -728,3 +728,17 @@ def test_evening_plan_still_offers_train_together_and_names_do_not_stack(env):
     hers = n.get("/api/sessions?limit=5").json()[0]
     back = a.post(f"/api/partners/{nid}/draft", json={"session_id": hers["id"]}).json()
     assert back["day_name"] == "Pernas (com Nathália)"                         # não vira "Pernas (com Andre) (com Nathália)"
+
+
+def test_registered_card_and_summary_show_the_same_minutes_as_the_scoreboard(env):
+    a, aid, n, nid, b, bid = env
+    _link(a, n, nid)
+    sid = a.post("/api/sessions", json=CHEST_DONE).json()["id"]                # ele: 61 min medidos
+    d = n.post(f"/api/partners/{aid}/draft", json={"session_id": sid}).json()
+    body = _body(d, client_id="n1")
+    body.pop("duration_min", None)                                             # ela anotou sem tempo
+    mine = n.post("/api/sessions", json=body).json()
+    card = n.get("/api/partners").json()["partners"][0]["today"]["mine"][0]
+    duel = {m["key"]: m for m in n.get(f"/api/partners/{aid}/duel").json()["metrics"]}
+    sm = n.get(f"/api/sessions/{mine['id']}/summary").json()["summary"]["registered"]
+    assert card["minutes"] == duel["minutes"]["me"] == sm["minutes"] == 61 and not card["minutes_estimated"]

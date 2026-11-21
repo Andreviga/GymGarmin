@@ -1819,6 +1819,12 @@ async function viewTreinar(planId, idx) {
   }
   if (planId === "livre") {
     const draft = store("gg_session");
+    if (draft && draft.edit_id) {  // correção de um treino salvo largada no meio: não é um treino livre de hoje
+      if (confirm(`Você tinha começado a corrigir “${draft.day_name || "um treino"}” de ${fmtDate(draft.date)} e não salvou. Continuar a correção? (Cancelar descarta a correção; o registro fica como estava)`)) { state.session = draft; location.hash = "#treinar/editar"; return; }
+      store("gg_session", null);
+      const sch0 = await api("/api/schedule").catch((e) => { if (e && e.name === "AbortError") throw e; return null; });
+      return startFree(sch0);
+    }
     if (draft && (draft.schedule_id || draft.plan_id)) return viewTreinar();  // já existe outro treino em andamento: a pessoa escolhe
     if (draft) {
       const started = (draft.items || []).some((it) => it.done || (it.sets || []).some((x) => x.done));
@@ -1842,9 +1848,9 @@ async function viewTreinar(planId, idx) {
     const plans = plansAll.filter((p) => p.active);
     const agenda = sch && sch.entries ? sch.entries.filter((e) => e.status === "planejado" && e.date >= sch.today) : [];
     const row = (href, title, sub, hl) => `<a class="pick ${hl ? "hl" : ""}" href="${href}"><span class="grow"><b>${esc(title)}</b><span class="small muted">${esc(sub)}</span></span><span class="chev" aria-hidden="true">›</span></a>`;
-    view.innerHTML = `${draft ? `<section class="today-card"><div class="eyebrow">Treino em andamento</div><div class="tc-title">${esc(draft.day_name || "Treino livre")}</div>
-      <p class="muted small" style="margin:0 0 12px">${fmtDate(draft.date)}</p>
-      <button class="btn block" id="resume">Continuar</button><button class="act" id="discard" style="margin-top:8px">Descartar</button></section>` : ""}
+    view.innerHTML = `${draft ? `<section class="today-card"><div class="eyebrow">${draft.edit_id ? "Correção não salva" : "Treino em andamento"}</div><div class="tc-title">${esc(draft.day_name || "Treino livre")}</div>
+      <p class="muted small" style="margin:0 0 12px">${fmtDate(draft.date)}${draft.edit_id ? " · o registro continua como estava até você salvar a correção" : ""}</p>
+      <button class="btn block" id="resume">${draft.edit_id ? "Continuar a correção" : "Continuar"}</button><button class="act" id="discard" style="margin-top:8px">${draft.edit_id ? "Descartar a correção" : "Descartar"}</button></section>` : ""}
       ${agenda.length ? `<h2 class="sec-title">Da sua agenda</h2><div class="picks">${agenda.slice(0, 7).map((e) => row(`#treinar/agenda/${e.id}`, `${dayLabel(e.date, sch)} · ${shortName(e)}`,
         `${e.time ? `~${Math.round(e.time.total)} min · ` : ""}${dayKind(e)}`, e.date === sch.today)).join("")}</div>` : ""}
       ${plans.map((p) => `<h2 class="sec-title">${esc(p.name)}</h2><div class="picks">${p.days.map((d, i) => row(`#treinar/${p.id}/${i}`, d.name, `${(d.items || []).length || ""} ${(d.items || []).length ? "exercícios" : "da planilha"}`)).join("")}</div>`).join("")
@@ -1969,11 +1975,14 @@ function sessionProgress() {
 }
 // campos de número do treino (carga, repetições, tempo): tocar seleciona o número, e digitar substitui
 // (com o cursor no meio do "12", digitar 15 dava "1152")
+function selectSoon(el) {
+  const sel = () => { try { if (document.activeElement === el) el.select(); } catch (_) { /* */ } };
+  setTimeout(sel, 0); setTimeout(sel, 120);  // depois do toque terminar (ele reposiciona o cursor)
+}
 document.addEventListener("focusin", (e) => {
   const el = e.target;
   if (!(el instanceof HTMLInputElement) || !el.matches("input[data-s], input[data-fv], input[data-lv], input[data-c]") || !el.value) return;
-  const sel = () => { try { if (document.activeElement === el) el.select(); } catch (_) { /* */ } };
-  setTimeout(sel, 0); setTimeout(sel, 120);  // depois do toque terminar (ele reposiciona o cursor)
+  selectSoon(el);
   el.addEventListener("mouseup", (ev) => ev.preventDefault(), { once: true });
 });
 function bindSession() {
@@ -1994,13 +2003,10 @@ function bindSession() {
         setTimeout(() => {
           it.sets.forEach((y, k) => { if (k > j && (!y.done || it.from_partner)) { const inp = $(`input[data-s="load_kg"][data-i="${el.dataset.i}"][data-j="${k}"]`);
             if (!inp) return;
-            if (inp === document.activeElement) {
-              const shown = inp.value === "" ? null : parseFloat(inp.value.replace(",", "."));
-              if (inp.dataset.was === undefined) inp.dataset.was = String(y.load_kg ?? "");  // ao sair dele, as seguintes acompanham
-              y.load_kg = Number.isFinite(shown) ? shown : null;
-              return;
-            }
-            inp.value = y.load_kg ?? ""; } });
+            inp.value = y.load_kg ?? "";
+            // o campo em que a pessoa acabou de tocar também recebe a carga copiada, com o número selecionado:
+            // se ela digitar, substitui (antes grudava: "12" + "15" virava "1152"); se não digitar, fica a copiada
+            if (inp === document.activeElement) { inp.dataset.was = String(y.load_kg ?? ""); selectSoon(inp); } } });
           save();
         }, 0);
         delete el.dataset.was;
@@ -2023,13 +2029,15 @@ function bindSession() {
     }
     if (t.dataset.cdone) { const it = s.items[+t.dataset.cdone]; it.done = !it.done; t.classList.toggle("on", it.done); save(); }
     if (t.dataset.pdone) { const it = s.items[+t.dataset.pdone]; it.done = !it.done; t.classList.toggle("on", it.done); save(); }
-    if (t.dataset.addset) { const it = s.items[+t.dataset.addset]; const last = it.sets[it.sets.length - 1] || {}; it.sets.push({ ...last, done: false }); renderSession(); }
+    if (t.dataset.addset) { const it = s.items[+t.dataset.addset]; const last = it.sets[it.sets.length - 1] || {}; it.sets.push({ ...last, done: !!(s.edit_id || s.replace_id || s.pulled) }); renderSession(); }
     if (t.dataset.rmset) { const it = s.items[+t.dataset.rmset]; it.sets.pop(); renderSession(); }
     if (t.dataset.dropitem && removeSessionItem(+t.dataset.dropitem)) return renderSession();
     const mk = t.closest("[data-miss]");
     if (mk) addEx(mk.dataset.miss);
   };
-  const addEx = (muscle) => pickExercise(null, (ex) => { s.items.push(newSessionItem(ex)); renderSession(); }, { muscle, missing: s.missing });
+  const addEx = (muscle) => pickExercise(null, (ex) => { const it = newSessionItem(ex);
+    if (s.edit_id || s.replace_id || s.pulled) { (it.sets || []).forEach((x) => { x.done = true; }); if (it.kind === "cardio") it.done = true; }  // treino já feito: o que acrescenta é o que fez
+    s.items.push(it); renderSession(); }, { muscle, missing: s.missing });
   $("#s-add").onclick = () => addEx();
   $("#s-cancel").onclick = () => { if (confirm(s.edit_id ? "Cancelar a correção? O registro fica como estava." : "Descartar este treino?")) { store("gg_session", null); state.session = null; location.hash = "#hoje"; } };
   $("#s-finish").onclick = finishSession;
@@ -2043,13 +2051,17 @@ async function finishSession() {
       const box = $("[name=pmerge]"); if (box) box.scrollIntoView({ block: "center", behavior: "smooth" });
       return toast("Antes de salvar, responda aqui: é a mesma atividade que o seu relógio gravou?", 6500);
     }
+    if ((s.edit_id || s.replace_id) && !s.unchecked_ack) {  // correção: linha preenchida sem ✓ seria descartada sem aviso
+      const off = s.items.reduce((n, it) => n + (fxStrength(it) ? (it.sets || []).filter((x) => !x.done && (x.reps || x.duration_s)).length : 0), 0);
+      if (off) { s.unchecked_ack = true; save(); return toast(`${off} ${off === 1 ? "série está" : "séries estão"} sem o ✓ e ${off === 1 ? "não vai" : "não vão"} para o registro. Toque no ✓ das que você fez, ou em salvar de novo para deixar de fora.`, 8000); }
+    }
     if (s.pulled || s.edit_id) {  // série feita sem a MINHA carga: marca em laranja e só salva no segundo toque
       const isBlank = (it, x) => x.done && !x.duration_s && (x.load_kg == null || x.load_kg === "") && (it.from_partner ? x.partner_load != null : !it.timed);
       const blank = s.items.reduce((n, it) => n + (fxStrength(it) ? (it.sets || []).filter((x) => isBlank(it, x)).length : 0), 0);
       if (blank && !s.blank_ack) {
         if (s.view !== "lista") { s.view = "lista"; save(); renderSession(); }
         s.items.forEach((it, i) => (it.sets || []).forEach((x, j) => { if (fxStrength(it) && isBlank(it, x)) { const inp = $(`input[data-s="load_kg"][data-i="${i}"][data-j="${j}"]`); if (inp) inp.classList.add("need-load"); } }));
-        const first = $("input.need-load"); if (first) first.scrollIntoView({ block: "center", behavior: "smooth" });
+        const first = $("input.need-load"); if (first) { first.scrollIntoView({ block: "start" }); window.scrollBy(0, -110); }  // no alto: o aviso fica embaixo
         s.blank_ack = true; save();
         return toast(`${blank} ${blank === 1 ? "série está" : "séries estão"} sem a sua carga (em laranja)${s.pulled ? `; a de ${s.partner_name || "quem treinou com você"} é só referência e não é salva` : ""}. Preencha, ou toque em salvar de novo para salvar assim.`, 8000);
       }
@@ -2633,8 +2645,8 @@ function renderFocus() {
     body = `<section class="today-card fx-end"><div class="eyebrow">Treino concluído</div><div class="tc-title">${esc(s.day_name || "Treino")} ✓</div>
       <p class="muted">${doneN} de ${order.length} exercícios · ${sets} séries feitas</p>
       <div class="field"><label for="s-notes">Como foi o treino?</label><textarea id="s-notes" placeholder="Sensações, dores, energia…">${esc(s.notes || "")}</textarea></div>
-      <button class="btn block" id="s-finish">Finalizar e salvar</button>
-      <button class="act" data-fx="list" style="margin-top:10px">Revisar na lista</button> <button class="act" id="s-cancel" style="margin-top:10px">Descartar treino</button></section>`;
+      <button class="btn block" id="s-finish">${s.edit_id ? "Salvar correção" : s.replace_id ? "Salvar (substitui o registro anterior)" : "Finalizar e salvar"}</button>
+      <button class="act" data-fx="list" style="margin-top:10px">Revisar na lista</button> <button class="act" id="s-cancel" style="margin-top:10px">${s.edit_id ? "Cancelar correção" : "Descartar treino"}</button></section>`;
   } else {
     const i = order[pos]; const p = it.plan || {};
     const eyebrow = it.endurance ? "Resistência" : it.kind === "cardio" ? "Cardio" : fxPh(it) === "preparo" ? "Aquecimento" : fxPh(it) === "pos" ? "Alongamento" : "Exercício";
@@ -2757,7 +2769,7 @@ function bindFocus() {
     if (a === "r-skip") { s.restEnd = null; s.restOver = false; s.lastSet = null; save(); return renderFocus(); }
     if (a === "work") { s.workTotal = +t.dataset.sec; s.prepEnd = Date.now() + 5000; s.workEnd = null; s.timeUp = false; s.workKind = t.dataset.kind; fxLast = null; save(); return renderFocus(); }
     if (a === "work-stop") { s.workEnd = null; s.prepEnd = null; save(); return renderFocus(); }
-    if (a === "addset" && it) { const last = it.sets[it.sets.length - 1] || {}; it.sets.push({ ...last, done: false }); save(); return renderFocus(); }
+    if (a === "addset" && it) { const last = it.sets[it.sets.length - 1] || {}; it.sets.push({ ...last, done: !!(s.edit_id || s.replace_id || s.pulled) && !!last.done }); save(); return renderFocus(); }
     if (a === "rmset" && it && it.sets.length > 1) { it.sets.pop(); s.fsel = null; save(); return renderFocus(); }
     if (a === "list") {
       const left = s.restEnd ? Math.ceil((s.restEnd - Date.now()) / 1000) : 0;
@@ -2772,7 +2784,7 @@ function bindFocus() {
     }, { missing: s.missing });
   };
   const fin = $("#s-finish"); if (fin) fin.onclick = finishSession;
-  const cancel = $("#s-cancel"); if (cancel) cancel.onclick = () => { if (confirm("Descartar este treino?")) { store("gg_session", null); state.session = null; fxLeave(); location.hash = "#hoje"; } };
+  const cancel = $("#s-cancel"); if (cancel) cancel.onclick = () => { if (confirm(s.edit_id ? "Cancelar a correção? O registro fica como estava." : "Descartar este treino?")) { store("gg_session", null); state.session = null; fxLeave(); location.hash = "#hoje"; } };
 }
 
 /* ---- timer de descanso ---- */

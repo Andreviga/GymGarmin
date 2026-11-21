@@ -300,6 +300,16 @@ def pair(mine: list[dict], theirs: list[dict], uid: int, pid: int) -> dict[int, 
     return out
 
 
+def shared_minutes(uid: int, s: dict) -> float | None:
+    """Tempo do treino feito junto que vale para este treino meu (o mesmo do placar), se houver."""
+    pid = s.get("with_partner")
+    if not pid or not is_partner(uid, int(pid)):
+        return None
+    iso = str(s.get("date"))[:10]
+    theirs = [x for x in db.list_sessions(int(pid), since=iso, limit=60) if str(x.get("date"))[:10] == iso and str(x.get("source")) != "passos"]
+    return _shared_time([s], theirs, uid, int(pid))[0].get(s.get("id"))
+
+
 def planned_registered(e: dict, mine: list[dict], pid: int) -> list[int]:
     """Treinos MEUS do dia que já são esse treino planejado da pessoa (mesmos exercícios)."""
     want = {it.get("exercise_id") for it in e.get("items") or []
@@ -328,11 +338,12 @@ def duplicates(mine: list[dict], links: dict[int, int | None]) -> list[list[int]
     return groups
 
 
-def registered_view(s: dict) -> dict:
-    """O que ficou salvo de um treino meu, para mostrar "✓ Você registrou"."""
+def registered_view(s: dict, minutes: float | None = None) -> dict:
+    """O que ficou salvo de um treino meu, para mostrar "✓ Você registrou". `minutes`: o tempo medido do treino feito
+    junto (o mesmo que o placar usa), quando o meu é só estimado."""
     st = [it for it in s.get("items") or [] if _is_strength(it)]
     sets = [x for it in st for x in it["sets"] if x.get("done", True)]
-    t, est = session_time(s)
+    t, est = (minutes, False) if minutes is not None else session_time(s)
     return {"id": s.get("id"), "title": s.get("day_name") or s.get("notes") or "Treino", "time": str(s.get("date"))[11:16],
             "date": str(s.get("date"))[:10], "exercises": len(st), "sets": len(sets), "minutes": round(t), "minutes_estimated": est,
             "no_load": sum(1 for x in sets if x.get("load_kg") in (None, "") and not x.get("duration_s")),
@@ -376,7 +387,7 @@ def day(uid: int, pid: int, d: date) -> dict:
         mine_v.append(v)
     return {"date": iso, "next": nxt, "partner": {"id": pid, "name": _names().get(pid, ""), "first": first_name(_names().get(pid, ""))},
             "done": done, "planned": [{**_entry_view(e), "mine_ids": planned_registered(e, mine, pid)} for e in planned], "mine": mine_v,
-            "registered": [registered_view(s) for s in sorted(mine, key=lambda s: str(s.get("date"))) if s.get("id") in links],
+            "registered": [registered_view(s, ov_me.get(s.get("id"))) for s in sorted(mine, key=lambda s: str(s.get("date"))) if s.get("id") in links],
             "duplicates": duplicates(mine, links)}
 
 
