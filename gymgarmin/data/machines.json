@@ -980,7 +980,12 @@
    "https://www.youtube.com/watch?v=Nxl8X6zjsrc"
   ],
   "image_like": null,
-  "picto": "squat"
+  "picto": "squat",
+  "aliases": [
+   "leg press 90",
+   "leg press 80",
+   "leg press vertical"
+  ]
  },
  {
   "id": "SissySquatBench",
@@ -1598,11 +1603,9 @@
   "rotation": false,
   "aliases": [
    "leg press articulado",
-   "leg press unilateral",
-   "seated leg press unilateral",
+   "leg press de alavanca",
    "leg press iso-lateral",
-   "iso-lateral leg press",
-   "lever leg press"
+   "leg press de anilhas articulado"
   ],
   "added": "2026-11"
  },
@@ -1650,10 +1653,7 @@
   "aliases": [
    "máquina de passada",
    "afundo na máquina",
-   "afundo reverso na máquina",
-   "reverse lunge machine",
-   "super lunge machine",
-   "glute lunge"
+   "lunge machine"
   ],
   "added": "2026-11"
  },
@@ -1695,11 +1695,8 @@
   "picto": null,
   "rotation": false,
   "aliases": [
-   "cadeira adutora em pé",
-   "adutor em pé",
-   "adução em pé",
-   "standing adductor",
-   "standing hip adduction"
+   "adutora em pé",
+   "standing adductor"
   ],
   "added": "2026-11"
  },
@@ -1743,10 +1740,7 @@
   "picto": null,
   "rotation": false,
   "aliases": [
-   "abdutor em pé",
-   "abdução em pé na máquina",
-   "standing abduction",
-   "standing hip abduction",
+   "abdutora em pé",
    "standing abductor"
   ],
   "added": "2026-11"
@@ -1793,11 +1787,9 @@
   "picto": null,
   "rotation": false,
   "aliases": [
-   "upper back",
-   "row/rear delt",
-   "back deltoids",
+   "upper back machine",
    "remada aberta na máquina",
-   "posterior de ombro na máquina"
+   "rear delt row"
   ],
   "added": "2026-11"
  },
@@ -1833,7 +1825,7 @@
    "confidence": "media"
   },
   "availability_br": "comum",
-  "evidence": "Mesma máquina do leg press horizontal, uma perna por vez: corrige diferença de força entre os lados e pede menos carga total. Feito pelo dono do app no Hammer Strength Select Seated Leg Press da academia dele.",
+  "evidence": "Mesma máquina do leg press horizontal, uma perna por vez: corrige diferença de força entre os lados e pede menos carga total.",
   "sources": [
    "https://lifefitness.com/pt-br/catalog/forca/seletorizado/hammer-strength-select-seated-leg-press"
   ],

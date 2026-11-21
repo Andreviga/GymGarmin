@@ -191,6 +191,8 @@ def alternatives(exercise_id: str, user_id: int | None = None, limit: int = 14) 
             out.append(eid)
 
     same_pattern = [e for ids in PATTERNS.values() if exercise_id in ids for e in ids]
+    if not same_pattern and ex.get("pattern") in PATTERNS:  # aparelho "por escolha" (fora do rodízio): irmãos pelo padrão dele
+        same_pattern = list(PATTERNS[ex["pattern"]])
     prim = set(ex.get("primaryMuscles") or [])
     by_muscle = []
     stations = station_ids()  # burpee, wall ball…
@@ -203,6 +205,8 @@ def alternatives(exercise_id: str, user_id: int | None = None, limit: int = 14) 
                 continue
             if ex.get("mechanic") and c.get("mechanic") and c["mechanic"] != ex["mechanic"]:
                 continue
+            if (c.get("rotation") is False or c.get("availability_br") == "rara") and c["id"] not in mine:
+                continue  # aparelho raro/por escolha só vira opção de troca para quem cadastrou esse aparelho
             by_muscle.append(c["id"])
     for eid in [e for e in same_pattern + by_muscle if e in mine]:
         add(eid)

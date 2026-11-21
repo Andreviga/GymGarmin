@@ -55,12 +55,19 @@ def get(machine_id: str) -> dict | None:
 
 
 def by_exercise() -> dict[str, str]:
-    """exercício do catálogo → aparelho onde ele é feito (para o detalhe do exercício mostrar o vídeo)."""
+    """exercício do catálogo → aparelho onde ele é feito (para o detalhe do exercício mostrar o vídeo).
+
+    Só entra aparelho que tem vídeo ou foto para mostrar; entre dois, vale o que cita o exercício na lista
+    "o que dá para fazer" (o banco onde se faz supino com halter não é "o aparelho" do afundo com halteres)."""
     out: dict[str, str] = {}
+    weak: dict[str, str] = {}
     for m in load():
+        if not (_videos(m) or _photos(m)):
+            continue
+        direct = {e.get("exercise_id") for e in m.get("exercises") or [] if e.get("exercise_id")}
         for eid in m.get("existing_exercise_ids") or []:
-            out.setdefault(eid, m["machine_id"])
-    return out
+            (out if eid in direct else weak).setdefault(eid, m["machine_id"])
+    return {**weak, **out}
 
 
 by_exercise.cache_clear = lambda: None  # sem cache: os aparelhos da comunidade entram na hora
@@ -128,7 +135,8 @@ def summary(m: dict) -> dict:
             "n_exercises": len(m.get("exercises") or []), "from_photo": bool(m.get("from_photo")),
             # busca também pelos nomes que as pessoas usam ("leg press 90") e pela marca ("hammer strength", "total health")
             "_search": _norm(" ".join([m["name"], m.get("name_en") or "", " ".join(m.get("aliases") or []),
-                                       " ".join(m.get("brands") or []), " ".join(e.get("name", "") for e in m.get("exercises") or [])]))}
+                                       " ".join(e.get("name", "") for e in m.get("exercises") or [])])),
+            "_brands": _norm(" ".join(m.get("brands") or []))}
 
 
 def detail(m: dict) -> dict:
@@ -157,13 +165,29 @@ def search(q: str = "", category: str | None = None) -> list[dict]:
     if category:
         items = [i for i in items if i["category"] == category]
     if q:
-        qn = _norm(q).split()
-        items = [i for i in items if all(w in i["_search"] for w in qn)]
+        items = [i for i in items if matches(q, i["_search"], i["_brands"])]
     order = {"comum": 0, "média": 1, "rara": 2}
     items.sort(key=lambda i: (not i["has_video"], order.get(i["availability_br"] or "", 3), i["name"]))
     for i in items:
-        i["s"] = i.pop("_search", "")  # a tela filtra por aqui: nome, apelidos ("leg press 90"), marcas e exercícios
+        i["s"] = i.pop("_search", "")  # a tela filtra por aqui: nome, apelidos ("leg press 90") e exercícios…
+        i["b"] = i.pop("_brands", "")  # …e marcas (só por começo de palavra)
     return items
+
+
+def matches(q: str, names: str, brands: str) -> bool:
+    """Todas as palavras da busca aparecem no nome/apelidos/exercícios, ou são começo de uma palavra da marca.
+    Pelo menos uma palavra tem de bater no nome ou ser uma marca inteira ("total health", "matrix")."""
+    tok = lambda s: re.findall(r"[a-z0-9]+", s)  # noqa: E731
+    words, nw, bw = tok(_norm(q)), tok(names), tok(brands)
+    if not words:
+        return True
+    # por começo de palavra: "press" não casa com "descompressão", "leg" não casa com a marca "Legend" no meio da busca
+    in_name = [any(n.startswith(w) for n in nw) for w in words]
+    in_brand = [any(b.startswith(w) for b in bw) for w in words]
+    if not all(n or b for n, b in zip(in_name, in_brand)):
+        return False
+    phrase = " ".join(words)
+    return any(in_name) or (len(phrase) >= 4 and f" {phrase}" in " " + " ".join(bw))
 
 
 # ------------------------------------------------------------------ conferência no ar ----

@@ -403,6 +403,8 @@ def _reverse_map(preferred: set[str] | None = None) -> dict[tuple[str, str], str
         g = ex.get("garmin") or {}
         if not g.get("category"):
             continue
+        if ex.get("rotation") is False and ex["id"] not in preferred:
+            continue  # aparelho raro "por escolha": o afundo com barra do relógio não vira "afundo na máquina" sozinho
         keys = [(g["category"], None)] + ([(g["category"], g["exercise"])] if g.get("exercise") else [])
         for key in keys:
             cur = best.get(key)

@@ -18,7 +18,7 @@ def test_machines_are_valid_and_in_catalog():
     assert len(ms) >= 20
     for m in ms:
         ex = catalog.get(m["id"])
-        assert ex and ex["top_machine"] and ex["evidence"]
+        assert ex and ex["evidence"] and ex["top_machine"] == (m.get("rotation") is not False)  # "por escolha" não é "um dos melhores"
         assert set(m["primaryMuscles"]) | set(m["secondaryMuscles"]) <= MUSCLES
         assert m["pattern"] in generator.PATTERNS
         assert (m["garmin"]["category"], m["garmin"]["exercise"]) in garmin
@@ -88,8 +88,8 @@ def test_owner_photos_are_findable_by_the_names_people_use():
     def names(q):
         return [x["id"] for x in catalog.search(q, limit=5)]
     assert names("pressão de pernas")[0] == "Horizontal_Leg_Press" and names("leg press 90")[0] == "Horizontal_Leg_Press"
-    assert names("leg press 90 unilateral") == ["Horizontal_Leg_Press_Unilateral"]
-    assert names("glúteo ajoelhado") == ["Kneeling_Hip_Extension_Machine"]
+    assert names("leg press 90 unilateral")[0] == "Horizontal_Leg_Press_Unilateral"
+    assert names("glúteo ajoelhado")[0] == "Kneeling_Hip_Extension_Machine"
     from gymgarmin import gallery
     by_brand = lambda q: {x["id"] for x in gallery.search(q)}  # noqa: E731
     assert "mx_leg_press_horizontal" in by_brand("hammer strength") and "mx_leg_press_horizontal" in by_brand("leg press 90")
@@ -105,3 +105,52 @@ def test_new_machine_exercises_only_enter_by_choice():
         assert ms[eid]["rotation"] is False and eid not in generator.PATTERNS[ms[eid]["pattern"]]
         assert catalog.get(eid)["kind"] == "strength"
     assert catalog.get("Gripper_Machine")["primaryMuscles"] == ["forearms"]
+
+
+# ------------------------------------------------------------------ achados da revisão ---
+def test_by_choice_machines_are_never_suggested_or_matched_by_the_watch():
+    from gymgarmin import analysis, garmin_sync, my_gym
+    new = {"LeverLegPress_Machine", "Horizontal_Leg_Press_Unilateral", "ReverseLunge_Machine", "StandingHipAbduction_Machine",
+           "StandingHipAdduction_Machine", "RearDeltRow_Machine", "Kneeling_Hip_Extension_Machine"}
+    for muscle in ("glutes", "abductors", "adductors", "quadriceps", "shoulders"):
+        for lims in ([], [{"key": "gestante", "severity": "significativa"}], [{"key": "cardiaco", "severity": "significativa"}]):
+            got = {s["id"] for s in analysis.suggest_for_muscle(muscle, lims, n=5)}
+            assert not got & new, (muscle, got & new)
+            assert all((catalog.get(i).get("availability_br") != "rara") for i in got)
+    rev = garmin_sync._reverse_map()
+    assert not set(rev.values()) & new                       # afundo com barra do relógio não vira "afundo na máquina"
+    assert rev.get(("LUNGE", "BARBELL_REVERSE_LUNGE")) != "ReverseLunge_Machine"
+    mine = garmin_sync._reverse_map({"ReverseLunge_Machine"})   # está no plano da pessoa: aí vale
+    assert mine[("LUNGE", "BARBELL_REVERSE_LUNGE")] == "ReverseLunge_Machine"
+    alts = my_gym.alternatives("Horizontal_Leg_Press_Unilateral", user_id=1)
+    assert any("Leg_Press" in a or "Hack" in a or "Lunge" in a or "Split" in a for a in alts[:6]) and not set(alts) & (new - {"Horizontal_Leg_Press_Unilateral"})
+    rear = my_gym.alternatives("RearDeltRow_Machine", user_id=1)
+    assert {"Face_Pull", "Reverse_Machine_Flyes"} & set(rear[:6])
+
+
+def test_search_does_not_let_a_rare_machine_take_common_words():
+    def names(q):
+        return [x["id"] for x in catalog.search(q, limit=6)]
+    assert names("leg press unilateral")[0] in ("Single-Leg_Leg_Press", "Horizontal_Leg_Press_Unilateral")
+    assert "LeverLegPress_Machine" not in names("leg press unilateral")[:1] and names("leg press articulado")[0] == "LeverLegPress_Machine"
+    assert names("leg press 90")[:2] == ["Horizontal_Leg_Press", "Horizontal_Leg_Press_Unilateral"] or names("leg press 90")[0] == "Horizontal_Leg_Press"
+    assert "VerticalLegPress_Machine" in names("leg press 90")
+    assert len(names("posterior de ombro")) > 1               # não devolve só a máquina rara
+    from gymgarmin import gallery
+    lp = [x["id"] for x in gallery.search("leg press")]
+    assert "mx_reverse_hyper" not in lp and "mx_leg_press_45" in lp and "mx_leg_press_horizontal" in lp
+    assert {"mx_leg_press_horizontal", "mx_vertical_leg_press"} <= {x["id"] for x in gallery.search("leg press 90")}
+    assert "mx_hip_thrust_machine" in {x["id"] for x in gallery.search("total health")} and gallery.search("matrix")
+    g = json.loads((DATA / "machine_gallery.json").read_text())
+    assert not any("mx_" in (m.get(k) or "") for m in g for k in ("why", "how_to_recognize"))
+
+
+def test_exercise_only_points_to_a_machine_that_has_media(monkeypatch):
+    from gymgarmin import gallery
+    monkeypatch.setattr(gallery, "status_map", lambda: {})     # nada conferido no ar: nenhum vídeo aparece…
+    assert gallery.by_exercise() == {} or all(gallery._photos(gallery.get(m)) for m in gallery.by_exercise().values())
+    ok = {v["url"]: {"status": "ok"} for m in gallery.load() for v in m.get("videos") or []}
+    monkeypatch.setattr(gallery, "status_map", lambda: ok)
+    be = gallery.by_exercise()
+    assert be["Horizontal_Leg_Press_Unilateral"] == "mx_leg_press_horizontal" and be["Kneeling_Hip_Extension_Machine"] == "mx_kneeling_glute_isolator"
+    assert be.get("Split_Squat_with_Dumbbells") != "mx_espaldar" and be.get("Sit-Up") != "mx_espaldar"

@@ -367,7 +367,11 @@ def _load() -> tuple[list[dict], dict[str, dict]]:
             "top_machine": m.get("top_machine", True), "evidence": m.get("evidence", ""), "sources": m.get("sources", []),
             "availability_br": m.get("availability_br"), "lengthened": m.get("lengthened", False), "picto": m.get("picto"),
             "aliases": m.get("aliases") or [],  # nomes que as pessoas usam ("leg press 90", "pressão de pernas")
+            # aparelho/variação que só entra por escolha da pessoa: fora do gerador, das sugestões e das trocas automáticas
+            "rotation": m.get("rotation", True) is not False, "pattern": m.get("pattern"),
         })
+        if items[-1]["rotation"] is False:
+            items[-1]["top_machine"] = False  # não é "um dos melhores": é só um aparelho que a academia pode ter
 
     for it in items:
         it["primary_pt"] = [muscle_pt(m) for m in it["primaryMuscles"]]
@@ -429,9 +433,12 @@ def search(q: str = "", muscle: str | None = None, equipment: str | None = None,
         scored = [(_score(i, qn, translated), i) for i in items]
         scored = [s for s in scored if s[0] > 0]
         top = max((s[0] for s in scored), default=0)
-        if top >= 4:  # há correspondência completa: descarta as parciais
-            scored = [s for s in scored if s[0] >= 4]
-        scored.sort(key=lambda s: (-s[0], not s[1]["popular"], len(s[1]["name"])))
+        full = [s for s in scored if s[0] >= 4]
+        if top >= 4 and any(s[1].get("rotation", True) for s in full):  # há correspondência completa: descarta as parciais
+            scored = full  # (se as completas são só aparelhos "por escolha", as parciais comuns continuam na lista)
+        avail = {"comum": 0, "média": 1, "rara": 2}  # entre empates, o aparelho mais comum primeiro ("leg press 90": horizontal antes do vertical)
+        scored.sort(key=lambda s: (-s[0], not s[1].get("rotation", True), avail.get(s[1].get("availability_br"), 0),
+                                   not s[1]["popular"], len(s[1]["name"])))
         items = [s[1] for s in scored]
     elif not muscle:
         items = sorted(items, key=lambda i: (not i["popular"], i["name"]))

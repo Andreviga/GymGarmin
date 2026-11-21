@@ -1492,7 +1492,7 @@ async function showExercise(id) {
     ${ex.machine_id ? `<button class="btn ghost block" data-machine="${esc(ex.machine_id)}" style="margin:-2px 0 10px">▶ Ver o aparelho em vídeo</button>` : ""}
     ${ex.kind !== "cardio" ? `<button class="act" id="ex-mm" style="margin:0 0 10px">📷 ${ex.my_machine ? "Editar meu aparelho" : "Fotografar o aparelho da minha academia"}</button>` : ""}
     ${ex.image_like ? `<p class="small muted img-note">Foto de um movimento parecido (${esc(ex.image_like)}): o aparelho da sua academia pode ser diferente.</p>` : ""}
-    ${ex.top_machine ? `<div class="evidence"><b>Por que está entre os melhores</b><p class="small">${esc(ex.evidence)}</p>
+    ${ex.top_machine || ex.evidence ? `<div class="evidence"><b>${ex.top_machine ? "Por que está entre os melhores" : "Sobre este aparelho"}</b><p class="small">${esc(ex.evidence)}</p>
       <p class="small muted">${ex.availability_br === "comum" ? "Comum nas academias brasileiras." : ex.availability_br === "média" ? "Aparece em academias médias e grandes." : "Mais raro: academias grandes e premium."}${ex.lengthened ? " Trabalha o músculo alongado." : ""}</p>
       ${(ex.sources || []).length ? `<p class="small">${ex.sources.map((u, i) => `<a href="${esc(u)}" target="_blank" rel="noopener">fonte ${i + 1}</a>`).join(" · ")}</p>` : ""}</div>` : ""}
     ${ex.images.length > 1 ? `<div class="imgs">${ex.images.map((s, i) => `<figure><img loading="lazy" src="${esc(s)}" alt=""><figcaption class="small muted">${i ? "fim do movimento" : "início"}</figcaption></figure>`).join("")}</div>` : ""}
@@ -2855,7 +2855,17 @@ async function viewAparelhos(openId) {
     store("gg_mx_filter", { q, c });
     const norm = (x) => x.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
     const words = norm(q).split(/\s+/).filter(Boolean);  // nome, apelido ("leg press 90"), marca ("total health") ou exercício
-    const items = data.items.filter((m) => { if (c && m.category !== c) return false; const hay = m.s || norm(`${m.name} ${m.name_en || ""}`); return words.every((w) => hay.includes(w)); });
+    const items = data.items.filter((m) => {
+      if (c && m.category !== c) return false;
+      if (!words.length) return true;
+      const tok = (x) => x.split(/[^a-z0-9]+/).filter(Boolean);
+      const nw = tok(m.s || norm(`${m.name} ${m.name_en || ""}`)); const bw = tok(m.b || ""); const qw = tok(words.join(" "));
+      // por começo de palavra: "press" não casa com "descompressão"; marca só vale sozinha ("total health"), não misturada a pedaço de nome
+      const inName = qw.map((w) => nw.some((n) => n.startsWith(w))); const inBrand = qw.map((w) => bw.some((b) => b.startsWith(w)));
+      if (!qw.every((_, i) => inName[i] || inBrand[i])) return false;
+      const phrase = qw.join(" ");
+      return inName.some(Boolean) || (phrase.length >= 4 && (" " + bw.join(" ")).includes(" " + phrase));
+    });
     $("#mx-count").textContent = `${items.length} aparelho${items.length === 1 ? "" : "s"}`;
     $("#mx-list").innerHTML = items.map((m) => `<li class="mx-card" data-machine="${esc(m.id)}">
       <span class="mx-img" data-machine="${esc(m.id)}">${m.thumb ? `<img loading="lazy" src="${esc(m.thumb)}" alt="" data-machine="${esc(m.id)}">` : pictoHtml(CAT_PICTO[m.category] || "dumbbell", "tile")}

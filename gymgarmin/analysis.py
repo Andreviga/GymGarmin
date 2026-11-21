@@ -297,6 +297,8 @@ def suggest_for_muscle(muscle: str, user_limitations: list[dict], exclude: set[s
     for ex in catalog.search(muscle=muscle, kind="strength", limit=200):
         if (exclude and ex["id"] in exclude) or muscle not in ex["primaryMuscles"]:
             continue
+        if ex.get("rotation") is False or ex.get("availability_br") == "rara":
+            continue  # aparelho raro ou "só por escolha": o app não sugere sozinho o que a academia talvez não tenha
         st = check_exercise(ex, user_limitations)["status"]
         if st == "evitar":
             continue
