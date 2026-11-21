@@ -1248,9 +1248,10 @@ def create_session(body: dict = Body(...)):
         target = body.pop("merge_into", None)
         no_merge = body.pop("no_merge", None) is True   # a pessoa viu a atividade do relógio e disse "é outro treino"
         watch = db.get_session(target) if isinstance(target, int) and not isinstance(target, bool) else None
-        if watch and dedupe.is_time_only(watch) and str(watch.get("date"))[:10] == str(body.get("date") or "")[:10]:
+        if watch and dedupe.is_mergeable_watch(watch) and str(watch.get("date"))[:10] == str(body.get("date") or "")[:10]:
             # a pessoa apontou a atividade do relógio (que só marcou o tempo) como sendo este treino
             saved = db.save_session(dedupe.merge_into_watch(body, watch), session_id=watch["id"])
+            _reopen_cardio_closed_by(saved)
             credit = schedule.credit_session(saved, _profile())
             saved = db.get_session(saved["id"]) or saved
             return {**saved, "prs": history.session_prs(db.list_sessions(limit=5000), saved, _profile().get("weight_kg")),
@@ -1259,6 +1260,7 @@ def create_session(body: dict = Body(...)):
             dedupe.find_twin(body, db.list_sessions(since=str(body.get("date") or "")[:10] or None, limit=200))
         if twin:  # o relógio já trouxe este treino: junta (séries do app + medidas do relógio)
             saved = db.save_session(dedupe.merge(body, twin), session_id=twin["id"])
+            _reopen_cardio_closed_by(saved)
         else:
             saved = db.save_session(body)
         # que treino da agenda esta sessão fecha (pelo conteúdo) e o que ainda falta na semana
@@ -1291,11 +1293,33 @@ def put_session(session_id: int, body: dict = Body(...)):
     return saved
 
 
+def _reopen_cardio_closed_by(saved: dict) -> None:
+    """A atividade só-de-tempo do relógio tinha fechado um cardio da agenda "pela data". Agora ela é a musculação
+    que a pessoa anotou (sem cardio nenhum): o cardio não foi feito e volta para a agenda."""
+    if any(not it.get("sets") and (it.get("duration_min") or load.sport_of(it)) for it in saved.get("items") or []):
+        return
+    day = str(saved.get("date"))[:10]
+    try:
+        for e in db.list_schedule(day, day):
+            by = e.get("done_by") or {}
+            if e.get("status") == "feito" and e.get("kind") != "forca" and by.get("session_id") == saved.get("id") and by.get("how") == "data":
+                e["status"] = "planejado" if date.fromisoformat(e["date"]) >= clock.today() else "perdido"
+                e.pop("done_by", None)
+                e.pop("partial", None)
+                db.save_entry(e)
+    except Exception:  # noqa: BLE001 — a agenda se acerta na próxima leitura; salvar o treino não pode falhar por isso
+        pass
+
+
 @app.delete("/api/sessions/{session_id}")
 def del_session(session_id: int):
     s = db.get_session(session_id)
     if s:
         schedule.reopen_for_session(s)  # o treino que esta sessão tinha fechado volta para a agenda
+        back = dedupe.unmerge_watch(s, garmin_sync.STRENGTH_GENERIC)
+        if back:  # treino anotado + relógio: sai o que a pessoa anotou; o que o relógio mediu fica (dá para juntar de novo)
+            db.save_session(back, session_id=session_id)
+            return {"ok": True, "watch_kept": True, "minutes": round(back["duration_min"])}
         try:  # veio do relógio/celular: fica marcado como apagado, senão a próxima sincronização traria de volta
             garmin_sync.forget_activity(s.get("garmin_activity_id"))
             ingest.forget_workout(s.get("ext_id"))
@@ -1482,9 +1506,12 @@ def partners_draft(pid: int, body: dict = Body(...)):
         items = _prefill_items(plan_items)
         for it in items:  # é um treino já feito: mesmas séries e repetições dele, marcadas; a carga é a minha (ou em branco)
             theirs = done.get(it["exercise_id"]) or []
+            # treino JÁ feito: a carga que vem é a última que EU usei nesse exercício (nunca a meta do próximo treino,
+            # que viraria recorde falso); sem histórico fica em branco
+            last = [x for x in ((it.get("last") or {}).get("sets") or []) if x.get("load_kg")]
             sets = []
             for k, x in enumerate(theirs):
-                mine = it["sets"][k] if k < len(it.get("sets") or []) else (it["sets"][-1] if it.get("sets") else {})
+                mine = (last[k] if k < len(last) else last[-1]) if last else {}
                 sets.append({"reps": x.get("reps"), "duration_s": x.get("duration_s"), "load_kg": mine.get("load_kg"), "rpe": None,
                              "done": True, "partner_load": x.get("load_kg")})
             it["sets"] = sets or it.get("sets")
@@ -1492,14 +1519,15 @@ def partners_draft(pid: int, body: dict = Body(...)):
             it["from_partner"] = True
         day_iso = str(s.get("date"))[:10]
         mine = [x for x in db.list_sessions(uid, since=day_iso, limit=60) if str(x.get("date"))[:10] == day_iso]
-        watch = [x for x in mine if dedupe.is_time_only(x)]
+        watch = [x for x in mine if dedupe.is_mergeable_watch(x)]
         # o tempo MEDIDO do treino dele (relógio ou anotado) serve de ponto de partida para o meu: treinamos juntos
         dur = round(float(s.get("duration_min") or (s.get("garmin_summary") or {}).get("duration_min") or 0)) or None
         return {"date": str(s.get("date"))[:16], "day_name": f"{s.get('day_name') or 'Treino'} (com {who})", "view": "lista",
                 "with_partner": pid, "partner_name": who, "pulled": True, "items": items, "duration_min": dur,
                 "merge_candidates": [{"id": x["id"], "time": str(x.get("date"))[11:16], "minutes": round(partners.session_minutes(x)),
                                       "kcal": round(partners.session_kcal(x, None)[0]) if not partners.session_kcal(x, None)[1] else None,
-                                      "title": x.get("notes") or x.get("day_name") or "Atividade do relógio"} for x in watch],
+                                      "title": x.get("notes") or x.get("day_name") or "Atividade do relógio",
+                                      "match": dedupe.overlap(x, s) >= dedupe.MIN_OVERLAP} for x in watch],
                 "already": [x["id"] for x in mine if x.get("with_partner") == pid and any(i.get("sets") for i in x.get("items") or [])]}
     if body.get("entry_id") is not None:
         e = db.get_entry(int(body["entry_id"]), user_id=pid)

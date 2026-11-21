@@ -917,11 +917,11 @@ async function openPartnerDay(pid, first, day) {
     t.disabled = true;
     try {
       const draft = await api(`/api/partners/${pid}/draft`, { method: "POST", body: ds.pull ? { session_id: +ds.pull } : { entry_id: +ds.join } });
-      if ((draft.already || []).length && !confirm(`Você já tem um treino puxado de ${name} nesse dia. Puxar de novo cria outro. Continuar?`)) { t.disabled = false; return; }
+      if ((draft.already || []).length && !confirm(`Você já tem um treino puxado de ${name} nesse dia. Puxar de novo cria mais um treino (o anterior continua). Continuar?`)) { t.disabled = false; return; }
       const cur = store("gg_session");
       if (cur && (cur.items || []).length && !confirm("Há um treino em andamento guardado neste aparelho. Trocar por este?")) { t.disabled = false; return; }
-      const cand = draft.merge_candidates || [];
-      state.session = { ...draft, view: draft.pulled ? "lista" : undefined, merge_into: cand.length === 1 ? cand[0].id : null };
+      const hit = (draft.merge_candidates || []).filter((c) => c.match);  // só vem marcada a atividade do relógio no mesmo horário do treino
+      state.session = { ...draft, view: draft.pulled ? "lista" : undefined, merge_into: hit.length === 1 ? hit[0].id : null };
       store("gg_session", state.session); closeModal();
       if (location.hash !== "#treinar/parceiro") location.hash = "#treinar/parceiro"; else renderSession();
     } catch (err) { t.disabled = false; toast(err.message, 5000); }
@@ -2611,7 +2611,11 @@ async function viewAnalise() {
     if (e.target.closest("#wr-open")) return openWatchReview(wr, viewAnalise);
     const h = e.target.closest("[data-hist]"); if (h) { location.hash = `#evolucao/${encodeURIComponent(h.dataset.hist)}`; return; }
     if (e.target.dataset.ex) return showExercise(e.target.dataset.ex);
-    if (e.target.dataset.del && confirm("Excluir este registro?")) { await api(`/api/sessions/${e.target.dataset.del}`, { method: "DELETE" }); viewAnalise(); }
+    if (e.target.dataset.del && confirm("Excluir este registro?")) {
+      const r = await api(`/api/sessions/${e.target.dataset.del}`, { method: "DELETE" });
+      if (r && r.watch_kept) toast(`Apaguei o que você anotou. A atividade do relógio (${r.minutes} min) continua no histórico; apague também se não quiser.`, 7000);
+      viewAnalise();
+    }
   };
 }
 

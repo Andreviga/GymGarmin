@@ -90,9 +90,9 @@ def test_pull_partner_workout_into_time_only_watch_session(env):
     ext = d["items"][0]
     assert [s["reps"] for s in ext["sets"]] == [15, 10, 10] and all(s["done"] for s in ext["sets"])
     assert [s["partner_load"] for s in ext["sets"]] == [40, 68, 75]                  # a carga dele aparece só como referência
-    assert all(s["load_kg"] is None or s["load_kg"] <= 30 for s in ext["sets"])     # a minha carga vem do MEU histórico (25 kg), nunca da dele
+    assert [s["load_kg"] for s in ext["sets"]] == [25, 25, 25]                      # a última carga que EU usei; nunca a dele nem a meta do próximo treino
     assert all(s["load_kg"] is None for s in d["items"][2]["sets"])                 # sem histórico meu: em branco
-    assert d["merge_candidates"] == [{"id": w["id"], "time": "12:35", "minutes": 62, "kcal": 310, "title": "Treino de força"}]
+    assert d["merge_candidates"] == [{"id": w["id"], "time": "12:35", "minutes": 62, "kcal": 310, "title": "Treino de força", "match": True}]
 
     payload = {"date": d["date"], "day_name": d["day_name"], "client_id": "n-pull", "with_partner": aid, "merge_into": w["id"],
                "items": [{"exercise_id": i["exercise_id"], "sets": [{"reps": s["reps"], "load_kg": s["load_kg"] or 20} for s in i["sets"]]} for i in d["items"]]}
@@ -252,3 +252,94 @@ def test_logging_the_workout_after_the_watch_joins_too_unless_i_say_it_is_anothe
     n.delete(f"/api/sessions/{mine['id']}")
     again = n.post("/api/sessions", json=body).json()
     assert again["id"] == w and again["merged"] and again["duration_min"] == 62 and again["items"][0]["exercise_id"] == "Leg_Extensions"
+
+
+# ------------------------------------------------------------------ achados da revisão: puxar e juntar ---
+ARMS = {"date": "2026-11-20T19:00", "day_name": "Braços", "client_id": "a-2", "duration_min": 40,
+        "items": [{"exercise_id": "Dumbbell_Bicep_Curl", "sets": [{"reps": 12, "load_kg": 12}, {"reps": 10, "load_kg": 14}]}]}
+
+
+def _day_sessions(c, day="2026-11-20"):
+    return sorted((s for s in c.get("/api/sessions?limit=30").json() if s["date"].startswith(day)), key=lambda s: s["date"])
+
+
+def test_second_strength_workout_of_the_day_never_overwrites_the_one_joined_with_the_watch(env):
+    a, aid, n, nid, b, bid = env
+    _link(a, n, nid)
+    w = _ingest(n, "OTHER_WORKOUT", "12:35", "13:37", 62).json()["imported"][0]["session_id"]
+    draft, first = _pull(a, aid, n, merge_into=w)
+    assert first["id"] == w and first["merged"] and first["duration_min"] == 62
+    sid2 = a.post("/api/sessions", json=ARMS).json()["id"]
+    d2 = n.post(f"/api/partners/{aid}/draft", json={"session_id": sid2}).json()
+    assert d2["already"] == [w] and d2["merge_candidates"] == []          # a atividade do relógio já tem dono
+    body = {k: v for k, v in d2.items() if k in ("date", "day_name", "items", "with_partner", "duration_min")}
+    second = n.post("/api/sessions", json={**body, "client_id": "n-2"}).json()
+    ss = _day_sessions(n)
+    assert second["id"] != w and len(ss) == 2
+    assert [i["exercise_id"] for i in ss[0]["items"]][0] == "Leg_Extensions" and ss[0]["garmin_summary"]["kcal"] == 310   # pernas intacto
+    assert ss[1]["items"][0]["exercise_id"] == "Dumbbell_Bicep_Curl" and not ss[1].get("merged") and ss[1]["duration_min"] == 40
+    # o mesmo sem parceiro: um treino livre anotado à noite também não toma o lugar do que foi juntado
+    free = n.post("/api/sessions", json={"date": "2026-11-20T20:30", "client_id": "n-3", "day_name": "Abdômen",
+                                         "items": [{"exercise_id": "Crunches", "sets": [{"reps": 20}, {"reps": 20}]}]}).json()
+    assert free["id"] not in (w, second["id"]) and len(_day_sessions(n)) == 3
+
+
+def test_exercise_done_in_two_blocks_is_pulled_once_with_all_its_sets(env):
+    a, aid, n, nid, b, bid = env
+    _link(a, n, nid)
+    blocks = {"date": "2026-11-20T12:30", "client_id": "a-9", "day_name": "Pernas", "items": [
+        {"exercise_id": "Leg_Extensions", "sets": [{"reps": 12, "load_kg": 40}, {"reps": 12, "load_kg": 40}]},
+        {"exercise_id": "Seated_Leg_Curl", "sets": [{"reps": 12, "load_kg": 30}, {"reps": 12, "load_kg": 30}]},
+        {"exercise_id": "Leg_Extensions", "sets": [{"reps": 8, "load_kg": 50}]},
+        {"exercise_id": "Seated_Leg_Curl", "sets": [{"reps": 8, "load_kg": 35}]}]}
+    sid = a.post("/api/sessions", json=blocks).json()["id"]
+    d = n.post(f"/api/partners/{aid}/draft", json={"session_id": sid}).json()
+    assert [(i["exercise_id"], len(i["sets"])) for i in d["items"]] == [("Leg_Extensions", 3), ("Seated_Leg_Curl", 3)]   # 6 séries, não 12
+    assert [s["reps"] for s in d["items"][0]["sets"]] == [12, 12, 8] and [s["partner_load"] for s in d["items"][0]["sets"]] == [40, 40, 50]
+
+
+def test_only_strength_or_unnamed_watch_activity_can_become_the_pulled_workout(env):
+    a, aid, n, nid, b, bid = env
+    _link(a, n, nid)
+    yoga = _ingest(n, "YOGA", "07:00", "07:50", 50).json()["imported"][0]["session_id"]
+    early = _ingest(n, "STRENGTH_TRAINING", "08:00", "08:45", 45, wid="z-early").json()["imported"][0]["session_id"]
+    sid = a.post("/api/sessions", json=ANDRE_WORKOUT).json()["id"]
+    d = n.post(f"/api/partners/{aid}/draft", json={"session_id": sid}).json()
+    assert [(c["id"], c["match"]) for c in d["merge_candidates"]] == [(early, False)]   # yoga nunca; musculação de outro horário não vem marcada
+    body = {k: v for k, v in d.items() if k in ("date", "day_name", "items", "with_partner", "duration_min")}
+    # tentativa de juntar com a yoga é ignorada; e ela deixou "Não, é outro treino" (a tela manda no_merge)
+    r = n.post("/api/sessions", json={**body, "client_id": "n-1", "merge_into": yoga, "no_merge": True})
+    assert r.status_code == 200 and r.json()["id"] not in (yoga, early)
+    assert len(_day_sessions(n)) == 3 and any(s["id"] == yoga and s["items"][0]["exercise_id"] == "atividade_mobilidade" for s in _day_sessions(n))
+
+
+def test_deleting_the_joined_workout_keeps_what_the_watch_measured(env):
+    a, aid, n, nid, b, bid = env
+    _link(a, n, nid)
+    w = _ingest(n, "OTHER_WORKOUT", "12:35", "13:37", 62).json()["imported"][0]["session_id"]
+    _pull(a, aid, n, merge_into=w)
+    r = n.delete(f"/api/sessions/{w}").json()
+    assert r["watch_kept"] and r["minutes"] == 62
+    left = _day_sessions(n)
+    assert len(left) == 1 and not any(i.get("sets") for i in left[0]["items"]) and left[0]["garmin_summary"]["kcal"] == 310
+    sid = a.get("/api/sessions?limit=5").json()[0]["id"]
+    d = n.post(f"/api/partners/{aid}/draft", json={"session_id": sid}).json()
+    assert [(c["id"], c["match"]) for c in d["merge_candidates"]] == [(w, True)]          # dá para refazer e juntar de novo
+    assert n.delete(f"/api/sessions/{w}").json().get("watch_kept") is None and _day_sessions(n) == []   # apagar a do relógio: some de vez
+    _ingest(n, "OTHER_WORKOUT", "12:35", "13:37", 62)
+    assert _day_sessions(n) == []                                                         # e não volta na próxima sincronização
+
+
+def test_cardio_closed_by_the_watch_activity_reopens_when_it_becomes_the_strength_workout(env):
+    a, aid, n, nid, b, bid = env
+    _link(a, n, nid)
+    e = db.save_entry({"date": "2026-11-20", "kind": "cardio", "status": "planejado", "day_name": "Cardio leve", "plan_id": None,
+                       "items": [{"exercise_id": "cardio_eliptico", "duration_min": 30}]}, user_id=nid)
+    w = _ingest(n, "OTHER_WORKOUT", "12:35", "13:37", 62).json()["imported"][0]["session_id"]
+    n.get("/api/schedule?date=2026-11-20")
+    before = db.get_entry(e["id"], user_id=nid)
+    assert before["status"] == "feito" and before["done_by"]["session_id"] == w       # a atividade do relógio fechou o cardio "pela data"
+    _pull(a, aid, n, merge_into=w)
+    n.get("/api/schedule?date=2026-11-20")
+    after = db.get_entry(e["id"], user_id=nid)
+    assert after["status"] == "planejado" and not after.get("done_by")                 # virou musculação: o cardio não foi feito

@@ -114,6 +114,8 @@ def find_twin(new: dict, sessions: list[dict]) -> dict | None:
             continue
         if _watch(s) == from_garmin:
             continue  # já está ligada a uma atividade (ou as duas são do app)
+        if s.get("merged"):
+            continue  # atividade do relógio que já foi juntada com um treino anotado: tem dono, não recebe outro por cima
         if not (kinds(s) & k_new):
             continue
         t1, t2 = _time(s), _time(new)
@@ -135,6 +137,29 @@ def is_time_only(s: dict) -> bool:
     items = s.get("items") or []
     return _watch(s) and bool(items) and all(
         (i.get("strength_min") or str(i.get("exercise_id") or "").startswith("atividade_")) and not i.get("sets") for i in items)
+
+
+def is_mergeable_watch(s: dict) -> bool:
+    """Atividade do relógio que pode SER a musculação que a pessoa está anotando: musculação sem séries ou atividade
+    sem tipo. Yoga, futebol, dança, corrida etc. são outra coisa e nunca viram o treino de força."""
+    items = s.get("items") or []
+    return _watch(s) and not s.get("merged") and bool(items) and all(
+        (i.get("strength_min") or i.get("exercise_id") == UNKNOWN_ACTIVITY) and not i.get("sets") for i in items)
+
+
+def unmerge_watch(s: dict, strength_id: str) -> dict | None:
+    """Treino juntado (séries do app + relógio) que a pessoa apagou: o que o relógio mediu continua valendo.
+    Devolve a atividade só-de-tempo para ser regravada, ou None se não havia medida de tempo."""
+    summ = s.get("garmin_summary") or {}
+    mins = float(s.get("duration_min") or summ.get("duration_min") or 0)
+    if not (s.get("merged") and _watch(s) and mins > 0 and any(i.get("sets") for i in s.get("items") or [])):
+        return None
+    item = {"exercise_id": strength_id, "_name": "Musculação (relógio)", "strength_min": round(mins, 1), "duration_min": round(mins, 1)}
+    for k in ("avg_hr", "max_hr", "kcal"):
+        if summ.get(k):
+            item[k] = summ[k]
+    out = {k: s[k] for k in ("date", "source", "garmin_activity_id", "ext_id", "garmin_summary") if s.get(k)}
+    return {**out, "duration_min": round(mins, 1), "notes": "Musculação (relógio)", "items": [item]}
 
 
 def merge_into_watch(app_s: dict, watch_s: dict) -> dict:

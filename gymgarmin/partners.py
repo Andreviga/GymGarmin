@@ -206,16 +206,18 @@ def day(uid: int, pid: int, d: date) -> dict:
 def plan_items_from_session(s: dict) -> tuple[list[dict], dict[str, list[dict]]]:
     """Sessão feita pelo parceiro → itens no formato de planilha (para o app montar o MEU rascunho com as minhas cargas)
     + as séries dele por exercício (repetições de cada série e a carga que ELE usou, só como referência)."""
-    items, done = [], {}
-    for it in s.get("items") or []:
+    done: dict[str, list[dict]] = {}
+    for it in s.get("items") or []:  # o mesmo exercício em dois blocos (alternou aparelhos) vira um item só, com todas as séries
         if _is_strength(it):
             sets = [x for x in it["sets"] if x.get("done", True)]
-            if not sets:
-                continue
-            reps = [int(x["reps"]) for x in sets if x.get("reps")]
-            items.append({"exercise_id": it["exercise_id"], "sets": len(sets), "reps": str(max(set(reps), key=reps.count)) if reps else "10",
-                          "rest_s": 90, "phase": "principal", **({"duration_s": sets[0]["duration_s"]} if sets[0].get("duration_s") and not reps else {})})
-            done.setdefault(it["exercise_id"], []).extend({"reps": x.get("reps"), "load_kg": x.get("load_kg"), "duration_s": x.get("duration_s")} for x in sets)
+            if sets:
+                done.setdefault(it["exercise_id"], []).extend(
+                    {"reps": x.get("reps"), "load_kg": x.get("load_kg"), "duration_s": x.get("duration_s")} for x in sets)
+    items = []
+    for ex_id, sets in done.items():
+        reps = [int(x["reps"]) for x in sets if x.get("reps")]
+        items.append({"exercise_id": ex_id, "sets": len(sets), "reps": str(max(set(reps), key=reps.count)) if reps else "10",
+                      "rest_s": 90, "phase": "principal", **({"duration_s": sets[0]["duration_s"]} if sets[0].get("duration_s") and not reps else {})})
     return items, done
 
 
