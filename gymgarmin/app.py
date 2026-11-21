@@ -1246,6 +1246,7 @@ def create_session(body: dict = Body(...)):
             else:
                 body.pop("duration_min")
         target = body.pop("merge_into", None)
+        no_merge = body.pop("no_merge", None) is True   # a pessoa viu a atividade do relógio e disse "é outro treino"
         watch = db.get_session(target) if isinstance(target, int) and not isinstance(target, bool) else None
         if watch and dedupe.is_time_only(watch) and str(watch.get("date"))[:10] == str(body.get("date") or "")[:10]:
             # a pessoa apontou a atividade do relógio (que só marcou o tempo) como sendo este treino
@@ -1254,7 +1255,7 @@ def create_session(body: dict = Body(...)):
             saved = db.get_session(saved["id"]) or saved
             return {**saved, "prs": history.session_prs(db.list_sessions(limit=5000), saved, _profile().get("weight_kg")),
                     "credit": credit}
-        twin = None if body.get("garmin_activity_id") else \
+        twin = None if body.get("garmin_activity_id") or no_merge else \
             dedupe.find_twin(body, db.list_sessions(since=str(body.get("date") or "")[:10] or None, limit=200))
         if twin:  # o relógio já trouxe este treino: junta (séries do app + medidas do relógio)
             saved = db.save_session(dedupe.merge(body, twin), session_id=twin["id"])

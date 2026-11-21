@@ -1909,7 +1909,10 @@ async function finishSession() {
     payload.client_id = s.client_id || (s.client_id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
     if (s.with_partner) payload.with_partner = s.with_partner;
     if (s.merge_into) payload.merge_into = s.merge_into;
-    else if (s.pulled && s.duration_min) payload.duration_min = s.duration_min;  // sem relógio: o tempo do treino feito junto
+    else {
+      if (s.pulled && s.duration_min) payload.duration_min = s.duration_min;  // sem relógio: o tempo do treino feito junto
+      if ((s.merge_candidates || []).length) payload.no_merge = true;          // viu a atividade do relógio e disse "é outro treino"
+    }
     save();
     const btn = $("#s-finish"); btn.disabled = true;
     let saved;

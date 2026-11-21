@@ -195,3 +195,60 @@ def test_pulled_workout_without_watch_keeps_the_time_of_the_workout_done_togethe
     # tempo absurdo vindo da tela não é gravado
     bad = n.post("/api/sessions", json={**body, "client_id": "x2", "duration_min": "abc"}).json()
     assert not bad.get("duration_min")
+
+
+def _ingest(c, kind, start, end, dur, wid=None, **extra):
+    tok = c.post("/api/account/ingest-token", json={}).json()["token"]
+    w = {"id": wid or f"z-{kind}-{start}", "type": kind, "name": "Treino", "start": f"2026-11-20T{start}:00-03:00",
+         "end": f"2026-11-20T{end}:00-03:00", "duration_min": dur, "avg_hr": 104, "max_hr": 131, "kcal": 310, **extra}
+    return c.post("/api/ingest", headers={"Authorization": f"Bearer {tok}"}, json={"source": "android", "days": [], "workouts": [w]})
+
+
+def _pull(a, aid, n, **more):
+    sid = a.post("/api/sessions", json=ANDRE_WORKOUT).json()["id"]
+    draft = n.post(f"/api/partners/{aid}/draft", json={"session_id": sid}).json()
+    body = {k: v for k, v in draft.items() if k in ("date", "day_name", "items", "with_partner", "duration_min")}
+    return draft, n.post("/api/sessions", json={**body, "client_id": "n-1", **more}).json()
+
+
+def test_watch_that_only_times_arrives_after_the_pulled_workout_and_joins_it(env):
+    """O caso real: ela registra o treino puxado e só depois o relógio (Amazfit: "outro treino") entrega o tempo."""
+    a, aid, n, nid, b, bid = env
+    _link(a, n, nid)
+    _, mine = _pull(a, aid, n)
+    assert mine["duration_min"] == 65 and not mine.get("merged")
+    r = _ingest(n, "OTHER_WORKOUT", "12:35", "13:37", 62).json()
+    assert r["imported"][0]["merged"] is True and r["imported"][0]["session_id"] == mine["id"]
+    ss = [s for s in n.get("/api/sessions?limit=20").json() if s["date"].startswith("2026-11-20")]
+    assert len(ss) == 1 and ss[0]["merged"] and ss[0]["duration_min"] == 62 and ss[0]["garmin_summary"]["kcal"] == 310
+    assert [i["exercise_id"] for i in ss[0]["items"]][:2] == ["Leg_Extensions", "Seated_Leg_Curl"] and ss[0]["with_partner"] == aid
+    by = {m["key"]: m for m in n.get(f"/api/partners/{aid}/duel").json()["metrics"]}
+    assert by["sessions"]["me"] == 1 and by["minutes"]["me"] == 62 and by["kcal"]["me"] == 310      # nada em dobro no placar
+    _ingest(n, "OTHER_WORKOUT", "12:35", "13:37", 62)                                                 # o relógio reenvia a cada sincronização
+    assert len([s for s in n.get("/api/sessions?limit=20").json() if s["date"].startswith("2026-11-20")]) == 1
+    # outro cardio mais tarde, fora do horário do treino: é outro treino mesmo
+    assert _ingest(n, "OTHER_WORKOUT_83", "18:10", "18:40", 30).json()["imported"][0]["merged"] is False
+    assert len([s for s in n.get("/api/sessions?limit=20").json() if s["date"].startswith("2026-11-20")]) == 2
+
+
+def test_same_time_rule_only_for_activities_the_watch_could_not_name(env):
+    a, aid, n, nid, b, bid = env
+    _link(a, n, nid)
+    _pull(a, aid, n)
+    # o relógio disse que era corrida na esteira no mesmo horário: não vira a musculação anotada
+    assert _ingest(n, "RUNNING_TREADMILL", "12:40", "13:10", 30, distance_km=4.2).json()["imported"][0]["merged"] is False
+
+
+def test_logging_the_workout_after_the_watch_joins_too_unless_i_say_it_is_another(env):
+    a, aid, n, nid, b, bid = env
+    _link(a, n, nid)
+    w = _ingest(n, "OTHER_WORKOUT", "12:35", "13:37", 62).json()["imported"][0]["session_id"]
+    draft, mine = _pull(a, aid, n, no_merge=True)                      # ela viu a atividade e disse "é outro treino"
+    assert [c["id"] for c in draft["merge_candidates"]] == [w] and mine["id"] != w
+    assert len(n.get("/api/sessions?limit=20").json()) == 2
+    # sem dizer nada (treino anotado por fora do cartão do parceiro): o mesmo horário junta sozinho
+    body = {"date": "2026-11-20T12:40", "day_name": "Treino livre", "client_id": "n-2", "duration_min": 55,
+            "items": [{"exercise_id": "Leg_Extensions", "sets": [{"reps": 12, "load_kg": 20}, {"reps": 12, "load_kg": 20}]}]}
+    n.delete(f"/api/sessions/{mine['id']}")
+    again = n.post("/api/sessions", json=body).json()
+    assert again["id"] == w and again["merged"] and again["duration_min"] == 62 and again["items"][0]["exercise_id"] == "Leg_Extensions"

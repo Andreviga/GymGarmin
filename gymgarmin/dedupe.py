@@ -44,12 +44,69 @@ def _watch(s: dict) -> bool:
     return bool(s.get("garmin_activity_id") or s.get("ext_id"))
 
 
+UNKNOWN_ACTIVITY = "atividade_outra"   # o relógio gravou tempo/FC/calorias mas não disse o que era
+SET_MIN = 2.6                          # minutos por série (com o descanso), para estimar a duração de um treino anotado
+MIN_OVERLAP = 0.5                      # fração do treino mais curto que precisa coincidir no horário
+
+
+def is_unknown_watch(s: dict) -> bool:
+    """Atividade do relógio sem tipo ("outro treino" do Amazfit/Zepp, Xiaomi, Samsung): só tempo, FC e calorias."""
+    items = s.get("items") or []
+    return _watch(s) and bool(items) and all(i.get("exercise_id") == UNKNOWN_ACTIVITY and not i.get("sets") for i in items)
+
+
+def _span(s: dict) -> tuple[datetime, datetime] | None:
+    """Início e fim do treino, quando a sessão tem hora (não só o dia) e dá para saber quanto durou."""
+    t = _time(s)
+    if not t or len(str(s.get("date") or "")) <= 10:
+        return None
+    items = s.get("items") or []
+    mins = float(s.get("duration_min") or (s.get("garmin_summary") or {}).get("duration_min") or 0)
+    if not mins:
+        mins = sum(float(i.get("duration_min") or i.get("strength_min") or 0) for i in items) + \
+            SET_MIN * sum(len(i["sets"]) for i in items if isinstance(i.get("sets"), list))
+    return (t, t + timedelta(minutes=mins)) if mins > 0 else None
+
+
+def overlap(a: dict, b: dict) -> float:
+    """Quanto do treino mais curto acontece ao mesmo tempo que o outro (0 a 1)."""
+    sa, sb = _span(a), _span(b)
+    if not sa or not sb:
+        return 0.0
+    both = (min(sa[1], sb[1]) - max(sa[0], sb[0])).total_seconds()
+    short = min((sa[1] - sa[0]).total_seconds(), (sb[1] - sb[0]).total_seconds())
+    return max(0.0, both) / short if short > 0 else 0.0
+
+
+def _same_time_twin(new: dict, sessions: list[dict], day: str) -> dict | None:
+    """Musculação anotada no app ↔ atividade sem tipo do relógio no mesmo horário: é o mesmo treino."""
+    from_watch = _watch(new)
+    if from_watch and not is_unknown_watch(new):
+        return None
+    if not from_watch and "forca" not in kinds(new):
+        return None
+    best, best_o = None, 0.0
+    for s in sessions:
+        if str(s.get("date") or "")[:10] != day or s.get("id") == new.get("id") or _watch(s) == from_watch:
+            continue
+        if from_watch and not any(i.get("sets") for i in s.get("items") or []):
+            continue      # do lado do app tem de ser treino com séries
+        if not from_watch and not is_unknown_watch(s):
+            continue
+        o = overlap(new, s)
+        if o >= MIN_OVERLAP and o > best_o:
+            best, best_o = s, o
+    return best
+
+
 def find_twin(new: dict, sessions: list[dict]) -> dict | None:
     """Sessão do mesmo dia e do mesmo tipo vinda da outra fonte (app ↔ relógio)."""
     day = str(new.get("date") or "")[:10]
     k_new = kinds(new)
-    if not day or not k_new:
+    if not day:
         return None
+    if not k_new:
+        return _same_time_twin(new, sessions, day)
     from_garmin = _watch(new)
     best, best_gap = None, None
     for s in sessions:
@@ -70,7 +127,7 @@ def find_twin(new: dict, sessions: list[dict]) -> dict | None:
                 continue
         if best is None or gap < best_gap:
             best, best_gap = s, gap
-    return best
+    return best or _same_time_twin(new, sessions, day)
 
 
 def is_time_only(s: dict) -> bool:
@@ -111,6 +168,19 @@ def merge(app_s: dict, garmin_s: dict) -> dict:
     out["merged"] = True
     if garmin_s.get("duration_min") and not out.get("duration_min"):
         out["duration_min"] = garmin_s["duration_min"]
+    if is_unknown_watch(garmin_s):
+        # relógio que só marca tempo: as medidas estavam no item genérico (que não entra); sobem para o resumo, e o
+        # horário e a duração medidos valem mais que os anotados (ex.: o tempo copiado do treino do parceiro)
+        summ = dict(out["garmin_summary"])
+        for gi in garmin_s.get("items") or []:
+            for k in ("avg_hr", "max_hr", "kcal", "duration_min"):
+                if gi.get(k) and not summ.get(k):
+                    summ[k] = gi[k]
+        out["garmin_summary"] = summ
+        if garmin_s.get("source") and not out.get("source"):
+            out["source"] = garmin_s["source"]
+        out["date"] = garmin_s.get("date") or out.get("date")
+        out["duration_min"] = garmin_s.get("duration_min") or summ.get("duration_min") or out.get("duration_min")
     items = [dict(i) for i in out.get("items") or []]
     g_items = garmin_s.get("items") or []
     for gi in g_items:
