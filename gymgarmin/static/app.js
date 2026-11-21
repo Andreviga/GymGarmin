@@ -56,7 +56,12 @@ function toast(msg, ms = 2600) {
 function store(key, val) { try { if (val === undefined) return JSON.parse(localStorage.getItem(key)); if (val === null) localStorage.removeItem(key); else localStorage.setItem(key, JSON.stringify(val)); } catch (_) { return null; } }
 
 function openModal(html) { $("#modal-body").innerHTML = html; $("#modal").hidden = false; return $("#modal-body"); }
-function closeModal() { $("#modal").hidden = true; $("#modal-body").innerHTML = ""; if (typeof route === "function" && route.again) { route.again = false; route(); } }
+function closeModal() {
+  $("#modal").hidden = true; $("#modal-body").innerHTML = ""; $("#modal-body").classList.remove("busy");
+  const hook = closeModal.hook; closeModal.hook = null;  // quem abriu a janela pode pedir para ser avisado quando ela fechar (×, toque fora, botão)
+  if (hook) { try { hook(); } catch (_) { /* a tela de trás segue como está */ } }
+  if (typeof route === "function" && route.again) { route.again = false; route(); }
+}
 $("#modal").addEventListener("click", (e) => { if (e.target.id === "modal" || e.target.classList.contains("modal-close")) closeModal(); });
 
 const STATUS_CLASS = { esquecido: "bad", abaixo: "warn", manutencao: "", otimo: "ok", alto: "warn", excesso: "bad" };
@@ -2446,56 +2451,87 @@ async function viewAnalise() {
 
 /* ---- relógio: séries sem nome e categorias que o app chutou ---- */
 function watchReviewCard(w) {
-  if (!w || (!w.categories.length && !w.sessions.length)) return "";
+  if (!w) return "";
+  const open = w.categories.length || w.sessions.length;
+  const answered = (w.confirmed || []).length || (w.labeled || []).length || (w.dismissed || []).length;
+  if (!open && !answered) return "";
+  if (!open) return `<section class="card wr-card"><div class="row between gap"><span><b>Do relógio: tudo conferido</b><br><span class="small muted">Dá para rever ou corrigir o que você respondeu.</span></span>
+    <button class="btn sm ghost" id="wr-open">Rever</button></div></section>`;
   const parts = [];
   if (w.categories.length) parts.push(`${w.guess_sets} séries em que o relógio disse só o tipo (${w.categories.slice(0, 3).map((c) => esc(c.label.toLowerCase())).join(", ")}${w.categories.length > 3 ? "…" : ""})`);
   if (w.sessions.length) parts.push(`${w.sessions.reduce((a, s) => a + s.sets, 0)} séries recentes sem nome nenhum`);
   return `<section class="card wr-card"><h2>Do relógio: falta dizer o exercício</h2>
-    <p class="small" style="margin-top:0">${parts.join(" e ")}. Elas já contam no volume da semana; com o exercício certo passam a contar também na evolução de cargas.</p>
+    <p class="small" style="margin-top:0">${parts.join(" e ")}. As que têm só o tipo contam no músculo do palpite; as sem nome contam apenas no total de séries. Com o exercício certo entram no volume por músculo e na evolução de cargas.</p>
     <button class="btn block" id="wr-open">Conferir em 1 minuto</button></section>`;
 }
-const setsTxt = (sets) => sets.map((x) => `${x.reps}×${x.load_kg ? fmtKg(x.load_kg).replace(" kg", "") : "—"}`).join("  ");
-function openWatchReview(w, onDone) {
-  let changed = false;
-  const done = () => { closeModal(); if (changed && onDone) onDone(); };
+const setTxt = (x) => `${x.reps}×${x.load_kg ? fmtKg(x.load_kg).replace(" kg", "") : "—"}`;
+async function openWatchReview(w0, onDone) {
+  let w = w0, changed = false, busy = false;
+  const splits = new Set();  // "sessão:item:posição" onde a pessoa mandou dividir um bloco
+  try { w = await api("/api/watch/review"); } catch (_) { /* usa o que a tela já tinha */ }
+  const finish = () => { if (changed && onDone) onDone(); };
+  // blocos como a pessoa vê: os do servidor, divididos onde ela tocou
+  const blocksOf = (s) => s.blocks.flatMap((b) => {
+    const cuts = b.sets.map((x) => x.i).filter((i, k) => k > 0 && splits.has(`${s.session_id}:${b.item}:${i}`));
+    const edges = [b.from, ...cuts, b.to];
+    return edges.slice(0, -1).map((from, k) => ({ item: b.item, from, to: edges[k + 1], sets: b.sets.filter((x) => x.i >= from && x.i < edges[k + 1]), suggestion: k === 0 ? b.suggestion : null }));
+  });
   const draw = () => {
+    const key = (s, b) => `${s.session_id}:${b.item}:${b.from}:${b.to}`;
     const body = openModal(`<h2>O que o relógio gravou</h2>
       ${w.categories.length ? `<h3>O relógio disse só o tipo</h3>
-        <p class="small muted" style="margin-top:0">Ele reconhece "rosca" ou "supino", mas não qual. Diga o que costuma ser: vale para os treinos já importados e para os próximos.</p>
-        <div class="stack">${w.categories.map((c) => `<div class="wr-cat"><div><b>${esc(c.label)}</b> <span class="small muted">· ${c.sets} séries em ${c.sessions} ${c.sessions === 1 ? "treino" : "treinos"}</span></div>
+        <p class="small muted" style="margin-top:0">Ele reconhece "rosca" ou "supino", mas não qual. Diga o que costuma ser: vale para os treinos já importados e para os próximos. Dá para trocar depois.</p>
+        <div class="stack">${w.categories.map((c) => `<div class="wr-cat"><div><b>${esc(c.label)}</b> <span class="small muted">· ${c.sets} ${c.sets === 1 ? "série" : "séries"} em ${c.sessions} ${c.sessions === 1 ? "treino" : "treinos"}</span></div>
           <div class="small">Hoje conta como <b>${esc(c.current.name)}</b>.</div>
           <div class="chips" style="margin-top:6px">${c.options.map((o, i) => `<button class="chip ${i ? "" : "on"}" data-wcat="${esc(c.category)}" data-ex="${esc(o.id)}">${i ? esc(o.name) : "✓ É isso mesmo"}</button>`).join("")}
             <button class="chip" data-wcat-pick="${esc(c.category)}">Outro…</button></div></div>`).join("")}</div>` : ""}
       ${w.sessions.length ? `<h3>Séries sem nome</h3>
-        <p class="small muted" style="margin-top:0">O app separou onde a carga recomeça (cada bloco deve ser um exercício). Diga qual foi; se não lembrar, tudo bem.</p>
+        <p class="small muted" style="margin-top:0">O app separou onde a carga recomeça; cada bloco deve ser um exercício. Se um bloco juntou dois exercícios, <b>toque na série em que o segundo começa</b> para dividir. Se não lembrar, tudo bem.</p>
         ${w.sessions.map((s) => `<div class="wr-sess"><b>${ddmm(s.date)} · ${esc(s.title)}</b>
           ${s.planned ? `<div class="small muted">Treino planejado no dia: ${esc(s.planned)}</div>` : ""}
-          ${s.blocks.map((b) => `<div class="wr-block"><div class="small wr-sets">${esc(setsTxt(b.sets))}</div>
-            <div class="row gap wrap">${b.suggestion ? `<button class="btn sm" data-wlab="${s.session_id}:${b.item}:${b.from}:${b.to}" data-ex="${esc(b.suggestion.id)}">Foi ${esc(b.suggestion.name)}</button>` : ""}
-              <button class="btn sm ghost" data-wlab-pick="${s.session_id}:${b.item}:${b.from}:${b.to}">${b.suggestion ? "Outro exercício" : "Escolher exercício"}</button></div></div>`).join("")}
+          ${blocksOf(s).map((b) => `<div class="wr-block"><div class="wr-sets">${b.sets.map((x, k) => `<button class="wr-set" ${k ? `data-wsplit="${s.session_id}:${b.item}:${x.i}" aria-label="Dividir o bloco na série ${setTxt(x)}"` : "disabled"}>${setTxt(x)}</button>`).join("")}</div>
+            <div class="row gap wrap">${b.suggestion ? `<button class="btn sm" data-wlab="${key(s, b)}" data-ex="${esc(b.suggestion.id)}">Foi ${esc(b.suggestion.name)}</button>` : ""}
+              <button class="btn sm ghost" data-wlab-pick="${key(s, b)}">${b.suggestion ? "Outro exercício" : "Escolher exercício"}</button></div></div>`).join("")}
           <button class="act" data-wdis="${s.session_id}" style="margin-top:8px">Não lembro deste treino</button></div>`).join("")}` : ""}
-      ${!w.categories.length && !w.sessions.length ? `<p class="ok-txt">✓ Tudo conferido. As séries do relógio já contam na evolução de cargas.</p>` : ""}
+      ${(w.confirmed || []).length || (w.labeled || []).length || (w.dismissed || []).length ? `<h3>Já respondido</h3>
+        <ul class="plain small wr-done">
+          ${(w.confirmed || []).map((c) => `<li class="row between gap"><span>${esc(c.label)} = <b>${esc(c.exercise.name)}</b></span><button class="act" data-wcat-pick="${esc(c.category)}">Trocar</button></li>`).join("")}
+          ${(w.labeled || []).map((l) => `<li class="row between gap"><span>${ddmm(l.date)} · ${esc(l.sets.map(setTxt).join("  "))} = <b>${esc(l.exercise.name)}</b></span><button class="act" data-wun="${l.session_id}:${l.item}">Desfazer</button></li>`).join("")}
+          ${(w.dismissed || []).map((d) => `<li class="row between gap"><span>${ddmm(d.date)} · ${esc(d.title)} <span class="muted">(${d.sets} ${d.sets === 1 ? "série" : "séries"} sem nome)</span></span><button class="act" data-wask="${d.session_id}">Perguntar de novo</button></li>`).join("")}
+        </ul>` : ""}
+      ${!w.categories.length && !w.sessions.length ? `<p class="ok-txt">✓ Nada pendente: o que o relógio gravou já tem exercício.</p>` : ""}
       <button class="btn ghost block" id="wr-close" style="margin-top:14px">Fechar</button>`);
-    body.onclick = async (e) => {
-      const t = e.target.closest("button"); if (!t || t.disabled) return;
-      if (t.id === "wr-close") return done();
+    closeModal.hook = finish;  // fechar no ×, tocando fora ou no botão: a tela de trás se atualiza
+    const expectOf = (k) => { const [sid, item, from, to] = k.split(":").map(Number); const s = w.sessions.find((x) => x.session_id === sid);
+      const b = s && blocksOf(s).find((x) => x.item === item && x.from === from && x.to === to);
+      return { session_id: sid, item, from, to, expect: b ? b.sets.map((x) => [x.reps, x.load_kg]) : null }; };
+    const call = async (path, payload, okMsg) => {
+      if (busy) return; busy = true; body.classList.add("busy");  // um pedido por vez: dois toques seguidos não se atropelam
+      try { const r = await api(path, { method: "POST", body: payload }); changed = true; w = r; splits.clear(); toast(okMsg(r), 3500); }
+      catch (err) { toast(err.message, 5000); try { w = await api("/api/watch/review"); splits.clear(); } catch (_) { /* fica como está */ } }
+      busy = false; body.classList.remove("busy"); draw();
+    };
+    const catMsg = (r) => `Anotado: ${r.exercise.name}${r.changed ? ` (${r.changed} ${r.changed === 1 ? "treino atualizado" : "treinos atualizados"})` : ""}`;
+    const labMsg = (r) => `Anotado: ${r.exercise.name}`;
+    body.onclick = (e) => {
+      const t = e.target.closest("button"); if (!t || t.disabled || busy) return;
+      if (t.id === "wr-close") return closeModal();
       const d = t.dataset;
-      const send = async (path, payload, okMsg) => {
-        t.disabled = true;
-        try { const r = await api(path, { method: "POST", body: payload }); changed = true; w = r; toast(okMsg(r), 3500); draw(); }
-        catch (err) { t.disabled = false; toast(err.message, 5000); }
+      if (d.wsplit) { splits.add(d.wsplit); return draw(); }
+      if (d.wcat) return call("/api/watch/category", { category: d.wcat, exercise_id: d.ex }, catMsg);
+      if (d.wlab) return call("/api/watch/label", { ...expectOf(d.wlab), exercise_id: d.ex }, labMsg);
+      if (d.wdis) return call("/api/watch/dismiss", { session_id: +d.wdis }, () => "Ok, não pergunto mais sobre esse treino");
+      if (d.wask) return call("/api/watch/dismiss", { session_id: +d.wask, undo: true }, () => "Voltei a perguntar sobre esse treino");
+      if (d.wun) { const [sid, item] = d.wun.split(":").map(Number); return call("/api/watch/unlabel", { session_id: sid, item }, () => "Desfeito: as séries voltaram a ficar sem nome"); }
+      // "Outro…": o seletor de exercício abre por cima. Escolheu: grava e volta para cá; fechou sem escolher: volta para cá também
+      const pick = (path, payload, okMsg) => {
+        let picked = false;
+        closeModal.hook = null;
+        pickExercise("strength", (ex) => { picked = true; call(path, { ...payload, exercise_id: ex.id }, okMsg); });
+        closeModal.hook = () => { if (!picked) setTimeout(draw, 0); };
       };
-      const catMsg = (r) => `Anotado: ${r.exercise.name}${r.changed ? ` (${r.changed} ${r.changed === 1 ? "treino atualizado" : "treinos atualizados"})` : ""}`;
-      if (d.wcat) return send("/api/watch/category", { category: d.wcat, exercise_id: d.ex }, catMsg);
-      if (d.wlab) { const [sid, item, from, to] = d.wlab.split(":").map(Number); return send("/api/watch/label", { session_id: sid, item, from, to, exercise_id: d.ex }, (r) => `Anotado: ${r.exercise.name}`); }
-      if (d.wdis) return send("/api/watch/dismiss", { session_id: +d.wdis }, () => "Ok, não pergunto mais sobre esse treino");
-      const reopen = async (path, payload, okMsg) => {
-        try { const r = await api(path, { method: "POST", body: payload }); changed = true; w = r; toast(okMsg(r), 3500); }
-        catch (err) { toast(err.message, 5000); }
-        draw();
-      };
-      if (d.wcatPick) return pickExercise("strength", (ex) => reopen("/api/watch/category", { category: d.wcatPick, exercise_id: ex.id }, catMsg));
-      if (d.wlabPick) { const [sid, item, from, to] = d.wlabPick.split(":").map(Number); return pickExercise("strength", (ex) => reopen("/api/watch/label", { session_id: sid, item, from, to, exercise_id: ex.id }, (r) => `Anotado: ${r.exercise.name}`)); }
+      if (d.wcatPick) return pick("/api/watch/category", { category: d.wcatPick }, catMsg);
+      if (d.wlabPick) return pick("/api/watch/label", expectOf(d.wlabPick), labMsg);
     };
   };
   draw();

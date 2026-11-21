@@ -205,7 +205,13 @@ label.chip { display: inline-flex; align-items: center; color: var(--ink); font-
 .wr-cat, .wr-sess { padding: 10px 0; border-bottom: 1px solid var(--line); }
 .wr-cat:last-child, .wr-sess:last-child { border-bottom: 0; }
 .wr-block { margin: 8px 0 0; padding: 8px 10px; background: var(--info-bg); border-radius: 10px; }
-.wr-sets { font-variant-numeric: tabular-nums; margin-bottom: 6px; word-spacing: 2px; }
+.wr-sets { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.wr-set { appearance: none; border: 1px solid var(--line); background: var(--card); color: var(--ink); font: inherit; font-size: 14px;
+  font-variant-numeric: tabular-nums; padding: 8px 10px; min-height: 40px; border-radius: 10px; }
+.wr-set:disabled { opacity: 1; border-style: dashed; }
+.wr-done li { padding: 8px 0; border-bottom: 1px solid var(--line); align-items: center; }
+.wr-done li:last-child { border-bottom: 0; }
+#modal-body.busy button { opacity: .55; pointer-events: none; }
 .mx-brands a { white-space: normal; }
 .steps-tags li { padding: 6px 0; border-bottom: 1px solid var(--line); align-items: center; }
 .steps-tags li:last-child { border-bottom: 0; }

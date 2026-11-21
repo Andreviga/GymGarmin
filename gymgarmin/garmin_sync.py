@@ -441,8 +441,8 @@ def remap_imported(sessions: list[dict], preferred_ids: set[str] | None = None) 
         dirty = False
         for it in s.get("items") or []:
             g = it.get("garmin") or {}
-            if not g or not it.get("sets"):
-                continue
+            if not g or not it.get("sets") or it.get("labeled"):
+                continue  # o que a pessoa já respondeu (categoria confirmada, bloco nomeado) não é remapeado
             cat, name = g.get("category"), g.get("name")
             if it.get("exercise_id") == UNKNOWN_ID:
                 if not it.get("_name"):

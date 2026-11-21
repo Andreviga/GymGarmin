@@ -1405,11 +1405,29 @@ def watch_label(body: dict = Body(...)):
     if not s:
         raise HTTPException(404, "Treino não encontrado")
     try:
-        watch_labels.apply_label(s, item, a, b, ex["id"])
+        watch_labels.apply_label(s, item, a, b, ex["id"], expect=body.get("expect"))
     except ValueError as e:
-        raise HTTPException(400, str(e)) from e
+        raise HTTPException(409, str(e)) from e
     db.save_session(s, session_id=s["id"])
     return {"exercise": {"id": ex["id"], "name": ex["name"]}, **_watch_review()}
+
+
+@app.post("/api/watch/unlabel")
+def watch_unlabel(body: dict = Body(...)):
+    """Desfaz o nome dado a um bloco de séries: {session_id, item}."""
+    try:
+        sid, item = int(body.get("session_id")), int(body.get("item"))
+    except (TypeError, ValueError) as e:
+        raise HTTPException(400, "Bloco inválido") from e
+    s = db.get_session(sid)
+    if not s:
+        raise HTTPException(404, "Treino não encontrado")
+    try:
+        watch_labels.unlabel(s, item)
+    except ValueError as e:
+        raise HTTPException(409, str(e)) from e
+    db.save_session(s, session_id=s["id"])
+    return _watch_review()
 
 
 @app.post("/api/watch/dismiss")
@@ -1420,7 +1438,8 @@ def watch_dismiss(body: dict = Body(...)):
     except (TypeError, ValueError) as e:
         raise HTTPException(400, "Treino inválido") from e
     prefs = _watch_prefs()
-    prefs["dismissed"] = ([x for x in prefs.get("dismissed") or [] if x != sid] + [sid])[-200:]
+    rest = [x for x in prefs.get("dismissed") or [] if x != sid]
+    prefs["dismissed"] = rest if body.get("undo") else (rest + [sid])[-200:]  # undo = "perguntar de novo"
     db.kv_set(watch_labels.PREFS_KEY, json.dumps(prefs))
     return _watch_review()
 
@@ -1635,7 +1654,8 @@ def g_import(activity_id: int):
     plan_ids = {it.get("exercise_id") for p in db.list_plans() for d in p.get("days", []) for it in d.get("items", [])}
     p = _profile()
     try:
-        session = garmin_sync.import_activity(activity_id, plan_ids, hr_max(p.get("age"), p.get("hr_max")))
+        session = garmin_sync.import_activity(activity_id, plan_ids, hr_max(p.get("age"), p.get("hr_max")),
+                                               cat_prefs=watch_labels.category_prefs(_watch_prefs()))
         return db.save_session(session)
     except ValueError as e:
         raise HTTPException(409, str(e)) from e
