@@ -477,3 +477,17 @@ def test_day_window_shows_the_same_shared_time_as_the_scoreboard(env):
     card = n.get("/api/partners").json()["partners"][0]["today"]["done"][0]
     assert card["minutes"] == 62 and not card["minutes_estimated"]            # o mesmo número do placar, na frase do cartão e na janela
     assert n.get(f"/api/partners/{aid}/day").json()["done"][0]["minutes"] == 62
+
+
+def test_live_workout_is_not_glued_to_a_watch_strength_session_of_another_time(env):
+    a, aid, n, nid, b, bid = env
+    morning = _ingest(n, "STRENGTH_TRAINING", "07:00", "07:45", 45, wid="m1").json()["imported"][0]["session_id"]
+    live = {"date": "2026-11-20T12:30", "day_name": "Treino livre", "client_id": "n-live", "duration_min": 58,   # feito ao vivo: tempo medido
+            "items": [{"exercise_id": "Leg_Extensions", "sets": [{"reps": 12, "load_kg": 20}] * 4}]}
+    mine = n.post("/api/sessions", json=live).json()
+    assert mine["id"] != morning and len(_day_sessions(n)) == 2               # manhã no relógio × meio-dia no app: dois treinos
+    assert len(n.get("/api/partners").json()["merge_questions"]) == 1         # e o Hoje pergunta, para o caso de ser o mesmo
+    # anotado depois, sem tempo medido: continua a regra de sempre (o relógio já tinha gravado esse treino)
+    n.delete(f"/api/sessions/{mine['id']}")
+    later = n.post("/api/sessions", json={k: v for k, v in live.items() if k != "duration_min"} | {"client_id": "n-later"}).json()
+    assert later["id"] == morning and later["merged"]
