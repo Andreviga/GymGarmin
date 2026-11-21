@@ -1239,6 +1239,8 @@ def create_session(body: dict = Body(...)):
             pid = body.get("with_partner")
             if not (acc and isinstance(pid, int) and not isinstance(pid, bool) and partners.is_partner(acc["user_id"], pid)):
                 body.pop("with_partner", None)
+        if body.get("time_set") is not True:  # a pessoa digitou a data/hora do treino (vale como hora de verdade)
+            body.pop("time_set", None)
         if "duration_min" in body:  # tempo do treino vindo da tela: número plausível ou nada
             dm = body.get("duration_min")
             if isinstance(dm, (int, float)) and not isinstance(dm, bool) and 1 <= dm <= 600:
@@ -1539,7 +1541,7 @@ def partners_get():
             theirs = [s for s in prev["done"] if s["has_sets"]]
             if theirs and not any(m.get("has_sets") for m in prev["mine"]):
                 p["recent"] = {"date": prev["date"], "days_ago": back, "id": theirs[-1]["id"], "title": theirs[-1]["title"],
-                               "minutes": theirs[-1]["minutes"]}
+                               "minutes": theirs[-1]["minutes"], "minutes_estimated": theirs[-1]["minutes_estimated"]}
                 break
     return {"enabled": True, **out, "merge_questions": _merge_questions()}
 

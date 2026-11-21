@@ -152,6 +152,8 @@ def score(data: dict, form: float | None = None) -> dict:
                                 "Sem sono nem frequência cardíaca do relógio hoje."]}
         return {"score": None, "level": "sem_dados", "action": "seguir",
                 "reasons": ["Sem sono nem frequência cardíaca do relógio hoje: siga o plano pela sensação."]}
+    if base is None:
+        reasons.append("sem sono do relógio hoje: nota só pela frequência cardíaca de repouso")
     s = base if base is not None else 70.0
     if rd is not None and rd >= 5:  # FC de repouso acima da base da própria pessoa (dados de saúde do relógio)
         s -= 15 if rd >= 8 else 8

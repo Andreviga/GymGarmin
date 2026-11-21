@@ -516,3 +516,18 @@ def test_people_list_says_who_is_the_owner_and_since_when_each_account_exists(en
     a, aid, n, nid, b, bid = env
     people = {p["id"]: p for p in n.get("/api/partners").json()["people"]}
     assert people[aid]["owner"] is True and people[bid]["owner"] is False and people[bid]["since"] == "2026-11-20"
+
+
+def test_workout_typed_with_its_own_time_is_not_glued_to_a_morning_watch_session(env):
+    a, aid, n, nid, b, bid = env
+    morning = _ingest(n, "STRENGTH_TRAINING", "07:00", "07:30", 30, wid="m1").json()["imported"][0]["session_id"]
+    typed = {"date": "2026-11-20T18:00", "day_name": "Treino livre", "client_id": "n-typed", "time_set": True,   # ela trocou a hora para 18:00
+             "items": [{"exercise_id": "Leg_Extensions", "sets": [{"reps": 12, "load_kg": 20}] * 3}]}
+    mine = n.post("/api/sessions", json=typed).json()
+    assert mine["id"] != morning and len(_day_sessions(n)) == 2 and len(n.get("/api/partners").json()["merge_questions"]) == 1
+    # a ordem inversa (relógio entrega depois) dá o mesmo: a hora digitada fica guardada no treino
+    n.delete(f"/api/sessions/{morning}")
+    n.delete(f"/api/sessions/{mine['id']}")
+    mine2 = n.post("/api/sessions", json={**typed, "client_id": "n-typed2"}).json()
+    r = _ingest(n, "STRENGTH_TRAINING", "07:00", "07:30", 30, wid="m2").json()["imported"][0]
+    assert r["merged"] is False and r["session_id"] != mine2["id"] and len(_day_sessions(n)) == 2

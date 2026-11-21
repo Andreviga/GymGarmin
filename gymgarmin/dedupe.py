@@ -132,11 +132,12 @@ def find_twin(new: dict, sessions: list[dict]) -> dict | None:
         if not (kinds(s) & k_new):
             continue
         w_side, a_side = (new, s) if from_garmin else (s, new)
-        if only_time(w_side) and a_side.get("duration_min") and any(i.get("sets") for i in a_side.get("items") or []) \
+        if only_time(w_side) and (a_side.get("duration_min") or a_side.get("time_set")) and any(i.get("sets") for i in a_side.get("items") or []) \
                 and _span(w_side) and _span(a_side) and overlap(w_side, a_side) == 0:
-            # o treino do app tem hora e duração de verdade (feito ao vivo, com o tempo medido) e não encosta na atividade
-            # só-de-tempo do relógio (ex.: musculação de manhã no relógio × treino ao meio-dia no app): são dois treinos.
-            # Se for o mesmo, a pergunta do Hoje junta. Treino anotado depois, sem duração, segue a regra de sempre.
+            # o treino do app tem hora de verdade (feito ao vivo com o tempo medido, ou a pessoa digitou a hora) e não
+            # encosta na atividade só-de-tempo do relógio (ex.: musculação de manhã no relógio × treino às 18h no app):
+            # são dois treinos. Se for o mesmo, a pergunta do Hoje junta. Treino anotado depois, com a hora em que a
+            # tela foi aberta, segue a regra de sempre.
             continue
         t1, t2 = _time(s), _time(new)
         gap = abs((t1 - t2).total_seconds()) if t1 and t2 else 0

@@ -897,7 +897,7 @@ function partnerCardsHtml(p) {
     const du = x.duel; const m = du ? Object.fromEntries(du.metrics.map((k) => [k.key, k])) : null;
     const lead = !du ? "" : du.score.lead === "me" ? "Você está na frente" : du.score.lead === "partner" ? `${esc(x.first)} está na frente` : "Empatados";
     const rc = x.recent;  // treino de ontem/anteontem que eu ainda não registrei
-    const recent = rc ? `<p class="small" style="margin:0 0 8px">${rc.days_ago === 1 ? "Ontem" : "Anteontem"} ${esc(x.first)} fez ${esc(rc.title)} (${rc.minutes} min). Se você fez junto e não registrou, dá para puxar.</p>` : "";
+    const recent = rc ? `<p class="small" style="margin:0 0 8px">${rc.days_ago === 1 ? "Ontem" : "Anteontem"} ${esc(x.first)} fez ${esc(rc.title)} (${rc.minutes_estimated ? "~" : ""}${rc.minutes} min). Se você fez junto e não registrou, dá para puxar.</p>` : "";
     return `<section class="card partner-card"><div class="row between gap"><b>Treino com ${esc(x.first)}</b>${du ? `<span class="pill ${du.score.lead === "me" ? "ok" : ""}">${lead}</span>` : ""}</div>
       <p class="small" style="margin:4px 0 8px">${status}</p>${recent}
       ${m ? `<div class="duel-mini small"><span>Semana</span><span>você <b>${m.sessions.me}</b> × <b>${m.sessions.partner}</b> treinos</span><span><b>${(du.est_min || {}).me ? "~" : ""}${fmtN(m.minutes.me)}</b> × <b>${(du.est_min || {}).partner ? "~" : ""}${fmtN(m.minutes.partner)}</b> min</span><span><b>${kcalTxt(m.kcal.me, (du.est || {}).me)}</b> × <b>${kcalTxt(m.kcal.partner, (du.est || {}).partner)}</b></span></div>` : ""}
@@ -1916,8 +1916,9 @@ function bindSession() {
 async function finishSession() {
     const s = state.session; const save = () => store("gg_session", s);
     if ((s.merge_candidates || []).length && !s.merge_answered) {  // decide se o treino conta uma ou duas vezes: não dá para pular
+      if (s.view !== "lista") { s.view = "lista"; save(); renderSession(); }  // no modo "um exercício por vez" a pergunta fica na lista
       const box = $("[name=pmerge]"); if (box) box.scrollIntoView({ block: "center", behavior: "smooth" });
-      return toast("Antes de salvar, responda no alto da tela: é a mesma atividade que o seu relógio gravou?", 6500);
+      return toast("Antes de salvar, responda aqui: é a mesma atividade que o seu relógio gravou?", 6500);
     }
     if (s.pulled) {  // treino puxado: a carga do parceiro é só dica; série sem a MINHA carga é salva em branco
       const blank = s.items.reduce((n, it) => n + (it.from_partner ? (it.sets || []).filter((x) => x.done && x.partner_load != null && (x.load_kg == null || x.load_kg === "")).length : 0), 0);
@@ -1941,6 +1942,7 @@ async function finishSession() {
     if (!payload.items.length) return toast("Nada para salvar ainda: marque pelo menos uma série ou um cardio como feito.", 5000);
     payload.client_id = s.client_id || (s.client_id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
     if (s.with_partner) payload.with_partner = s.with_partner;
+    if (s.date_touched) payload.time_set = true;  // a pessoa digitou a hora do treino: vale como horário de verdade ao comparar com o relógio
     if (s.merge_into) payload.merge_into = s.merge_into;
     else {
       if (s.pulled && s.duration_min) payload.duration_min = s.duration_min;  // sem relógio: o tempo do treino feito junto
