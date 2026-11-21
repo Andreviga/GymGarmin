@@ -163,3 +163,35 @@ def test_calorie_estimate_only_when_watch_gave_none():
     kcal, est = partners.session_kcal(s_app, 60)
     assert est and kcal == round(partners.MET_STRENGTH * 60 * 1.0)
     assert partners.session_minutes({"items": [{"exercise_id": "Leg_Press", "sets": [{}] * 10}]}) == 26.0   # sem duração: ~2,6 min por série
+
+
+def test_today_card_remembers_yesterdays_workout_until_i_register_it(env):
+    a, aid, n, nid, b, bid = env
+    _link(a, n, nid)
+    a.post("/api/sessions", json=ANDRE_WORKOUT)
+    assert n.get("/api/partners").json()["partners"][0]["recent"] is None          # é de hoje: aparece em "hoje", não em "ontem"
+    clock.freeze(datetime(2026, 11, 21, 9, 0))                                     # ela só abre o app no dia seguinte
+    p = n.get("/api/partners").json()["partners"][0]
+    assert p["today"]["done"] == [] and p["recent"]["days_ago"] == 1 and p["recent"]["date"] == "2026-11-20"
+    assert p["recent"]["title"] == "Treino livre"
+    draft = n.post(f"/api/partners/{aid}/draft", json={"session_id": p["recent"]["id"]}).json()
+    n.post("/api/sessions", json={k: v for k, v in draft.items() if k in ("date", "day_name", "items", "with_partner")})
+    assert n.get("/api/partners").json()["partners"][0]["recent"] is None          # registrou: o lembrete some
+    assert a.get("/api/partners").json()["partners"][0]["recent"] is None          # e o André não é chamado a puxar o que era dele
+
+
+def test_pulled_workout_without_watch_keeps_the_time_of_the_workout_done_together(env):
+    a, aid, n, nid, b, bid = env
+    _link(a, n, nid)
+    sid = a.post("/api/sessions", json=ANDRE_WORKOUT).json()["id"]
+    draft = n.post(f"/api/partners/{aid}/draft", json={"session_id": sid}).json()
+    assert draft["duration_min"] == 65 and draft["merge_candidates"] == []        # o relógio dela não entregou nada
+    body = {k: v for k, v in draft.items() if k in ("date", "day_name", "items", "with_partner", "duration_min")}
+    mine = n.post("/api/sessions", json=body).json()
+    assert mine["duration_min"] == 65
+    du = n.get(f"/api/partners/{aid}/duel").json()
+    by = {m["key"]: m for m in du["metrics"]}
+    assert by["minutes"]["me"] == 65 and by["minutes"]["partner"] >= 65           # mesmo treino, mesmo tempo no placar
+    # tempo absurdo vindo da tela não é gravado
+    bad = n.post("/api/sessions", json={**body, "client_id": "x2", "duration_min": "abc"}).json()
+    assert not bad.get("duration_min")

@@ -1239,6 +1239,12 @@ def create_session(body: dict = Body(...)):
             pid = body.get("with_partner")
             if not (acc and isinstance(pid, int) and not isinstance(pid, bool) and partners.is_partner(acc["user_id"], pid)):
                 body.pop("with_partner", None)
+        if "duration_min" in body:  # tempo do treino vindo da tela: número plausível ou nada
+            dm = body.get("duration_min")
+            if isinstance(dm, (int, float)) and not isinstance(dm, bool) and 1 <= dm <= 600:
+                body["duration_min"] = round(float(dm), 1)
+            else:
+                body.pop("duration_min")
         target = body.pop("merge_into", None)
         watch = db.get_session(target) if isinstance(target, int) and not isinstance(target, bool) else None
         if watch and dedupe.is_time_only(watch) and str(watch.get("date"))[:10] == str(body.get("date") or "")[:10]:
@@ -1410,6 +1416,15 @@ def partners_get():
         du = partners.duel(uid, p["id"], today, today)
         p["duel"] = {"metrics": du["metrics"], "score": du["score"], "kcal_estimated": du["kcal_estimated"],
                      "est": {"me": du["me"]["kcal_estimated"], "partner": du["partner"]["kcal_estimated"]}}
+        # treinaram juntos ontem/anteontem e eu ainda não registrei nada com séries nesse dia: o cartão lembra de puxar
+        p["recent"] = None
+        for back in (1, 2):
+            prev = partners.day(uid, p["id"], today - timedelta(days=back))
+            theirs = [s for s in prev["done"] if s["has_sets"]]
+            if theirs and not any(m.get("has_sets") for m in prev["mine"]):
+                p["recent"] = {"date": prev["date"], "days_ago": back, "id": theirs[-1]["id"], "title": theirs[-1]["title"],
+                               "minutes": theirs[-1]["minutes"]}
+                break
     return {"enabled": True, **out}
 
 
@@ -1477,8 +1492,10 @@ def partners_draft(pid: int, body: dict = Body(...)):
         day_iso = str(s.get("date"))[:10]
         mine = [x for x in db.list_sessions(uid, since=day_iso, limit=60) if str(x.get("date"))[:10] == day_iso]
         watch = [x for x in mine if dedupe.is_time_only(x)]
+        # o tempo MEDIDO do treino dele (relógio ou anotado) serve de ponto de partida para o meu: treinamos juntos
+        dur = round(float(s.get("duration_min") or (s.get("garmin_summary") or {}).get("duration_min") or 0)) or None
         return {"date": str(s.get("date"))[:16], "day_name": f"{s.get('day_name') or 'Treino'} (com {who})", "view": "lista",
-                "with_partner": pid, "partner_name": who, "pulled": True, "items": items,
+                "with_partner": pid, "partner_name": who, "pulled": True, "items": items, "duration_min": dur,
                 "merge_candidates": [{"id": x["id"], "time": str(x.get("date"))[11:16], "minutes": round(partners.session_minutes(x)),
                                       "kcal": round(partners.session_kcal(x, None)[0]) if not partners.session_kcal(x, None)[1] else None,
                                       "title": x.get("notes") or x.get("day_name") or "Atividade do relógio"} for x in watch],
