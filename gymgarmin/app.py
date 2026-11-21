@@ -1263,6 +1263,10 @@ def create_session(body: dict = Body(...)):
             _reopen_cardio_closed_by(saved)
         else:
             saved = db.save_session(body)
+            if no_merge:
+                day_iso = str(saved.get("date"))[:10]
+                _dismiss_merge([f"{x['id']}:{saved['id']}" for x in db.list_sessions(since=day_iso, limit=60)
+                                if str(x.get("date"))[:10] == day_iso and dedupe.is_mergeable_watch(x)])
         # que treino da agenda esta sessão fecha (pelo conteúdo) e o que ainda falta na semana
         credit = schedule.credit_session(saved, _profile())
         saved = db.get_session(saved["id"]) or saved
@@ -1426,12 +1430,87 @@ def _partner_day(v: str | None) -> date:
     return d
 
 
+MERGE_DISMISS_KEY = "merge_dismissed"
+
+
+def _merge_dismissed() -> list[str]:
+    try:
+        v = json.loads(db.kv_get(MERGE_DISMISS_KEY) or "[]")
+    except ValueError:
+        v = []
+    return [str(x) for x in v] if isinstance(v, list) else []
+
+
+def _dismiss_merge(pairs: list[str]) -> None:
+    if pairs:
+        db.kv_set(MERGE_DISMISS_KEY, json.dumps(([x for x in _merge_dismissed() if x not in pairs] + pairs)[-200:]))
+
+
+def _clock_of(s: dict) -> datetime | None:
+    try:
+        return datetime.fromisoformat(str(s.get("date"))[:19])
+    except ValueError:
+        return None
+
+
+def _merge_questions() -> list[dict]:
+    """Últimos 7 dias: atividade do relógio que só marcou tempo + treino com séries anotado no mesmo dia e ainda sem
+    relógio. Se os horários coincidem o app já juntou sozinho; o que sobra aqui é dúvida de verdade: pergunta."""
+    try:
+        since = (clock.today() - timedelta(days=6)).isoformat()
+        by_day: dict[str, list[dict]] = {}
+        for s in db.list_sessions(since=since, limit=300):
+            if str(s.get("source")) != "passos":
+                by_day.setdefault(str(s.get("date"))[:10], []).append(s)
+        gone, out = set(_merge_dismissed()), []
+        for day in sorted(by_day, reverse=True):
+            watch = sorted((s for s in by_day[day] if dedupe.is_mergeable_watch(s)), key=lambda s: str(s.get("date")))
+            apps = [s for s in by_day[day] if not (s.get("garmin_activity_id") or s.get("ext_id"))
+                    and any(i.get("sets") for i in s.get("items") or [])]
+            used: set = set()
+            for w in watch:
+                cands = [a for a in apps if a["id"] not in used and f"{w['id']}:{a['id']}" not in gone]
+                if not cands:
+                    continue
+                tw = _clock_of(w)
+                a = min(cands, key=lambda x: abs(((_clock_of(x) or tw) - tw).total_seconds()) if tw else 0)
+                used.add(a["id"])
+                kcal, est = partners.session_kcal(w, None)
+                out.append({"date": day,
+                            "watch": {"id": w["id"], "time": str(w.get("date"))[11:16], "minutes": round(partners.session_minutes(w)),
+                                      "kcal": None if est else round(kcal), "title": w.get("notes") or w.get("day_name") or "Atividade do relógio"},
+                            "app": {"id": a["id"], "time": str(a.get("date"))[11:16], "title": a.get("day_name") or "Treino",
+                                    "sets": sum(len(i.get("sets") or []) for i in a.get("items") or [])}})
+        return out[:2]
+    except Exception:  # noqa: BLE001 — a pergunta é um extra: nunca derruba a tela Hoje
+        return []
+
+
+@app.post("/api/sessions/merge-answer")
+def merge_answer(body: dict = Body(...)):
+    """Resposta a "é o mesmo treino que o relógio gravou?": {watch_id, app_id, same}."""
+    w = db.get_session(body.get("watch_id")) if isinstance(body.get("watch_id"), int) else None
+    a = db.get_session(body.get("app_id")) if isinstance(body.get("app_id"), int) else None
+    if not w or not a or not dedupe.is_mergeable_watch(w) or (a.get("garmin_activity_id") or a.get("ext_id")) \
+            or not any(i.get("sets") for i in a.get("items") or []) or str(w.get("date"))[:10] != str(a.get("date"))[:10]:
+        raise HTTPException(409, "Esses treinos mudaram. Abra a tela Hoje de novo.")
+    if body.get("same") is True:
+        schedule.reopen_for_session(w)      # o que a atividade do relógio tinha fechado "pela data" é reavaliado com o treino junto
+        saved = db.save_session(dedupe.merge(a, w), session_id=a["id"])
+        db.delete_session(w["id"])          # o vínculo com o relógio foi para o treino anotado: a atividade não volta em dobro
+        schedule.credit_session(saved, _profile())
+        return {"ok": True, "merged": saved["id"], "minutes": round(partners.session_minutes(saved)), "questions": _merge_questions()}
+    _dismiss_merge([f"{w['id']}:{a['id']}"])
+    return {"ok": True, "merged": None, "questions": _merge_questions()}
+
+
 @app.get("/api/partners")
 def partners_get():
-    """Com quem treino, quem me convidou e quem posso convidar; para cada parceiro, o dia de hoje e o placar da semana."""
+    """Com quem treino, quem me convidou e quem posso convidar; para cada parceiro, o dia de hoje e o placar da semana.
+    Vai junto a pergunta "é o mesmo treino que o relógio gravou?" (aparece no Hoje mesmo para quem não tem parceiro)."""
     acc = auth.current_account()
     if not acc:
-        return {"enabled": False, "people": [], "partners": [], "requests": []}
+        return {"enabled": False, "people": [], "partners": [], "requests": [], "merge_questions": _merge_questions()}
     uid, today = int(acc["user_id"]), clock.today()
     out = partners.overview(uid)
     for p in out["partners"]:
@@ -1440,7 +1519,8 @@ def partners_get():
                       "done": [{"id": s["id"], "title": s["title"], "minutes": s["minutes"], "kcal": s["kcal"], "has_sets": s["has_sets"]} for s in d["done"]]}
         du = partners.duel(uid, p["id"], today, today)
         p["duel"] = {"metrics": du["metrics"], "score": du["score"], "kcal_estimated": du["kcal_estimated"],
-                     "est": {"me": du["me"]["kcal_estimated"], "partner": du["partner"]["kcal_estimated"]}}
+                     "est": {"me": du["me"]["kcal_estimated"], "partner": du["partner"]["kcal_estimated"]},
+                     "est_min": {"me": du["me"]["minutes_estimated"], "partner": du["partner"]["minutes_estimated"]}}
         # treinaram juntos ontem/anteontem e eu ainda não registrei nada com séries nesse dia: o cartão lembra de puxar
         p["recent"] = None
         for back in (1, 2):
@@ -1450,7 +1530,7 @@ def partners_get():
                 p["recent"] = {"date": prev["date"], "days_ago": back, "id": theirs[-1]["id"], "title": theirs[-1]["title"],
                                "minutes": theirs[-1]["minutes"]}
                 break
-    return {"enabled": True, **out}
+    return {"enabled": True, **out, "merge_questions": _merge_questions()}
 
 
 @app.post("/api/partners/{pid}/invite")
@@ -1521,7 +1601,8 @@ def partners_draft(pid: int, body: dict = Body(...)):
         mine = [x for x in db.list_sessions(uid, since=day_iso, limit=60) if str(x.get("date"))[:10] == day_iso]
         watch = [x for x in mine if dedupe.is_mergeable_watch(x)]
         # o tempo MEDIDO do treino dele (relógio ou anotado) serve de ponto de partida para o meu: treinamos juntos
-        dur = round(float(s.get("duration_min") or (s.get("garmin_summary") or {}).get("duration_min") or 0)) or None
+        t_min, t_est = partners.session_time(s)
+        dur = round(t_min) if t_min and not t_est else None   # só tempo medido: estimativa por série não vira "tempo do treino"
         return {"date": str(s.get("date"))[:16], "day_name": f"{s.get('day_name') or 'Treino'} (com {who})", "view": "lista",
                 "with_partner": pid, "partner_name": who, "pulled": True, "items": items, "duration_min": dur,
                 "merge_candidates": [{"id": x["id"], "time": str(x.get("date"))[11:16], "minutes": round(partners.session_minutes(x)),

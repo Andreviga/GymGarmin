@@ -864,6 +864,12 @@ function bindPartnerMine() {
 }
 // botões dos cartões de parceria (Hoje, com ou sem treino montado). Devolve true se o toque era de parceria.
 async function partnerAction(d, t, again) {
+  if (d.msame || d.mdiff) {  // "é o mesmo treino que o relógio gravou?"
+    const [w, a] = (d.msame || d.mdiff).split(":").map(Number); t.disabled = true;
+    const r = await api("/api/sessions/merge-answer", { method: "POST", body: { watch_id: w, app_id: a, same: !!d.msame } });
+    toast(r.merged ? `Juntei: o treino ficou com o tempo do relógio (${r.minutes} min) e conta uma vez só.` : "Ok, ficam como dois treinos.", 5000);
+    again(); return true;
+  }
   if (d.paccept) { t.disabled = true; await api(`/api/partners/${d.paccept}/accept`, { method: "POST" }); toast("Parceria de treino aceita"); again(); return true; }
   if (d.pdecline) { t.disabled = true; await api(`/api/partners/${d.pdecline}`, { method: "DELETE" }); again(); return true; }
   if (d.pday) { openPartnerDay(+d.pday, d.pname, d.pdate || undefined); return true; }
@@ -871,9 +877,15 @@ async function partnerAction(d, t, again) {
   return false;
 }
 const kcalTxt = (v, est) => `${est ? "~" : ""}${fmtN(v)} kcal`;
+function watchMergeHtml(qs) {
+  return (qs || []).map((q) => `<div class="rec atencao q-card"><b>É o mesmo treino?</b>
+    <p class="small" style="margin:4px 0 8px">${ddmm(q.date)}: o relógio gravou <b>${q.watch.minutes} min</b> às ${esc(q.watch.time)}${q.watch.kcal ? ` (${fmtN(q.watch.kcal)} kcal)` : ""} e você anotou <b>${esc(q.app.title)}</b>${q.app.time ? ` às ${esc(q.app.time)}` : ""} (${q.app.sets} ${q.app.sets === 1 ? "série" : "séries"}). Se for o mesmo, vira um treino só, com o tempo e as calorias do relógio.</p>
+    <div class="row gap wrap"><button class="btn sm" data-msame="${q.watch.id}:${q.app.id}">Sim, é o mesmo</button><button class="btn sm ghost" data-mdiff="${q.watch.id}:${q.app.id}">Não, são dois treinos</button></div></div>`).join("");
+}
 function partnerCardsHtml(p) {
-  if (!p || !p.enabled) return "";
-  const req = (p.requests || []).map((x) => `<div class="rec atencao q-card"><b>${esc(x.first)} quer treinar com você</b>
+  if (!p) return "";
+  if (!p.enabled) return watchMergeHtml(p.merge_questions);
+  const req = (p.requests || []).map((x) => `<div class="rec atencao q-card"><b>${esc(x.name || x.first)} quer treinar com você</b>
     <p class="small" style="margin:4px 0 8px">Vocês passam a ver o treino um do outro (exercícios, séries, tempo e calorias) e um placar da semana. Nada de saúde, sono ou passos.</p>
     <div class="row gap wrap"><button class="btn sm" data-paccept="${x.id}">Aceitar</button><button class="btn sm ghost" data-pdecline="${x.id}">Agora não</button></div></div>`).join("");
   const cards = (p.partners || []).map((x) => {
@@ -886,12 +898,12 @@ function partnerCardsHtml(p) {
     const recent = rc ? `<p class="small" style="margin:0 0 8px">${rc.days_ago === 1 ? "Ontem" : "Anteontem"} ${esc(x.first)} fez ${esc(rc.title)} (${rc.minutes} min). Se você fez junto e não registrou, dá para puxar.</p>` : "";
     return `<section class="card partner-card"><div class="row between gap"><b>Treino com ${esc(x.first)}</b>${du ? `<span class="pill ${du.score.lead === "me" ? "ok" : ""}">${lead}</span>` : ""}</div>
       <p class="small" style="margin:4px 0 8px">${status}</p>${recent}
-      ${m ? `<div class="duel-mini small"><span>Semana</span><span>você <b>${m.sessions.me}</b> × <b>${m.sessions.partner}</b> treinos</span><span><b>${fmtN(m.minutes.me)}</b> × <b>${fmtN(m.minutes.partner)}</b> min</span><span><b>${kcalTxt(m.kcal.me, (du.est || {}).me)}</b> × <b>${kcalTxt(m.kcal.partner, (du.est || {}).partner)}</b></span></div>` : ""}
+      ${m ? `<div class="duel-mini small"><span>Semana</span><span>você <b>${m.sessions.me}</b> × <b>${m.sessions.partner}</b> treinos</span><span><b>${(du.est_min || {}).me ? "~" : ""}${fmtN(m.minutes.me)}</b> × <b>${(du.est_min || {}).partner ? "~" : ""}${fmtN(m.minutes.partner)}</b> min</span><span><b>${kcalTxt(m.kcal.me, (du.est || {}).me)}</b> × <b>${kcalTxt(m.kcal.partner, (du.est || {}).partner)}</b></span></div>` : ""}
       <div class="row gap wrap" style="margin-top:8px"><button class="btn sm" data-pday="${x.id}" data-pname="${esc(x.first)}">${done.length || plan.length ? "Treinar junto / puxar o treino" : "Ver treinos"}</button>
         ${rc ? `<button class="btn sm ${done.length || plan.length ? "ghost" : ""}" data-pday="${x.id}" data-pname="${esc(x.first)}" data-pdate="${rc.date}">Puxar o de ${rc.days_ago === 1 ? "ontem" : "anteontem"}</button>` : ""}
         <button class="btn sm ghost" data-pduel="${x.id}">Placar da semana</button></div></section>`;
   }).join("");
-  return req + cards;
+  return watchMergeHtml(p.merge_questions) + req + cards;
 }
 // o dia do parceiro: o que ele planejou e o que já fez; daqui sai o MEU treino com as minhas cargas
 async function openPartnerDay(pid, first, day) {
@@ -945,11 +957,11 @@ async function openDuel(pid, day) {
   try { d = await api(`/api/partners/${pid}/duel${day ? `?date=${day}` : ""}`); } catch (e) { return toast(e.message, 5000); }
   const me = d.me, p = d.partner;
   const bar = (m) => { const tot = (m.me + m.partner) || 1; const a = Math.round(100 * m.me / tot);
-    const val = (v, est) => m.key === "kcal" ? kcalTxt(v, est) : `${fmtN(v)}${m.unit ? " " + m.unit : ""}`;
-    return `<div class="duel-row"><div class="row between small"><span><b>${val(m.me, me.kcal_estimated)}</b></span><span class="muted">${esc(m.label)}</span><span><b>${val(m.partner, p.kcal_estimated)}</b></span></div>
+    const val = (v, who) => m.key === "kcal" ? kcalTxt(v, who.kcal_estimated) : `${m.key === "minutes" && who.minutes_estimated ? "~" : ""}${fmtN(v)}${m.unit ? " " + m.unit : ""}`;
+    return `<div class="duel-row"><div class="row between small"><span><b>${val(m.me, me)}</b></span><span class="muted">${esc(m.label)}</span><span><b>${val(m.partner, p)}</b></span></div>
       <div class="duel-bar" role="img" aria-label="${esc(m.label)}: você ${m.me}, ${esc(p.first)} ${m.partner}"><span class="a ${m.lead === "me" ? "lead" : ""}" style="width:${m.me || m.partner ? a : 50}%"></span><span class="b ${m.lead === "partner" ? "lead" : ""}" style="width:${m.me || m.partner ? 100 - a : 50}%"></span></div></div>`; };
   const head = d.score.lead === "me" ? `Você está na frente (${d.score.me} × ${d.score.partner})` : d.score.lead === "partner" ? `${esc(p.first)} está na frente (${d.score.partner} × ${d.score.me})` : `Empate (${d.score.me} × ${d.score.partner})`;
-  const cell = (x) => x ? `${x.minutes} min<br><span class="muted">${kcalTxt(x.kcal, x.kcal_estimated)}</span>` : `<span class="muted">—</span>`;
+  const cell = (x) => x ? `${x.minutes_estimated ? "~" : ""}${x.minutes} min<br><span class="muted">${kcalTxt(x.kcal, x.kcal_estimated)}</span>` : `<span class="muted">—</span>`;
   const body = openModal(`<h2>Placar da semana</h2>
     <div class="row between gap" style="margin:-4px 0 10px"><button class="btn sm ghost" data-go="${d.prev}">‹ anterior</button><b>${ddmm(d.week_start)} a ${ddmm(d.week_end)}</b>
       <button class="btn sm ghost" data-go="${d.next || ""}" ${d.next ? "" : "disabled"}>próxima ›</button></div>
@@ -958,7 +970,7 @@ async function openDuel(pid, day) {
     <table class="duel-days small"><thead><tr><th></th><th>Você</th><th>${esc(p.first)}</th></tr></thead><tbody>
       ${d.days.filter((x) => !x.future).map((x) => `<tr class="${d.together.includes(x.date) ? "tog" : ""}"><td>${["dom", "seg", "ter", "qua", "qui", "sex", "sáb"][new Date(x.date + "T12:00:00").getDay()]} ${ddmm(x.date)}</td><td class="${x.lead === "me" ? "win" : ""}">${cell(x.me)}</td><td class="${x.lead === "partner" ? "win" : ""}">${cell(x.partner)}</td></tr>`).join("")}
     </tbody></table>
-    <p class="small muted">Vale um ponto para quem ganha em cada item (treinos, tempo, calorias). ${d.kcal_estimated ? "Calorias com “~” são estimadas pelo tempo e pelo peso, porque o relógio não informou. " : ""}Calorias dependem do peso de cada um e do relógio: servem para brincar, não para comparar esforço. No dia a dia ganha quem gastou mais calorias.</p>`);
+    <p class="small muted">Vale um ponto para quem ganha em cada item (treinos, tempo, calorias). ${d.minutes_estimated ? "Tempo com “~” é estimado pelo número de séries (o treino foi anotado sem relógio e sem cronômetro). " : ""}${d.kcal_estimated ? "Calorias com “~” são estimadas pelo tempo e por uma faixa de peso, porque o relógio não informou. " : ""}Calorias dependem do peso de cada um e do relógio: servem para brincar, não para comparar esforço. No dia a dia ganha quem gastou mais calorias.</p>`);
   body.onclick = (e) => { const t = e.target.closest("button[data-go]"); if (t && t.dataset.go) openDuel(pid, t.dataset.go); };
 }
 function bindCoachMine() {
@@ -1846,7 +1858,7 @@ function bindSession() {
   const save = () => { store("gg_session", s); sessionProgress(); };
   view.oninput = (e) => {
     const el = e.target;
-    if (el.id === "s-date") s.date = el.value;
+    if (el.id === "s-date") { s.date = el.value; s.date_touched = true; }
     if (el.id === "s-notes") s.notes = el.value;
     if (el.dataset.s) {
       const v = el.value === "" ? null : parseFloat(el.value.replace(",", ".")); const it = s.items[+el.dataset.i]; const j = +el.dataset.j;
@@ -1912,6 +1924,13 @@ async function finishSession() {
     else {
       if (s.pulled && s.duration_min) payload.duration_min = s.duration_min;  // sem relógio: o tempo do treino feito junto
       if ((s.merge_candidates || []).length) payload.no_merge = true;          // viu a atividade do relógio e disse "é outro treino"
+    }
+    if (!payload.duration_min && !s.pulled && !s.date_touched) {
+      // treino feito agora, com o app aberto: vai o tempo de verdade (do início até salvar). Anotado depois, em poucos
+      // minutos, ou deixado aberto por horas, não vale como tempo de treino
+      const mins = Math.round((Date.now() - new Date(s.date).getTime()) / 60000);
+      const nsets = payload.items.reduce((a, it) => a + (it.sets || []).length, 0);
+      if (nsets && mins >= Math.max(8, nsets * 1.5) && mins <= 240) payload.duration_min = mins;
     }
     save();
     const btn = $("#s-finish"); btn.disabled = true;

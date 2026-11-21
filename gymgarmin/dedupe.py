@@ -139,6 +139,13 @@ def is_time_only(s: dict) -> bool:
         (i.get("strength_min") or str(i.get("exercise_id") or "").startswith("atividade_")) and not i.get("sets") for i in items)
 
 
+def only_time(s: dict) -> bool:
+    """Do relógio, sem séries: musculação só com o tempo ou atividade sem tipo."""
+    items = s.get("items") or []
+    return _watch(s) and bool(items) and all(
+        (i.get("strength_min") or i.get("exercise_id") == UNKNOWN_ACTIVITY) and not i.get("sets") for i in items)
+
+
 def is_mergeable_watch(s: dict) -> bool:
     """Atividade do relógio que pode SER a musculação que a pessoa está anotando: musculação sem séries ou atividade
     sem tipo. Yoga, futebol, dança, corrida etc. são outra coisa e nunca viram o treino de força."""
@@ -191,9 +198,14 @@ def merge(app_s: dict, garmin_s: dict) -> dict:
         out["ext_id"] = garmin_s["ext_id"]
     out["garmin_summary"] = garmin_s.get("garmin_summary") or {}
     out["merged"] = True
-    if garmin_s.get("duration_min") and not out.get("duration_min"):
+    # o relógio gravou só a corrida/bike de um treino que também tem musculação: o tempo e as calorias dele valem
+    # para o item de cardio (abaixo), não para o treino inteiro
+    only_cardio = "forca" in kinds(app_s) and "forca" not in kinds(garmin_s) and not is_unknown_watch(garmin_s)
+    if only_cardio:
+        out["garmin_summary"] = {"partial": True}
+    elif garmin_s.get("duration_min") and not out.get("duration_min"):
         out["duration_min"] = garmin_s["duration_min"]
-    if is_unknown_watch(garmin_s):
+    if is_unknown_watch(garmin_s) or (only_time(garmin_s) and any(i.get("sets") for i in out.get("items") or [])):
         # relógio que só marca tempo: as medidas estavam no item genérico (que não entra); sobem para o resumo, e o
         # horário e a duração medidos valem mais que os anotados (ex.: o tempo copiado do treino do parceiro)
         summ = dict(out["garmin_summary"])

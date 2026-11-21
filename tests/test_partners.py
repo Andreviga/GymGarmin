@@ -343,3 +343,98 @@ def test_cardio_closed_by_the_watch_activity_reopens_when_it_becomes_the_strengt
     n.get("/api/schedule?date=2026-11-20")
     after = db.get_entry(e["id"], user_id=nid)
     assert after["status"] == "planejado" and not after.get("done_by")                 # virou musculação: o cardio não foi feito
+
+
+# ------------------------------------------------------------------ achados da revisão: placar ---
+def test_watch_that_recorded_only_the_treadmill_does_not_shrink_the_whole_workout(env):
+    a, aid, n, nid, b, bid = env
+    _link(a, n, nid)
+    w = dict(ANDRE_WORKOUT)
+    w.pop("duration_min")
+    sid = a.post("/api/sessions", json=w).json()["id"]                       # 7 séries + 12 min de esteira, sem tempo medido
+    before = {m["key"]: m["me"] for m in a.get(f"/api/partners/{nid}/duel").json()["metrics"]}
+    # o Garmin sincroniza só a corrida na esteira (12 min, 130 kcal) e ela é juntada ao treino
+    from gymgarmin import dedupe
+    run = {"date": "2026-11-20T13:20:00", "source": "garmin", "garmin_activity_id": 991, "duration_min": 12,
+           "garmin_summary": {"duration_min": 12, "kcal": 130, "avg_hr": 150},
+           "items": [{"exercise_id": "cardio_esteira_corrida", "sport": "corrida", "duration_min": 12, "kcal": 130, "avg_hr": 150, "zone": 3}]}
+    app_s = db.get_session(sid, user_id=aid)
+    merged = db.save_session(dedupe.merge(app_s, run), session_id=sid, user_id=aid)
+    assert merged["garmin_summary"].get("partial") and not merged.get("duration_min")
+    assert partners.watch_covers_only_cardio(merged)
+    after = a.get(f"/api/partners/{nid}/duel").json()
+    by = {m["key"]: m["me"] for m in after["metrics"]}
+    assert by["minutes"] == before["minutes"] and by["minutes"] > 25          # o treino não encolheu para 12 min
+    assert by["kcal"] > 130 and after["me"]["kcal_estimated"] and after["me"]["minutes_estimated"]
+    # dado antigo, gravado antes desta correção (duração do treino = a da esteira): mesma leitura
+    old = {**app_s, "garmin_activity_id": 991, "duration_min": 12, "garmin_summary": {"duration_min": 12, "kcal": 130}}
+    assert partners.watch_covers_only_cardio(old) and partners.session_time(old)[0] > 25
+
+
+def test_workout_done_together_uses_the_measured_time_for_both(env):
+    a, aid, n, nid, b, bid = env
+    _link(a, n, nid)
+    w = dict(ANDRE_WORKOUT)
+    w.pop("duration_min")
+    sid = a.post("/api/sessions", json=w).json()["id"]                       # ele anotou no app: tempo só estimado
+    solo = a.get(f"/api/partners/{nid}/duel").json()
+    assert solo["me"]["minutes_estimated"] and solo["minutes_estimated"]
+    watch = _ingest(n, "OTHER_WORKOUT", "12:35", "13:37", 62).json()["imported"][0]["session_id"]
+    d = n.post(f"/api/partners/{aid}/draft", json={"session_id": sid}).json()
+    assert d["duration_min"] is None                                          # estimativa por série não vira "tempo do treino"
+    body = {k: v for k, v in d.items() if k in ("date", "day_name", "items", "with_partner")}
+    n.post("/api/sessions", json={**body, "client_id": "n-1", "merge_into": watch})
+    du = a.get(f"/api/partners/{nid}/duel").json()
+    by = {m["key"]: m for m in du["metrics"]}
+    assert by["minutes"]["me"] == by["minutes"]["partner"] == 62              # mesmo treino, mesmo tempo (o medido pelo relógio dela)
+    assert not du["me"]["minutes_estimated"] and not du["partner"]["minutes_estimated"]
+    assert du["me"]["kcal_estimated"] and by["kcal"]["me"] > by["kcal"]["partner"] * 0.9   # 82 kg em 62 min não fica atrás por causa do chute de tempo
+    mirror = {m["key"]: m for m in n.get(f"/api/partners/{aid}/duel").json()["metrics"]}
+    assert (mirror["minutes"]["me"], mirror["minutes"]["partner"]) == (62, 62) and mirror["kcal"]["partner"] == by["kcal"]["me"]   # os dois veem os mesmos números
+
+
+def test_owner_without_a_name_is_not_shown_as_eu_and_estimates_do_not_reveal_weight(env):
+    a, aid, n, nid, b, bid = env
+    a.put("/api/profile", json={"name": "Eu"})
+    _link(a, n, nid)
+    assert n.get("/api/partners").json()["partners"][0]["first"] == "Andre"   # vem do começo do e-mail (andre@x.com)
+    s = {"items": [{"exercise_id": "Leg_Extensions", "sets": [{"reps": 10, "load_kg": 20}] * 10}], "duration_min": 60}
+    k82, k80, k63 = (partners.session_kcal(s, kg)[0] for kg in (82, 80, 63.5))
+    assert k82 == k80 and k82 % 10 == 0 and k63 == partners.session_kcal(s, 65)[0]   # faixa de 5 kg, arredondado
+
+
+def test_today_asks_when_the_watch_time_and_the_logged_workout_do_not_overlap(env):
+    """O relógio gravou 62 min ao meio-dia; ela anota o treino às 23h21 (hora em que abriu a tela): pergunta em vez de dobrar."""
+    a, aid, n, nid, b, bid = env
+    _link(a, n, nid)
+    w = _ingest(n, "OTHER_WORKOUT", "12:35", "13:37", 62).json()["imported"][0]["session_id"]
+    late = {"date": "2026-11-20T20:50", "day_name": "Treino livre", "client_id": "n-late",
+            "items": [{"exercise_id": "Leg_Extensions", "sets": [{"reps": 12, "load_kg": 20}] * 3},
+                      {"exercise_id": "Seated_Leg_Curl", "sets": [{"reps": 12, "load_kg": 20}] * 3}]}
+    mine = n.post("/api/sessions", json=late).json()
+    assert mine["id"] != w and len(_day_sessions(n)) == 2                      # horários não batem: não junta sozinho
+    q = n.get("/api/partners").json()["merge_questions"]
+    assert len(q) == 1 and (q[0]["watch"]["id"], q[0]["app"]["id"]) == (w, mine["id"]) and q[0]["watch"]["minutes"] == 62 and q[0]["app"]["sets"] == 6
+    r = n.post("/api/sessions/merge-answer", json={"watch_id": w, "app_id": mine["id"], "same": True}).json()
+    assert r["merged"] == mine["id"] and r["minutes"] == 62 and r["questions"] == []
+    left = _day_sessions(n)
+    assert len(left) == 1 and left[0]["date"].startswith("2026-11-20T12:35") and left[0]["garmin_summary"]["kcal"] == 310
+    assert [i["exercise_id"] for i in left[0]["items"]] == ["Leg_Extensions", "Seated_Leg_Curl"]
+    by = {m["key"]: m for m in n.get(f"/api/partners/{aid}/duel").json()["metrics"]}
+    assert by["sessions"]["me"] == 1 and by["minutes"]["me"] == 62
+    _ingest(n, "OTHER_WORKOUT", "12:35", "13:37", 62)                           # reenvio do relógio não recria a atividade
+    assert len(_day_sessions(n)) == 1
+    assert n.post("/api/sessions/merge-answer", json={"watch_id": w, "app_id": mine["id"], "same": True}).status_code == 409
+
+
+def test_saying_they_are_two_workouts_stops_the_question(env):
+    a, aid, n, nid, b, bid = env
+    w = _ingest(n, "OTHER_WORKOUT", "07:00", "07:40", 40).json()["imported"][0]["session_id"]
+    mine = n.post("/api/sessions", json={"date": "2026-11-20T19:30", "client_id": "n-2", "day_name": "Braços",
+                                         "items": [{"exercise_id": "Dumbbell_Bicep_Curl", "sets": [{"reps": 12, "load_kg": 8}] * 3}]}).json()
+    assert len(n.get("/api/partners").json()["merge_questions"]) == 1          # aparece mesmo para quem não tem parceiro
+    r = n.post("/api/sessions/merge-answer", json={"watch_id": w, "app_id": mine["id"], "same": False}).json()
+    assert r["merged"] is None and r["questions"] == [] and len(_day_sessions(n)) == 2
+    assert n.get("/api/partners").json()["merge_questions"] == []
+    # e sessão de outra pessoa não entra na resposta
+    assert a.post("/api/sessions/merge-answer", json={"watch_id": w, "app_id": mine["id"], "same": True}).status_code == 409

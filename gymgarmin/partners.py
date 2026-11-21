@@ -40,7 +40,13 @@ def _save(uid: int, st: dict) -> None:
 
 
 def _names() -> dict[int, str]:
-    return {int(a["user_id"]): (a.get("name") or "").strip() or "Sem nome" for a in db.list_accounts()}
+    out = {}
+    for a in db.list_accounts():
+        name = (a.get("name") or "").strip()
+        if not name or name == "Eu":  # dono que não preencheu o nome: "Eu está na frente" confundiria quem lê
+            name = (str(a.get("email") or "").split("@")[0].replace(".", " ").strip() or "Sem nome").title()
+        out[int(a["user_id"])] = name
+    return out
 
 
 def first_name(name: str) -> str:
@@ -120,27 +126,63 @@ def _is_strength(it: dict) -> bool:
     return isinstance(it.get("sets"), list) and bool(it["sets"]) and (catalog.get(it.get("exercise_id")) or {}).get("kind") == "strength"
 
 
-def session_minutes(s: dict) -> float:
-    """Tempo de treino de uma sessão: o medido; sem ele, a soma dos itens ou ~2,6 min por série."""
-    if s.get("duration_min"):
-        return float(s["duration_min"])
+def _cardio_minutes(s: dict) -> float:
+    return sum(float(it.get("duration_min") or 0) for it in s.get("items") or []
+               if not isinstance(it.get("sets"), list) and not it.get("strength_min"))
+
+
+def _n_sets(s: dict) -> int:
+    return sum(len(it["sets"]) for it in s.get("items") or [] if isinstance(it.get("sets"), list))
+
+
+def watch_covers_only_cardio(s: dict) -> bool:
+    """Treino com musculação + cardio em que o relógio gravou só o cardio (ex.: só a esteira): a duração e as calorias
+    "do relógio" são da corrida, não do treino inteiro."""
     summ = s.get("garmin_summary") or {}
-    if summ.get("duration_min"):
-        return float(summ["duration_min"])
+    cardio = _cardio_minutes(s)
+    if not (_n_sets(s) and cardio > 0 and (s.get("garmin_activity_id") or s.get("ext_id"))):
+        return False
+    measured = float(s.get("duration_min") or summ.get("duration_min") or 0)
+    return bool(summ.get("partial")) or 0 < measured <= cardio * 1.1 + 2
+
+
+def session_time(s: dict) -> tuple[float, bool]:
+    """(minutos, estimado?). Medido pelo relógio ou informado; sem isso, itens de tempo + ~2,6 min por série (estimado)."""
+    summ = s.get("garmin_summary") or {}
+    if not watch_covers_only_cardio(s):
+        if s.get("duration_min"):
+            return float(s["duration_min"]), False
+        if summ.get("duration_min"):
+            return float(summ["duration_min"]), False
     mins = sum(float(it.get("duration_min") or it.get("strength_min") or 0) for it in s.get("items") or [])
-    sets = sum(len(it["sets"]) for it in s.get("items") or [] if isinstance(it.get("sets"), list))
-    return round(mins + sets * SET_MIN, 1)
+    sets = _n_sets(s)
+    return round(mins + sets * SET_MIN, 1), bool(sets)
 
 
-def session_kcal(s: dict, weight_kg: float | None) -> tuple[float, bool]:
-    """(calorias, estimado?). Do relógio quando há; senão estimativa por MET × peso × tempo."""
+def session_minutes(s: dict) -> float:
+    return session_time(s)[0]
+
+
+def _bucket_kg(weight_kg: float | None) -> float:
+    """Peso em faixas de 5 kg: a estimativa não muda quase nada e o parceiro não consegue descobrir o peso exato."""
+    return float(round(float(weight_kg or DEFAULT_KG) / 5) * 5)
+
+
+def session_kcal(s: dict, weight_kg: float | None, minutes: float | None = None) -> tuple[float, bool]:
+    """(calorias, estimado?). Do relógio quando há; senão estimativa por MET × peso × tempo (arredondada à dezena).
+    `minutes` troca o tempo estimado pelo tempo medido do treino feito junto com o parceiro."""
     summ = s.get("garmin_summary") or {}
+    kg = _bucket_kg(weight_kg)
+    if watch_covers_only_cardio(s):  # caloria medida só da corrida + estimativa da musculação
+        cardio_kcal = sum(float(it.get("kcal") or 0) for it in s.get("items") or [] if not isinstance(it.get("sets"), list)) \
+            or float(summ.get("kcal") or 0)
+        strength_min = max(0.0, (minutes if minutes is not None else session_time(s)[0]) - _cardio_minutes(s))
+        return float(round((cardio_kcal + MET_STRENGTH * kg * strength_min / 60) / 10) * 10), True
     if summ.get("kcal"):
         return float(summ["kcal"]), False
     measured = sum(float(it.get("kcal") or 0) for it in s.get("items") or [])
     if measured > 0:
         return measured, False
-    kg = float(weight_kg or DEFAULT_KG)
     total, counted = 0.0, 0.0
     for it in s.get("items") or []:
         if isinstance(it.get("sets"), list) or it.get("strength_min"):
@@ -149,13 +191,15 @@ def session_kcal(s: dict, weight_kg: float | None) -> tuple[float, bool]:
         zone = 1 if load.is_light(it) else int(it.get("zone") or 2)
         total += MET_BY_ZONE.get(zone, 6.0) * kg * mins / 60
         counted += mins
-    strength_min = max(0.0, session_minutes(s) - counted) if any(isinstance(it.get("sets"), list) or it.get("strength_min") for it in s.get("items") or []) else 0.0
+    whole = minutes if minutes is not None else session_minutes(s)
+    strength_min = max(0.0, whole - counted) if any(isinstance(it.get("sets"), list) or it.get("strength_min") for it in s.get("items") or []) else 0.0
     total += MET_STRENGTH * kg * strength_min / 60
-    return round(total), True
+    return float(round(total / 10) * 10), True
 
 
-def _session_view(s: dict, weight_kg: float | None, detail: bool = True) -> dict:
-    kcal, est = session_kcal(s, weight_kg)
+def _session_view(s: dict, weight_kg: float | None, detail: bool = True, minutes: float | None = None) -> dict:
+    kcal, est = session_kcal(s, weight_kg, minutes)
+    mins, mins_est = (minutes, False) if minutes is not None else session_time(s)
     items = []
     for it in s.get("items") or []:
         if _is_strength(it):
@@ -169,7 +213,7 @@ def _session_view(s: dict, weight_kg: float | None, detail: bool = True) -> dict
                           "minutes": round(float(it.get("duration_min") or it.get("strength_min") or 0)),
                           "km": it.get("distance_km")})
     return {"id": s.get("id"), "date": str(s.get("date"))[:16], "title": s.get("day_name") or s.get("notes") or "Treino",
-            "minutes": round(session_minutes(s)), "kcal": round(kcal), "kcal_estimated": est,
+            "minutes": round(mins), "minutes_estimated": mins_est, "kcal": round(kcal), "kcal_estimated": est,
             "sets": sum(i["n"] for i in items if i["kind"] == "forca"), "items": items,
             "has_sets": any(i["kind"] == "forca" for i in items), "with_partner": s.get("with_partner"),
             "watch": bool(s.get("garmin_activity_id") or s.get("ext_id")), "source": s.get("source") or "app"}
@@ -238,23 +282,47 @@ def _week(d: date) -> tuple[date, date]:
     return start, start + timedelta(days=6)
 
 
-def _totals(uid: int, start: date, end: date) -> dict:
+def _week_sessions(uid: int, start: date, end: date) -> list[dict]:
+    return [s for s in db.list_sessions(uid, since=start.isoformat(), limit=400)
+            if start.isoformat() <= str(s.get("date"))[:10] <= end.isoformat()
+            and str(s.get("source")) != "passos"]  # a caminhada estimada pelos passos (festival) não é treino para o placar
+
+
+def _shared_time(mine: list[dict], theirs: list[dict], uid: int, pid: int) -> tuple[dict, dict]:
+    """Treino feito junto (um puxou o do outro): se só um dos dois tem o tempo medido, vale para os dois.
+    Devolve {id da sessão: minutos} para cada lado."""
+    ov_me, ov_p = {}, {}
+    for a in mine:
+        for b in theirs:
+            if str(a.get("date"))[:10] != str(b.get("date"))[:10] or not (_n_sets(a) and _n_sets(b)):
+                continue
+            if a.get("with_partner") != pid and b.get("with_partner") != uid:
+                continue
+            (ta, ea), (tb, eb) = session_time(a), session_time(b)
+            if ea and not eb and a.get("id") not in ov_me:
+                ov_me[a.get("id")] = tb
+            elif eb and not ea and b.get("id") not in ov_p:
+                ov_p[b.get("id")] = ta
+    return ov_me, ov_p
+
+
+def _totals(uid: int, sessions: list[dict], shared: dict | None = None) -> dict:
     kg = db.get_profile(uid).get("weight_kg")
     days: dict[str, dict] = {}
-    tot = {"sessions": 0, "minutes": 0.0, "kcal": 0.0, "kcal_estimated": False, "sets": 0, "km": 0.0}
-    for s in db.list_sessions(uid, since=start.isoformat(), limit=400):
+    tot = {"sessions": 0, "minutes": 0.0, "minutes_estimated": False, "kcal": 0.0, "kcal_estimated": False, "sets": 0, "km": 0.0}
+    for s in sessions:
         iso = str(s.get("date"))[:10]
-        if not (start.isoformat() <= iso <= end.isoformat()) or str(s.get("source")) == "passos":
-            continue  # a caminhada estimada pelos passos (festival) não é treino para o placar
-        v = _session_view(s, kg, detail=False)
-        row = days.setdefault(iso, {"date": iso, "sessions": 0, "minutes": 0, "kcal": 0, "kcal_estimated": False, "titles": []})
+        v = _session_view(s, kg, detail=False, minutes=(shared or {}).get(s.get("id")))
+        row = days.setdefault(iso, {"date": iso, "sessions": 0, "minutes": 0, "minutes_estimated": False, "kcal": 0, "kcal_estimated": False, "titles": []})
         row["sessions"] += 1
         row["minutes"] += v["minutes"]
+        row["minutes_estimated"] = row["minutes_estimated"] or v["minutes_estimated"]
         row["kcal"] += v["kcal"]
         row["kcal_estimated"] = row["kcal_estimated"] or v["kcal_estimated"]
         row["titles"].append(v["title"])
         tot["sessions"] += 1
         tot["minutes"] += v["minutes"]
+        tot["minutes_estimated"] = tot["minutes_estimated"] or v["minutes_estimated"]
         tot["kcal"] += v["kcal"]
         tot["kcal_estimated"] = tot["kcal_estimated"] or v["kcal_estimated"]
         tot["sets"] += v["sets"]
@@ -268,7 +336,9 @@ def duel(uid: int, pid: int, d: date, today: date | None = None) -> dict:
     today = today or clock.today()
     start, end = _week(d)
     names = _names()
-    me, other = _totals(uid, start, end), _totals(pid, start, end)
+    mine, theirs = _week_sessions(uid, start, end), _week_sessions(pid, start, end)
+    ov_me, ov_p = _shared_time(mine, theirs, uid, pid)
+    me, other = _totals(uid, mine, ov_me), _totals(pid, theirs, ov_p)
     metrics = []
     for key, label, unit in (("sessions", "Treinos", ""), ("minutes", "Tempo de treino", "min"), ("kcal", "Calorias", "kcal")):
         a, b = me[key], other[key]
@@ -292,4 +362,5 @@ def duel(uid: int, pid: int, d: date, today: date | None = None) -> dict:
             "metrics": metrics, "score": {"me": wins_me, "partner": wins_p,
                                           "lead": "me" if wins_me > wins_p else "partner" if wins_p > wins_me else "tie"},
             "days": days, "kcal_estimated": me["kcal_estimated"] or other["kcal_estimated"],
+            "minutes_estimated": me["minutes_estimated"] or other["minutes_estimated"],
             "together": [x["date"] for x in days if x["me"] and x["partner"]]}
