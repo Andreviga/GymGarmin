@@ -379,6 +379,8 @@ def sync_status(entries: list[dict], sessions: list[dict], today: date) -> list[
             end_min = defaultdict(float)
             for it in its:
                 sp_ = load.sport_of(it)
+                if it.get("light"):
+                    continue  # yoga, pilates, alongamento: registro leve, não é o cardio nem a corrida do dia
                 if sp_ or (catalog.get(it.get("exercise_id")) or {}).get("kind") == "cardio":
                     end_min[sp_ or "cardio"] += float(it.get("duration_min") or 0)
             if substitute:

@@ -975,5 +975,295 @@
    "altura_passo"
   ],
   "tips": "Corpo inteiro, sem impacto, com FC muito alta em pouco tempo; ótimo para intervalados curtos. Raro no Brasil (estúdios e academias premium)."
+ },
+ {
+  "id": "atividade_hiit",
+  "name": "Cardio, HIIT ou aula funcional",
+  "name_en": "Cardio / HIIT class",
+  "impact": "medio",
+  "primaryMuscles": [],
+  "secondaryMuscles": [],
+  "met": {
+   "leve": 5.0,
+   "moderado": 8.0,
+   "vigoroso": 10.0
+  },
+  "garmin_step": {
+   "category": "CARDIO",
+   "exercise": "CARDIO"
+  },
+  "fit_step": {
+   "category": "cardio",
+   "exercise": null
+  },
+  "fit_sport": {
+   "sport": "fitness_equipment",
+   "sub_sport": "cardio_training"
+  },
+  "connect_sport": "other",
+  "params": [],
+  "tips": "Aula ou circuito de cardio registrado pelo relógio (HIIT, funcional, aeróbica). Conta pelo tempo e pela frequência cardíaca.",
+  "activity": true
+ },
+ {
+  "id": "atividade_mobilidade",
+  "name": "Yoga, pilates ou alongamento",
+  "name_en": "Yoga / pilates / stretching",
+  "impact": "baixo",
+  "primaryMuscles": [],
+  "secondaryMuscles": [],
+  "met": {
+   "leve": 2.5,
+   "moderado": 3.0,
+   "vigoroso": 4.0
+  },
+  "garmin_step": {
+   "category": "CARDIO",
+   "exercise": "CARDIO"
+  },
+  "fit_step": {
+   "category": "cardio",
+   "exercise": null
+  },
+  "fit_sport": {
+   "sport": "training",
+   "sub_sport": "yoga"
+  },
+  "connect_sport": "other",
+  "params": [],
+  "tips": "Sessão de mobilidade. Entra como atividade leve: ajuda na recuperação e quase não soma carga.",
+  "activity": true
+ },
+ {
+  "id": "atividade_coletivo",
+  "name": "Esporte coletivo (futebol, basquete, vôlei)",
+  "name_en": "Team sport",
+  "impact": "alto",
+  "primaryMuscles": [],
+  "secondaryMuscles": [],
+  "met": {
+   "leve": 5.0,
+   "moderado": 7.0,
+   "vigoroso": 10.0
+  },
+  "garmin_step": {
+   "category": "CARDIO",
+   "exercise": "CARDIO"
+  },
+  "fit_step": {
+   "category": "cardio",
+   "exercise": null
+  },
+  "fit_sport": {
+   "sport": "generic",
+   "sub_sport": "generic"
+  },
+  "connect_sport": "other",
+  "params": [],
+  "tips": "Jogo ou treino de esporte coletivo. Tem corrida, sprints e mudanças de direção: pesa nas pernas como um treino intervalado.",
+  "activity": true
+ },
+ {
+  "id": "atividade_raquete",
+  "name": "Esporte de raquete (tênis, padel, beach tennis)",
+  "name_en": "Racket sport",
+  "impact": "medio",
+  "primaryMuscles": [],
+  "secondaryMuscles": [],
+  "met": {
+   "leve": 4.5,
+   "moderado": 7.0,
+   "vigoroso": 9.0
+  },
+  "garmin_step": {
+   "category": "CARDIO",
+   "exercise": "CARDIO"
+  },
+  "fit_step": {
+   "category": "cardio",
+   "exercise": null
+  },
+  "fit_sport": {
+   "sport": "generic",
+   "sub_sport": "generic"
+  },
+  "connect_sport": "other",
+  "params": [],
+  "tips": "Tênis, padel, beach tennis, squash ou pickleball. Conta pelo tempo e pela frequência cardíaca.",
+  "activity": true
+ },
+ {
+  "id": "atividade_luta",
+  "name": "Luta (boxe, jiu-jítsu, muay thai)",
+  "name_en": "Combat sport",
+  "impact": "medio",
+  "primaryMuscles": [],
+  "secondaryMuscles": [],
+  "met": {
+   "leve": 5.0,
+   "moderado": 7.5,
+   "vigoroso": 10.0
+  },
+  "garmin_step": {
+   "category": "CARDIO",
+   "exercise": "CARDIO"
+  },
+  "fit_step": {
+   "category": "cardio",
+   "exercise": null
+  },
+  "fit_sport": {
+   "sport": "generic",
+   "sub_sport": "generic"
+  },
+  "connect_sport": "other",
+  "params": [],
+  "tips": "Treino de luta. Conta pelo tempo e pela frequência cardíaca.",
+  "activity": true
+ },
+ {
+  "id": "atividade_danca",
+  "name": "Dança",
+  "name_en": "Dance",
+  "impact": "medio",
+  "primaryMuscles": [],
+  "secondaryMuscles": [],
+  "met": {
+   "leve": 3.5,
+   "moderado": 5.0,
+   "vigoroso": 7.5
+  },
+  "garmin_step": {
+   "category": "CARDIO",
+   "exercise": "CARDIO"
+  },
+  "fit_step": {
+   "category": "cardio",
+   "exercise": null
+  },
+  "fit_sport": {
+   "sport": "generic",
+   "sub_sport": "generic"
+  },
+  "connect_sport": "other",
+  "params": [],
+  "tips": "Aula ou sessão de dança. Conta pelo tempo e pela frequência cardíaca.",
+  "activity": true
+ },
+ {
+  "id": "atividade_escalada",
+  "name": "Escalada",
+  "name_en": "Climbing",
+  "impact": "baixo",
+  "primaryMuscles": [],
+  "secondaryMuscles": [],
+  "met": {
+   "leve": 5.0,
+   "moderado": 7.5,
+   "vigoroso": 9.0
+  },
+  "garmin_step": {
+   "category": "CARDIO",
+   "exercise": "CARDIO"
+  },
+  "fit_step": {
+   "category": "cardio",
+   "exercise": null
+  },
+  "fit_sport": {
+   "sport": "generic",
+   "sub_sport": "generic"
+  },
+  "connect_sport": "other",
+  "params": [],
+  "tips": "Escalada em rocha ou parede. Puxa muito antebraço e costas: considere isso antes de um treino de puxar.",
+  "activity": true
+ },
+ {
+  "id": "atividade_aquatica",
+  "name": "Esporte na água (surfe, SUP, caiaque)",
+  "name_en": "Water sport",
+  "impact": "baixo",
+  "primaryMuscles": [],
+  "secondaryMuscles": [],
+  "met": {
+   "leve": 3.0,
+   "moderado": 5.0,
+   "vigoroso": 7.0
+  },
+  "garmin_step": {
+   "category": "CARDIO",
+   "exercise": "CARDIO"
+  },
+  "fit_step": {
+   "category": "cardio",
+   "exercise": null
+  },
+  "fit_sport": {
+   "sport": "generic",
+   "sub_sport": "generic"
+  },
+  "connect_sport": "other",
+  "params": [],
+  "tips": "Surfe, stand up paddle, caiaque, vela. Conta pelo tempo e pela frequência cardíaca.",
+  "activity": true
+ },
+ {
+  "id": "atividade_neve_patins",
+  "name": "Esqui, snowboard ou patins",
+  "name_en": "Snow sport / skating",
+  "impact": "medio",
+  "primaryMuscles": [],
+  "secondaryMuscles": [],
+  "met": {
+   "leve": 4.5,
+   "moderado": 6.0,
+   "vigoroso": 8.0
+  },
+  "garmin_step": {
+   "category": "CARDIO",
+   "exercise": "CARDIO"
+  },
+  "fit_step": {
+   "category": "cardio",
+   "exercise": null
+  },
+  "fit_sport": {
+   "sport": "generic",
+   "sub_sport": "generic"
+  },
+  "connect_sport": "other",
+  "params": [],
+  "tips": "Esqui, snowboard ou patinação. Conta pelo tempo e pela frequência cardíaca.",
+  "activity": true
+ },
+ {
+  "id": "atividade_outra",
+  "name": "Outra atividade do relógio",
+  "name_en": "Other activity",
+  "impact": "baixo",
+  "primaryMuscles": [],
+  "secondaryMuscles": [],
+  "met": {
+   "leve": 3.0,
+   "moderado": 5.0,
+   "vigoroso": 7.0
+  },
+  "garmin_step": {
+   "category": "CARDIO",
+   "exercise": "CARDIO"
+  },
+  "fit_step": {
+   "category": "cardio",
+   "exercise": null
+  },
+  "fit_sport": {
+   "sport": "generic",
+   "sub_sport": "generic"
+  },
+  "connect_sport": "other",
+  "params": [],
+  "tips": "Atividade registrada pelo relógio que não é musculação nem uma das modalidades do app. Conta pelo tempo e pela frequência cardíaca.",
+  "activity": true
  }
 ]

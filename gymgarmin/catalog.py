@@ -340,9 +340,11 @@ def _load() -> tuple[list[dict], dict[str, dict]]:
             "met": c["met"],
             "params": c["params"],
             "timed": True,
-            "popular": True,
-            # aparelhos de academia; corrida na rua, natação etc. são modalidades (sports.py)
-            "machine": c.get("id") not in OUTDOOR_SPORT_IDS,
+            "popular": not c.get("activity"),
+            # aparelhos de academia; corrida na rua, natação etc. são modalidades (sports.py);
+            # "activity" = atividade genérica do relógio (futebol, yoga, luta…): só registro, nunca entra em treino gerado
+            "machine": c.get("id") not in OUTDOOR_SPORT_IDS and not c.get("activity"),
+            "activity": bool(c.get("activity")),
             "endurance": bool(c.get("endurance")),
         })
 
@@ -364,6 +366,7 @@ def _load() -> tuple[list[dict], dict[str, dict]]:
             "garmin": m["garmin"], "timed": False, "popular": True,
             "top_machine": m.get("top_machine", True), "evidence": m.get("evidence", ""), "sources": m.get("sources", []),
             "availability_br": m.get("availability_br"), "lengthened": m.get("lengthened", False), "picto": m.get("picto"),
+            "aliases": m.get("aliases") or [],  # nomes que as pessoas usam ("leg press 90", "pressão de pernas")
         })
 
     for it in items:
@@ -371,7 +374,8 @@ def _load() -> tuple[list[dict], dict[str, dict]]:
         it["secondary_pt"] = [muscle_pt(m) for m in it["secondaryMuscles"]]
         it["_search"] = strip_accents(" ".join([it["name"], it["name_en"], it["equipment_pt"] or "",
                                                  " ".join(it["primary_pt"]),
-                                                 " ".join(MUSCLE_ALIASES.get(m, "") for m in it["primaryMuscles"])]))
+                                                 " ".join(MUSCLE_ALIASES.get(m, "") for m in it["primaryMuscles"]),
+                                                 " ".join(it.get("aliases") or [])]))
     return items, {i["id"]: i for i in items}
 
 

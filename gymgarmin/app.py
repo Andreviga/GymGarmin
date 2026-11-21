@@ -737,7 +737,10 @@ def exercises(q: str = "", muscle: str | None = None, equipment: str | None = No
 PICTO = [(("corrida", "esteira_corrida"), "run"), (("ciclismo", "bike", "spinning"), "bike"), (("natacao",), "swim"),
          (("remo",), "row"), (("trilha",), "hike"), (("caminhada",), "walk"), (("ski",), "ski"), (("eliptico",), "elliptical"),
          (("escada",), "stairs"), (("corda",), "rope"), (("kettlebell",), "kettlebell"), (("esteira_curva",), "run"),
-         (("treno",), "sled"), (("ergometro_braco",), "armerg"), (("versaclimber",), "climber")]
+         (("treno",), "sled"), (("ergometro_braco",), "armerg"), (("versaclimber",), "climber"),
+         (("atividade_mobilidade",), "yoga"), (("atividade_coletivo",), "ball"), (("atividade_raquete",), "racket"),
+         (("atividade_luta",), "glove"), (("atividade_escalada",), "climber"), (("atividade_aquatica",), "swim"),
+         (("atividade_neve",), "ski"), (("atividade_danca",), "rope"), (("atividade_",), "pulse")]
 
 
 @app.get("/api/media")

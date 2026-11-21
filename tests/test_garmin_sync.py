@@ -283,7 +283,8 @@ def test_token_renewed_mid_run_is_saved_even_if_sync_fails(monkeypatch):
 
 def test_late_watch_sync_still_imported_and_unsupported_not_fetched():
     """Relógio que passou dias sem sincronizar: a atividade antiga aparece depois e ainda entra.
-    Yoga/tênis nem têm o detalhe baixado, e não são buscados de novo a cada execução."""
+    Yoga/futebol entram como atividade genérica sem baixar o detalhe; o que não é treino (meditação) fica de fora
+    e não é buscado de novo a cada execução."""
     clock.freeze(datetime(2026, 11, 20, 9, 0))
     garmin_sync.login("eu@x.com", "senha")
     assert garmin_sync.sync(db.save_session, db.garmin_imported_ids())["ok"]
@@ -292,10 +293,25 @@ def test_late_watch_sync_still_imported_and_unsupported_not_fetched():
                   "startTimeLocal": "2026-11-15 08:00:00", "duration": 5400, "distance": 50000})
     EXTRA.append({"activityId": 9101, "activityName": "Yoga", "activityType": {"typeKey": "yoga"},
                   "startTimeLocal": "2026-11-20 07:00:00", "duration": 3600})
+    EXTRA.append({"activityId": 9102, "activityName": "Pelada de quinta", "activityType": {"typeKey": "soccer"},
+                  "startTimeLocal": "2026-11-19 20:00:00", "duration": 4200, "averageHR": 152, "maxHR": 181, "calories": 720,
+                  "steps": 8900, "distance": 6100})
+    EXTRA.append({"activityId": 9103, "activityName": "Respiração", "activityType": {"typeKey": "breathwork"},
+                  "startTimeLocal": "2026-11-20 22:00:00", "duration": 600})
+    EXTRA.append({"activityId": 9104, "activityName": "Toque sem querer", "activityType": {"typeKey": "other"},
+                  "startTimeLocal": "2026-11-20 12:00:00", "duration": 40})
     FakeGarmin.calls = []
-    r = garmin_sync.sync(db.save_session, db.garmin_imported_ids())
-    assert [i["name"] for i in r["imported"]] == ["Pedal de domingo"] and r["skipped"] == 1
-    assert not any(c[0] == "detail" and str(c[1]) == "9101" for c in FakeGarmin.calls)
+    r = garmin_sync.sync(db.save_session, db.garmin_imported_ids(), hr_max=190)
+    assert sorted(i["name"] for i in r["imported"]) == ["Pedal de domingo", "Pelada de quinta", "Yoga"] and r["skipped"] == 2
+    assert not any(c[0] == "detail" and str(c[1]) in ("9101", "9102", "9103", "9104") for c in FakeGarmin.calls)
+    by = {s.get("garmin_activity_id"): s for s in db.list_sessions()}
+    game = by[9102]["items"][0]
+    assert game["exercise_id"] == "atividade_coletivo" and game["_name"] == "Futebol" and game["duration_min"] == 70
+    assert game["avg_hr"] == 152 and game["max_hr"] == 181 and game["kcal"] == 720 and game["steps"] == 8900 and game["zone"] >= 3
+    yoga = by[9101]["items"][0]
+    assert yoga["exercise_id"] == "atividade_mobilidade" and yoga["light"] and yoga["tss"] == 15.0
+    from gymgarmin import load
+    assert load.session_stress(by[9102], {"hrmax": 190})["tss"] > 40 > load.session_stress(by[9101], {"hrmax": 190})["tss"] > 0
     FakeGarmin.calls = []
     garmin_sync.sync(db.save_session, db.garmin_imported_ids())
     assert not any(c[0] == "detail" for c in FakeGarmin.calls)

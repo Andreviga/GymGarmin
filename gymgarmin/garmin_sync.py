@@ -525,11 +525,63 @@ def _is_strength(activity: dict) -> bool:
 
 
 def importable_type(type_key: str | None) -> bool:
-    """Tipos que o app registra (o resto — yoga, tênis… — nem é baixado)."""
+    """Tipos que o app registra: modalidades, musculação, aparelhos de cardio e as outras atividades
+    (futebol, yoga, tênis…) como atividade genérica. Só fica de fora o que não é treino (meditação, dirigir…)."""
     from . import sports as sp
 
     t = (type_key or "").lower()
-    return t in sp.GARMIN_TYPE_TO_SPORT or t in GYM_MACHINES or "strength" in t
+    return t in sp.GARMIN_TYPE_TO_SPORT or t in GYM_MACHINES or "strength" in t or activity_kind(t) is not None
+
+
+def needs_detail(type_key: str | None) -> bool:
+    """Musculação (séries) e modalidades (potência, TSS, elevação) pedem o detalhe da atividade;
+    aparelho de cardio e atividade genérica entram só com o resumo da lista (uma chamada a menos por atividade)."""
+    from . import sports as sp
+
+    t = (type_key or "").lower()
+    return t in sp.GARMIN_TYPE_TO_SPORT or "strength" in t
+
+
+# Outras atividades do relógio → atividade genérica do catálogo (tempo, FC e calorias contam na carga da semana).
+# A ordem importa: a primeira regra que casa vence. Palavras em inglês (Garmin, Apple, Health Connect) e português.
+NOT_WORKOUT = ("breath", "meditat", "meditaç", "respira", "motor", "driving", "racing", "flying", "e_sport", "esport", "gaming", "navigat",
+               "transition", "incident", "multi_sport", "multisport", "sleep", "nap", "hunting", "fishing", "pesca", "mind")
+ACTIVITY_RULES = [
+    (("yoga", "ioga", "pilates", "stretch", "along", "mobili", "flexib", "barre", "tai_chi", "tai chi", "cooldown"), "atividade_mobilidade"),
+    (("soccer", "football", "futebol", "futsal", "basket", "basquet", "volley", "volei", "vôlei", "handball", "handebol", "rugby",
+      "hockey", "lacrosse", "baseball", "softball", "cricket", "ultimate", "team"), "atividade_coletivo"),
+    (("tennis", "tenis", "tênis", "padel", "paddel", "pickleball", "squash", "racquet", "racket", "raquete", "badminton"), "atividade_raquete"),
+    (("boxing", "boxe", "martial", "mma", "wrestl", "judo", "judô", "karate", "caratê", "jiu", "kickbox", "muay", "fight", "combat",
+      "luta", "capoeira", "fencing", "esgrima"), "atividade_luta"),
+    (("danc", "dança", "zumba"), "atividade_danca"),
+    (("rock_climb", "indoor_climb", "climbing", "boulder", "escalada"), "atividade_escalada"),
+    (("surf", "paddl", "kayak", "caiaque", "canoe", "canoa", "sail", "vela", "kite", "wake", "raft", "snorkel", "diving",
+      "mergulho", "boating", "water_sport", "water sport"), "atividade_aquatica"),
+    (("ski", "esqui", "snowboard", "snow", "skat", "patin"), "atividade_neve_patins"),
+    (("hiit", "bootcamp", "cardio", "aerob", "aeróbic", "fitness_equipment", "circuit", "interval", "tabata", "step_"), "atividade_hiit"),
+]
+ACTIVITY_NAMES_PT = {
+    "yoga": "Yoga", "pilates": "Pilates", "soccer": "Futebol", "american_football": "Futebol americano", "basketball": "Basquete",
+    "volleyball": "Vôlei", "beach_volleyball": "Vôlei de praia", "handball": "Handebol", "rugby": "Rúgbi", "tennis": "Tênis",
+    "tennis_v2": "Tênis", "padel": "Padel", "paddelball": "Padel", "pickleball": "Pickleball", "squash": "Squash",
+    "badminton": "Badminton", "table_tennis": "Tênis de mesa", "boxing": "Boxe", "mixed_martial_arts": "Artes marciais",
+    "dance": "Dança", "rock_climbing": "Escalada", "indoor_climbing": "Escalada indoor", "bouldering": "Boulder",
+    "surfing": "Surfe", "stand_up_paddleboarding": "Stand up paddle", "kayaking": "Caiaque", "kayaking_v2": "Caiaque",
+    "hiit": "HIIT", "indoor_cardio": "Cardio", "skating": "Patinação", "inline_skating": "Patins", "golf": "Golfe",
+    "resort_skiing_snowboarding_ws": "Esqui / snowboard", "other": "Outra atividade",
+}
+ACTIVITY_LIGHT_TSS_H = 15  # yoga, pilates, alongamento: carga fixa e baixa por hora (a FC mal sai do repouso)
+
+
+def activity_kind(type_key: str | None) -> str | None:
+    """Tipo do relógio → atividade genérica do catálogo; None quando não é treino (meditação, dirigir…) ou não há tipo."""
+    t = (type_key or "").lower().strip()
+    if not t or any(k in t for k in NOT_WORKOUT):
+        return None
+    for keys, act in ACTIVITY_RULES:
+        if any(k in t for k in keys):
+            return act
+    return "atividade_outra"
 
 
 # ambiente de cada tipo de atividade do Garmin (para escolher o item do catálogo)
@@ -538,7 +590,7 @@ TYPE_ENV = {"treadmill_running": "esteira", "indoor_running": "esteira", "trail_
             "open_water_swimming": "aguas_abertas", "lap_swimming": "piscina", "indoor_rowing": "indoor",
             "rowing": "agua", "treadmill_walking": "esteira", "indoor_walking": "esteira"}
 GYM_MACHINES = {"elliptical": "cardio_eliptico", "stair_climbing": "cardio_escada", "stairs": "cardio_escada",
-                "indoor_cardio": "cardio_eliptico"}
+                "floor_climbing": "cardio_escada", "jump_rope": "cardio_corda", "jumprope": "cardio_corda"}
 
 
 def _zone_from_hr(avg, hr_max):
@@ -586,6 +638,19 @@ def endurance_item(activity: dict, hr_max: int | None = None) -> dict | None:
     machine = GYM_MACHINES.get(type_key)
     if machine:
         return _steps_into({"exercise_id": machine, **base}, activity)
+    if "strength" in type_key:
+        return None  # musculação: tratada por quem chama (séries ou tempo de treino)
+    act = activity_kind(type_key)
+    if act:
+        item = {"exercise_id": act, **base, "activity_type": type_key}
+        label = ACTIVITY_NAMES_PT.get(type_key)
+        if label:
+            item["_name"] = label
+        if activity.get("distance"):
+            item["distance_km"] = round(float(activity["distance"]) / 1000, 3)
+        if act == "atividade_mobilidade":  # leve: não fecha cardio da agenda nem conta como treino intenso
+            item.update(zone=1, light=True, tss=round(base["duration_min"] / 60 * ACTIVITY_LIGHT_TSS_H, 1))
+        return _steps_into(item, activity)
     return None
 
 
@@ -612,7 +677,17 @@ def recent_activities(days: int = 14) -> list[dict]:
         "duration_min": round((a.get("duration") or 0) / 60), "avg_hr": a.get("averageHR"),
         "calories": a.get("calories"), "distance_km": round((a.get("distance") or 0) / 1000, 2) or None,
         "steps": a.get("steps"), "cadence": a.get("averageRunningCadenceInStepsPerMinute"),
+        "max_hr": a.get("maxHR"), "duration_s": a.get("duration"), "distance_m": a.get("distance"),
     } for a in acts or []]
+
+
+def session_from_summary(a: dict, hr_max: int | None = None) -> dict:
+    """Sessão montada só com o resumo da lista de atividades (sem baixar o detalhe)."""
+    flat = {"activityId": a.get("activity_id"), "activityName": a.get("name"), "activityType": {"typeKey": a.get("type")},
+            "startTimeLocal": a.get("start"), "duration": a.get("duration_s") or (a.get("duration_min") or 0) * 60,
+            "averageHR": a.get("avg_hr"), "maxHR": a.get("max_hr"), "calories": a.get("calories"),
+            "distance": a.get("distance_m"), "steps": a.get("steps")}
+    return activity_to_session({k: v for k, v in flat.items() if v is not None}, None, None, hr_max)
 
 
 def import_activity(activity_id: int, preferred_ids: set[str] | None = None, hr_max: int | None = None) -> dict:
@@ -647,6 +722,11 @@ FIRST_SYNC_DAYS = 42   # 6 semanas: o condicionamento (CTL) precisa do passado p
 LOOKBACK_DAYS = 14     # o relógio pode passar dias sem sincronizar: sempre olha 2 semanas para trás
 MAX_ATTEMPTS = 3       # atividade que falha 3 vezes é deixada de lado
 SKIP_KEY = "garmin_skipped"
+MIN_ACTIVITY_MIN = 3   # atividade de menos de 3 min sem séries: toque acidental no relógio
+
+
+def _is_strength_session(session: dict) -> bool:
+    return any(it.get("sets") for it in session.get("items") or [])
 
 
 def _is_rate_limit(e: Exception) -> bool:
@@ -730,10 +810,12 @@ def sync(save_session, imported_ids: set, preferred_ids: set[str] | None = None,
             aid = str(a.get("activity_id") or "")
             if aid and a.get("steps"):
                 act_steps[aid] = {"steps": a["steps"], "cadence": a.get("cadence")}
-            if not aid or aid in imported_ids or (skip.get(aid) or {}).get("final"):
+            sk = skip.get(aid) or {}
+            by_type = sk.get("final") and "attempts" not in sk and sk.get("why") == a.get("type")  # descartada pelo tipo
+            if not aid or aid in imported_ids or (sk.get("final") and not (by_type and importable_type(a.get("type")))):
                 continue
             if not importable_type(a.get("type")):
-                skip[aid] = {"final": True, "why": a.get("type")}  # yoga, tênis…: nem baixa o detalhe
+                skip[aid] = {"final": True, "why": a.get("type")}  # meditação, dirigir…: não é treino, nem baixa o detalhe
                 skip_changed = True
                 skipped += 1
                 continue
@@ -746,7 +828,8 @@ def sync(save_session, imported_ids: set, preferred_ids: set[str] | None = None,
             done += 1
             aid = str(a["activity_id"])
             try:
-                session = import_activity(a["activity_id"], preferred_ids, hr_max)
+                session = (import_activity(a["activity_id"], preferred_ids, hr_max) if needs_detail(a.get("type"))
+                           else session_from_summary(a, hr_max))
             except Exception as e:  # noqa: BLE001
                 if _is_rate_limit(e) or _is_auth_error(e) or "connection" in type(e).__name__.lower():
                     raise
@@ -755,7 +838,7 @@ def sync(save_session, imported_ids: set, preferred_ids: set[str] | None = None,
                 skip_changed = True
                 errors.append(f"{a.get('name') or aid}: {type(e).__name__}")
                 continue
-            if not session.get("items"):
+            if not session.get("items") or (session.get("duration_min") or 0) < MIN_ACTIVITY_MIN and not _is_strength_session(session):
                 skip[aid] = {"final": True, "why": "sem dados"}
                 skip_changed = True
                 skipped += 1

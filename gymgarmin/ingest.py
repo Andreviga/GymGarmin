@@ -131,7 +131,10 @@ def garmin_type(t) -> str | None:
     for keys, gtype in TYPE_RULES:
         if any(k in s for k in keys):
             return gtype
-    return None
+    from . import garmin_sync
+
+    key = re.sub(r"[^a-z0-9à-ú]+", "_", s).strip("_")
+    return key if garmin_sync.activity_kind(key) else None  # futebol, ioga, tênis…: atividade genérica
 
 
 # --------------------------------------------------------------- saúde do dia
@@ -269,7 +272,9 @@ def save_workouts(workouts: list[dict], source: str, hr_max: int | None, merge=N
             continue
         saved = (merge(s) if merge else None) or db.save_session(s)
         known.add(s["ext_id"])
-        imported.append({"session_id": saved.get("id"), "date": s["date"][:10], "type": s["items"][0].get("sport") or "musculacao",
+        first = s["items"][0]
+        kind = first.get("sport") or ("atividade" if str(first.get("exercise_id")).startswith("atividade_") else "musculacao")
+        imported.append({"session_id": saved.get("id"), "date": s["date"][:10], "type": kind,
                          "merged": bool(saved.get("merged"))})
     return imported, skipped
 

@@ -1,22 +1,159 @@
 [
- {"id": "Wall_Ball", "name": "Wall ball (agachamento + lançamento na parede)", "name_en": "Wall Ball", "equipment": "medicine ball",
-  "category": "strength", "force": "push", "mechanic": "compound", "level": "beginner",
-  "primaryMuscles": ["quadriceps", "shoulders"], "secondaryMuscles": ["glutes", "triceps", "abdominals"],
-  "instructions": ["Bola na altura do peito, pés na largura dos ombros, a um passo da parede.", "Agache até a coxa passar da paralela.", "Suba explodindo e lance a bola no alvo; receba já descendo para a próxima.", "Erro comum: lançar só com os braços — a força vem das pernas."],
-  "garmin": {"category": "SQUAT", "exercise": "WALL_BALL", "garmin_name": "Wall Ball", "confidence": "alta"}, "picto": "squat"},
- {"id": "Burpee_Broad_Jump", "name": "Burpee com salto à frente (burpee broad jump)", "name_en": "Burpee Broad Jump", "equipment": "body only",
-  "category": "strength", "force": "push", "mechanic": "compound", "level": "intermediate",
-  "primaryMuscles": ["quadriceps", "chest"], "secondaryMuscles": ["glutes", "shoulders", "triceps", "calves"],
-  "instructions": ["Desça ao chão (peito encosta), volte em pé.", "Salte à frente com os dois pés, aterrissando macio.", "Emende o próximo burpee onde aterrissou.", "Erro comum: saltos longos demais no começo e quebrar no fim — mantenha um ritmo que dá para sustentar."],
-  "garmin": {"category": "TOTAL_BODY", "exercise": "BURPEE", "garmin_name": "Burpee", "confidence": "media"}, "picto": "squat"},
- {"id": "Sandbag_Walking_Lunge", "name": "Afundo andando com saco (sandbag lunge)", "name_en": "Sandbag Walking Lunge", "equipment": "other",
-  "category": "strength", "force": "push", "mechanic": "compound", "level": "beginner",
-  "primaryMuscles": ["quadriceps", "glutes"], "secondaryMuscles": ["hamstrings", "adductors", "abdominals"],
-  "instructions": ["Saco apoiado nos ombros, atrás do pescoço.", "Passo à frente e desça até o joelho de trás encostar no chão.", "Suba e emende o próximo passo com a outra perna.", "Erro comum: passos curtos que jogam o joelho da frente para frente demais."],
-  "garmin": {"category": "LUNGE", "exercise": "LUNGE", "garmin_name": "Lunge", "confidence": "media"}, "picto": "squat"},
- {"id": "Sled_Pull_Rope", "name": "Trenó puxado na corda (sled pull)", "name_en": "Sled Pull (rope)", "equipment": "other",
-  "category": "strength", "force": "pull", "mechanic": "compound", "level": "intermediate",
-  "primaryMuscles": ["lats", "biceps"], "secondaryMuscles": ["middle back", "hamstrings", "glutes", "forearms"],
-  "instructions": ["Fique atrás da linha, quadril baixo e pés firmes.", "Puxe a corda mão a mão, trazendo o trenó até você.", "Use as pernas e o quadril, não só os braços.", "Erro comum: ficar em pé com as pernas esticadas — perde força e cansa a lombar."],
-  "garmin": {"category": "SLED", "exercise": "SLED", "garmin_name": "Sled", "confidence": "media"}, "picto": "sled"}
+ {
+  "id": "Wall_Ball",
+  "name": "Wall ball (agachamento + lançamento na parede)",
+  "name_en": "Wall Ball",
+  "equipment": "medicine ball",
+  "category": "strength",
+  "force": "push",
+  "mechanic": "compound",
+  "level": "beginner",
+  "primaryMuscles": [
+   "quadriceps",
+   "shoulders"
+  ],
+  "secondaryMuscles": [
+   "glutes",
+   "triceps",
+   "abdominals"
+  ],
+  "instructions": [
+   "Bola na altura do peito, pés na largura dos ombros, a um passo da parede.",
+   "Agache até a coxa passar da paralela.",
+   "Suba explodindo e lance a bola no alvo; receba já descendo para a próxima.",
+   "Erro comum: lançar só com os braços — a força vem das pernas."
+  ],
+  "garmin": {
+   "category": "SQUAT",
+   "exercise": "WALL_BALL",
+   "garmin_name": "Wall Ball",
+   "confidence": "alta"
+  },
+  "picto": "squat"
+ },
+ {
+  "id": "Burpee_Broad_Jump",
+  "name": "Burpee com salto à frente (burpee broad jump)",
+  "name_en": "Burpee Broad Jump",
+  "equipment": "body only",
+  "category": "strength",
+  "force": "push",
+  "mechanic": "compound",
+  "level": "intermediate",
+  "primaryMuscles": [
+   "quadriceps",
+   "chest"
+  ],
+  "secondaryMuscles": [
+   "glutes",
+   "shoulders",
+   "triceps",
+   "calves"
+  ],
+  "instructions": [
+   "Desça ao chão (peito encosta), volte em pé.",
+   "Salte à frente com os dois pés, aterrissando macio.",
+   "Emende o próximo burpee onde aterrissou.",
+   "Erro comum: saltos longos demais no começo e quebrar no fim — mantenha um ritmo que dá para sustentar."
+  ],
+  "garmin": {
+   "category": "TOTAL_BODY",
+   "exercise": "BURPEE",
+   "garmin_name": "Burpee",
+   "confidence": "media"
+  },
+  "picto": "squat"
+ },
+ {
+  "id": "Sandbag_Walking_Lunge",
+  "name": "Afundo andando com saco (sandbag lunge)",
+  "name_en": "Sandbag Walking Lunge",
+  "equipment": "other",
+  "category": "strength",
+  "force": "push",
+  "mechanic": "compound",
+  "level": "beginner",
+  "primaryMuscles": [
+   "quadriceps",
+   "glutes"
+  ],
+  "secondaryMuscles": [
+   "hamstrings",
+   "adductors",
+   "abdominals"
+  ],
+  "instructions": [
+   "Saco apoiado nos ombros, atrás do pescoço.",
+   "Passo à frente e desça até o joelho de trás encostar no chão.",
+   "Suba e emende o próximo passo com a outra perna.",
+   "Erro comum: passos curtos que jogam o joelho da frente para frente demais."
+  ],
+  "garmin": {
+   "category": "LUNGE",
+   "exercise": "LUNGE",
+   "garmin_name": "Lunge",
+   "confidence": "media"
+  },
+  "picto": "squat"
+ },
+ {
+  "id": "Sled_Pull_Rope",
+  "name": "Trenó puxado na corda (sled pull)",
+  "name_en": "Sled Pull (rope)",
+  "equipment": "other",
+  "category": "strength",
+  "force": "pull",
+  "mechanic": "compound",
+  "level": "intermediate",
+  "primaryMuscles": [
+   "lats",
+   "biceps"
+  ],
+  "secondaryMuscles": [
+   "middle back",
+   "hamstrings",
+   "glutes",
+   "forearms"
+  ],
+  "instructions": [
+   "Fique atrás da linha, quadril baixo e pés firmes.",
+   "Puxe a corda mão a mão, trazendo o trenó até você.",
+   "Use as pernas e o quadril, não só os braços.",
+   "Erro comum: ficar em pé com as pernas esticadas — perde força e cansa a lombar."
+  ],
+  "garmin": {
+   "category": "SLED",
+   "exercise": "SLED",
+   "garmin_name": "Sled",
+   "confidence": "media"
+  },
+  "picto": "sled"
+ },
+ {
+  "id": "Gripper_Machine",
+  "name": "Pegada na máquina (gripper)",
+  "name_en": "Plate-Loaded Gripper",
+  "equipment": "machine",
+  "category": "strength",
+  "force": "pull",
+  "mechanic": "isolation",
+  "level": "beginner",
+  "primaryMuscles": [
+   "forearms"
+  ],
+  "secondaryMuscles": [],
+  "instructions": [
+   "Segure a barra fixa com a palma e a barra móvel com os dedos, com os braços relaxados.",
+   "Feche as mãos aproximando as duas barras e segure um instante.",
+   "Abra devagar até os dedos ficarem quase estendidos, sem soltar a barra.",
+   "Erro comum: encolher os ombros e puxar com os braços em vez de só fechar as mãos."
+  ],
+  "garmin": {
+   "category": "CURL",
+   "exercise": "BARBELL_WRIST_CURL",
+   "garmin_name": "Barbell Wrist Curl",
+   "confidence": "generica"
+  },
+  "picto": null
+ }
 ]

@@ -119,8 +119,8 @@ def _add_researched_machines() -> None:
     import json
     from pathlib import Path
     for m in json.loads((Path(__file__).resolve().parent / "data" / "machines.json").read_text()):
-        if m.get("availability_br") == "rara" or m["pattern"] not in PATTERNS:
-            continue
+        if m.get("availability_br") == "rara" or m["pattern"] not in PATTERNS or m.get("rotation") is False:
+            continue  # "rotation": false = aparelho/variação que só entra por escolha da pessoa
         if m["id"] not in PATTERNS[m["pattern"]]:
             PATTERNS[m["pattern"]].append(m["id"])
 

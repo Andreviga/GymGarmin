@@ -144,13 +144,18 @@ const PICTO_SVG = {
   sled: '<circle cx="7" cy="5" r="2"/><path d="M7 7l3 5-4 3-1 5M10 12l5-1M13 15l-2 5M14 9h6v8h-6zM13 20h9"/>',
   armerg: '<circle cx="8" cy="6" r="2"/><path d="M8 8v7l4 5M8 11l5 1M15 12a3 3 0 1 0 0-.1M15 12v9M11 21h8"/>',
   climber: '<circle cx="12" cy="5" r="2"/><path d="M17 2v20M12 7v6l-3 4v4M12 13l3 3h2M12 9l5-3M12 9l-4 2"/>',
+  yoga: '<circle cx="12" cy="5" r="2"/><path d="M12 7.5v6M12 9.5l-5 3M12 9.5l5 3M12 13.5l-6 4h12zM4 20.5h16"/>',
+  ball: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5l4 3-1.5 4.5h-5L8 10.5zM12 3.5v4M16 10.5l4-1.5M14.5 15l2.5 4M9.5 15L7 19M8 10.5L4 9"/>',
+  racket: '<ellipse cx="9.5" cy="8.5" rx="5" ry="6.5" transform="rotate(-35 9.5 8.5)"/><path d="M13 13.5l6.5 7.5M6 6l7 5M8 3.5l6 9M5 10l6 3.5"/><circle cx="19" cy="5" r="1.6"/>',
+  glove: '<path d="M7 12V7.5a3 3 0 016 0V9a3.2 3.2 0 016 1.5V14a5 5 0 01-5 5H9a2 2 0 01-2-2zM7 13h3.5M8 19v2.5h8V19"/>',
+  pulse: '<path d="M2.5 12h4l2.5-6.5 4 13 2.5-6.5h6"/>',
 };
 let MEDIA = null;
 async function loadMedia() {
   if (MEDIA) return MEDIA;
-  try { MEDIA = store("gg_media_v2"); } catch (_) { MEDIA = null; }
+  try { MEDIA = store("gg_media_v3"); } catch (_) { MEDIA = null; }
   if (!MEDIA || !MEDIA.f) {
-    try { MEDIA = await api("/api/media"); store("gg_media_v2", MEDIA); } catch (_) { MEDIA = { base: "", f: {}, p: {} }; }
+    try { MEDIA = await api("/api/media"); store("gg_media_v3", MEDIA); } catch (_) { MEDIA = { base: "", f: {}, p: {} }; }
   }
   return MEDIA;
 }
@@ -2813,6 +2818,18 @@ function ytEmbed(v) {
     <img loading="lazy" src="https://i.ytimg.com/vi/${esc(v.id)}/hqdefault.jpg" alt=""><span class="yt-play" aria-hidden="true">▶</span></div>
     <p class="small muted yt-credit">${v.channel ? `Vídeo: ${esc(v.channel)}` : "Vídeo do YouTube"}${v.title ? ` · ${esc(v.title)}` : ""} · <a href="https://www.youtube.com/watch?v=${esc(v.id)}" target="_blank" rel="noopener">abrir no YouTube</a></p>`;
 }
+// fabricantes: com a página do produto quando a pesquisa achou; avisa quando o aparelho ainda não foi conferido no site da marca
+function machineBrandsHtml(m) {
+  const bm = (m.brand_models || []).filter((b) => /^https:\/\//.test(b.url || ""));
+  const linked = new Set(bm.map((b) => b.brand));
+  const plain = (m.brands || []).filter((b) => !linked.has(b) && ![...linked].some((l) => l.includes(b) || b.includes(l)));
+  if (!bm.length && !plain.length) return m.is_new && m.confirmed === false ? `<p class="small muted">Sem fabricante confirmado para este aparelho.</p>` : "";
+  const seen = new Set();
+  const links = bm.filter((b) => { const k = b.brand + "|" + b.url; if (seen.has(k)) return false; seen.add(k); return true; }).slice(0, 10)
+    .map((b) => `<a href="${esc(b.url)}" target="_blank" rel="noopener">${esc(b.brand)}${b.model ? ` <span class="muted">(${esc(b.model)})</span>` : ""}</a>`);
+  return `<h3>Fabricantes</h3><p class="small mx-brands">${[...links, ...plain.map(esc)].join(" · ")}</p>
+    ${m.confirmed === false ? `<p class="small muted">Marcas e modelos vistos na busca; a página do fabricante não foi aberta para conferir.</p>` : ""}`;
+}
 async function showMachine(id) {
   const m = await api(`/api/machines/${encodeURIComponent(id)}`);
   const vids = m.videos || []; const embeds = vids.filter((v) => v.embed); const links = vids.filter((v) => !v.embed);
@@ -2826,9 +2843,12 @@ async function showMachine(id) {
       ${x.video ? (x.video.embed ? `<button class="act" data-ytx="${esc(x.video.id)}" aria-label="Ver vídeo: ${esc(x.name)}">▶ vídeo</button>` : `<a class="act" href="https://www.youtube.com/watch?v=${esc(x.video.id)}" target="_blank" rel="noopener">▶ YouTube</a>`) : ""}
       ${x.exercise_id ? `<button class="act" data-exl="${esc(x.exercise_id)}" aria-label="Detalhes do exercício">›</button>` : ""}</li>`).join("")}</ul>` : ""}
     ${(m.linked || []).length ? `<div class="chips" style="margin:8px 0 4px">${m.linked.map((x) => `<button class="chip" data-exl="${esc(x.id)}">${esc(x.name)} ›</button>`).join("")}</div>` : ""}
+    ${(m.settings || []).length ? `<h3>Regulagens</h3><ul class="plain small">${m.settings.map((t) => `<li>${esc(t)}</li>`).join("")}</ul>` : ""}
     ${(m.tips || []).length ? `<h3>Dicas</h3><ul class="plain small">${m.tips.map((t) => `<li>${esc(t)}</li>`).join("")}</ul>` : ""}
+    ${m.how_to_recognize ? `<h3>Como reconhecer na academia</h3><p class="small">${esc(m.how_to_recognize)}</p>` : ""}
+    ${m.id_note ? `<p class="small muted">${esc(m.id_note)}</p>` : ""}
     ${embeds.length > 1 || links.length ? `<h3>Mais vídeos</h3><ul class="plain small">${[...embeds.slice(1), ...links].map((v) => `<li><a href="https://www.youtube.com/watch?v=${esc(v.id)}" target="_blank" rel="noopener">${esc(v.title || "Vídeo")}</a>${v.channel ? ` · ${esc(v.channel)}` : ""}</li>`).join("")}</ul>` : ""}
-    ${(m.brands || []).length ? `<p class="small muted">Fabricantes: ${m.brands.map(esc).join(", ")}</p>` : ""}`);
+    ${machineBrandsHtml(m)}`);
   body.onclick = (e) => {
     const y = e.target.closest("[data-yt]");
     if (y) { y.outerHTML = `<div class="yt on"><iframe src="https://www.youtube-nocookie.com/embed/${esc(y.dataset.yt)}?autoplay=1&playsinline=1&rel=0" title="Vídeo do exercício" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe></div>`; return; }

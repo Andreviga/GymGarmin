@@ -125,8 +125,10 @@ def summary(m: dict) -> dict:
     return {"id": m["machine_id"], "name": m["name"], "name_en": m.get("name_en"), "category": m.get("category"),
             "is_new": bool(m.get("is_new")), "community": bool(m.get("community")), "availability_br": m.get("availability_br"), "thumb": thumb,
             "thumb_kind": "photo" if photos else "video" if vids else None, "has_video": bool(vids),
-            "n_exercises": len(m.get("exercises") or []), "_search": _norm(" ".join([m["name"], m.get("name_en") or "",
-                                                                                    " ".join(e.get("name", "") for e in m.get("exercises") or [])]))}
+            "n_exercises": len(m.get("exercises") or []), "from_photo": bool(m.get("from_photo")),
+            # busca também pelos nomes que as pessoas usam ("leg press 90") e pela marca ("hammer strength", "total health")
+            "_search": _norm(" ".join([m["name"], m.get("name_en") or "", " ".join(m.get("aliases") or []),
+                                       " ".join(m.get("brands") or []), " ".join(e.get("name", "") for e in m.get("exercises") or [])]))}
 
 
 def detail(m: dict) -> dict:

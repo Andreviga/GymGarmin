@@ -20,7 +20,10 @@ from . import load
 RUN_SPM = 165          # passos por minuto correndo: usado só quando o relógio não mandou os passos da atividade
 WALK_SPM = 110
 HIKE_SPM = 100
-MACHINE_SPM = {"cardio_eliptico": 90, "cardio_escada": 80}  # o relógio no pulso conta parte do movimento
+MACHINE_SPM = {"cardio_eliptico": 90, "cardio_escada": 80,  # o relógio no pulso conta parte do movimento
+               # outras atividades sem os passos medidos (ex.: vindas do celular): estimativa conservadora
+               "atividade_coletivo": 95, "atividade_raquete": 70, "atividade_danca": 80, "atividade_hiit": 50, "atividade_luta": 35,
+               "atividade_outra": 40}
 EVENT_SPM = 85         # festival/passeio: anda devagar e para muito (vira o tempo estimado "em pé e andando")
 BASE_DAYS = 28         # janela do "costume" (mediana: um dia fora da curva não puxa a referência)
 MIN_BASE_DAYS = 7
@@ -66,7 +69,10 @@ def _what(it: dict) -> str | None:
     sp = load.sport_of(it)
     if sp in ("corrida", "caminhada", "trilha"):
         return sp
-    return {"cardio_eliptico": "eliptico", "cardio_escada": "escada"}.get(it.get("exercise_id"))
+    eid = str(it.get("exercise_id") or "")
+    if eid.startswith("atividade_"):
+        return "atividade"
+    return {"cardio_eliptico": "eliptico", "cardio_escada": "escada"}.get(eid)
 
 
 def is_event(session: dict) -> bool:

@@ -30,7 +30,9 @@ def test_numbers_as_shortcuts_send_them():
     assert ingest.minutes("2700 s") == 45 and ingest.minutes(32) == 32
     assert ingest.garmin_type("Corrida") == "running" and ingest.garmin_type("HKWorkoutActivityTypeTraditionalStrengthTraining") == "strength_training"
     assert ingest.garmin_type("RUNNING_TREADMILL") == "treadmill_running" and ingest.garmin_type("BIKING_STATIONARY") == "indoor_cycling"
-    assert ingest.garmin_type("Elíptico") == "elliptical" and ingest.garmin_type("Ioga") is None
+    assert ingest.garmin_type("Elíptico") == "elliptical" and ingest.garmin_type("Ioga") == "ioga"
+    assert ingest.garmin_type("HKWorkoutActivityTypeSoccer") == "soccer" and ingest.garmin_type("EXERCISE_TYPE_TENNIS") == "tennis"
+    assert ingest.garmin_type("Meditação") is None and ingest.garmin_type("") is None  # não é treino
 
 
 def test_iphone_shortcut_payload_creates_sessions_health_and_readiness(c):
@@ -48,14 +50,16 @@ def test_iphone_shortcut_payload_creates_sessions_health_and_readiness(c):
                              "duration_min": "55", "avg_hr": "102"},
                             {"id": "w3", "type": "Ioga", "start": "2026-11-15T07:00:00-03:00", "duration_min": "30"}]}
     r = anon.post("/api/ingest", json=payload, headers={"Authorization": f"Bearer {tok}"}).json()
-    assert r["days"] == ["2026-11-17"] and len(r["imported"]) == 2 and r["skipped"] == 1
+    assert r["days"] == ["2026-11-17"] and len(r["imported"]) == 3 and r["skipped"] == 0
     sessions = c.get("/api/sessions").json()
+    yoga = next(s for s in sessions if s["items"][0]["exercise_id"] == "atividade_mobilidade")  # antes era descartada
+    assert yoga["items"][0]["light"] and yoga["items"][0]["tss"] == 7.5 and yoga["items"][0]["duration_min"] == 30
     run = next(s for s in sessions if s["items"][0].get("sport") == "corrida")
     assert run["source"] == "apple" and run["items"][0]["distance_km"] == 5.1 and run["items"][0]["pace_s_km"] == 376
     assert any(s["items"][0].get("strength_min") == 55 for s in sessions)
     # reenviar não duplica
     again = anon.post("/api/ingest?token=" + tok, json=payload).json()
-    assert again["imported"] == [] and len(c.get("/api/sessions").json()) == 2
+    assert again["imported"] == [] and len(c.get("/api/sessions").json()) == 3
     h = c.get("/api/health").json()
     assert h["has_data"] and h["last_night"]["duration_h"] == 6.5 and h["last_night"]["rem_pct"] == 21.8
     rd = c.get("/api/readiness").json()

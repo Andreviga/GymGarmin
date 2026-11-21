@@ -120,7 +120,15 @@
    "https://pubmed.ncbi.nlm.nih.gov/27735888/"
   ],
   "image_like": "Leg_Press",
-  "picto": null
+  "picto": null,
+  "aliases": [
+   "leg press 90",
+   "leg press 90 graus",
+   "pressão de pernas",
+   "seated leg press",
+   "leg press sentado",
+   "leg horizontal"
+  ]
  },
  {
   "id": "Reverse_Hack_Squat",
@@ -240,7 +248,12 @@
    "https://www.gazetasp.com.br/esportes/movement-amplia-linha-next-com-aparelhos-articulados-de-gluteos-de/"
   ],
   "image_like": "Barbell_Hip_Thrust",
-  "picto": null
+  "picto": null,
+  "aliases": [
+   "elevação pélvica guiada",
+   "glute drive",
+   "hip thrust guiado"
+  ]
  },
  {
   "id": "Smith_Machine_Hip_Thrust",
@@ -1539,5 +1552,346 @@
   ],
   "image_like": null,
   "picto": "dumbbell"
+ },
+ {
+  "id": "LeverLegPress_Machine",
+  "name": "Leg press articulado (alavanca, de anilhas)",
+  "name_en": "Lever / Iso-Lateral Leg Press",
+  "equipment": "machine",
+  "category": "strength",
+  "force": "push",
+  "mechanic": "compound",
+  "level": "beginner",
+  "primaryMuscles": [
+   "quadriceps",
+   "glutes"
+  ],
+  "secondaryMuscles": [
+   "hamstrings",
+   "adductors",
+   "calves"
+  ],
+  "pattern": "squat",
+  "lengthened": false,
+  "instructions": [
+   "Regule o encosto para começar com os joelhos perto de 90° e a lombar inteira apoiada; pés na largura do quadril no meio da plataforma.",
+   "Solte a trava, desça controlando (2–3 s) até onde o quadril continua colado no banco e empurre sem travar os joelhos.",
+   "Nos modelos iso-laterais dá para fazer uma perna de cada vez: mantenha o quadril reto, sem girar para o lado que empurra.",
+   "Erro comum: encurtar a descida para colocar mais anilhas ou deixar a lombar descolar no fundo."
+  ],
+  "garmin": {
+   "category": "SQUAT",
+   "exercise": "LEG_PRESS",
+   "garmin_name": "Leg Press",
+   "confidence": "alta"
+  },
+  "availability_br": "média",
+  "evidence": "Sentado, você empurra plataformas presas a braços de alavanca carregados com anilhas, em vez de um carrinho sobre trilhos. Em vários modelos cada perna tem seu braço (iso-lateral), o que permite treinar uma perna de cada vez e impede a perna forte de compensar. Como a carga fica numa alavanca, a força necessária muda ao longo do movimento.",
+  "sources": [
+   "https://www.lifefitness.com/en-us/catalog/strength-training/plate-loaded/plate-loaded-iso-lateral-leg-press",
+   "https://www.lifefitness.com/en-us/about/newsroom/new-super-squat-press",
+   "https://shop.lifefitness.com/products/hammer-strength-plate-loaded-squat-press",
+   "https://www.technogym.com/en-INT/product/pure-strength-leg-press_MG50.html"
+  ],
+  "image_like": "Leg_Press",
+  "picto": null,
+  "rotation": false,
+  "aliases": [
+   "leg press articulado",
+   "leg press unilateral",
+   "seated leg press unilateral",
+   "leg press iso-lateral",
+   "iso-lateral leg press",
+   "lever leg press"
+  ],
+  "added": "2026-11"
+ },
+ {
+  "id": "ReverseLunge_Machine",
+  "name": "Afundo reverso na máquina (lunge machine)",
+  "name_en": "Machine Reverse Lunge",
+  "equipment": "machine",
+  "category": "strength",
+  "force": "push",
+  "mechanic": "compound",
+  "level": "intermediate",
+  "primaryMuscles": [
+   "quadriceps",
+   "glutes"
+  ],
+  "secondaryMuscles": [
+   "adductors",
+   "hamstrings"
+  ],
+  "pattern": "single_leg",
+  "lengthened": false,
+  "instructions": [
+   "Ajuste o aparelho à sua altura seguindo a placa de instruções, suba na plataforma e firme o tronco (ombros sob as almofadas ou mãos nos pegadores, conforme o modelo).",
+   "Leve uma perna para trás e desça dobrando os dois joelhos, mantendo o joelho da frente na linha do pé.",
+   "Suba empurrando com o calcanhar da perna da frente; alterne as pernas ou faça um lado por vez.",
+   "Erro comum: empurrar com a perna de trás ou deixar o joelho da frente cair para dentro."
+  ],
+  "garmin": {
+   "category": "LUNGE",
+   "exercise": "BARBELL_REVERSE_LUNGE",
+   "garmin_name": "Barbell Reverse Lunge",
+   "confidence": "media"
+  },
+  "availability_br": "rara",
+  "evidence": "Aparelho de anilhas dedicado ao afundo: o corpo fica guiado enquanto uma perna recua, o que tira boa parte da exigência de equilíbrio do afundo com halteres. Difere do agachamento alavanca (ground base), que é feito para agachar com os dois pés.",
+  "sources": [
+   "https://www.panattasport.com/en/free-weight-special/super-lunge-machine/",
+   "https://bootybuilder.com/product/booty-builder-reverse-lunge-machine/",
+   "https://precor.com/strength/glutebuilder/glute-lunge"
+  ],
+  "image_like": null,
+  "picto": null,
+  "rotation": false,
+  "aliases": [
+   "máquina de passada",
+   "afundo na máquina",
+   "afundo reverso na máquina",
+   "reverse lunge machine",
+   "super lunge machine",
+   "glute lunge"
+  ],
+  "added": "2026-11"
+ },
+ {
+  "id": "StandingHipAdduction_Machine",
+  "name": "Adução de quadril em pé na máquina",
+  "name_en": "Standing Hip Adduction (machine)",
+  "equipment": "machine",
+  "category": "strength",
+  "force": "pull",
+  "mechanic": "isolation",
+  "level": "beginner",
+  "primaryMuscles": [
+   "adductors"
+  ],
+  "secondaryMuscles": [],
+  "pattern": "adductor",
+  "lengthened": false,
+  "instructions": [
+   "Ajuste o aparelho à sua altura e à abertura inicial que alonga a parte interna da coxa sem dor, seguindo a placa de instruções (o encaixe muda de marca para marca).",
+   "Em pé, com o tronco firme e as mãos nos pegadores, feche as pernas em direção à linha do meio do corpo.",
+   "Volte devagar até a posição aberta, sem deixar a carga bater.",
+   "Erro comum: balançar ou inclinar o tronco para ajudar no movimento."
+  ],
+  "garmin": {
+   "category": "HIP_STABILITY",
+   "exercise": "WEIGHTED_STANDING_ADDUCTION",
+   "garmin_name": "Weighted Standing Adduction",
+   "confidence": "media"
+  },
+  "availability_br": "rara",
+  "evidence": "Faz a adução com o quadril estendido, em pé, em vez de sentado: muda o ângulo de trabalho dos adutores e exige estabilidade do tronco. A cadeira adutora tradicional trabalha com o quadril flexionado a 90°.",
+  "sources": [
+   "https://bootybuilder.com/product/booty-builder-selectorized-standing-hip-adduction/",
+   "https://bootybuilder.com/product-category/machines/abductor-adductor-machines/",
+   "https://www.skelcore.com/products/plate-loaded-standing-adductor-with-linear-adjustment"
+  ],
+  "image_like": "Thigh_Adductor",
+  "picto": null,
+  "rotation": false,
+  "aliases": [
+   "cadeira adutora em pé",
+   "adutor em pé",
+   "adução em pé",
+   "standing adductor",
+   "standing hip adduction"
+  ],
+  "added": "2026-11"
+ },
+ {
+  "id": "StandingHipAbduction_Machine",
+  "name": "Abdutora em pé (máquina)",
+  "name_en": "Standing Hip Abduction Machine",
+  "equipment": "machine",
+  "category": "strength",
+  "force": "push",
+  "mechanic": "isolation",
+  "level": "beginner",
+  "primaryMuscles": [
+   "abductors",
+   "glutes"
+  ],
+  "secondaryMuscles": [],
+  "pattern": "glute",
+  "lengthened": false,
+  "instructions": [
+   "Suba na plataforma, encoste a parte de fora das coxas/joelhos nas almofadas e incline o tronco à frente sobre o apoio, segurando as manoplas.",
+   "Abra as duas pernas para os lados até onde o quadril permitir, sem balançar o tronco.",
+   "Volte devagar (2 a 3 segundos), sem deixar a carga bater.",
+   "Erro comum: usar tranco e girar os pés para fora para ganhar amplitude; comece leve."
+  ],
+  "garmin": {
+   "category": "HIP_STABILITY",
+   "exercise": "WEIGHTED_STANDING_HIP_ABDUCTION",
+   "garmin_name": "Weighted Standing Hip Abduction",
+   "confidence": "media"
+  },
+  "availability_br": "rara",
+  "evidence": "Abdução de quadril feita em pé, com o tronco inclinado à frente e apoiado. Com o quadril dobrado, o movimento tende a pôr mais glúteo do que sentado ereto. Difere da cadeira abdutora por não ter assento.",
+  "sources": [
+   "https://en.movement.com.br/product/standing-abductor-next/",
+   "https://lionfitness.com.br/produto/abdutor-em-pe-optimus",
+   "https://bootybuilder.com/product/booty-builder-standing-abductor",
+   "https://bootybuilder.com/product/booty-builder-selectorized-standing-abductor/"
+  ],
+  "image_like": "Thigh_Abductor",
+  "picto": null,
+  "rotation": false,
+  "aliases": [
+   "abdutor em pé",
+   "abdução em pé na máquina",
+   "standing abduction",
+   "standing hip abduction",
+   "standing abductor"
+  ],
+  "added": "2026-11"
+ },
+ {
+  "id": "RearDeltRow_Machine",
+  "name": "Remada aberta na máquina para deltoide posterior (upper back)",
+  "name_en": "Machine Rear Delt Row (Upper Back)",
+  "equipment": "machine",
+  "category": "strength",
+  "force": "pull",
+  "mechanic": "compound",
+  "level": "beginner",
+  "primaryMuscles": [
+   "shoulders",
+   "middle back"
+  ],
+  "secondaryMuscles": [
+   "traps",
+   "biceps"
+  ],
+  "pattern": "rear_delt",
+  "lengthened": false,
+  "instructions": [
+   "Regule o assento para as manoplas ficarem na linha dos ombros e encoste o peito no apoio.",
+   "Puxe os cotovelos para trás e para os lados, na altura dos ombros, até as mãos chegarem perto do peito.",
+   "Segure 1 s juntando as escápulas e volte devagar até estender os braços.",
+   "Erro comum: deixar os cotovelos caírem junto ao corpo (vira remada de dorsal) ou encolher os ombros."
+  ],
+  "garmin": {
+   "category": "ROW",
+   "exercise": "WIDE_GRIP_SEATED_CABLE_ROW",
+   "garmin_name": "Wide-grip Seated Cable Row",
+   "confidence": "media"
+  },
+  "availability_br": "rara",
+  "evidence": "Aparelho dedicado a posterior de ombro, romboides e trapézio médio: puxa-se com os cotovelos altos e abertos e o peito apoiado. Difere do voador invertido (braço quase reto, em arco) por ser uma puxada com o cotovelo dobrado, que aceita mais carga.",
+  "sources": [
+   "https://www.technogym.com/en-US/product/selection-900-upper-back_MN1P.html",
+   "https://www.panattasport.com/en/free-weight-special/back-deltoids/",
+   "https://www.lifefitness.com/en-us/catalog/cybex/cybex-products/cybex-prestige-strength-total-access-row-rear-delt"
+  ],
+  "image_like": "Reverse_Machine_Flyes",
+  "picto": null,
+  "rotation": false,
+  "aliases": [
+   "upper back",
+   "row/rear delt",
+   "back deltoids",
+   "remada aberta na máquina",
+   "posterior de ombro na máquina"
+  ],
+  "added": "2026-11"
+ },
+ {
+  "id": "Horizontal_Leg_Press_Unilateral",
+  "name": "Leg press horizontal unilateral (uma perna)",
+  "name_en": "Single-Leg Seated Leg Press",
+  "equipment": "machine",
+  "category": "strength",
+  "force": "push",
+  "mechanic": "compound",
+  "level": "beginner",
+  "primaryMuscles": [
+   "quadriceps",
+   "glutes"
+  ],
+  "secondaryMuscles": [
+   "adductors",
+   "hamstrings"
+  ],
+  "pattern": "single_leg",
+  "lengthened": false,
+  "instructions": [
+   "Sente com lombar e quadril encostados e coloque um pé no centro da plataforma; o outro fica fora dela, apoiado no chão.",
+   "Dobre o joelho até cerca de 90° sem o quadril descolar do banco e empurre sem travar o joelho.",
+   "Carga bem menor que com as duas pernas; faça as mesmas repetições de cada lado, começando pelo lado mais fraco.",
+   "Erro comum: girar o quadril para o lado da perna que trabalha ou deixar o joelho cair para dentro."
+  ],
+  "garmin": {
+   "category": "SQUAT",
+   "exercise": "LEG_PRESS",
+   "garmin_name": "Leg Press",
+   "confidence": "media"
+  },
+  "availability_br": "comum",
+  "evidence": "Mesma máquina do leg press horizontal, uma perna por vez: corrige diferença de força entre os lados e pede menos carga total. Feito pelo dono do app no Hammer Strength Select Seated Leg Press da academia dele.",
+  "sources": [
+   "https://lifefitness.com/pt-br/catalog/forca/seletorizado/hammer-strength-select-seated-leg-press"
+  ],
+  "image_like": "Leg_Press",
+  "picto": null,
+  "rotation": false,
+  "aliases": [
+   "leg press 90 unilateral",
+   "leg press sentado unilateral",
+   "pressão de pernas unilateral",
+   "leg horizontal uma perna"
+  ],
+  "added": "2026-11"
+ },
+ {
+  "id": "Kneeling_Hip_Extension_Machine",
+  "name": "Extensão de quadril ajoelhado na máquina",
+  "name_en": "Kneeling Glute Isolator (machine hip extension)",
+  "equipment": "machine",
+  "category": "strength",
+  "force": "push",
+  "mechanic": "isolation",
+  "level": "beginner",
+  "primaryMuscles": [
+   "glutes"
+  ],
+  "secondaryMuscles": [
+   "hamstrings",
+   "lower back"
+  ],
+  "pattern": "glute",
+  "lengthened": false,
+  "instructions": [
+   "Ajoelhe no apoio, trave os pés na barra de trás, encoste o quadril no apoio da frente e o rolo nas costas, na altura dos ombros.",
+   "Incline o tronco à frente dobrando só o quadril, mantendo a coluna reta.",
+   "Volte empurrando o rolo com as costas até o quadril estender por completo e segure 1 s.",
+   "Erro comum: terminar o movimento arqueando a lombar em vez de estender o quadril."
+  ],
+  "garmin": {
+   "category": "HIP_STABILITY",
+   "exercise": "WEIGHTED_QUADRUPED_HIP_EXTENSION",
+   "garmin_name": "Weighted Quadruped Hip Extension",
+   "confidence": "media"
+  },
+  "availability_br": "rara",
+  "evidence": "Aparelho de anilhas em que a pessoa fica ajoelhada, com os pés travados e um rolo apoiado nas costas, e estende o quadril contra a carga. Isola o glúteo com as duas pernas ao mesmo tempo, sem exigir equilíbrio e sem carga na coluna como no hip thrust com barra. Não é o coice (que é uma perna por vez).",
+  "sources": [
+   "https://www.precor.com/strength/glutebuilder/kneeling-glute-isolator",
+   "https://www.precor.com/en-US/products/GPL0363"
+  ],
+  "image_like": null,
+  "picto": null,
+  "rotation": false,
+  "aliases": [
+   "glúteo ajoelhado",
+   "glute isolator",
+   "glutebuilder"
+  ],
+  "added": "2026-11"
  }
 ]
