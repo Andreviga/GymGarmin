@@ -153,7 +153,10 @@ def review(sessions: list[dict], entries: list[dict], prefs: dict, today: date, 
                 # bloco com carga não é exercício de peso do corpo (barra fixa, flexão): pula esses na sugestão
                 loaded = any((x.get("load_kg") or 0) > 0 for x in part)
                 pick = next((c for c in cands if not (loaded and (catalog.get(c) or {}).get("equipment") == "body only")), None)
-                if pick:
+                near = _neighbor(items, idx) if len(part) <= 2 and (a, b) == (0, len(sets)) else None
+                if near:  # 1–2 séries soltas entre séries do MESMO exercício: o relógio só não reconheceu aquelas
+                    pick = near
+                elif pick:
                     cands.remove(pick)
                 sug = pick
                 blks.append({"item": idx, "from": a, "to": b,
@@ -172,6 +175,18 @@ def review(sessions: list[dict], entries: list[dict], prefs: dict, today: date, 
     out_cats.sort(key=lambda r: -r["sets"])
     return {"categories": out_cats, "sessions": recent, "unknown_sets": unknown_total, "guess_sets": guess_total,
             "confirmed": [{"category": c, "label": CATEGORY_PT.get(c, c), "exercise": {"id": e, "name": _name(e)}} for c, e in confirmed.items()]}
+
+
+def _neighbor(items: list[dict], idx: int) -> str | None:
+    """Exercício dos itens vizinhos quando o de antes e o de depois são o mesmo (ou só existe um vizinho com nome)."""
+    def named(i: int) -> str | None:
+        if 0 <= i < len(items) and items[i].get("sets") and not _is_unknown(items[i]):
+            return items[i].get("exercise_id")
+        return None
+    prev, nxt = named(idx - 1), named(idx + 1)
+    if prev and nxt:
+        return prev if prev == nxt else None
+    return prev or nxt
 
 
 def _category_options(cat: str, mine: list[str] | None = None) -> list[str]:

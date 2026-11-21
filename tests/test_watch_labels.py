@@ -144,3 +144,13 @@ def test_api_confirm_category_and_label_block(client):
     assert client.post("/api/watch/category", json={"category": "CURL", "exercise_id": "corrida_rua"}).status_code == 400
     assert client.post("/api/watch/label", json={"session_id": 999, "item": 0, "from": 0, "to": 1, "exercise_id": "Leg_Press"}).status_code == 404
     assert client.post("/api/watch/label", json={"session_id": a["id"], "item": 0, "from": 0, "to": 1, "exercise_id": "Leg_Press"}).status_code == 400
+
+
+def test_loose_sets_between_the_same_exercise_suggest_that_exercise():
+    s = _session(1, "2026-11-14", [_guess("Barbell_Squat", "SQUAT", "10x68"), _unknown("11x0"), _guess("Barbell_Squat", "SQUAT", "11x0"),
+                                   _guess("Barbell_Deadlift", "DEADLIFT", "7x68"), _unknown("8x0"), _guess("Side_Lateral_Raise", "LATERAL_RAISE", "8x10")])
+    blks = wl.review([s], [], {}, TODAY)["sessions"][0]["blocks"]
+    assert blks[0]["suggestion"]["id"] == "Barbell_Squat"  # entre duas séries de agachamento
+    assert blks[1]["suggestion"] is None                    # vizinhos diferentes: não chuta
+    wl.apply_label(s, 1, 0, 1, "Barbell_Squat")
+    assert s["items"][1]["exercise_id"] == "Barbell_Squat" and s["items"][1]["labeled"] == "bloco"

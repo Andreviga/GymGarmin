@@ -1776,9 +1776,12 @@ def _health_report(today: date) -> dict:
         if len(str(s["date"])) > 10:
             times.setdefault(t.date(), []).append(t.hour + t.minute / 60)
     days = _health_days(today, 56)
-    sv = steps.summary(days, sessions, steps.load_tags(db.kv_get(STEP_TAGS_KEY)), today)
-    rep = health.report(days, json.loads(db.kv_get("health_weekly") or "{}"), daily, prof, today, times,
-                        steps_text=steps.activity_text(sv))
+    try:  # o cartão de passos é um extra: se algo nele falhar, o resto do painel de saúde continua
+        sv = steps.summary(days, sessions, steps.load_tags(db.kv_get(STEP_TAGS_KEY)), today)
+        txt = steps.activity_text(sv)
+    except Exception:  # noqa: BLE001
+        sv, txt = None, None
+    rep = health.report(days, json.loads(db.kv_get("health_weekly") or "{}"), daily, prof, today, times, steps_text=txt)
     rep["steps"] = sv
     st = garmin_sync.status()
     rep["garmin"] = {"connected": st["connected"], "needs_reconnect": st["needs_reconnect"]}
