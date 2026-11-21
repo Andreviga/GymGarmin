@@ -714,3 +714,17 @@ def test_correction_keeps_deload_watch_guess_and_new_cardio_and_moves_the_day(en
     moved = n.put(f"/api/sessions/{s['id']}", json={"edit": True, "date": "2026-11-19T09:00", "items": [
         {"exercise_id": "Leg_Press", "sets": [{"reps": 10, "load_kg": 90}] * 2}]}).json()
     assert moved["date"].startswith("2026-11-19") and db.get_entry(e["id"], user_id=nid)["status"] != "feito"   # o treino de 20/11 volta
+
+
+def test_evening_plan_still_offers_train_together_and_names_do_not_stack(env):
+    a, aid, n, nid, b, bid = env
+    _link(a, n, nid)
+    legs = a.post("/api/sessions", json=LEGS).json()["id"]
+    d = n.post(f"/api/partners/{aid}/draft", json={"session_id": legs}).json()
+    n.post("/api/sessions", json=_body(d, client_id="n-legs"))
+    db.save_entry({**CHEST_PLAN}, user_id=aid)                                # o planejado dele da noite: outro treino
+    day = n.get(f"/api/partners/{aid}/day").json()
+    assert day["planned"][0]["mine_ids"] == []                                # "Treinar junto agora" continua disponível
+    hers = n.get("/api/sessions?limit=5").json()[0]
+    back = a.post(f"/api/partners/{nid}/draft", json={"session_id": hers["id"]}).json()
+    assert back["day_name"] == "Pernas (com Nathália)"                         # não vira "Pernas (com Andre) (com Nathália)"

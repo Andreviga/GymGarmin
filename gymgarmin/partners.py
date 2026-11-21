@@ -300,6 +300,14 @@ def pair(mine: list[dict], theirs: list[dict], uid: int, pid: int) -> dict[int, 
     return out
 
 
+def planned_registered(e: dict, mine: list[dict], pid: int) -> list[int]:
+    """Treinos MEUS do dia que já são esse treino planejado da pessoa (mesmos exercícios)."""
+    want = {it.get("exercise_id") for it in e.get("items") or []
+            if (it.get("phase") or "principal") == "principal" and (catalog.get(it.get("exercise_id")) or {}).get("kind") == "strength"}
+    return [m["id"] for m in mine if strength_ids(m) and (same_copy(strength_ids(m), want)
+            or (m.get("with_partner") == pid and linked_overlap(strength_ids(m), want)))]
+
+
 def duplicates(mine: list[dict], links: dict[int, int | None]) -> list[list[int]]:
     """Registros meus que são o MESMO treino (ligados ao mesmo treino da pessoa, ou cópias um do outro): devem virar um."""
     groups: list[list[int]] = []
@@ -367,7 +375,7 @@ def day(uid: int, pid: int, d: date) -> dict:
         v["registered"] = registered_view(s)
         mine_v.append(v)
     return {"date": iso, "next": nxt, "partner": {"id": pid, "name": _names().get(pid, ""), "first": first_name(_names().get(pid, ""))},
-            "done": done, "planned": [_entry_view(e) for e in planned], "mine": mine_v,
+            "done": done, "planned": [{**_entry_view(e), "mine_ids": planned_registered(e, mine, pid)} for e in planned], "mine": mine_v,
             "registered": [registered_view(s) for s in sorted(mine, key=lambda s: str(s.get("date"))) if s.get("id") in links],
             "duplicates": duplicates(mine, links)}
 

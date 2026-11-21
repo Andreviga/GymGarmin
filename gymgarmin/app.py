@@ -1301,7 +1301,7 @@ def _saved_extra(saved: dict) -> dict:
     try:
         v = partners._session_view(saved, _profile().get("weight_kg"))
         pid = saved.get("with_partner")
-        return {"summary": {"items": [i for i in v["items"] if i["kind"] == "forca"], "registered": partners.registered_view(saved),
+        return {"summary": {"items": v["items"], "registered": partners.registered_view(saved),
                             "partner_name": partners.first_name(partners._names().get(int(pid), "")) if pid else None}}
     except Exception:  # noqa: BLE001 — o resumo é só para a tela: nunca impede o treino de ser salvo
         return {}
@@ -1512,6 +1512,12 @@ def session_prefill(plan_id: int, idx: int):
 # ----------------------------------------------------- evolução de cargas ----
 
 # ---- treinar com o companheiro: parceria, puxar o treino do outro, placar
+
+def _base_name(name: str | None) -> str:
+    """Nome do treino sem o "(com Fulano)" que ele já tinha (puxar de volta não vira "Pernas (com Andre) (com Nathália)")."""
+    import re
+    return re.sub(r"\s*\(com [^)]*\)\s*$", "", str(name or "")).strip() or "Treino"
+
 
 def _already_for(uid: int, pid: int, s: dict, mine: list[dict]) -> list[dict]:
     """Treinos MEUS do dia que já são ESTE treino da pessoa (comparando com todos os treinos dela no dia: cada um meu
@@ -1743,7 +1749,7 @@ def partners_draft(pid: int, body: dict = Body(...)):
         # o tempo MEDIDO do treino dele (relógio ou anotado) serve de ponto de partida para o meu: treinamos juntos
         t_min, t_est = partners.session_time(s)
         dur = round(t_min) if t_min and not t_est else None   # só tempo medido: estimativa por série não vira "tempo do treino"
-        return {"date": str(s.get("date"))[:16], "day_name": f"{s.get('day_name') or 'Treino'} (com {who})", "view": "lista",
+        return {"date": str(s.get("date"))[:16], "day_name": f"{_base_name(s.get('day_name'))} (com {who})", "view": "lista",
                 "with_partner": pid, "partner_name": who, "pulled": True, "items": items, "duration_min": dur,
                 "merge_candidates": [{"id": x["id"], "time": str(x.get("date"))[11:16], "minutes": round(partners.session_minutes(x)),
                                       "kcal": round(partners.session_kcal(x, None)[0]) if not partners.session_kcal(x, None)[1] else None,
@@ -1760,7 +1766,7 @@ def partners_draft(pid: int, body: dict = Body(...)):
             raise HTTPException(400, f"O treino de {who} nesse dia não tem musculação para fazer junto.")
         today_iso = clock.today().isoformat()
         mine_today = [x for x in db.list_sessions(uid, since=today_iso, limit=60) if str(x.get("date"))[:10] == today_iso]
-        return {"date": clock.now().isoformat(timespec="minutes"), "day_name": f"{e.get('day_name') or 'Treino'} (com {who})",
+        return {"date": clock.now().isoformat(timespec="minutes"), "day_name": f"{_base_name(e.get('day_name'))} (com {who})",
                 "with_partner": pid, "partner_name": who, "items": _prefill_items(plan_items),
                 "already": _already(uid, pid, mine_today, {i["exercise_id"] for i in plan_items})}
     raise HTTPException(400, "Diga qual treino do parceiro (session_id ou entry_id)")

@@ -996,7 +996,7 @@ async function openPartnerDay(pid, first, day) {
         : s.has_sets ? `<button class="btn sm" data-pull="${s.id}">Fiz esse treino com ${esc(name)}: puxar</button>`
         : `<p class="small muted" style="margin:4px 0 0">${un ? `Quando ${esc(name)} der nome a essas séries (Progresso → Conferir), dá para puxar.` : "Sem séries registradas: não há o que puxar."}</p>`}</div>`; }).join("")}` : ""}
     ${d.planned.length ? `<h3>Na agenda de ${esc(name)}</h3>${d.planned.map((e) => `<div class="pt-row"><div><b>${esc(e.title)}</b></div><div class="small muted">${itemsTxt(e.items)}</div>
-      ${e.has_sets ? ((d.registered || []).length ? `<p class="small muted" style="margin:4px 0 0">Você já registrou um treino com ${esc(name)} nesse dia.</p>` : `<button class="btn sm" data-join="${e.id}">Treinar junto agora</button>`) : `<p class="small muted" style="margin:4px 0 0">Sem musculação nesse treino (corrida e cardio cada um faz no seu ritmo).</p>`}</div>`).join("")}` : ""}
+      ${e.has_sets ? ((e.mine_ids || []).length ? `<p class="small ok-txt" style="margin:4px 0 0">✓ Você já registrou esse treino (acima).</p>` : `<button class="btn sm" data-join="${e.id}">Treinar junto agora</button>`) : `<p class="small muted" style="margin:4px 0 0">Sem musculação nesse treino (corrida e cardio cada um faz no seu ritmo).</p>`}</div>`).join("")}` : ""}
     ${!d.done.length && !d.planned.length ? `<p class="muted">Nenhum treino de ${esc(name)} nesse dia.</p>` : ""}
     <p class="small muted" style="margin-top:12px">“Puxar” copia os exercícios, as séries e as repetições de ${esc(name)}; as cargas são as suas (a de ${esc(name)} aparece só como referência). Se o seu relógio só marcou o tempo, você escolhe juntar com essa atividade na hora de salvar.</p>`);
   const again = () => openPartnerDay(pid, name, d.date);
@@ -2145,7 +2145,7 @@ function savedListHtml(sm) {
   const r = sm.registered || {};
   const st = (x) => x.duration_s && !x.reps ? `${x.duration_s} s` : `${x.reps ?? "—"}×${x.load_kg != null && x.load_kg !== "" ? fmtKg(x.load_kg).replace(" kg", "") : `<span class="no-load">?</span>`}`;
   return `<h3 class="sv-h">O que ficou registrado${sm.partner_name ? ` <span class="pill ok">com ${esc(sm.partner_name)}</span>` : ""}</h3>
-    <ul class="sv-list small">${sm.items.map((i) => `<li><b>${esc(i.name)}</b> · ${(i.sets || []).map(st).join("  ")}${i.sets && i.sets.some((x) => x.load_kg != null) ? " kg" : ""}</li>`).join("")}</ul>
+    <ul class="sv-list small">${sm.items.map((i) => i.kind === "forca" ? `<li><b>${esc(i.name)}</b> · ${(i.sets || []).map(st).join("  ")}${i.sets && i.sets.some((x) => x.load_kg != null) ? " kg" : ""}</li>` : `<li><b>${esc(i.name)}</b> · ${i.minutes} min</li>`).join("")}</ul>
     ${r.no_load ? `<p class="small rec atencao" style="margin-top:8px">${r.no_load} ${r.no_load === 1 ? "série ficou" : "séries ficaram"} sem a sua carga (“?”). Dá para completar em Progresso → Histórico → tocar no treino → Corrigir.</p>` : ""}`;
 }
 
