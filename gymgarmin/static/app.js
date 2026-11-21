@@ -847,7 +847,7 @@ async function partnerMineCard() {
     : `<button class="btn sm" data-pinv="${x.id}">Convidar</button>`;
   return `<div class="card" id="partner-mine"><h2>Treinar com alguém</h2>
     <p class="small muted">Parceiros de treino veem um do outro só o treino: o que está planejado, o que foi feito (exercícios, séries, tempo e calorias) e o placar da semana. Nunca saúde, sono, passos ou peso. Dá para desfazer quando quiser.</p>
-    <ul class="list">${p.people.map((x) => `<li class="row between gap wrap"><span><b>${esc(x.name)}</b>${x.status === "parceiro" ? ` <span class="pill ok">parceiro de treino</span>` : x.status === "convidou" ? ` <span class="pill warn">convidou você</span>` : ""}</span>
+    <ul class="list">${p.people.map((x) => `<li class="row between gap wrap"><span><b>${esc(x.name)}</b> <span class="small muted">${partnerWho(x)}</span>${x.status === "parceiro" ? ` <span class="pill ok">parceiro de treino</span>` : x.status === "convidou" ? ` <span class="pill warn">convidou você</span>` : ""}</span>
       <span class="row gap">${btn(x)}</span></li>`).join("")}</ul></div>`;
 }
 function bindPartnerMine() {
@@ -877,15 +877,17 @@ async function partnerAction(d, t, again) {
   return false;
 }
 const kcalTxt = (v, est) => `${est ? "~" : ""}${fmtN(v)} kcal`;
+// para não confundir duas contas com o mesmo nome: dono do app, ou desde quando a conta existe
+const partnerWho = (x) => (x.owner ? "· dono do app" : x.since ? `· conta criada em ${ddmm(x.since)}` : "");
 function watchMergeHtml(qs) {
   return (qs || []).map((q) => `<div class="rec atencao q-card"><b>É o mesmo treino?</b>
-    <p class="small" style="margin:4px 0 8px">${ddmm(q.date)}: o relógio gravou <b>${q.watch.minutes} min</b> às ${esc(q.watch.time)}${q.watch.kcal ? ` (${fmtN(q.watch.kcal)} kcal)` : ""} e você anotou <b>${esc(q.app.title)}</b>${q.app.time ? ` às ${esc(q.app.time)}` : ""} (${q.app.sets} ${q.app.sets === 1 ? "série" : "séries"}). Se for o mesmo, vira um treino só, com o tempo e as calorias do relógio.</p>
+    <p class="small" style="margin:4px 0 8px">${ddmm(q.date)}: o relógio gravou <b>${/relógio/i.test(q.watch.title) ? "" : esc(q.watch.title) + " · "}${q.watch.minutes} min</b> às ${esc(q.watch.time)}${q.watch.kcal ? ` (${fmtN(q.watch.kcal)} kcal)` : ""} e você anotou <b>${esc(q.app.title)}</b>${q.app.time ? ` às ${esc(q.app.time)}` : ""} (${q.app.sets} ${q.app.sets === 1 ? "série" : "séries"}). Se for o mesmo, vira um treino só, com o tempo e as calorias do relógio.</p>
     <div class="row gap wrap"><button class="btn sm" data-msame="${q.watch.id}:${q.app.id}">Sim, é o mesmo</button><button class="btn sm ghost" data-mdiff="${q.watch.id}:${q.app.id}">Não, são dois treinos</button></div></div>`).join("");
 }
 function partnerCardsHtml(p) {
   if (!p) return "";
   if (!p.enabled) return watchMergeHtml(p.merge_questions);
-  const req = (p.requests || []).map((x) => `<div class="rec atencao q-card"><b>${esc(x.name || x.first)} quer treinar com você</b>
+  const req = (p.requests || []).map((x) => `<div class="rec atencao q-card"><b>${esc(x.name || x.first)} quer treinar com você</b> <span class="small muted">${partnerWho(x)}</span>
     <p class="small" style="margin:4px 0 8px">Vocês passam a ver o treino um do outro (exercícios, séries, tempo e calorias) e um placar da semana. Nada de saúde, sono ou passos.</p>
     <div class="row gap wrap"><button class="btn sm" data-paccept="${x.id}">Aceitar</button><button class="btn sm ghost" data-pdecline="${x.id}">Agora não</button></div></div>`).join("");
   const cards = (p.partners || []).map((x) => {

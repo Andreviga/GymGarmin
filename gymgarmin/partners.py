@@ -39,6 +39,12 @@ def _save(uid: int, st: dict) -> None:
     db.kv_set(KEY, json.dumps(st), user_id=uid)
 
 
+def _who() -> dict[int, dict]:
+    """Para distinguir duas contas com o mesmo nome: quem é o dono do app e desde quando a conta existe."""
+    return {int(a["user_id"]): {"owner": bool(a.get("is_admin")), "since": str(a.get("created_at") or "")[:10] or None}
+            for a in db.list_accounts()}
+
+
 def _names() -> dict[int, str]:
     out = {}
     for a in db.list_accounts():
@@ -64,14 +70,14 @@ def partner_ids(uid: int) -> list[int]:
 
 def overview(uid: int) -> dict:
     """Quem eu posso convidar, quem me convidou e com quem já treino."""
-    st, names = _state(uid), _names()
+    st, names, who = _state(uid), _names(), _who()
     people = []
     for oid, name in sorted(names.items(), key=lambda kv: kv[1].lower()):
         if oid == uid:
             continue
         k = str(oid)
         status = "parceiro" if (k in st["links"] and is_partner(uid, oid)) else "convidou" if k in st["received"] else "convidado" if k in st["sent"] else None
-        people.append({"id": oid, "name": name, "first": first_name(name), "status": status})
+        people.append({"id": oid, "name": name, "first": first_name(name), "status": status, **who.get(oid, {})})
     return {"people": people, "partners": [p for p in people if p["status"] == "parceiro"],
             "requests": [p for p in people if p["status"] == "convidou"]}
 

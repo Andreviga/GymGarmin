@@ -491,3 +491,28 @@ def test_live_workout_is_not_glued_to_a_watch_strength_session_of_another_time(e
     n.delete(f"/api/sessions/{mine['id']}")
     later = n.post("/api/sessions", json={k: v for k, v in live.items() if k != "duration_min"} | {"client_id": "n-later"}).json()
     assert later["id"] == morning and later["merged"]
+
+
+def test_watch_naming_the_same_workout_differently_at_the_same_time_makes_today_ask(env):
+    a, aid, n, nid, b, bid = env
+    _link(a, n, nid)
+    _, mine = _pull(a, aid, n)                                                # treino puxado: 12:30, 65 min
+    r = _ingest(n, "HIIT", "12:35", "13:37", 62).json()["imported"][0]
+    assert r["merged"] is False and len(_day_sessions(n)) == 2                # o relógio disse HIIT: não junta sozinho...
+    q = n.get("/api/partners").json()["merge_questions"]
+    assert len(q) == 1 and (q[0]["watch"]["id"], q[0]["app"]["id"]) == (r["session_id"], mine["id"])   # ...mas pergunta
+    ans = n.post("/api/sessions/merge-answer", json={"watch_id": r["session_id"], "app_id": mine["id"], "same": True}).json()
+    assert ans["merged"] == mine["id"] and ans["minutes"] == 62
+    left = _day_sessions(n)
+    assert len(left) == 1 and left[0]["garmin_summary"]["kcal"] == 310 and all(i.get("sets") for i in left[0]["items"])   # sem "HIIT 62 min" sobrando como cardio
+    by = {m["key"]: m for m in n.get(f"/api/partners/{aid}/duel").json()["metrics"]}
+    assert by["sessions"]["me"] == 1 and by["minutes"]["me"] == 62
+    # HIIT de outro horário (aula de manhã) não gera pergunta
+    _ingest(n, "HIIT", "07:00", "07:30", 30, wid="aula")
+    assert n.get("/api/partners").json()["merge_questions"] == []
+
+
+def test_people_list_says_who_is_the_owner_and_since_when_each_account_exists(env):
+    a, aid, n, nid, b, bid = env
+    people = {p["id"]: p for p in n.get("/api/partners").json()["people"]}
+    assert people[aid]["owner"] is True and people[bid]["owner"] is False and people[bid]["since"] == "2026-11-20"

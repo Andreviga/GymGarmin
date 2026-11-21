@@ -1471,12 +1471,15 @@ def _merge_questions() -> list[dict]:
                 by_day.setdefault(str(s.get("date"))[:10], []).append(s)
         gone, out = set(_merge_dismissed()), []
         for day in sorted(by_day, reverse=True):
-            watch = sorted((s for s in by_day[day] if dedupe.is_mergeable_watch(s)), key=lambda s: str(s.get("date")))
             apps = [s for s in by_day[day] if not (s.get("garmin_activity_id") or s.get("ext_id"))
                     and any(i.get("sets") for i in s.get("items") or [])]
+            # musculação/atividade sem tipo do relógio (qualquer horário) ou atividade de outro tipo NO MESMO horário
+            watch = sorted((s for s in by_day[day] if dedupe.is_mergeable_watch(s) or any(dedupe.same_time_watch(s, a) for a in apps)),
+                           key=lambda s: str(s.get("date")))
             used: set = set()
             for w in watch:
-                cands = [a for a in apps if a["id"] not in used and f"{w['id']}:{a['id']}" not in gone]
+                cands = [a for a in apps if a["id"] not in used and f"{w['id']}:{a['id']}" not in gone
+                         and (dedupe.is_mergeable_watch(w) or dedupe.same_time_watch(w, a))]
                 if not cands:
                     continue
                 tw = _clock_of(w)
@@ -1498,12 +1501,12 @@ def merge_answer(body: dict = Body(...)):
     """Resposta a "é o mesmo treino que o relógio gravou?": {watch_id, app_id, same}."""
     w = db.get_session(body.get("watch_id")) if isinstance(body.get("watch_id"), int) else None
     a = db.get_session(body.get("app_id")) if isinstance(body.get("app_id"), int) else None
-    if not w or not a or not dedupe.is_mergeable_watch(w) or (a.get("garmin_activity_id") or a.get("ext_id")) \
+    if not w or not a or not (dedupe.is_mergeable_watch(w) or dedupe.same_time_watch(w, a)) or (a.get("garmin_activity_id") or a.get("ext_id")) \
             or not any(i.get("sets") for i in a.get("items") or []) or str(w.get("date"))[:10] != str(a.get("date"))[:10]:
         raise HTTPException(409, "Esses treinos mudaram. Abra a tela Hoje de novo.")
     if body.get("same") is True:
         schedule.reopen_for_session(w)      # o que a atividade do relógio tinha fechado "pela data" é reavaliado com o treino junto
-        saved = db.save_session(dedupe.merge(a, w), session_id=a["id"])
+        saved = db.save_session(dedupe.merge(a, w, whole=True), session_id=a["id"])
         db.delete_session(w["id"])          # o vínculo com o relógio foi para o treino anotado: a atividade não volta em dobro
         schedule.credit_session(saved, _profile())
         return {"ok": True, "merged": saved["id"], "minutes": round(partners.session_minutes(saved)), "questions": _merge_questions()}
