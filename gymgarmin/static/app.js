@@ -1101,6 +1101,25 @@ function watchGuide(brand) {
     <p class="small muted">Os nomes dos menus mudam um pouco entre versões do app. Procure por “${esc(hub)}”.</p></div>`;
 }
 
+// explica, em português simples, por que o treino do relógio não chegou (o app do celular conta o que achou no Health Connect)
+function ingestHintHtml(last) {
+  if (!last || last.source !== "android") return "";
+  const d = last.diag; const tips = [];
+  if (!d) {
+    if (!last.workouts) tips.push("Nenhum treino veio neste envio. <b>Atualize o app HAX Sync</b> (baixe de novo no botão abaixo e instale por cima): a versão nova manda todos os tipos de treino — a antiga descartava os que o relógio grava como \"outro exercício\", comum em Amazfit e Xiaomi.");
+  } else {
+    const miss = d.missing || [];
+    if (miss.some((m) => /EXERCISE/.test(m))) tips.push("O HAX Sync está <b>sem permissão de Exercício</b> no Health Connect. Abra o Health Connect → Permissões do app → HAX Sync → ligue Exercício.");
+    else if (!d.exercise_total) tips.push(`O Health Connect <b>não tinha nenhum treino</b> nos últimos ${d.window_days || "…"} dias. O relógio só entrega o treino se o app dele estiver ligado ao Health Connect: no <b>Zepp</b> (Amazfit) é Perfil → Adicionar contas → Health Connect; no <b>Mi Fitness</b>, Perfil → Health Connect. Ligue <b>Exercício</b>, frequência cardíaca e sono, abra o app do relógio para ele sincronizar e toque em Sincronizar no HAX Sync.`);
+    else {
+      const types = Object.entries(d.exercise_types || {}).map(([k, v]) => `${v}× ${esc(k.toLowerCase().replace(/_/g, " "))}`).join(", ");
+      tips.push(`O relógio entregou ${d.exercise_total} treino(s) neste período (${types})${last.workouts < d.exercise_total ? "; os que já estavam aqui não entram de novo" : ""}.`);
+    }
+    if (d.steps_days && !d.sleep_days) tips.push("Vieram passos, mas <b>não veio sono</b>: ligue Sono e Frequência cardíaca na ligação do app do relógio com o Health Connect para o HAX calcular a prontidão.");
+    if (miss.length && !miss.some((m) => /EXERCISE/.test(m))) tips.push(`Permissões desligadas no Health Connect: ${miss.map((m) => esc(m.replace(/^READ_/, "").toLowerCase().replace(/_/g, " "))).join(", ")}.`);
+  }
+  return tips.length ? `<div class="rec small">${tips.map((t) => `<p style="margin:4px 0">${t}</p>`).join("")}</div>` : "";
+}
 async function devicesCard() {
   const me = state.me || {};
   if (!me.logged_in) return "";
@@ -1119,6 +1138,7 @@ async function devicesCard() {
       ${st.has_token ? `<button class="btn sm ghost" id="ing-del">Desligar</button>` : ""}</div>
     <div id="ing-token"></div>
     <p class="small ${last ? "" : "muted"}">${last ? `Último envio: <b>${fmtDate(last.at)}</b> (${last.source === "android" ? "Android" : "iPhone"}) · ${last.days.length} dia(s) de saúde · ${last.workouts} treino(s) novo(s)${last.skipped ? ` · ${last.skipped} ignorado(s) (muito curto ou não é treino, ex.: meditação)` : ""}` : "Nenhum envio recebido ainda."}</p>
+    ${ingestHintHtml(last)}
     <details><summary><b>iPhone (Apple Saúde) — app Atalhos</b></summary><div class="small">
       <ol>
         <li>Abra o app <b>Atalhos</b> → <b>+</b> (novo atalho) → nome "HAX".</li>

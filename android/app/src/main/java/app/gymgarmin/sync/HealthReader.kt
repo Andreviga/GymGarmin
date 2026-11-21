@@ -69,8 +69,36 @@ class HealthReader(context: Context) {
             ExerciseSessionRecord.EXERCISE_TYPE_WEIGHTLIFTING,
             ExerciseSessionRecord.EXERCISE_TYPE_CALISTHENICS,
             ExerciseSessionRecord.EXERCISE_TYPE_HIGH_INTENSITY_INTERVAL_TRAINING -> "STRENGTH_TRAINING"
-            else -> null // ioga, tênis…: o GymGarmin não registra
+            // os demais entram no HAX como atividade genérica (tempo, FC e calorias): nada é descartado aqui.
+            // Relógios como Amazfit/Zepp e Xiaomi costumam gravar a musculação como "outro exercício".
+            ExerciseSessionRecord.EXERCISE_TYPE_YOGA -> "YOGA"
+            ExerciseSessionRecord.EXERCISE_TYPE_PILATES -> "PILATES"
+            ExerciseSessionRecord.EXERCISE_TYPE_STRETCHING -> "STRETCHING"
+            ExerciseSessionRecord.EXERCISE_TYPE_DANCING -> "DANCING"
+            ExerciseSessionRecord.EXERCISE_TYPE_SOCCER -> "SOCCER"
+            ExerciseSessionRecord.EXERCISE_TYPE_BASKETBALL -> "BASKETBALL"
+            ExerciseSessionRecord.EXERCISE_TYPE_VOLLEYBALL -> "VOLLEYBALL"
+            ExerciseSessionRecord.EXERCISE_TYPE_TENNIS -> "TENNIS"
+            ExerciseSessionRecord.EXERCISE_TYPE_TABLE_TENNIS -> "TABLE_TENNIS"
+            ExerciseSessionRecord.EXERCISE_TYPE_BADMINTON -> "BADMINTON"
+            ExerciseSessionRecord.EXERCISE_TYPE_SQUASH -> "SQUASH"
+            ExerciseSessionRecord.EXERCISE_TYPE_BOXING -> "BOXING"
+            ExerciseSessionRecord.EXERCISE_TYPE_MARTIAL_ARTS -> "MARTIAL_ARTS"
+            ExerciseSessionRecord.EXERCISE_TYPE_ROCK_CLIMBING -> "ROCK_CLIMBING"
+            ExerciseSessionRecord.EXERCISE_TYPE_SURFING -> "SURFING"
+            ExerciseSessionRecord.EXERCISE_TYPE_PADDLING -> "PADDLING"
+            ExerciseSessionRecord.EXERCISE_TYPE_SKIING -> "SKIING"
+            ExerciseSessionRecord.EXERCISE_TYPE_SNOWBOARDING -> "SNOWBOARDING"
+            ExerciseSessionRecord.EXERCISE_TYPE_SKATING -> "SKATING"
+            ExerciseSessionRecord.EXERCISE_TYPE_GOLF -> "GOLF"
+            ExerciseSessionRecord.EXERCISE_TYPE_BOOT_CAMP -> "BOOT_CAMP"
+            ExerciseSessionRecord.EXERCISE_TYPE_EXERCISE_CLASS -> "EXERCISE_CLASS"
+            ExerciseSessionRecord.EXERCISE_TYPE_GUIDED_BREATHING -> "GUIDED_BREATHING"
+            ExerciseSessionRecord.EXERCISE_TYPE_OTHER_WORKOUT -> "OTHER_WORKOUT"
+            else -> "OTHER_WORKOUT_$t"
         }
+
+        const val APP_VERSION = "1.1"
     }
 
     suspend fun grantedAll(): Boolean =
@@ -145,10 +173,26 @@ class HealthReader(context: Context) {
             }
         }
 
+        // diagnóstico: o que o Health Connect tinha para ler (o HAX mostra em Perfil → Outros relógios)
+        val diag = JSONObject().put("app", APP_VERSION).put("window_days", days)
+        safe {
+            val granted = client.permissionController.getGrantedPermissions()
+            val missing = JSONArray()
+            for (p in PERMISSIONS) if (p !in granted) missing.put(p.substringAfterLast('.'))
+            diag.put("missing", missing)
+        }
+        diag.put("health_days", byDay.size)
+        diag.put("sleep_days", byDay.values.count { it.has("sleep_h") })
+        diag.put("steps_days", byDay.values.count { it.has("steps") })
+        val typeCount = sortedMapOf<String, Int>()
+        val origins = sortedSetOf<String>()
+
         val workouts = JSONArray()
         safe {
             for (s in readAll(ExerciseSessionRecord::class, from, now)) {
-                val type = typeName(s.exerciseType) ?: continue
+                val type = typeName(s.exerciseType) ?: "OTHER_WORKOUT"
+                typeCount[type] = (typeCount[type] ?: 0) + 1
+                origins.add(s.metadata.dataOrigin.packageName)
                 val w = JSONObject()
                     .put("id", s.metadata.id)
                     .put("type", type)
@@ -174,9 +218,13 @@ class HealthReader(context: Context) {
                 workouts.put(w)
             }
         }
+        diag.put("exercise_total", workouts.length())
+        diag.put("exercise_types", JSONObject(typeCount as Map<*, *>))
+        diag.put("exercise_apps", JSONArray(origins.toList()))
         return JSONObject()
             .put("source", "android")
             .put("days", JSONArray(byDay.values.toList()))
             .put("workouts", workouts)
+            .put("diag", diag)
     }
 }

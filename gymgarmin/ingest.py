@@ -297,6 +297,27 @@ def save_workouts(workouts: list[dict], source: str, hr_max: int | None, merge=N
     return imported, skipped
 
 
+def _diag(d) -> dict | None:
+    """O que o app do celular disse que encontrou (só números e nomes curtos: nada disso é confiável para decidir, só para explicar)."""
+    if not isinstance(d, dict):
+        return None
+    out: dict = {}
+    for k in ("app",):
+        if isinstance(d.get(k), str):
+            out[k] = d[k][:12]
+    for k in ("window_days", "health_days", "sleep_days", "steps_days", "exercise_total"):
+        v = num(d.get(k), integer=True)
+        if v is not None:
+            out[k] = int(v)
+    if isinstance(d.get("missing"), list):
+        out["missing"] = [str(x)[:40] for x in d["missing"][:12]]
+    if isinstance(d.get("exercise_types"), dict):
+        out["exercise_types"] = {str(k)[:40]: int(num(v, integer=True) or 0) for k, v in list(d["exercise_types"].items())[:20]}
+    if isinstance(d.get("exercise_apps"), list):
+        out["exercise_apps"] = [str(x)[:60] for x in d["exercise_apps"][:6]]
+    return out
+
+
 def ingest(payload: dict, hr_max: int | None, merge=None) -> dict:
     if not isinstance(payload, dict):
         raise ValueError("Formato inválido: envie um objeto JSON.")
@@ -313,7 +334,7 @@ def ingest(payload: dict, hr_max: int | None, merge=None) -> dict:
     saved_days = save_days(days, source)
     imported, skipped = save_workouts(workouts, source, hr_max, merge)
     last = {"at": clock.now().isoformat(timespec="seconds"), "source": source, "days": saved_days,
-            "workouts": len(imported), "skipped": skipped,
-            "sample": json.dumps(payload, ensure_ascii=False)[:600]}
+            "workouts": len(imported), "skipped": skipped, "sent": len(workouts), "diag": _diag(payload.get("diag")),
+            "sample": json.dumps({k: v for k, v in payload.items() if k != "diag"}, ensure_ascii=False)[:600]}
     db.kv_set("ingest_last", json.dumps(last, ensure_ascii=False))
     return {"ok": True, "days": saved_days, "imported": imported, "skipped": skipped}

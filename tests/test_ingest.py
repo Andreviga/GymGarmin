@@ -96,3 +96,27 @@ def test_token_belongs_to_one_user_only(c):
     # trocar o código invalida o antigo
     m.post("/api/account/ingest-token")
     assert TestClient(c.app).post("/api/ingest", json={}, headers={"Authorization": f"Bearer {tok}"}).status_code == 401
+
+
+def test_android_sends_every_workout_type_and_says_what_it_found(c):
+    """Relógio que grava a musculação como "outro exercício" (Amazfit/Zepp): o treino entra com o tempo em vez de sumir."""
+    c.put("/api/profile", json={"age": 34})
+    c.post("/api/auth/setup", json={"email": "dona@x.com", "password": "senha-forte"})
+    tok = c.post("/api/account/ingest-token").json()["token"]
+    anon = TestClient(c.app)
+    payload = {"source": "android", "days": [{"date": "2026-11-19", "steps": 7053}],
+               "workouts": [{"id": "z1", "type": "OTHER_WORKOUT", "name": "Treino de força", "start": "2026-11-20T18:05:00-03:00",
+                             "end": "2026-11-20T19:10:00-03:00", "duration_min": 65.0, "avg_hr": 104, "max_hr": 131, "kcal": 310},
+                            {"id": "z2", "type": "OTHER_WORKOUT_83", "start": "2026-11-19T07:00:00-03:00", "duration_min": 20.0},
+                            {"id": "z3", "type": "GUIDED_BREATHING", "start": "2026-11-19T22:00:00-03:00", "duration_min": 10.0}],
+               "diag": {"app": "1.1", "window_days": 30, "missing": ["READ_SLEEP"], "health_days": 1, "sleep_days": 0, "steps_days": 1,
+                        "exercise_total": 3, "exercise_types": {"OTHER_WORKOUT": 1, "OTHER_WORKOUT_83": 1, "GUIDED_BREATHING": 1},
+                        "exercise_apps": ["com.huami.watch.hmwatchmanager"], "junk": {"x": 1}}}
+    r = anon.post("/api/ingest", json=payload, headers={"Authorization": f"Bearer {tok}"}).json()
+    assert len(r["imported"]) == 2 and r["skipped"] == 1                       # respiração guiada não é treino
+    s = next(x for x in c.get("/api/sessions").json() if x.get("ext_id") == "android:z1")
+    it = s["items"][0]
+    assert it["exercise_id"] == "atividade_outra" and it["duration_min"] == 65 and it["kcal"] == 310 and it["avg_hr"] == 104
+    last = c.get("/api/account/ingest").json()["last"]
+    assert last["sent"] == 3 and last["diag"]["exercise_total"] == 3 and last["diag"]["missing"] == ["READ_SLEEP"]
+    assert "junk" not in last["diag"] and "diag" not in last["sample"]
