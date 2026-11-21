@@ -2378,6 +2378,24 @@
   ],
   "videos": [
    {
+    "url": "https://www.youtube.com/watch?v=7rbgf-4018Q",
+    "title": "Beinpressmaschine - Hammer Strength Select SE Full Leg Press",
+    "status": "pending",
+    "added": "2026-11"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=mq40ebFwhT8",
+    "title": "How to Adjust & Use the Leg Press Machines Correctly",
+    "status": "pending",
+    "added": "2026-11"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=gTo0HfVcLxo",
+    "title": "Fast Fit - LEG PRESS HORIZONTAL",
+    "status": "pending",
+    "added": "2026-11"
+   },
+   {
     "url": "https://www.youtube.com/watch?v=8ZrJ8Q9SNbY",
     "title": "Exercise Tutorial: Technogym Horizontal Leg Press",
     "status": "pending"
@@ -2385,11 +2403,6 @@
    {
     "url": "https://www.youtube.com/watch?v=30N6fKpuTNo",
     "title": "Life Fitness Pro2 Seated Leg Press Instructions",
-    "status": "pending"
-   },
-   {
-    "url": "https://www.youtube.com/watch?v=QQEW__B5y9I",
-    "title": "How To: Horizontal Leg Press",
     "status": "pending"
    }
   ],
@@ -2875,6 +2888,24 @@
   ],
   "videos": [
    {
+    "url": "https://www.youtube.com/watch?v=b4Ap-gneDlE",
+    "title": "Hip Thrust - Elevação Pélvica Guiada",
+    "status": "pending",
+    "added": "2026-11"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=r6NGjEs9dag",
+    "title": "Elevação Pélvica Total Health",
+    "status": "pending",
+    "added": "2026-11"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=OCMjir2i6uU",
+    "title": "Hip Thrust (Elevação Pélvica Máquina)",
+    "status": "pending",
+    "added": "2026-11"
+   },
+   {
     "url": "https://www.youtube.com/watch?v=amcaUtVnjkY",
     "title": "Hammer Strength Glute Drive - Instructional Video",
     "status": "pending"
@@ -2882,11 +2913,6 @@
    {
     "url": "https://www.youtube.com/watch?v=KKw3Pueff0I",
     "title": "How to use the Nautilus Glute Drive",
-    "status": "pending"
-   },
-   {
-    "url": "https://www.youtube.com/watch?v=n709jYONQe4",
-    "title": "How to Use a Hip Thrust Machine Properly",
     "status": "pending"
    }
   ],
@@ -9019,7 +9045,26 @@
    "Carga: pino na pilha de pesos; anote uma carga para a extensão e outra para a flexão."
   ],
   "how_to_recognize": "Parece uma cadeira extensora comum, com encosto e pilha de pesos (pino) ao lado, mas o braço com o rolo tem um seletor/trava que muda o ponto de partida (perna dobrada para a extensora, perna esticada para a flexora) e costuma haver um apoio sobre as coxas ou um segundo rolo. A placa de instruções mostra dois exercícios: quadríceps e posteriores.",
-  "videos": [],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=ErzDntBnjUQ",
+    "title": "VERSA MEDICAL LEG EXTENSION / LEG CURL MD-S711",
+    "status": "pending",
+    "added": "2026-11"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=4qppO5uqTo0",
+    "title": "How to use the leg extension leg curl machine",
+    "status": "pending",
+    "added": "2026-11"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=L-_9SQTQT9g",
+    "title": "Cadeira Extensora + Flexora 2 em 1 UPLIFT",
+    "status": "pending",
+    "added": "2026-11"
+   }
+  ],
   "photos": [],
   "confirmed": true,
   "added": "2026-11",
@@ -9189,7 +9234,26 @@
    "Carga: pino na pilha de pesos. Anote uma carga para cada modo."
   ],
   "how_to_recognize": "Cadeira com encosto, apoios para os pés e dois braços com almofadas na altura dos joelhos. A diferença para a adutora ou a abdutora simples: as almofadas giram (têm pino/trava no eixo) para ficar por dentro ou por fora dos joelhos, e a placa mostra os dois exercícios (parte interna e externa da coxa). Pilha de pesos com pino, ao lado ou à frente do usuário.",
-  "videos": [],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=AVP269_aOgk",
+    "title": "TNT FITNESS: Conheça a Adutora e Abdutora Conjugada - Seu Treino Elevado ao Próximo Nível!",
+    "status": "pending",
+    "added": "2026-11"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=_ARUxqrII3Y",
+    "title": "HOW TO USE GYM MACHINES: Adductor / Abductor",
+    "status": "pending",
+    "added": "2026-11"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=ESHQCLn750E",
+    "title": "Cadeira adutora e abdutora - Dicas Smart Fit",
+    "status": "pending",
+    "added": "2026-11"
+   }
+  ],
   "photos": [],
   "confirmed": true,
   "added": "2026-11",
@@ -9358,7 +9422,26 @@
    "Pinos para elástico em alguns modelos."
   ],
   "how_to_recognize": "Banco com encosto inclinado, parecido com um leg press sentado, mas SEM pilha de pesos e sem trilho comprido: uma ou duas plataformas de pé presas a braços de alavanca que giram num eixo, com pinos de anilha nas laterais ou em cima dos braços. Braços que se movem separados indicam o modelo iso-lateral. Diferença do leg 45°: não existe carrinho deslizando em trilho inclinado.",
-  "videos": [],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=vQj-oXW65CQ",
+    "title": "Leg Press Articulado da Total Health",
+    "status": "pending",
+    "added": "2026-11"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=rNW4WI-cKGw",
+    "title": "Seated Leg Press Unilateral",
+    "status": "pending",
+    "added": "2026-11"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=S42M17Wc0O4",
+    "title": "How-To Use the \"Iso-Lateral Leg Press\" Machine",
+    "status": "pending",
+    "added": "2026-11"
+   }
+  ],
   "photos": [],
   "confirmed": true,
   "added": "2026-11",
@@ -9488,7 +9571,26 @@
    "Carga: pino na pilha de pesos (linhas selectorizadas) ou anilhas (modelos articulados)."
   ],
   "how_to_recognize": "Banco com encosto e, na frente, uma plataforma pequena só para a ponta dos pés, que gira em arco (não é a plataforma larga do leg press); pessoa sentada com as pernas quase retas. Não tem almofada sobre as coxas (isso é a panturrilha sentada clássica) nem ombreiras (panturrilha em pé). Pilha de pesos ao lado ou, na versão articulada, pinos de anilha.",
-  "videos": [],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=xxVP9cMYMvQ",
+    "title": "Hammer Strength Select Horizontal Calf",
+    "status": "pending",
+    "added": "2026-11"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=WvFjkJzOA_o",
+    "title": "How To Do A SEATED MACHINE HORIZONTAL CALF EXTENSION (Life Fitness)",
+    "status": "pending",
+    "added": "2026-11"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=i9HrxxKCYVI",
+    "title": "How to use the Seated Calf Extension Machine",
+    "status": "pending",
+    "added": "2026-11"
+   }
+  ],
   "photos": [],
   "confirmed": true,
   "added": "2026-11",
@@ -9612,7 +9714,26 @@
    "Ponto de partida/amplitude, quando houver ajuste."
   ],
   "how_to_recognize": "Cadeira extensora sem a pilha de pesos única: dois braços separados, cada um com seu rolo e seu pino de anilha (um de cada lado da cadeira), que sobem de forma independente. A versão MTS da Hammer Strength usa duas pilhas de pesos, uma por perna, no lugar das anilhas.",
-  "videos": [],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=b1qPDBWUQ-8",
+    "title": "Iso-Lateral Leg Extension",
+    "status": "pending",
+    "added": "2026-11"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=wpvFnlVR4s4",
+    "title": "Extensora Unilateral Total Health",
+    "status": "pending",
+    "added": "2026-11"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=nMOGCMqCU0I",
+    "title": "Hammer Strength Iso Leg Extensions",
+    "status": "pending",
+    "added": "2026-11"
+   }
+  ],
   "photos": [],
   "confirmed": true,
   "added": "2026-11",
@@ -9731,7 +9852,20 @@
    "Pegadores à frente para fixar o tronco."
   ],
   "how_to_recognize": "Banco para deitar de bruços, com leve dobra no meio (quadril mais alto) e pegadores na frente; atrás, dois braços independentes com rolos de tornozelo, cada um com seu pino de anilha na lateral. Não tem pilha de pesos e os dois rolos sobem separados.",
-  "videos": [],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=ivyNJX603As",
+    "title": "Iso-Lateral Leg Curl - Plate Loaded - Hammer Strength",
+    "status": "pending",
+    "added": "2026-11"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=v884bMkULjo",
+    "title": "Flexora Unilateral Total Health",
+    "status": "pending",
+    "added": "2026-11"
+   }
+  ],
   "photos": [],
   "confirmed": true,
   "added": "2026-11",
@@ -9863,7 +9997,26 @@
    "Encosto: inclinação, quando o modelo tiver."
   ],
   "how_to_recognize": "Leg press de anilhas (inclinado a 45° ou horizontal) com DUAS plataformas lado a lado, cada uma em seu carrinho/trilho, com seus pinos de anilha e sua trava de segurança; em alguns modelos há uma trava que une as duas. No leg 45° comum a plataforma é uma só.",
-  "videos": [],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=fMHjd44Zqi0",
+    "title": "Panatta Super Leg Press 45° Dual System Free Weight Special Lábtoló gép 1FW090",
+    "status": "pending",
+    "added": "2026-11"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=7FIrHCAtXeI",
+    "title": "Dual System Horizontal Leg Press",
+    "status": "pending",
+    "added": "2026-11"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=UrckO6ALNAA",
+    "title": "Panatta Horizontal Split Leg Press - both legs",
+    "status": "pending",
+    "added": "2026-11"
+   }
+  ],
   "photos": [],
   "confirmed": true,
   "added": "2026-11",
@@ -9980,7 +10133,26 @@
    "Posição dos pés na plataforma (alta/baixa)."
   ],
   "how_to_recognize": "Um único trilho inclinado com carrinho que tem, ao mesmo tempo, encosto com OMBREIRAS (para o hack) e uma plataforma de pés na outra ponta, além de um banco baixo para o modo leg press; estrutura mais curta e leve que a das máquinas de academia de rede, com pinos de anilha no carrinho.",
-  "videos": [],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=Vnz6NBCuxms",
+    "title": "Body-Solid Leg Press & Hack Squat GLPH1100 (BodySolid.com)",
+    "status": "pending",
+    "added": "2026-11"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=iGs3q7Eim2c",
+    "title": "leg press 45° co jugado com hack da sajequipamentos",
+    "status": "pending",
+    "added": "2026-11"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=WYULx6vmzrg",
+    "title": "Leg Press 45º c/ Hack Squat 2 em 1: Primeiras impressões após Adaptação. É bom?",
+    "status": "pending",
+    "added": "2026-11"
+   }
+  ],
   "photos": [],
   "confirmed": true,
   "added": "2026-11",
@@ -10101,7 +10273,20 @@
    "Pegadores: use para equilíbrio, sem puxar o corpo com os braços."
   ],
   "how_to_recognize": "Aparelho de anilhas sem banco nem encosto: a pessoa fica em pé numa plataforma, guiada por ombreiras ou pegadores, e recua uma perna de cada vez. O desenho varia bastante entre as marcas — confirme pela placa, que traz 'Lunge'.",
-  "videos": [],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=ZWbO1EVT7hI",
+    "title": "How to use Booty Builder ® Reverse Lunge Machine",
+    "status": "pending",
+    "added": "2026-11"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=eCPBiTKXmRc",
+    "title": "Booty Builder Reverse Lunge Machine",
+    "status": "pending",
+    "added": "2026-11"
+   }
+  ],
   "photos": [],
   "confirmed": true,
   "added": "2026-11",
@@ -10214,7 +10399,26 @@
    "Carga: anilhas ou pilha de pesos com pino, conforme o modelo."
   ],
   "how_to_recognize": "Pessoa em pé com o tronco inclinado à frente (quadril a cerca de 90°), antebraços apoiados numa almofada com pegadores e uma almofada que desce sobre o quadril/lombar; ponta dos pés num degrau. Diferente da panturrilha em pé (ombreiras, corpo reto) e da sentada (almofada nas coxas, joelhos dobrados).",
-  "videos": [],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=IXVSZZKZhOk",
+    "title": "Watson Donkey Calf Raise",
+    "status": "pending",
+    "added": "2026-11"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=c5nwNxa50VQ",
+    "title": "Build Bigger Calves: Donkey Calf Machine Walkthrough — Arsenal Strength at Force Fitness",
+    "status": "pending",
+    "added": "2026-11"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=SrXa__2BGDc",
+    "title": "Arsenal Strength Donkey Calf Raise",
+    "status": "pending",
+    "added": "2026-11"
+   }
+  ],
   "photos": [],
   "confirmed": true,
   "added": "2026-11",
@@ -10304,7 +10508,26 @@
    "Pegadores para manter o tronco parado."
   ],
   "how_to_recognize": "Pessoa EM PÉ, segurando pegadores, com almofadas ou plataformas que resistem ao movimento de fechar as pernas; sem assento. Diferente da cadeira adutora (sentado). O desenho muda entre os fabricantes — confirme pela placa ('Standing Hip Adduction' / 'Standing Adductor').",
-  "videos": [],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=1poHbmq8Wkw",
+    "title": "How to use Booty Builder Standing Adductor Selectorized",
+    "status": "pending",
+    "added": "2026-11"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=0xZO2nmi6S4",
+    "title": "ABDUCTOR Y ADUCTOR EN MÁQUINA DE PIE",
+    "status": "pending",
+    "added": "2026-11"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=_8l0A6EEjkY",
+    "title": "How To Do The STANDING SINGLE LEG HIP ADDUCTION MACHINE",
+    "status": "pending",
+    "added": "2026-11"
+   }
+  ],
   "photos": [],
   "confirmed": true,
   "added": "2026-11",
@@ -10431,7 +10654,26 @@
    "Carga extra: anilha ou halter no peito. Alguns bancos têm pegada atrás da cabeça para o abdominal infra."
   ],
   "how_to_recognize": "Banco longo e estreito, inclinado com a cabeça mais baixa que o quadril, com um ou dois pares de rolos de espuma na ponta alta para prender pés ou joelhos. Não tem pilha de pesos nem cabos; costuma ter um pino ou 'escadinha' embaixo para mudar a inclinação e, às vezes, uma manopla para ajudar a subir.",
-  "videos": [],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=TnSKXn1MmHE",
+    "title": "Abdominal Banco Declinado como fazer corretamente",
+    "status": "pending",
+    "added": "2026-11"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=ywVCP5rsfa8",
+    "title": "Panatta Decline Bench - Abdominal Crunches",
+    "status": "pending",
+    "added": "2026-11"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=4-nOeX22Jt4",
+    "title": "COMO FAZER ABDOMINAL FLEXÃO DE TRONCO NO BANCO DECLINADO",
+    "status": "pending",
+    "added": "2026-11"
+   }
+  ],
   "photos": [],
   "confirmed": true,
   "added": "2026-11",
@@ -10555,7 +10797,26 @@
    "Para limitar a amplitude, role em direção a uma parede (ela serve de batente)."
   ],
   "how_to_recognize": "Uma roda pequena (às vezes duas, lado a lado) com um eixo atravessado que serve de manopla para as duas mãos. Acessório solto de chão, sem estrutura, normalmente guardado junto de colchonetes e elásticos.",
-  "videos": [],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=vRi105QOGKU",
+    "title": "ABDOMINAL RODINHA - 3 DICAS PARA FAZER CERTO",
+    "status": "pending",
+    "added": "2026-11"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=pMgnie8K21g",
+    "title": "Como fazer ABDOMINAL RODINHA INICIANTE - Treino com a roda de abdominal para emagrecer em casa!",
+    "status": "pending",
+    "added": "2026-11"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=lgqafFHK4H8",
+    "title": "Abdominal rodinha (rolinho)",
+    "status": "pending",
+    "added": "2026-11"
+   }
+  ],
   "photos": [],
   "confirmed": true,
   "added": "2026-11",
@@ -10674,7 +10935,26 @@
    "Antes de se pendurar, confira se o espaldar está firme na parede."
   ],
   "how_to_recognize": "Escada de barras horizontais paralelas (madeira ou aço) presa à parede, mais alta que uma pessoa. Não tem assento, cabos nem pesos; costuma ficar na área de alongamento.",
-  "videos": [],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=IagrrTKBETg",
+    "title": "Alongamento no espaldar - principais exercícios",
+    "status": "pending",
+    "added": "2026-11"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=rCKdMJmD054",
+    "title": "[FLEXIBILIDADE] Alongamento no Espaldar - Ombros & Coluna",
+    "status": "pending",
+    "added": "2026-11"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=KXZ8nDa15HM",
+    "title": "21 EXERCÍCIOS XTREME - TREINE PESADO",
+    "status": "pending",
+    "added": "2026-11"
+   }
+  ],
   "photos": [],
   "confirmed": true,
   "added": "2026-11",
@@ -10801,7 +11081,27 @@
    "Ponto de contato da perna que trabalha: sola do pé no meio da plataforma, ou rolo atrás da coxa/joelho, conforme o modelo."
   ],
   "how_to_recognize": "Máquina baixa em que a pessoa fica 'de quatro': almofada para um joelho, apoio acolchoado para peito/antebraços com manoplas e, atrás, uma plataforma ou rolo que a outra perna empurra para cima e para trás. Tem pilha de pesos com pino. Se a pessoa fica em pé, é o glúteo em pé que já está na galeria.",
-  "videos": [],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=Z8gztZ1_t9A",
+    "title": "Fast Fit - Glúteos 4 apoios máquina",
+    "channel": "Panobianco Academia",
+    "status": "pending",
+    "added": "2026-11"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=0O5ShNTui0c",
+    "title": "4 Apoios Máquina - Academia Templo Gym",
+    "status": "pending",
+    "added": "2026-11"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=YFenEkt2ovQ",
+    "title": "How To Do A MACHINE KNEELING GLUTE KICKBACK (Star Trac)",
+    "status": "pending",
+    "added": "2026-11"
+   }
+  ],
   "photos": [],
   "confirmed": true,
   "added": "2026-11",
@@ -10927,7 +11227,26 @@
    "Apoio do tronco e pegadas: incline-se à frente, apoiado, e segure as duas manoplas para o tronco não balançar."
   ],
   "how_to_recognize": "Não tem assento: a pessoa fica em pé numa plataforma, inclinada à frente sobre um apoio com manoplas, com duas almofadas na parte de fora das coxas/joelhos presas a braços que abrem para os lados. Carga em anilhas nas laterais (ou torre de pesos nas versões de pino).",
-  "videos": [],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=yd2bYC_cLDA",
+    "title": "Booty Builder ® Standing Hip Abductor",
+    "status": "pending",
+    "added": "2026-11"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=KW5claMtqJs",
+    "title": "Máquina Abdutora em Pé: Análise Cinesiológica Completa",
+    "status": "pending",
+    "added": "2026-11"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=X3rVBZH7vj8",
+    "title": "1FE096 - Standing Abductor Machine (new 2019)",
+    "status": "pending",
+    "added": "2026-11"
+   }
+  ],
   "photos": [],
   "confirmed": true,
   "added": "2026-11",
@@ -11034,7 +11353,26 @@
    "Carga no pino: confira ao trocar de exercício; a lombar costuma pedir carga diferente do abdominal."
   ],
   "how_to_recognize": "Máquina sentada com um rolo/almofada num braço que pode ficar na frente do peito ou atrás das costas, apoio de pés com rolos e torre de pesos; o adesivo de instruções mostra dois exercícios (abdominal e lombar).",
-  "videos": [],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=zEThFlRGX0o",
+    "title": "Dual Abdominal",
+    "status": "pending",
+    "added": "2026-11"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=jctucQ__nvY",
+    "title": "HOW TO USE GYM MACHINES: Lumbar / Abdominal",
+    "status": "pending",
+    "added": "2026-11"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=I5OUhko12pk",
+    "title": "Abdominal and Lower Back Machine",
+    "status": "pending",
+    "added": "2026-11"
+   }
+  ],
   "photos": [],
   "confirmed": true,
   "added": "2026-11",
@@ -11146,7 +11484,26 @@
    "Distância dos pés: ajuste para as canelas ficarem verticais no topo; use protetor na barra."
   ],
   "how_to_recognize": "Almofada baixa e larga na altura das escápulas, presa a um rack ou a uma plataforma no chão, às vezes com pinos para elástico. Usa barra olímpica solta com anilhas: não tem braço de alavanca, cinto, trilho nem torre de pesos, e é isso que a separa da máquina de elevação pélvica.",
-  "videos": [],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=xhzrQJghRxI",
+    "title": "Rogue Fitness Monster Hip Thruster Bench",
+    "status": "pending",
+    "added": "2026-11"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=5MTBEfeX800",
+    "title": "ELEVAÇÃO PÉLVICA - HIP THRUST - ROCKFIT EQUIPAMENTOS",
+    "status": "pending",
+    "added": "2026-11"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=2IxaK9qewLk",
+    "title": "Rogue Hip Thruster Bench Review (Plus Extra Exercise Usage!)",
+    "status": "pending",
+    "added": "2026-11"
+   }
+  ],
   "photos": [],
   "confirmed": true,
   "added": "2026-11",
@@ -11353,7 +11710,26 @@
    "Apoio de pés (remada): pés na plataforma ou na barra, com os joelhos levemente flexionados."
   ],
   "how_to_recognize": "Uma única torre de pesos com DUAS saídas de cabo no mesmo lado: polia alta com barra longa sobre um assento com rolos de coxa, e polia baixa perto do chão com plataforma ou barra para os pés (às vezes com um banco baixo e comprido). Se só houver a polia alta, é o puxador simples; se houver duas colunas separadas com polias reguláveis, é o crossover.",
-  "videos": [],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=mT7bXKHej0s",
+    "title": "Máquina Puxada Alta e Baixa Conjugada LEP 04",
+    "status": "pending",
+    "added": "2026-11"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=PzBPu-Yui8Y",
+    "title": "Matrix Versa Lat Pulldown / Seated Row",
+    "status": "pending",
+    "added": "2026-11"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=EwjtYl2Kv0s",
+    "title": "Watson Gym Equipment - Lat Pulldown/Low Pulley Row",
+    "status": "pending",
+    "added": "2026-11"
+   }
+  ],
   "photos": [],
   "confirmed": true,
   "added": "2026-11",
@@ -11470,7 +11846,26 @@
    "Carga: pino na pilha de pesos (Technogym, Cybex) ou anilhas nas alavancas (Panatta), com o mesmo peso dos dois lados."
   ],
   "how_to_recognize": "Parece uma remada sentada com apoio de peito, mas as manoplas ficam altas, na linha dos ombros, e afastadas; o movimento termina com os cotovelos abertos para os lados. Pode ter pilha de pesos com pino ou alavancas com anilhas. A placa costuma trazer 'Upper Back', 'Rear Delt' ou 'Back Deltoids'.",
-  "videos": [],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=xiLW4AWj4XQ",
+    "title": "How to use UPPER BACK machine by Technogym",
+    "status": "pending",
+    "added": "2026-11"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=yj1f-CyTIWA",
+    "title": "Technogym Upper Back Row - Set Up & Execution",
+    "status": "pending",
+    "added": "2026-11"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=_I3pbM7Eu0c",
+    "title": "Techno Gym Upper Back Demonstration",
+    "status": "pending",
+    "added": "2026-11"
+   }
+  ],
   "photos": [],
   "confirmed": true,
   "added": "2026-11",
@@ -11585,7 +11980,26 @@
    "Braços independentes (em alguns modelos): permitem treinar um lado de cada vez."
   ],
   "how_to_recognize": "Estrutura baixa no chão com dois braços de alavanca laterais carregados com anilhas e alças na altura das canelas ou dos joelhos; muitas têm um segundo par de alças mais alto. A pessoa fica em pé no meio, como dentro de uma barra hexagonal. Não tem assento nem apoio de ombros (isso a diferencia do agachamento alavanca e do hack). É muito parecida com a máquina de encolhimento, e alguns modelos fazem as duas funções.",
-  "videos": [],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=_Jv1wNEZW6Q",
+    "title": "Nautilus Leverage Deadlift Shrug",
+    "status": "pending",
+    "added": "2026-11"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=QZktKqJx5cc",
+    "title": "Watson Plate Loaded Deadlift and Shrug",
+    "status": "pending",
+    "added": "2026-11"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=jZfcJur-rDY",
+    "title": "Nautilus Deadlift",
+    "status": "pending",
+    "added": "2026-11"
+   }
+  ],
   "photos": [],
   "confirmed": true,
   "added": "2026-11",
@@ -11691,7 +12105,21 @@
    "Unilateral ou bilateral: cada manopla tem o seu cabo; dá para puxar as duas juntas, uma de cada vez ou alternando."
   ],
   "how_to_recognize": "Banco baixo com apoio para os pés de frente para DUAS polias baixas independentes, cada uma com sua manopla; muitas vezes há duas pilhas de pesos, uma de cada lado. Sem apoio de peito. Se houver só um cabo com triângulo, é a remada baixa comum.",
-  "videos": [],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=iZEdKcIJA_s",
+    "title": "Watson Gym Equipment - Animal Dual Stack Low Pulley Row",
+    "channel": "Watson Gym Equipment",
+    "status": "pending",
+    "added": "2026-11"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=BrvKNzCTiRY",
+    "title": "Dual Pulley Seated Cable Row",
+    "status": "pending",
+    "added": "2026-11"
+   }
+  ],
   "photos": [],
   "confirmed": true,
   "added": "2026-11",
@@ -11793,7 +12221,27 @@
    "Manoplas: cada mão segura uma manopla independente; a pegada (neutra, pronada ou supinada) se escolhe girando o punho."
   ],
   "how_to_recognize": "Assento com almofada de coxas sob uma estrutura com DUAS polias altas lado a lado, cada uma com seu cabo e sua manopla, em vez de uma barra longa única. Tem pilha de pesos com pino. São cabos, não braços de alavanca rígidos.",
-  "videos": [],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=_UWBplTNgmo",
+    "title": "Animal Dual Stack Lat Pulldown By Watson Gym Equipment",
+    "channel": "Watson Gym Equipment",
+    "status": "pending",
+    "added": "2026-11"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=st23CwNwQmA",
+    "title": "Puxada Alta na Polia Dupla - ISOMETRIC + FAST",
+    "status": "pending",
+    "added": "2026-11"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=cWlP6exByqk",
+    "title": "PUXADA ALTA NA POLIA DUPLA - EXCELENTE EXERCÍCIO PARA COSTAS",
+    "status": "pending",
+    "added": "2026-11"
+   }
+  ],
   "photos": [],
   "confirmed": true,
   "added": "2026-11",
@@ -11901,7 +12349,26 @@
    "Braços independentes: cada mão segue o seu caminho e dá para treinar um lado por vez."
   ],
   "how_to_recognize": "Base larga no chão com dois braços de alavanca longos e independentes, articulados embaixo, com pinos de anilha e manoplas anguladas na altura do peito; a pessoa fica em pé de frente e empurra para a frente e para cima. Sem assento. Na Hammer Strength a placa traz 'Ground Base'.",
-  "videos": [],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=KKkUV0Eg-N0",
+    "title": "Hammer Strength Ground Base Jammer Instructions",
+    "status": "pending",
+    "added": "2026-11"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=97uzbOmtUBo",
+    "title": "Hammer Strength Ground Base - Jammer",
+    "status": "pending",
+    "added": "2026-11"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=PVbzZp5F9hQ",
+    "title": "Hammer Strength Sports Performance -- Jammer Press",
+    "status": "pending",
+    "added": "2026-11"
+   }
+  ],
   "photos": [],
   "confirmed": true,
   "added": "2026-11",
@@ -12001,7 +12468,20 @@
    "Braços independentes: cada lado se move sozinho."
   ],
   "how_to_recognize": "Máquina de anilhas da Hammer Strength com DOIS assentos em lados opostos da mesma estrutura e braços de alavanca independentes: de um lado, encosto e manoplas de supino; do outro, assento com almofada de coxas rebatível e manoplas de puxada acima da cabeça.",
-  "videos": [],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=V3jhe-F-ceU",
+    "title": "Iso-Lateral Chest / Back",
+    "status": "pending",
+    "added": "2026-11"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=WSZ1QSYhlBg",
+    "title": "Plate Loaded Chest Back Machine for Sale, Buy Hammer Strength Online",
+    "status": "pending",
+    "added": "2026-11"
+   }
+  ],
   "photos": [],
   "confirmed": true,
   "added": "2026-11",
@@ -12144,7 +12624,26 @@
    "Porta-anilhas no próprio banco: não mudam o exercício, só onde guardar a carga."
   ],
   "how_to_recognize": "Banco reto, estreito e fixo, com dois postes verticais atrás da cabeceira que seguram uma barra olímpica comprida em ganchos; pinos para guardar anilhas nos postes ou na base. Não tem pilha de pesos nem cabos. A pessoa fica deitada de barriga para cima com a barra acima do rosto. Diferenças: no inclinado o encosto sobe e há um assento; no declinado a cabeça fica mais baixa e há rolos para prender as pernas; a gaiola (power rack) tem quatro colunas e travas reguláveis.",
-  "videos": [],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=9Q3HPTOs71c",
+    "title": "Matrix Fitness Breaker Olympic Flat Bench",
+    "status": "pending",
+    "added": "2026-11"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=MMVCA6YQijg",
+    "title": "Banco de Supino Reto com Barra Starboard 1077",
+    "status": "pending",
+    "added": "2026-11"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=WwXS2TeFmeg",
+    "title": "Supino Reto com Barra - Exercício para Peito",
+    "status": "pending",
+    "added": "2026-11"
+   }
+  ],
   "photos": [],
   "confirmed": true,
   "added": "2026-11",
@@ -12264,7 +12763,26 @@
    "Plataforma do ajudante atrás do banco: alguns modelos têm; confira se o seu tem."
   ],
   "how_to_recognize": "Banco com encosto inclinado para trás e um assento pequeno, preso a dois postes altos atrás que seguram a barra olímpica acima da cabeça de quem senta; muitas vezes há um degrau atrás para o ajudante. Sem pilha de pesos. Diferença para o banco de desenvolvimento olímpico: lá o encosto fica quase em pé (perto de 90°).",
-  "videos": [],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=1lwMVI1hPhw",
+    "title": "Banco Supino Inclinado Supino Linha Hard Arzur Fitness",
+    "status": "pending",
+    "added": "2026-11"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=nmrWUrlU82Y",
+    "title": "Target Your Upper Pectorals Using FW 1002 Olympic Incline Bench by Into Wellness/Realleader USA",
+    "status": "pending",
+    "added": "2026-11"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=GhfwvlZbLGM",
+    "title": "Supino Inclinado com Barra - Exercício para o Peito",
+    "status": "pending",
+    "added": "2026-11"
+   }
+  ],
   "photos": [],
   "confirmed": true,
   "added": "2026-11",
@@ -12414,7 +12932,26 @@
    "Posição do banco: muitos modelos têm rodinhas e alça para deslocar; deixe espaço dos dois lados para os halteres."
   ],
   "how_to_recognize": "Banco solto, sem postes nem suporte de barra: um encosto comprido e um assento curto sobre uma base baixa, com uma escada de encaixes ou um pino sob o encosto para mudar o ângulo; costuma ter rodinhas em uma ponta e alça na outra. Fica perto dos halteres. Se o estofado é uma peça única que não inclina, é o banco reto.",
-  "videos": [],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=KIZZ8HbENgQ",
+    "title": "Life Fitness Multi Adjustable Bench",
+    "status": "pending",
+    "added": "2026-11"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=xBI_Uq6uMSc",
+    "title": "Multi-Adjustable Bench Promo",
+    "status": "pending",
+    "added": "2026-11"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=5RQrZj9jzXI",
+    "title": "Banco Regulável Uplift AB1.0: perfeito para seu treino",
+    "status": "pending",
+    "added": "2026-11"
+   }
+  ],
   "photos": [],
   "confirmed": true,
   "added": "2026-11",
@@ -12542,7 +13079,26 @@
    "Posição: bancos soltos podem ser arrastados; deixe espaço dos dois lados para os halteres."
   ],
   "how_to_recognize": "Banco baixo e plano, com um único estofado retangular comprido sobre pés fixos; sem encosto, sem postes, sem barra e sem pinos de regulagem. Fica na área de halteres.",
-  "videos": [],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=-eTQ3EdfJmY",
+    "title": "Hammer Strength Angled Flat Bench Top Features",
+    "status": "pending",
+    "added": "2026-11"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=UT4JHAFZAFA",
+    "title": "Review: Runtter Banco Musculação Para Academia Reto 90x30x42cm Preto",
+    "status": "pending",
+    "added": "2026-11"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=kDyXFeO6MD4",
+    "title": "Fly no Banco Reto com Halteres - Músculos Trabalhados",
+    "status": "pending",
+    "added": "2026-11"
+   }
+  ],
   "photos": [],
   "confirmed": true,
   "added": "2026-11",
@@ -12657,7 +13213,14 @@
    "Se o seu modelo tiver assento ou apoio de pés regulável, anote a posição."
   ],
   "how_to_recognize": "Banco pequeno e fixo, com assento curto e encosto alto quase vertical, sem postes, sem barra e sem regulagem aparente; fica na área dos halteres. A pessoa senta ereta com as costas inteiras apoiadas.",
-  "videos": [],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=w481DALa6vk",
+    "title": "Mirafit Seated Utility Bench",
+    "status": "pending",
+    "added": "2026-11"
+   }
+  ],
   "photos": [],
   "confirmed": true,
   "added": "2026-11",
@@ -12772,7 +13335,26 @@
    "Ângulo do banco: costuma ser fixo; se o seu regula, anote o furo usado."
   ],
   "how_to_recognize": "Banco comprido inclinado com a cabeceira mais baixa que o assento, rolos acolchoados na ponta alta para prender pernas ou pés e dois postes com ganchos para a barra olímpica acima da cabeceira. Sem pilha de pesos. A pessoa fica deitada com a cabeça mais baixa que o quadril. Não confundir com a prancha abdominal declinada, que não tem suporte de barra.",
-  "videos": [],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=AVugvfwX8m8",
+    "title": "Hammer Strength Olympic Decline Bench For Sale",
+    "status": "pending",
+    "added": "2026-11"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=ifWEwZDWMAw",
+    "title": "Supino Declinado com Barra - Exercício para Peito",
+    "status": "pending",
+    "added": "2026-11"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=Q2l-zdlNshk",
+    "title": "Fast Fit - Supino declinado com barra",
+    "status": "pending",
+    "added": "2026-11"
+   }
+  ],
   "photos": [],
   "confirmed": true,
   "added": "2026-11",
@@ -12895,7 +13477,20 @@
    "Anote a carga na barra e a largura da pegada."
   ],
   "how_to_recognize": "Banco com assento curto e encosto alto quase vertical, preso a dois postes altos que seguram a barra olímpica acima e atrás da cabeça de quem está sentado; costuma ter um degrau atrás para o ajudante e pinos para anilhas. Sem pilha de pesos. Diferença para o supino inclinado olímpico: o encosto é bem mais em pé.",
-  "videos": [],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=HWnQe0QGuUU",
+    "title": "Olympic Shoulder Bench Matrix",
+    "status": "pending",
+    "added": "2026-11"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=C8UdTdDaFL4",
+    "title": "Hammer Strength Olympic Military Bench For Sale",
+    "status": "pending",
+    "added": "2026-11"
+   }
+  ],
   "photos": [],
   "confirmed": true,
   "added": "2026-11",
@@ -12986,7 +13581,20 @@
    "Pinos para guardar anilhas na própria máquina: não mudam o exercício."
   ],
   "how_to_recognize": "Banco quase horizontal dentro de uma estrutura de aço, com dois braços de alavanca independentes que passam por cima do peito de quem está deitado; cada braço tem um pino para anilhas e há pinos de armazenamento na estrutura. Não há barra solta nem pilha de pesos. Diferença para o supino articulado comum: aqui a pessoa fica deitada, não sentada.",
-  "videos": [],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=kPi1grOKflU",
+    "title": "Iso-Lateral Horizontal Bench Press",
+    "status": "pending",
+    "added": "2026-11"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=tGbdoYir9Es",
+    "title": "Hammer Strength Iso-Lateral Horizontal Bench Press",
+    "status": "pending",
+    "added": "2026-11"
+   }
+  ],
   "photos": [],
   "confirmed": true,
   "added": "2026-11",
@@ -13158,7 +13766,26 @@
    "Não tem pilha de pesos: anote a barra usada (o peso da barra W varia) e as anilhas."
   ],
   "how_to_recognize": "Banco pequeno com assento e, à frente dele, um apoio estofado inclinado que desce para longe de quem senta, com um suporte ou ganchos para a barra do outro lado. Não tem pilha de pesos, cabos nem braço de alavanca: é só estrutura e estofado. Na versão em pé o apoio fica mais alto e não há assento.",
-  "videos": [],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=9WXNkESgmzY",
+    "title": "COMO FAZER ROSCA SCOTT COM BARRA W CORRETAMENTE",
+    "status": "pending",
+    "added": "2026-11"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=7yD59xe-Q6c",
+    "title": "Rosca com barra w no banco scott - prof. Matheus Gomes",
+    "status": "pending",
+    "added": "2026-11"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=ZL5BZ4VjLt0",
+    "title": "Body-Solid GPCB329 Preacher Curl Bench",
+    "status": "pending",
+    "added": "2026-11"
+   }
+  ],
   "photos": [],
   "confirmed": true,
   "added": "2026-11",
@@ -13296,7 +13923,20 @@
    "Carga: pino na pilha de pesos. A relação de polias varia entre modelos, então a mesma placa pode pesar diferente em outra máquina; compare cargas só na mesma estação."
   ],
   "how_to_recognize": "Uma única coluna ou torre com pilha de pesos e uma saída de cabo: ou um carro que sobe e desce na coluna (polia ajustável), ou duas saídas fixas, uma no alto e outra perto do chão. Sem banco nem assento; às vezes é presa na parede ou faz parte de uma estação maior. No crossover são duas colunas ligadas por uma travessa; no puxador há assento e rolos para as coxas.",
-  "videos": [],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=-S0jvicEINo",
+    "title": "Medical Adjustable Pulley Overview by Chris Adsit",
+    "status": "pending",
+    "added": "2026-11"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=y_FpghAaqvQ",
+    "title": "HI-LOW ADJUSTABLE PULLEY HOIST FITNESS OCCASION",
+    "status": "pending",
+    "added": "2026-11"
+   }
+  ],
   "photos": [],
   "confirmed": true,
   "added": "2026-11",
@@ -13369,7 +14009,26 @@
    "Carga: pino na pilha de pesos; nas versões de anilhas, anote por lado se os braços forem independentes."
   ],
   "how_to_recognize": "Máquina sentada com um apoio estofado à frente do tronco onde ficam os braços, e duas manoplas (ou uma barra) presas a um braço de alavanca que gira num eixo ao lado dos cotovelos. Em geral as manoplas começam perto dos ombros e são empurradas para frente e para baixo até estender os braços. Parece a Scott de pino, mas o movimento é de empurrar. Diferença para o seated dip: aqui há apoio de cotovelo e as manoplas não ficam ao lado do quadril.",
-  "videos": [],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=o_WWmC5jtDY",
+    "title": "How To Do A SEATED MACHINE TRICEPS EXTENSION (Hammer Strength)",
+    "status": "pending",
+    "added": "2026-11"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=NNyuuN2sJb0",
+    "title": "How to ACTUALLY Use the Machine Tricep Extension (the one that looks like a preacher curl)",
+    "status": "pending",
+    "added": "2026-11"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=dLi01TSjcVY",
+    "title": "MACHINE TRICEP EXTENSION (How To)",
+    "status": "pending",
+    "added": "2026-11"
+   }
+  ],
   "photos": [],
   "confirmed": true,
   "added": "2026-11",
@@ -13474,7 +14133,26 @@
    "Carga: pino na pilha de pesos; anote uma carga para a rosca e outra para a extensão (costumam ser diferentes)."
   ],
   "how_to_recognize": "Parece uma Scott de pino: assento, apoio estofado para os braços e uma barra ou manoplas num braço de alavanca com eixo na altura dos cotovelos, ligado a uma pilha de pesos. O que denuncia a função dupla é o adesivo de instruções mostrando os dois exercícios (bíceps e tríceps) e, em geral, uma trava ou alavanca que muda a posição de partida do braço de alavanca.",
-  "videos": [],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=Gn_Y6ehICVs",
+    "title": "Preacher Curl/Triceps ExtensionHD-3100",
+    "status": "pending",
+    "added": "2026-11"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=RNzZHDL86qc",
+    "title": "How To Use a Hoist Fitness Dual Bicep Curl / Triceps Extension",
+    "status": "pending",
+    "added": "2026-11"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=fcziDNsUWPM",
+    "title": "Bicep Curl and Tricep Extension Machine",
+    "status": "pending",
+    "added": "2026-11"
+   }
+  ],
   "photos": [],
   "confirmed": true,
   "added": "2026-11",
@@ -13618,7 +14296,26 @@
    "Carga: anilhas ou pino, conforme o modelo; as cargas são baixas, então anote também a amplitude que consegue."
   ],
   "how_to_recognize": "Máquina pequena, em geral usada sentado, com um apoio estofado para os antebraços e uma barra curta ou duas manoplas que giram num eixo alinhado aos punhos; o movimento é curto, só da mão. A carga fica em anilhas num braço de alavanca pequeno ou numa pilha de pesos, conforme o modelo.",
-  "videos": [],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=gplmbxLX3XU",
+    "title": "Forearm Muscles? Build them Using FW 2030 Wrist Curl Machine by Into Wellness/Realleader USA",
+    "status": "pending",
+    "added": "2026-11"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=js6Z2yvgrG4",
+    "title": "FOREARMS (FLEXORS) - Wrist Curls On Machine",
+    "status": "pending",
+    "added": "2026-11"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=Nd3mYFQ_ffM",
+    "title": "Multi Wrist Curl Machine",
+    "status": "pending",
+    "added": "2026-11"
+   }
+  ],
   "photos": [],
   "confirmed": true,
   "added": "2026-11",
@@ -13702,7 +14399,20 @@
    "Carga: anilhas no braço de alavanca; anote a carga e se foi isometria (tempo) ou repetições."
   ],
   "how_to_recognize": "Aparelho compacto de anilhas com duas barras paralelas na altura das mãos, uma fixa e uma móvel, que a pessoa aproxima fechando as mãos; a barra móvel está ligada a um braço de alavanca com pino para anilhas. O movimento é só dos dedos: punho e cotovelo ficam parados.",
-  "videos": [],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=xSam_BRMjTA",
+    "title": "Gripper",
+    "status": "pending",
+    "added": "2026-11"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=IAugjAya1Us",
+    "title": "250lb plate loaded grip machine hold",
+    "status": "pending",
+    "added": "2026-11"
+   }
+  ],
   "photos": [],
   "confirmed": true,
   "added": "2026-11",
@@ -13779,7 +14489,26 @@
    "Carga: anilha na ponta da corda; anote o peso e quantas subidas e descidas fez."
   ],
   "how_to_recognize": "Um tubo ou bastão grosso horizontal que gira, com uma corda ou fita enrolada nele e uma anilha pendurada na ponta. Pode ser solto (seguro com os braços estendidos), encaixado num suporte ou fixo na parede.",
-  "videos": [],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=6RYmiKijRyc",
+    "title": "COMO FAZER EXTENSÃO E FLEXAO COM ROLO DE PURSO",
+    "status": "pending",
+    "added": "2026-11"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=joBnolqeZRk",
+    "title": "Rogue Wrist Roller Review with Improvements and a Demo",
+    "status": "pending",
+    "added": "2026-11"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=PYwV6X09K5w",
+    "title": "ÚNICO exercício que você precisa para antebraços",
+    "status": "pending",
+    "added": "2026-11"
+   }
+  ],
   "photos": [],
   "confirmed": true,
   "added": "2026-11",
@@ -13899,7 +14628,26 @@
    "Alvo de wall ball e acessórios (landmine, apoio de paralelas, degrau): variam conforme a montagem da academia."
   ],
   "how_to_recognize": "Estrutura metálica comprida, com várias colunas furadas ligadas por travessas no alto e muitas barras fixas em alturas diferentes (às vezes em escada horizontal), encostada na parede ou no meio da sala; costuma ter ganchos de barra, alvos redondos de wall ball, argolas e fitas penduradas. Sem pilha de pesos.",
-  "videos": [],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=Gqe_IhVe4iQ",
+    "title": "Technogym Omnia",
+    "status": "pending",
+    "added": "2026-11"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=DQsYtl4j8KY",
+    "title": "'Technogym Omnia' functional training equipment demo",
+    "status": "pending",
+    "added": "2026-11"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=QLsu6LY7Lec",
+    "title": "Gaiola Funcional Rotech Fitness Equipment",
+    "status": "pending",
+    "added": "2026-11"
+   }
+  ],
   "photos": [],
   "confirmed": true,
   "added": "2026-11",
@@ -13987,7 +14735,26 @@
    "Carga: anilhas no pino baixo."
   ],
   "how_to_recognize": "Máquina baixa de anilhas com um apoio grande e plano para ajoelhar, uma barra atrás para travar os dois pés, um apoio almofadado na frente para o quadril e um braço comprido que sobe do eixo com um rolo que encosta nas costas. Costuma ter o logotipo GLUTEBUILDER.",
-  "videos": [],
+  "videos": [
+   {
+    "url": "https://www.youtube.com/watch?v=i_4eMXavKlU",
+    "title": "Model Fitness Glute Builder Kneeling Glute Isolator",
+    "status": "pending",
+    "added": "2026-11"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=IGL-lmKGjtQ",
+    "title": "Especialízate en Glúteos: Entrenamiento Avanzado con el Kneeling Glute Isolator de GluteBuilder",
+    "status": "pending",
+    "added": "2026-11"
+   },
+   {
+    "url": "https://www.youtube.com/watch?v=KTvET-V_efY",
+    "title": "Glutebuilder Plate Loaded Line",
+    "status": "pending",
+    "added": "2026-11"
+   }
+  ],
   "photos": [],
   "confirmed": true,
   "from_photo": true,
