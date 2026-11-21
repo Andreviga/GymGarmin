@@ -2001,7 +2001,7 @@ function bindSession() {
         // a tela é atualizada logo depois da troca de campo: o campo em que a pessoa acabou de tocar fica como está
         // (ela vai digitar ali; escrever o número copiado nele fazia "12" + "15" virar "1152")
         setTimeout(() => {
-          it.sets.forEach((y, k) => { if (k > j && (!y.done || it.from_partner)) { const inp = $(`input[data-s="load_kg"][data-i="${el.dataset.i}"][data-j="${k}"]`);
+          it.sets.forEach((y, k) => { if (k > j && (!y.done || it.from_partner || it.fresh)) { const inp = $(`input[data-s="load_kg"][data-i="${el.dataset.i}"][data-j="${k}"]`);
             if (!inp) return;
             inp.value = y.load_kg ?? "";
             // o campo em que a pessoa acabou de tocar também recebe a carga copiada, com o número selecionado:
@@ -2036,7 +2036,7 @@ function bindSession() {
     if (mk) addEx(mk.dataset.miss);
   };
   const addEx = (muscle) => pickExercise(null, (ex) => { const it = newSessionItem(ex);
-    if (s.edit_id || s.replace_id || s.pulled) { (it.sets || []).forEach((x) => { x.done = true; }); if (it.kind === "cardio") it.done = true; }  // treino já feito: o que acrescenta é o que fez
+    if (s.edit_id || s.replace_id || s.pulled) { (it.sets || []).forEach((x) => { x.done = true; }); if (it.kind === "cardio") it.done = true; it.fresh = true; }  // treino já feito: o que acrescenta é o que fez
     s.items.push(it); renderSession(); }, { muscle, missing: s.missing });
   $("#s-add").onclick = () => addEx();
   $("#s-cancel").onclick = () => { if (confirm(s.edit_id ? "Cancelar a correção? O registro fica como estava." : "Descartar este treino?")) { store("gg_session", null); state.session = null; location.hash = "#hoje"; } };
@@ -2506,7 +2506,7 @@ const WARM_REST = 45, WARM_LAST_REST = 75;
 function fxCarry(it, k, f, old, val) {
   if (f !== "load_kg" || !it || !it.sets) return;
   // no treino puxado as séries já vêm marcadas como feitas: a carga digitada desce do mesmo jeito para as que estão vazias/iguais
-  for (let j = k + 1; j < it.sets.length; j++) { const y = it.sets[j]; if ((!y.done || it.from_partner) && (y.load_kg == null || y.load_kg === old)) y.load_kg = val; }
+  for (let j = k + 1; j < it.sets.length; j++) { const y = it.sets[j]; if ((!y.done || it.from_partner || it.fresh) && (y.load_kg == null || y.load_kg === old)) y.load_kg = val; }
 }
 // a série que acabou de ser feita (para corrigir repetições e carga enquanto o descanso já corre)
 function fxLast_(s) {

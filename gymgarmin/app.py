@@ -1259,7 +1259,7 @@ def create_session(body: dict = Body(...)):
                     and (x.get("with_partner") == body["with_partner"] or x.get("merged")
                          or not (x.get("garmin_activity_id") or x.get("ext_id")))] if acc and day_iso else []
             if twin:
-                v = partners.registered_view(twin[0])
+                v = partners.registered_view(twin[0], partners.shared_minutes(int(acc["user_id"]), twin[0]))
                 return JSONResponse({"detail": f"Você já registrou esse treino em {v['date'][8:10]}/{v['date'][5:7]} às {v['time']} "
                                                f"({v['exercises']} exercícios, {v['sets']} séries). Para mudar, toque em Ver e corrigir "
                                                f"no cartão do parceiro ou no Histórico.", "existing_id": v["id"], "existing": v},
@@ -1527,7 +1527,7 @@ def _already_for(uid: int, pid: int, s: dict, mine: list[dict]) -> list[dict]:
     day_iso = str(s.get("date"))[:10]
     theirs = [x for x in db.list_sessions(pid, since=day_iso, limit=60) if str(x.get("date"))[:10] == day_iso]
     links = partners.pair(mine, theirs or [s], uid, pid)
-    return [partners.registered_view(x) for x in mine if links.get(x["id"]) == s["id"]]
+    return [partners.registered_view(x, partners.shared_minutes(uid, x)) for x in mine if links.get(x["id"]) == s["id"]]
 
 
 def _already(uid: int, pid: int, mine: list[dict], want: set) -> list[dict]:
