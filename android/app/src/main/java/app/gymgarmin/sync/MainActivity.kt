@@ -11,6 +11,7 @@ import android.view.ViewGroup.LayoutParams.MATCH_PARENT
 import android.view.ViewGroup.LayoutParams.WRAP_CONTENT
 import android.widget.Button
 import android.widget.EditText
+import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
@@ -64,7 +65,7 @@ class MainActivity : ComponentActivity() {
         }
         col.addView(text("Código pessoal", 14f, true))
         token = EditText(this).apply {
-            hint = "gg_…  (HAX → Perfil → Outros relógios)"
+            hint = "gg_…  (HAX → Perfil → Relógios → Código pessoal)"
             setText(p.getString("token", ""))
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
         }
@@ -80,8 +81,13 @@ class MainActivity : ComponentActivity() {
         col.addView(status)
         p.getString("last_err", null)?.let { col.addView(text("Último erro automático: $it", 13f)) }
         col.addView(text("Depois do primeiro envio, o app manda sozinho a cada ~6 horas (com internet).", 13f))
-        // Android 15 desenha atrás da barra de status: o conteúdo começa abaixo dela
-        setContentView(ScrollView(this).apply { fitsSystemWindows = true; addView(col, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT)) })
+        // Android 15 desenha atrás da barra de status e ignora a cor dela: o fundo azul fica atrás das barras e o
+        // conteúdo (fundo branco) começa abaixo delas, em qualquer versão
+        val scroll = ScrollView(this).apply { setBackgroundColor(Color.WHITE); addView(col, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT)) }
+        setContentView(FrameLayout(this).apply {
+            setBackgroundColor(BRAND); fitsSystemWindows = true
+            addView(scroll, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
+        })
         col.gravity = Gravity.TOP
     }
 

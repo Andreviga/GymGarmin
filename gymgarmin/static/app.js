@@ -1264,8 +1264,8 @@ function ingestHintHtml(last) {
     const TYPE = { OTHER_WORKOUT: "outro treino", STRENGTH_TRAINING: "musculação", WALKING: "caminhada", RUNNING: "corrida", RUNNING_TREADMILL: "corrida na esteira", BIKING: "bicicleta", BIKING_STATIONARY: "bicicleta ergométrica",
       HIKING: "trilha", ELLIPTICAL: "elíptico", YOGA: "yoga", PILATES: "pilates", HIIT: "HIIT", DANCING: "dança", SWIMMING_POOL: "natação", ROWING_MACHINE: "remo", STAIR_CLIMBING: "escada", STRETCHING: "alongamento" };
     const win = d.workout_days || d.window_days;
-    if (d.app && /^1\.[0-2]$/.test(d.app) && d.app !== "1.1") tips.push("Tem versão nova do HAX Sync (com o logo do HAX): baixe no botão abaixo e instale por cima. Seus dados e o código pessoal continuam.");
-    if (d.app === "1.1") tips.push("Seu HAX Sync é a versão 1.1, que depois do primeiro envio <b>só olha os últimos 2 dias</b>: treino mais antigo não chega. Baixe de novo no botão abaixo (versão 1.2), instale por cima e toque em Sincronizar: ela relê os últimos 30 dias.");
+    if (d.app && /^1\.([02]|3)$/.test(d.app)) tips.push("Tem versão nova do HAX Sync (com o logo do HAX): baixe no botão abaixo e instale por cima. Seus dados e o código pessoal continuam.");
+    if (d.app === "1.1") tips.push("Seu HAX Sync é a versão 1.1, que depois do primeiro envio <b>só olha os últimos 2 dias</b>: treino mais antigo não chega. Baixe de novo no botão abaixo (versão nova, com o logo do HAX), instale por cima e toque em Sincronizar: ela relê os últimos 30 dias.");
     if (miss.some((m) => /EXERCISE/.test(m))) tips.push("O HAX Sync está <b>sem permissão de Exercício</b> no Health Connect. Abra o Health Connect → Permissões do app → HAX Sync → ligue Exercício.");
     else if (!d.exercise_total) tips.push(`O Health Connect <b>não tinha nenhum treino</b> nos últimos ${win || "…"} dias. O relógio só entrega o treino se o app dele estiver ligado ao Health Connect: no <b>Zepp</b> (Amazfit) é Perfil → Adicionar contas → Health Connect; no <b>Mi Fitness</b>, Perfil → Health Connect. Ligue <b>Exercício</b>, frequência cardíaca e sono, abra o app do relógio para ele sincronizar e toque em Sincronizar no HAX Sync.`);
     else {

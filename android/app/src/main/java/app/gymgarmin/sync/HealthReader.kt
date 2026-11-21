@@ -98,7 +98,7 @@ class HealthReader(context: Context) {
             else -> "OTHER_WORKOUT_$t"
         }
 
-        const val APP_VERSION = "1.3"
+        const val APP_VERSION = "1.3.1"
     }
 
     suspend fun grantedAll(): Boolean =
@@ -173,7 +173,7 @@ class HealthReader(context: Context) {
             }
         }
 
-        // diagnóstico: o que o Health Connect tinha para ler (o HAX mostra em Perfil → Outros relógios)
+        // diagnóstico: o que o Health Connect tinha para ler (o HAX mostra em Perfil → Relógios)
         // treinos: pelo menos 7 dias, porque o app do relógio (Zepp, Mi Fitness) às vezes entrega com dias de atraso
         val workoutDays = maxOf(days, 7L)
         val fromWorkouts = LocalDate.now(zone).minusDays(workoutDays).atStartOfDay(zone).toInstant()

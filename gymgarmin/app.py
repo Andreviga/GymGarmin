@@ -348,7 +348,7 @@ async def ingest_data(request: Request, authorization: str | None = Header(None)
     raw = (authorization or "").removeprefix("Bearer ").strip() or (x_gymgarmin_token or "").strip() or (token or "").strip()
     acc = db.account_by_ingest_token(auth.hash_token(raw)) if raw else None
     if not acc:
-        raise HTTPException(401, "Código pessoal inválido. Gere um novo em Perfil → Outros relógios.")
+        raise HTTPException(401, "Código pessoal inválido. Gere um novo em Perfil → Relógios → Código pessoal.")
     try:
         body = await request.json()
     except Exception as e:  # noqa: BLE001

@@ -21,7 +21,10 @@ import java.util.concurrent.TimeUnit
 object Sync {
     const val DEFAULT_SERVER = "https://haxfit.vercel.app"
     /** Endereços antigos do app (o projeto mudou de nome): quem tinha um deles salvo passa para o atual. */
-    private val OLD_SERVERS = listOf("gymgarmin.vercel.app")
+    private val OLD_HOSTS = setOf("gymgarmin.vercel.app")
+
+    private fun hostOf(s: String): String =
+        s.substringAfter("://").substringBefore('/').substringBefore(':').trim().lowercase()
 
     fun prefs(ctx: Context) = ctx.getSharedPreferences("gymgarmin", Context.MODE_PRIVATE)
 
@@ -29,8 +32,9 @@ object Sync {
     fun server(ctx: Context): String {
         val p = prefs(ctx)
         val saved = (p.getString("server", DEFAULT_SERVER) ?: DEFAULT_SERVER).trim().trimEnd('/')
-        if (saved.isEmpty() || OLD_SERVERS.any { saved.contains(it, ignoreCase = true) }) {
-            p.edit().putString("server", DEFAULT_SERVER).apply()
+        if (saved.isEmpty() || hostOf(saved) in OLD_HOSTS) {
+            // o erro guardado era do endereço antigo: some junto com ele
+            p.edit().putString("server", DEFAULT_SERVER).remove("last_err").apply()
             return DEFAULT_SERVER
         }
         return saved
@@ -41,7 +45,7 @@ object Sync {
         val p = prefs(ctx)
         val token = p.getString("token", "")?.trim().orEmpty()
         val server = server(ctx)
-        if (token.isEmpty()) throw IllegalStateException("Cole o código pessoal (HAX → Perfil → Outros relógios).")
+        if (token.isEmpty()) throw IllegalStateException("Cole o código pessoal (HAX → Perfil → Relógios → Código pessoal).")
         val since = p.getLong("last_ok", 0L)
         // primeira vez (ou primeira vez desta versão do app): 30 dias; depois, desde o último envio com folga de 2 dias.
         // Quem atualiza o app precisa reler tudo: a versão antiga descartava tipos de treino que esta envia.
@@ -53,7 +57,8 @@ object Sync {
             "${res.optJSONArray("imported")?.length() ?: 0} treino(s) novo(s)."
         val now = System.currentTimeMillis()
         val stamp = SimpleDateFormat("dd/MM HH:mm", Locale("pt", "BR")).format(Date(now))
-        p.edit().putLong("last_ok", now).putString("app_ver", HealthReader.APP_VERSION).putString("last_msg", "$stamp — $msg").apply()
+        p.edit().putLong("last_ok", now).putString("app_ver", HealthReader.APP_VERSION).putString("last_msg", "$stamp — $msg")
+            .remove("last_err").apply()  // deu certo: o erro de antes não aparece mais na tela
         return msg
     }
 
