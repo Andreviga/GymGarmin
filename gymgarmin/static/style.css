@@ -202,6 +202,20 @@ label.chip { display: inline-flex; align-items: center; color: var(--ink); font-
 .spark { width: 80px; height: 24px; }
 .hist-chart { width: 100%; height: auto; display: block; margin: 6px 0; }
 .steps-q .btn { flex: 1 1 40%; }
+.duel-mini { display: flex; flex-wrap: wrap; gap: 4px 12px; color: var(--ink-2); }
+.duel-mini b { color: var(--ink); font-variant-numeric: tabular-nums; }
+.pt-row { padding: 10px 0; border-bottom: 1px solid var(--line); }
+.pt-row:last-of-type { border-bottom: 0; }
+.pt-row .btn { margin-top: 8px; }
+.duel-row { margin: 12px 0; }
+.duel-bar { display: flex; height: 14px; border-radius: 8px; overflow: hidden; background: var(--line); margin-top: 4px; gap: 2px; }
+.duel-bar span { display: block; height: 100%; background: var(--ink-2); opacity: .45; }
+.duel-bar span.lead { background: var(--brand); opacity: 1; }
+.duel-days { width: 100%; border-collapse: collapse; margin: 14px 0 8px; font-variant-numeric: tabular-nums; }
+.duel-days th, .duel-days td { padding: 6px 4px; border-bottom: 1px solid var(--line); text-align: center; vertical-align: top; }
+.duel-days td:first-child, .duel-days th:first-child { text-align: left; white-space: nowrap; }
+.duel-days td.win { font-weight: 700; }
+.duel-days tr.tog td:first-child::after { content: " 🤝"; }
 .wr-cat, .wr-sess { padding: 10px 0; border-bottom: 1px solid var(--line); }
 .wr-cat:last-child, .wr-sess:last-child { border-bottom: 0; }
 .wr-block { margin: 8px 0 0; padding: 8px 10px; background: var(--info-bg); border-radius: 10px; }

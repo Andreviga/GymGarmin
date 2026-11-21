@@ -120,3 +120,12 @@ def test_android_sends_every_workout_type_and_says_what_it_found(c):
     last = c.get("/api/account/ingest").json()["last"]
     assert last["sent"] == 3 and last["diag"]["exercise_total"] == 3 and last["diag"]["missing"] == ["READ_SLEEP"]
     assert "junk" not in last["diag"] and "diag" not in last["sample"]
+
+
+def test_phone_workout_time_stays_in_the_persons_timezone():
+    """O celular manda a hora com fuso (-03:00); o servidor roda em UTC. Treino das 21h30 é das 21h30 do mesmo dia."""
+    assert ingest.parse_dt("2026-11-20T21:30:00-03:00").isoformat() == "2026-11-20T21:30:00"
+    assert ingest.parse_dt("2026-11-21T00:30:00Z").isoformat() == "2026-11-20T21:30:00"
+    assert ingest.parse_dt("2026-11-20T12:35:00").isoformat() == "2026-11-20T12:35:00"   # sem fuso: já é hora local
+    s = ingest.workout_session({"id": "z", "type": "OTHER_WORKOUT", "start": "2026-11-20T21:30:00-03:00", "duration_min": 40}, "android", 190)
+    assert s["date"].startswith("2026-11-20T21:30")

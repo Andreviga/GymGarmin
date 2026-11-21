@@ -73,6 +73,33 @@ def find_twin(new: dict, sessions: list[dict]) -> dict | None:
     return best
 
 
+def is_time_only(s: dict) -> bool:
+    """Atividade do relógio que só tem tempo/FC/calorias (musculação sem séries, "outro exercício", cardio genérico)."""
+    items = s.get("items") or []
+    return _watch(s) and bool(items) and all(
+        (i.get("strength_min") or str(i.get("exercise_id") or "").startswith("atividade_")) and not i.get("sets") for i in items)
+
+
+def merge_into_watch(app_s: dict, watch_s: dict) -> dict:
+    """A pessoa disse que o treino que está salvando É aquela atividade do relógio: ficam os exercícios e séries do app
+    e, do relógio, o vínculo, o horário, a duração, a FC e as calorias. O item genérico ("65 min de atividade") sai,
+    para o treino não contar duas vezes na carga, no tempo e nas calorias."""
+    out = {k: v for k, v in app_s.items() if k not in ("id", "created_at", "merge_into")}
+    for k in ("garmin_activity_id", "ext_id", "source"):
+        if watch_s.get(k):
+            out[k] = watch_s[k]
+    summ = dict(watch_s.get("garmin_summary") or {})
+    for it in watch_s.get("items") or []:  # as medidas ficavam no item genérico: sobem para o resumo
+        for src, dst in (("avg_hr", "avg_hr"), ("max_hr", "max_hr"), ("kcal", "kcal"), ("duration_min", "duration_min")):
+            if it.get(src) and not summ.get(dst):
+                summ[dst] = it[src]
+    out["garmin_summary"] = summ
+    out["merged"] = True
+    out["date"] = watch_s.get("date") or out.get("date")           # o relógio sabe a hora em que o treino aconteceu
+    out["duration_min"] = watch_s.get("duration_min") or summ.get("duration_min") or out.get("duration_min")
+    return out
+
+
 def merge(app_s: dict, garmin_s: dict) -> dict:
     """Une as duas: itens do app + medidas do relógio."""
     out = {k: v for k, v in app_s.items() if k not in ("id", "created_at")}

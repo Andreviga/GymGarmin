@@ -16,7 +16,7 @@ from fastapi.staticfiles import StaticFiles
 
 from datetime import date, timedelta
 
-from . import auth, coach, focus, gallery, ingest, my_gym, training_rules
+from . import auth, coach, focus, gallery, ingest, my_gym, partners, training_rules
 from . import (analysis, calibration, catalog, clock, db, dedupe, health, endurance, garmin_export, garmin_sync, generator, history, limitations,
                load, plans_io, progression, readiness, schedule, sports, steps, templates, watch_labels)
 from .muscles import EQUIPMENT_PT, HR_ZONES, MUSCLES, hr_max, zone_bpm
@@ -94,6 +94,9 @@ class AuthMiddleware:
                         return await resp(scope, receive, send)
                     atok = db.set_current_user(aid)
                     auth.set_acting(acc["user_id"])
+                    if scope["path"].startswith("/api/partners"):
+                        resp = JSONResponse({"detail": "Parceria de treino é da própria pessoa: o coach não acessa por ela."}, status_code=403)
+                        return await resp(scope, receive, send)
                     if scope["path"].startswith(("/api/health", "/api/checkin", "/api/steps")) and \
                             db.kv_get(f"coach_share_health:{acc['user_id']}") == "0":
                         resp = JSONResponse({"detail": "Este atleta não compartilha saúde e sono com o coach."}, status_code=403)
@@ -1231,6 +1234,20 @@ def sessions(since: str | None = None, limit: int = 100):
 @app.post("/api/sessions")
 def create_session(body: dict = Body(...)):
     try:
+        if body.get("with_partner") is not None:  # só vale parceiro de verdade (o campo vem da tela)
+            acc = auth.current_account()
+            pid = body.get("with_partner")
+            if not (acc and isinstance(pid, int) and not isinstance(pid, bool) and partners.is_partner(acc["user_id"], pid)):
+                body.pop("with_partner", None)
+        target = body.pop("merge_into", None)
+        watch = db.get_session(target) if isinstance(target, int) and not isinstance(target, bool) else None
+        if watch and dedupe.is_time_only(watch) and str(watch.get("date"))[:10] == str(body.get("date") or "")[:10]:
+            # a pessoa apontou a atividade do relógio (que só marcou o tempo) como sendo este treino
+            saved = db.save_session(dedupe.merge_into_watch(body, watch), session_id=watch["id"])
+            credit = schedule.credit_session(saved, _profile())
+            saved = db.get_session(saved["id"]) or saved
+            return {**saved, "prs": history.session_prs(db.list_sessions(limit=5000), saved, _profile().get("weight_kg")),
+                    "credit": credit}
         twin = None if body.get("garmin_activity_id") else \
             dedupe.find_twin(body, db.list_sessions(since=str(body.get("date") or "")[:10] or None, limit=200))
         if twin:  # o relógio já trouxe este treino: junta (séries do app + medidas do relógio)
@@ -1351,6 +1368,132 @@ def session_prefill(plan_id: int, idx: int):
 
 
 # ----------------------------------------------------- evolução de cargas ----
+
+# ---- treinar com o companheiro: parceria, puxar o treino do outro, placar
+
+def _me_id() -> int:
+    acc = auth.current_account()
+    if not acc:
+        raise HTTPException(400, "Treinar com alguém precisa de conta: crie a sua em Perfil.")
+    return int(acc["user_id"])
+
+
+def _partner_or_403(pid: int) -> int:
+    uid = _me_id()
+    if not partners.is_partner(uid, pid):
+        raise HTTPException(403, "Vocês ainda não são parceiros de treino.")
+    return uid
+
+
+def _partner_day(v: str | None) -> date:
+    try:
+        d = date.fromisoformat(str(v)[:10]) if v else clock.today()
+    except ValueError as e:
+        raise HTTPException(400, "Data inválida") from e
+    if d > clock.today() or (clock.today() - d).days > 60:
+        raise HTTPException(400, "Só dá para ver os últimos 60 dias")
+    return d
+
+
+@app.get("/api/partners")
+def partners_get():
+    """Com quem treino, quem me convidou e quem posso convidar; para cada parceiro, o dia de hoje e o placar da semana."""
+    acc = auth.current_account()
+    if not acc:
+        return {"enabled": False, "people": [], "partners": [], "requests": []}
+    uid, today = int(acc["user_id"]), clock.today()
+    out = partners.overview(uid)
+    for p in out["partners"]:
+        d = partners.day(uid, p["id"], today)
+        p["today"] = {"planned": [{"id": e["id"], "title": e["title"], "has_sets": e["has_sets"]} for e in d["planned"]],
+                      "done": [{"id": s["id"], "title": s["title"], "minutes": s["minutes"], "kcal": s["kcal"], "has_sets": s["has_sets"]} for s in d["done"]]}
+        du = partners.duel(uid, p["id"], today, today)
+        p["duel"] = {"metrics": du["metrics"], "score": du["score"], "kcal_estimated": du["kcal_estimated"],
+                     "est": {"me": du["me"]["kcal_estimated"], "partner": du["partner"]["kcal_estimated"]}}
+    return {"enabled": True, **out}
+
+
+@app.post("/api/partners/{pid}/invite")
+def partners_invite(pid: int):
+    try:
+        status = partners.invite(_me_id(), pid)
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from e
+    return {"status": status, **partners_get()}
+
+
+@app.post("/api/partners/{pid}/accept")
+def partners_accept(pid: int):
+    try:
+        partners.accept(_me_id(), pid)
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from e
+    return partners_get()
+
+
+@app.delete("/api/partners/{pid}")
+def partners_remove(pid: int):
+    partners.remove(_me_id(), pid)
+    return partners_get()
+
+
+@app.get("/api/partners/{pid}/day")
+def partners_day(pid: int, date_: str | None = Query(None, alias="date")):
+    uid = _partner_or_403(pid)
+    return partners.day(uid, pid, _partner_day(date_))
+
+
+@app.get("/api/partners/{pid}/duel")
+def partners_duel(pid: int, date_: str | None = Query(None, alias="date")):
+    uid = _partner_or_403(pid)
+    return partners.duel(uid, pid, _partner_day(date_), clock.today())
+
+
+@app.post("/api/partners/{pid}/draft")
+def partners_draft(pid: int, body: dict = Body(...)):
+    """Monta o MEU treino a partir do treino do parceiro: {session_id} = o que ele já fez (as séries vêm marcadas, para
+    quem treinou só com o relógio); {entry_id} = o planejado dele (para treinar junto agora). As cargas são as minhas."""
+    uid = _partner_or_403(pid)
+    names = partners._names()
+    who = partners.first_name(names.get(pid, ""))
+    if body.get("session_id") is not None:
+        s = db.get_session(int(body["session_id"]), user_id=pid)
+        if not s or str(s.get("source")) == "passos":
+            raise HTTPException(404, "Treino do parceiro não encontrado")
+        plan_items, done = partners.plan_items_from_session(s)
+        if not plan_items:
+            raise HTTPException(400, f"Esse treino de {who} não tem exercícios com séries para puxar (só tempo).")
+        items = _prefill_items(plan_items)
+        for it in items:  # é um treino já feito: mesmas séries e repetições dele, marcadas; a carga é a minha (ou em branco)
+            theirs = done.get(it["exercise_id"]) or []
+            sets = []
+            for k, x in enumerate(theirs):
+                mine = it["sets"][k] if k < len(it.get("sets") or []) else (it["sets"][-1] if it.get("sets") else {})
+                sets.append({"reps": x.get("reps"), "duration_s": x.get("duration_s"), "load_kg": mine.get("load_kg"), "rpe": None,
+                             "done": True, "partner_load": x.get("load_kg")})
+            it["sets"] = sets or it.get("sets")
+            it["warmup"] = []
+            it["from_partner"] = True
+        day_iso = str(s.get("date"))[:10]
+        mine = [x for x in db.list_sessions(uid, since=day_iso, limit=60) if str(x.get("date"))[:10] == day_iso]
+        watch = [x for x in mine if dedupe.is_time_only(x)]
+        return {"date": str(s.get("date"))[:16], "day_name": f"{s.get('day_name') or 'Treino'} (com {who})", "view": "lista",
+                "with_partner": pid, "partner_name": who, "pulled": True, "items": items,
+                "merge_candidates": [{"id": x["id"], "time": str(x.get("date"))[11:16], "minutes": round(partners.session_minutes(x)),
+                                      "kcal": round(partners.session_kcal(x, None)[0]) if not partners.session_kcal(x, None)[1] else None,
+                                      "title": x.get("notes") or x.get("day_name") or "Atividade do relógio"} for x in watch],
+                "already": [x["id"] for x in mine if x.get("with_partner") == pid and any(i.get("sets") for i in x.get("items") or [])]}
+    if body.get("entry_id") is not None:
+        e = db.get_entry(int(body["entry_id"]), user_id=pid)
+        if not e:
+            raise HTTPException(404, "Treino do parceiro não encontrado")
+        plan_items = partners.plan_items_from_entry(e)
+        if not plan_items:
+            raise HTTPException(400, f"O treino de {who} nesse dia não tem musculação para fazer junto.")
+        return {"date": clock.now().isoformat(timespec="minutes"), "day_name": f"{e.get('day_name') or 'Treino'} (com {who})",
+                "with_partner": pid, "partner_name": who, "items": _prefill_items(plan_items)}
+    raise HTTPException(400, "Diga qual treino do parceiro (session_id ou entry_id)")
+
 
 # ---- séries do relógio sem nome: conferir categorias e dar nome aos blocos
 

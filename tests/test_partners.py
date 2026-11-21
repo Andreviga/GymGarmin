@@ -1,0 +1,165 @@
+"""Treinar com o companheiro: convite + aceite, puxar o treino do outro, juntar com o relógio que só marca tempo, placar."""
+from datetime import datetime
+
+import pytest
+from fastapi.testclient import TestClient
+
+from gymgarmin import auth, clock, db, garmin_sync, partners
+
+
+@pytest.fixture()
+def env(tmp_path, monkeypatch):
+    monkeypatch.setenv("GYMGARMIN_HOME", str(tmp_path))
+    monkeypatch.setenv("GYMGARMIN_DB", str(tmp_path / "t.sqlite3"))
+    monkeypatch.delenv("VERCEL", raising=False)
+    auth.reset_cache()
+    garmin_sync._clients.clear()
+    clock.freeze(datetime(2026, 11, 20, 21, 0))  # sexta à noite
+    from gymgarmin.app import app
+
+    a = TestClient(app)
+    a.post("/api/auth/setup", json={"email": "andre@x.com", "password": "senha-andre"})
+    a.put("/api/profile", json={"name": "Andre", "weight_kg": 82})
+    people = []
+    for name, mail in (("Nathália Moreira", "nat@x.com"), ("Bia", "bia@x.com")):
+        inv = a.post("/api/admin/invites", json={"note": name}).json()
+        c = TestClient(app)
+        c.post("/api/auth/register", json={"code": inv["code"], "email": mail, "password": "senha-123456", "name": name})
+        people.append((c, c.get("/api/auth/me").json()["user"]["id"]))
+    aid = a.get("/api/auth/me").json()["user"]["id"]
+    yield a, aid, people[0][0], people[0][1], people[1][0], people[1][1]
+    clock.freeze(None)
+    auth.reset_cache()
+
+
+def _link(a, n, nid):
+    a.post(f"/api/partners/{nid}/invite")
+    aid = a.get("/api/auth/me").json()["user"]["id"]
+    n.post(f"/api/partners/{aid}/accept")
+
+
+ANDRE_WORKOUT = {"date": "2026-11-20T12:30", "day_name": "Treino livre", "client_id": "a-1", "duration_min": 65,
+                 "items": [{"exercise_id": "Leg_Extensions", "sets": [{"reps": 15, "load_kg": 40}, {"reps": 10, "load_kg": 68}, {"reps": 10, "load_kg": 75}]},
+                           {"exercise_id": "Seated_Leg_Curl", "sets": [{"reps": 14, "load_kg": 54}, {"reps": 10, "load_kg": 68}]},
+                           {"exercise_id": "Hip_Thrust_Machine", "sets": [{"reps": 10, "load_kg": 80}, {"reps": 10, "load_kg": 110}]},
+                           {"exercise_id": "cardio_esteira_corrida", "duration_min": 12, "zone": 2}]}
+
+
+def test_invite_needs_acceptance_and_shows_only_training(env):
+    a, aid, n, nid, b, bid = env
+    assert [p["first"] for p in a.get("/api/partners").json()["people"]] == ["Bia", "Nathália"]
+    assert a.get(f"/api/partners/{nid}/day").status_code == 403                     # sem parceria não vê nada
+    r = a.post(f"/api/partners/{nid}/invite").json()
+    assert r["status"] == "convidado" and r["partners"] == []
+    assert a.get(f"/api/partners/{nid}/day").status_code == 403                     # convite pendente ainda não abre
+    req = n.get("/api/partners").json()["requests"]
+    assert [x["first"] for x in req] == ["Andre"]
+    assert n.post(f"/api/partners/{bid}/accept").status_code == 400                 # não dá para aceitar convite que não existe
+    r = n.post(f"/api/partners/{aid}/accept").json()
+    assert [p["id"] for p in r["partners"]] == [aid] and r["requests"] == []
+    assert partners.is_partner(aid, nid) and partners.is_partner(nid, aid) and not partners.is_partner(aid, bid)
+    assert b.get(f"/api/partners/{aid}/day").status_code == 403 and b.get(f"/api/partners/{aid}/duel").status_code == 403
+    # convite cruzado vira parceria na hora
+    b.post(f"/api/partners/{aid}/invite")
+    assert a.post(f"/api/partners/{bid}/invite").json()["status"] == "parceiro"
+    # desfazer vale para os dois lados
+    a.delete(f"/api/partners/{bid}")
+    assert not partners.is_partner(bid, aid) and b.get(f"/api/partners/{aid}/day").status_code == 403
+    # o dia do parceiro traz treino, nunca saúde
+    db.kv_set("health:2026-11-20", '{"steps": 9000, "sleep": {"duration_h": 5}}', user_id=aid)
+    a.post("/api/sessions", json=ANDRE_WORKOUT)
+    day = n.get(f"/api/partners/{aid}/day").json()
+    txt = str(day)
+    assert day["done"][0]["has_sets"] and day["done"][0]["sets"] == 7 and "steps" not in txt and "sleep" not in txt and "weight" not in txt
+
+
+def test_pull_partner_workout_into_time_only_watch_session(env):
+    """A Nathalia treinou com o relógio que só marca o tempo; o André registrou as séries. Ela puxa o treino dele."""
+    a, aid, n, nid, _b, _bid = env
+    _link(a, n, nid)
+    saved = a.post("/api/sessions", json=ANDRE_WORKOUT).json()
+    # o relógio dela entregou "outro exercício": 62 min, 310 kcal
+    w = db.save_session({"date": "2026-11-20T12:35:00", "source": "android", "ext_id": "android:z1", "notes": "Treino de força",
+                         "duration_min": 62, "garmin_summary": {"duration_min": 62},
+                         "items": [{"exercise_id": "atividade_outra", "duration_min": 62, "zone": 1, "avg_hr": 104, "max_hr": 131, "kcal": 310}]}, user_id=nid)
+    db.save_session({"date": "2026-11-12T09:00", "client_id": "n-old", "items": [{"exercise_id": "Leg_Extensions", "sets": [{"reps": 12, "load_kg": 25}] * 3}]}, user_id=nid)
+
+    d = n.post(f"/api/partners/{aid}/draft", json={"session_id": saved["id"]}).json()
+    assert d["with_partner"] == aid and d["pulled"] and d["day_name"].endswith("(com Andre)") and d["date"].startswith("2026-11-20")
+    assert [i["exercise_id"] for i in d["items"]] == ["Leg_Extensions", "Seated_Leg_Curl", "Hip_Thrust_Machine"]   # só a musculação
+    ext = d["items"][0]
+    assert [s["reps"] for s in ext["sets"]] == [15, 10, 10] and all(s["done"] for s in ext["sets"])
+    assert [s["partner_load"] for s in ext["sets"]] == [40, 68, 75]                  # a carga dele aparece só como referência
+    assert all(s["load_kg"] is None or s["load_kg"] <= 30 for s in ext["sets"])     # a minha carga vem do MEU histórico (25 kg), nunca da dele
+    assert all(s["load_kg"] is None for s in d["items"][2]["sets"])                 # sem histórico meu: em branco
+    assert d["merge_candidates"] == [{"id": w["id"], "time": "12:35", "minutes": 62, "kcal": 310, "title": "Treino de força"}]
+
+    payload = {"date": d["date"], "day_name": d["day_name"], "client_id": "n-pull", "with_partner": aid, "merge_into": w["id"],
+               "items": [{"exercise_id": i["exercise_id"], "sets": [{"reps": s["reps"], "load_kg": s["load_kg"] or 20} for s in i["sets"]]} for i in d["items"]]}
+    r = n.post("/api/sessions", json=payload).json()
+    assert r["id"] == w["id"] and r["merged"] and r["ext_id"] == "android:z1" and r["with_partner"] == aid
+    assert r["date"].startswith("2026-11-20T12:35") and r["duration_min"] == 62
+    assert not any(str(i["exercise_id"]).startswith("atividade_") for i in r["items"])     # os 62 min genéricos saíram: não conta em dobro
+    assert r["garmin_summary"]["kcal"] == 310 and r["garmin_summary"]["avg_hr"] == 104
+    mine = [s for s in db.list_sessions(nid, since="2026-11-20") if s["date"].startswith("2026-11-20")]
+    assert len(mine) == 1
+    # puxar de novo avisa que já existe
+    again = n.post(f"/api/partners/{aid}/draft", json={"session_id": saved["id"]}).json()
+    assert again["already"] == [w["id"]] and again["merge_candidates"] == []
+    # with_partner de quem não é parceiro é ignorado; merge_into de sessão que não é só-tempo também
+    x = n.post("/api/sessions", json={"date": "2026-11-19T10:00", "client_id": "n-x", "with_partner": 999, "merge_into": w["id"],
+                                      "items": [{"exercise_id": "Leg_Press", "sets": [{"reps": 10, "load_kg": 50}]}]}).json()
+    assert "with_partner" not in x and x["id"] != w["id"]
+
+
+def test_train_together_uses_partner_plan_with_my_loads(env):
+    a, aid, n, nid, _b, _bid = env
+    _link(a, n, nid)
+    e = db.save_entry({"date": "2026-11-20", "kind": "forca", "status": "planejado", "day_name": "Pernas (variação)", "plan_id": None,
+                       "items": [{"exercise_id": "Leg_Press", "sets": 4, "reps": "8-12", "rest_s": 120, "load_kg": 180, "phase": "principal"},
+                                 {"exercise_id": "Leg_Extensions", "sets": 3, "reps": "10-15", "rest_s": 75, "phase": "principal"},
+                                 {"exercise_id": "corrida_rua", "sport": "corrida", "duration_min": 30, "phase": "principal"}]}, user_id=aid)
+    day = n.get(f"/api/partners/{aid}/day").json()
+    assert day["planned"][0]["title"] == "Pernas (variação)" and day["planned"][0]["has_sets"]
+    d = n.post(f"/api/partners/{aid}/draft", json={"entry_id": e["id"]}).json()
+    assert [i["exercise_id"] for i in d["items"]] == ["Leg_Press", "Leg_Extensions"] and d["with_partner"] == aid and not d.get("pulled")
+    press = d["items"][0]
+    assert len(press["sets"]) == 4 and not any(s["done"] for s in press["sets"])
+    assert all((s["load_kg"] or 0) != 180 for s in press["sets"])                    # a carga planejada dele não vem para mim
+    assert n.post(f"/api/partners/{aid}/draft", json={"entry_id": 99999}).status_code == 404
+    assert n.post(f"/api/partners/{aid}/draft", json={}).status_code == 400
+
+
+def test_duel_counts_time_and_calories_and_marks_estimates(env):
+    a, aid, n, nid, _b, _bid = env
+    _link(a, n, nid)
+    a.post("/api/sessions", json=ANDRE_WORKOUT)                                       # sem relógio: 65 min, calorias estimadas
+    db.save_session({"date": "2026-11-18T07:00", "source": "garmin", "garmin_activity_id": 1, "duration_min": 40,
+                     "garmin_summary": {"kcal": 480, "duration_min": 40},
+                     "items": [{"exercise_id": "corrida_rua", "sport": "corrida", "duration_min": 40, "distance_km": 6.2, "kcal": 480}]}, user_id=aid)
+    db.save_session({"date": "2026-11-20T12:35", "source": "android", "ext_id": "android:z1", "duration_min": 62,
+                     "items": [{"exercise_id": "atividade_outra", "duration_min": 62, "zone": 1, "kcal": 310}]}, user_id=nid)
+    db.save_session({"date": "2026-11-17T18:00", "source": "passos", "ext_id": "passos:2026-11-17", "duration_min": 120,
+                     "items": [{"exercise_id": "caminhada_rua", "sport": "caminhada", "duration_min": 120, "tss": 30}]}, user_id=nid)
+    d = a.get(f"/api/partners/{nid}/duel").json()
+    assert d["week_start"] == "2026-11-16" and d["me"]["first"] == "Andre" and d["partner"]["first"] == "Nathália"
+    m = {x["key"]: x for x in d["metrics"]}
+    assert (m["sessions"]["me"], m["sessions"]["partner"]) == (2, 1)                   # o festival estimado pelos passos não é treino
+    assert (m["minutes"]["me"], m["minutes"]["partner"]) == (105, 62)
+    assert m["kcal"]["partner"] == 310 and m["kcal"]["me"] > 480 and d["kcal_estimated"] and d["me"]["kcal_estimated"]
+    assert d["score"] == {"me": 3, "partner": 0, "lead": "me"} and d["together"] == ["2026-11-20"]
+    fri = next(x for x in d["days"] if x["date"] == "2026-11-20")
+    assert fri["me"]["minutes"] == 65 and fri["partner"]["kcal"] == 310 and not fri["future"]
+    mirror = n.get(f"/api/partners/{aid}/duel").json()
+    assert mirror["score"] == {"me": 0, "partner": 3, "lead": "partner"}
+    ov = a.get("/api/partners").json()["partners"][0]
+    assert ov["duel"]["score"]["lead"] == "me" and ov["today"]["done"][0]["minutes"] == 62
+
+
+def test_calorie_estimate_only_when_watch_gave_none():
+    s_watch = {"items": [{"exercise_id": "Leg_Press", "sets": [{"reps": 10, "load_kg": 50}] * 10}], "duration_min": 60, "garmin_summary": {"kcal": 300}}
+    s_app = {"items": [{"exercise_id": "Leg_Press", "sets": [{"reps": 10, "load_kg": 50}] * 10}], "duration_min": 60}
+    assert partners.session_kcal(s_watch, 60) == (300.0, False)
+    kcal, est = partners.session_kcal(s_app, 60)
+    assert est and kcal == round(partners.MET_STRENGTH * 60 * 1.0)
+    assert partners.session_minutes({"items": [{"exercise_id": "Leg_Press", "sets": [{}] * 10}]}) == 26.0   # sem duração: ~2,6 min por série

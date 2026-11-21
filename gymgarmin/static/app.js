@@ -212,15 +212,18 @@ async function viewHoje(weekDate) {
   const [sch, rd, gst, prof, stp] = await Promise.all([api(`/api/schedule${weekDate ? `?date=${weekDate}` : ""}`),
     weekDate ? Promise.resolve(null) : api("/api/readiness").catch(() => null), api("/api/garmin/status").catch(() => null),
     api("/api/profile").catch(() => null), weekDate ? Promise.resolve(null) : api("/api/steps").catch(() => null)]);
+  const prt = weekDate || actAs() ? null : await api("/api/partners").catch(() => null);
+
   if (!sch.plan) {
     const incomplete = profileMissing(state.profile || await api("/api/profile").catch(() => ({}))).length > 0;
-    view.innerHTML = `${pageHead("Hoje")}${firstStepsHtml(false)}${installCardHtml("hoje")}<section class="today-card">
+    view.innerHTML = `${pageHead("Hoje")}${firstStepsHtml(false)}${partnerCardsHtml(prt)}${installCardHtml("hoje")}<section class="today-card">
       <div class="eyebrow">Comece por aqui</div><div class="tc-title">Monte seu treino</div>
       <p class="muted">Diga há quanto tempo treina, os dias e o tempo que tem. O app monta musculação e corrida juntas, respeita suas limitações e reorganiza a semana quando você faltar.</p>
       ${incomplete ? `<a class="btn block" id="wiz-open" href="#bemvindo">✨ Responder 7 perguntas e montar meu treino</a>` : `<button class="btn block" id="gen-open">Gerar meu treino</button>`}
       <a class="btn ghost block" href="#planilhas" style="margin-top:8px">Montar manualmente</a></section>`;
     const go = $("#gen-open"); if (go) go.onclick = () => openGenerator();
     bindSteps();
+    view.onclick = async (ev) => { const t = ev.target.closest("button"); if (!t) return; try { await partnerAction(t.dataset, t, () => viewHoje()); } catch (e) { toast(e.message, 5000); } };
     return;
   }
   const g = sch.goals;
@@ -237,7 +240,7 @@ async function viewHoje(weekDate) {
   sch._sel = sel;
   const adjusted = plannedToday.some((e) => e.readiness_backup);
   view.innerHTML = `${weekDate ? pageHead(`Semana de ${ddmm(sch.week_start)}`) : pageHead("Hoje", true, sch.today)}
-  ${weekDate ? "" : firstStepsHtml(true) + statsHtml(rd, g, adjusted, plannedToday.length > 0) + (sch.pending || []).map(questionHtml).join("") + stepsAskHtml(stp, sch.today) + legacyHtml(sch) + focusChip(prof) + garminSyncCard(sch, gst) + installCardHtml("hoje")}${athleteHtml}
+  ${weekDate ? "" : firstStepsHtml(true) + statsHtml(rd, g, adjusted, plannedToday.length > 0) + (sch.pending || []).map(questionHtml).join("") + stepsAskHtml(stp, sch.today) + partnerCardsHtml(prt) + legacyHtml(sch) + focusChip(prof) + garminSyncCard(sch, gst) + installCardHtml("hoje")}${athleteHtml}
   ${missed.length ? `<div class="rec alerta"><b>Treino perdido:</b> ${missed.map((e) => `${e.weekday} ${ddmm(e.date)} – ${esc(e.day_name)}`).join(", ")}.
      <div class="row gap wrap" style="margin-top:6px">${missed.map((e) => `<button class="btn sm" data-skip="${e.id}">Ajustar a semana (${e.weekday})</button>`).join("")}</div></div>` : ""}
   <section class="week">
@@ -471,6 +474,7 @@ function bindAgenda(sch) {
         toast(r.closed ? `${r.closed.day_name} marcado como feito` : "Contou como treino extra", 3500); return again();
       }
       if (d.stag) { t.disabled = true; toast(stepsTagToast(await answerSteps(d.stag)), 5000); return again(); }
+      if (await partnerAction(d, t, again)) return;
       if (t.id === "legacy-clean" || t.id === "legacy-keep") {
         t.disabled = true; const keep = t.id === "legacy-keep";
         const r = await api("/api/schedule/legacy", { method: "POST", body: { keep } });
@@ -830,6 +834,125 @@ async function coachMineCard() {
       <span class="row gap">${c.linked ? `<label class="small row gap" style="margin:0"><input type="checkbox" data-share="${c.id}" ${c.share_health ? "checked" : ""}> saúde e sono</label>
         <button class="btn sm ghost" data-unlink="${c.id}">Remover acesso</button>` : `<button class="btn sm" data-link="${c.id}">Autorizar</button>`}</span></li>`).join("")}</ul></div>`;
 }
+/* ---- treinar com o companheiro: parceria, puxar o treino do outro, placar ---- */
+async function partnerMineCard() {
+  const me = state.me; if (!(me && me.logged_in) || actAs()) return "";
+  const p = await api("/api/partners").catch(() => null);
+  if (!p || !p.enabled || !p.people.length) return "";
+  const btn = (x) => x.status === "parceiro" ? `<button class="btn sm ghost" data-premove="${x.id}">Desfazer</button>`
+    : x.status === "convidou" ? `<button class="btn sm" data-pacc="${x.id}">Aceitar</button><button class="btn sm ghost" data-premove="${x.id}">Agora não</button>`
+    : x.status === "convidado" ? `<span class="small muted">convite enviado</span><button class="btn sm ghost" data-premove="${x.id}">Cancelar</button>`
+    : `<button class="btn sm" data-pinv="${x.id}">Convidar</button>`;
+  return `<div class="card" id="partner-mine"><h2>Treinar com alguém</h2>
+    <p class="small muted">Parceiros de treino veem um do outro só o treino: o que está planejado, o que foi feito (exercícios, séries, tempo e calorias) e o placar da semana. Nunca saúde, sono, passos ou peso. Dá para desfazer quando quiser.</p>
+    <ul class="list">${p.people.map((x) => `<li class="row between gap wrap"><span><b>${esc(x.name)}</b>${x.status === "parceiro" ? ` <span class="pill ok">parceiro de treino</span>` : x.status === "convidou" ? ` <span class="pill warn">convidou você</span>` : ""}</span>
+      <span class="row gap">${btn(x)}</span></li>`).join("")}</ul></div>`;
+}
+function bindPartnerMine() {
+  const c = $("#partner-mine"); if (!c) return;
+  c.onclick = async (e) => {
+    const t = e.target.closest("button"); if (!t || t.disabled) return; const d = t.dataset; t.disabled = true;
+    try {
+      if (d.pinv) { const r = await api(`/api/partners/${d.pinv}/invite`, { method: "POST" }); toast(r.status === "parceiro" ? "Agora vocês são parceiros de treino" : "Convite enviado: aparece para a pessoa na tela Hoje", 4500); }
+      else if (d.pacc) { await api(`/api/partners/${d.pacc}/accept`, { method: "POST" }); toast("Parceria de treino aceita"); }
+      else if (d.premove) { if (!confirm("Desfazer/cancelar a parceria de treino com esta pessoa?")) { t.disabled = false; return; } await api(`/api/partners/${d.premove}`, { method: "DELETE" }); }
+      viewPerfil();
+    } catch (err) { t.disabled = false; toast(err.message, 5000); }
+  };
+}
+// botões dos cartões de parceria (Hoje, com ou sem treino montado). Devolve true se o toque era de parceria.
+async function partnerAction(d, t, again) {
+  if (d.paccept) { t.disabled = true; await api(`/api/partners/${d.paccept}/accept`, { method: "POST" }); toast("Parceria de treino aceita"); again(); return true; }
+  if (d.pdecline) { t.disabled = true; await api(`/api/partners/${d.pdecline}`, { method: "DELETE" }); again(); return true; }
+  if (d.pday) { openPartnerDay(+d.pday, d.pname); return true; }
+  if (d.pduel) { openDuel(+d.pduel); return true; }
+  return false;
+}
+const kcalTxt = (v, est) => `${est ? "~" : ""}${fmtN(v)} kcal`;
+function partnerCardsHtml(p) {
+  if (!p || !p.enabled) return "";
+  const req = (p.requests || []).map((x) => `<div class="rec atencao q-card"><b>${esc(x.first)} quer treinar com você</b>
+    <p class="small" style="margin:4px 0 8px">Vocês passam a ver o treino um do outro (exercícios, séries, tempo e calorias) e um placar da semana. Nada de saúde, sono ou passos.</p>
+    <div class="row gap wrap"><button class="btn sm" data-paccept="${x.id}">Aceitar</button><button class="btn sm ghost" data-pdecline="${x.id}">Agora não</button></div></div>`).join("");
+  const cards = (p.partners || []).map((x) => {
+    const t = x.today || {}; const done = t.done || []; const plan = t.planned || [];
+    const status = done.length ? `Hoje ${esc(x.first)} já treinou: ${done.map((s) => `${esc(s.title)} (${s.minutes} min)`).join(", ")}.`
+      : plan.length ? `Hoje ${esc(x.first)} tem ${plan.map((e) => esc(e.title)).join(" + ")} na agenda.` : `${esc(x.first)} não tem treino hoje.`;
+    const du = x.duel; const m = du ? Object.fromEntries(du.metrics.map((k) => [k.key, k])) : null;
+    const lead = !du ? "" : du.score.lead === "me" ? "Você está na frente" : du.score.lead === "partner" ? `${esc(x.first)} está na frente` : "Empatados";
+    return `<section class="card partner-card"><div class="row between gap"><b>Treino com ${esc(x.first)}</b>${du ? `<span class="pill ${du.score.lead === "me" ? "ok" : ""}">${lead}</span>` : ""}</div>
+      <p class="small" style="margin:4px 0 8px">${status}</p>
+      ${m ? `<div class="duel-mini small"><span>Semana</span><span>você <b>${m.sessions.me}</b> × <b>${m.sessions.partner}</b> treinos</span><span><b>${fmtN(m.minutes.me)}</b> × <b>${fmtN(m.minutes.partner)}</b> min</span><span><b>${kcalTxt(m.kcal.me, (du.est || {}).me)}</b> × <b>${kcalTxt(m.kcal.partner, (du.est || {}).partner)}</b></span></div>` : ""}
+      <div class="row gap wrap" style="margin-top:8px"><button class="btn sm" data-pday="${x.id}" data-pname="${esc(x.first)}">${done.length || plan.length ? "Treinar junto / puxar o treino" : "Ver treinos"}</button>
+        <button class="btn sm ghost" data-pduel="${x.id}">Placar da semana</button></div></section>`;
+  }).join("");
+  return req + cards;
+}
+// o dia do parceiro: o que ele planejou e o que já fez; daqui sai o MEU treino com as minhas cargas
+async function openPartnerDay(pid, first, day) {
+  let d;
+  try { d = await api(`/api/partners/${pid}/day${day ? `?date=${day}` : ""}`); } catch (e) { return toast(e.message, 5000); }
+  const name = d.partner.first || first || "parceiro";
+  const itemsTxt = (its) => its.map((i) => i.kind === "forca" ? `${esc(i.name)}${i.n ? ` ${i.n}×${i.reps ? esc(String(i.reps)) : ""}` : ""}` : `${esc(i.name)}${i.minutes ? ` ${i.minutes} min` : ""}`).join(" · ");
+  const prev = addDays(d.date, -1); const today = localISO().slice(0, 10);
+  const body = openModal(`<h2>Treino de ${esc(name)}</h2>
+    <div class="row between gap" style="margin:-4px 0 10px"><button class="btn sm ghost" data-go="${prev}">‹ ${ddmm(prev)}</button><b>${d.date === today ? "Hoje" : ddmm(d.date)}</b>
+      <button class="btn sm ghost" data-go="${d.next}" ${d.date >= today ? "disabled" : ""}>${ddmm(d.next)} ›</button></div>
+    ${d.done.length ? `<h3>Já feito</h3>${d.done.map((s) => `<div class="pt-row"><div><b>${esc(s.title)}</b> <span class="small muted">· ${s.date.slice(11, 16)} · ${s.minutes} min · ${kcalTxt(s.kcal, s.kcal_estimated)}</span></div>
+      <div class="small muted">${itemsTxt(s.items) || "sem exercícios registrados (só tempo)"}</div>
+      ${s.has_sets ? `<button class="btn sm" data-pull="${s.id}">Fiz esse treino com ${esc(name)}: puxar</button>` : `<p class="small muted" style="margin:4px 0 0">Sem séries registradas: não há o que puxar.</p>`}</div>`).join("")}` : ""}
+    ${d.planned.length ? `<h3>Na agenda</h3>${d.planned.map((e) => `<div class="pt-row"><div><b>${esc(e.title)}</b></div><div class="small muted">${itemsTxt(e.items)}</div>
+      ${e.has_sets ? `<button class="btn sm" data-join="${e.id}">Treinar junto agora</button>` : `<p class="small muted" style="margin:4px 0 0">Sem musculação nesse treino (corrida e cardio cada um faz no seu ritmo).</p>`}</div>`).join("")}` : ""}
+    ${!d.done.length && !d.planned.length ? `<p class="muted">Nenhum treino de ${esc(name)} nesse dia.</p>` : ""}
+    <p class="small muted" style="margin-top:12px">“Puxar” copia os exercícios, as séries e as repetições de ${esc(name)}; as cargas são as suas (a dele aparece só como referência). Se o seu relógio só marcou o tempo, você escolhe juntar com essa atividade na hora de salvar.</p>`);
+  body.onclick = async (e) => {
+    const t = e.target.closest("button"); if (!t || t.disabled) return; const ds = t.dataset;
+    if (ds.go) return openPartnerDay(pid, name, ds.go);
+    if (!ds.pull && !ds.join) return;
+    t.disabled = true;
+    try {
+      const draft = await api(`/api/partners/${pid}/draft`, { method: "POST", body: ds.pull ? { session_id: +ds.pull } : { entry_id: +ds.join } });
+      if ((draft.already || []).length && !confirm(`Você já tem um treino puxado de ${name} nesse dia. Puxar de novo cria outro. Continuar?`)) { t.disabled = false; return; }
+      const cur = store("gg_session");
+      if (cur && (cur.items || []).length && !confirm("Há um treino em andamento guardado neste aparelho. Trocar por este?")) { t.disabled = false; return; }
+      const cand = draft.merge_candidates || [];
+      state.session = { ...draft, view: draft.pulled ? "lista" : undefined, merge_into: cand.length === 1 ? cand[0].id : null };
+      store("gg_session", state.session); closeModal();
+      if (location.hash !== "#treinar/parceiro") location.hash = "#treinar/parceiro"; else renderSession();
+    } catch (err) { t.disabled = false; toast(err.message, 5000); }
+  };
+}
+function partnerDraftHtml(s) {
+  if (!s.with_partner) return "";
+  const cand = s.merge_candidates || [];
+  return `<div class="rec small" style="margin-top:10px"><b>${s.pulled ? `Treino puxado de ${esc(s.partner_name || "parceiro")}` : `Treinando com ${esc(s.partner_name || "parceiro")}`}</b>
+    <p style="margin:4px 0">${s.pulled ? "Exercícios, séries e repetições são os dele, já marcados como feitos. Confira as suas cargas (em cinza, a que ele usou), tire o que você não fez e salve." : "Mesmos exercícios e séries do treino dele, com as suas cargas."}</p>
+    ${cand.length ? `<p style="margin:6px 0 2px"><b>É a mesma atividade que o seu relógio gravou?</b> Se for, o tempo, a frequência cardíaca e as calorias dela ficam neste treino (sem contar duas vezes).</p>
+      ${cand.map((c) => `<label class="row gap" style="margin:2px 0"><input type="radio" name="pmerge" value="${c.id}" ${s.merge_into === c.id ? "checked" : ""}> ${esc(c.title)} · ${esc(c.time)} · ${c.minutes} min${c.kcal ? ` · ${fmtN(c.kcal)} kcal` : ""}</label>`).join("")}
+      <label class="row gap" style="margin:2px 0"><input type="radio" name="pmerge" value="" ${s.merge_into ? "" : "checked"}> Não, é outro treino</label>` : ""}</div>`;
+}
+// placar da semana: treinos, tempo e calorias de cada um
+async function openDuel(pid, day) {
+  let d;
+  try { d = await api(`/api/partners/${pid}/duel${day ? `?date=${day}` : ""}`); } catch (e) { return toast(e.message, 5000); }
+  const me = d.me, p = d.partner;
+  const bar = (m) => { const tot = (m.me + m.partner) || 1; const a = Math.round(100 * m.me / tot);
+    const val = (v, est) => m.key === "kcal" ? kcalTxt(v, est) : `${fmtN(v)}${m.unit ? " " + m.unit : ""}`;
+    return `<div class="duel-row"><div class="row between small"><span><b>${val(m.me, me.kcal_estimated)}</b></span><span class="muted">${esc(m.label)}</span><span><b>${val(m.partner, p.kcal_estimated)}</b></span></div>
+      <div class="duel-bar" role="img" aria-label="${esc(m.label)}: você ${m.me}, ${esc(p.first)} ${m.partner}"><span class="a ${m.lead === "me" ? "lead" : ""}" style="width:${m.me || m.partner ? a : 50}%"></span><span class="b ${m.lead === "partner" ? "lead" : ""}" style="width:${m.me || m.partner ? 100 - a : 50}%"></span></div></div>`; };
+  const head = d.score.lead === "me" ? `Você está na frente (${d.score.me} × ${d.score.partner})` : d.score.lead === "partner" ? `${esc(p.first)} está na frente (${d.score.partner} × ${d.score.me})` : `Empate (${d.score.me} × ${d.score.partner})`;
+  const cell = (x) => x ? `${x.minutes} min<br><span class="muted">${kcalTxt(x.kcal, x.kcal_estimated)}</span>` : `<span class="muted">—</span>`;
+  const body = openModal(`<h2>Placar da semana</h2>
+    <div class="row between gap" style="margin:-4px 0 10px"><button class="btn sm ghost" data-go="${d.prev}">‹ anterior</button><b>${ddmm(d.week_start)} a ${ddmm(d.week_end)}</b>
+      <button class="btn sm ghost" data-go="${d.next || ""}" ${d.next ? "" : "disabled"}>próxima ›</button></div>
+    <div class="row between"><b>Você</b><span class="pill ${d.score.lead === "me" ? "ok" : ""}">${head}</span><b>${esc(p.first)}</b></div>
+    ${d.metrics.map(bar).join("")}
+    <table class="duel-days small"><thead><tr><th></th><th>Você</th><th>${esc(p.first)}</th></tr></thead><tbody>
+      ${d.days.filter((x) => !x.future).map((x) => `<tr class="${d.together.includes(x.date) ? "tog" : ""}"><td>${["dom", "seg", "ter", "qua", "qui", "sex", "sáb"][new Date(x.date + "T12:00:00").getDay()]} ${ddmm(x.date)}</td><td class="${x.lead === "me" ? "win" : ""}">${cell(x.me)}</td><td class="${x.lead === "partner" ? "win" : ""}">${cell(x.partner)}</td></tr>`).join("")}
+    </tbody></table>
+    <p class="small muted">Vale um ponto para quem ganha em cada item (treinos, tempo, calorias). ${d.kcal_estimated ? "Calorias com “~” são estimadas pelo tempo e pelo peso, porque o relógio não informou. " : ""}Calorias dependem do peso de cada um e do relógio: servem para brincar, não para comparar esforço. No dia a dia ganha quem gastou mais calorias.</p>`);
+  body.onclick = (e) => { const t = e.target.closest("button[data-go]"); if (t && t.dataset.go) openDuel(pid, t.dataset.go); };
+}
 function bindCoachMine() {
   $$("[data-link]").forEach((b) => { b.onclick = async () => { await api(`/api/coach/mine/${b.dataset.link}`, { method: "POST" }); toast("Coach autorizado"); viewPerfil(); }; });
   $$("[data-unlink]").forEach((b) => { b.onclick = async () => { if (!confirm("Remover o acesso deste coach?")) return; await api(`/api/coach/mine/${b.dataset.unlink}`, { method: "DELETE" }); viewPerfil(); }; });
@@ -1179,7 +1302,7 @@ function bindDevices() {
 }
 function bindAccount() {
   bindDevices();
-  bindCoachMine();
+  bindCoachMine(); bindPartnerMine();
   const st = $("#acc-setup");
   if (st) st.onsubmit = async (e) => {
     e.preventDefault();
@@ -1555,6 +1678,11 @@ async function showExercise(id) {
 
 /* ------------------------------------------------------------- TREINAR -- */
 async function viewTreinar(planId, idx) {
+  if (planId === "parceiro") {  // treino puxado do parceiro (ou "treinar junto"): o rascunho já está montado
+    const draft = state.session && state.session.with_partner ? state.session : store("gg_session");
+    if (draft && draft.with_partner) { state.session = draft; return renderSession(); }
+    return viewTreinar();
+  }
   if (planId === "livre") {
     const draft = store("gg_session");
     if (draft && (draft.schedule_id || draft.plan_id)) return viewTreinar();  // já existe outro treino em andamento: a pessoa escolhe
@@ -1629,7 +1757,8 @@ function renderSession() {
       <div class="meter" style="margin-top:10px"><span style="width:${mainIt.length ? Math.round(100 * doneN / mainIt.length) : 0}%"></span></div>
       <details class="small sub" style="margin-top:8px"><summary>Data e hora: ${esc(when)}</summary>
         <div class="field" style="margin:0 0 6px"><label for="s-date">Data e hora do treino</label><input type="datetime-local" id="s-date" value="${esc((s.date || "").slice(0, 16))}"></div></details>
-      ${s.deload ? `<p class="small rec">Semana de deload: menos séries, carga −10%, RPE ~6.</p>` : ""}</section>
+      ${s.deload ? `<p class="small rec">Semana de deload: menos séries, carga −10%, RPE ~6.</p>` : ""}
+      ${partnerDraftHtml(s)}</section>
     ${missingChipsHtml(s)}
     ${compactCard("preparo", "Aquecimento — elevar, ativar, potencializar")}
     ${idxs.filter(([it]) => phaseOf(it) === "principal").map(([it, i]) => sessionItemHtml(it, i)).join("")}
@@ -1662,7 +1791,8 @@ function sessionItemHtml(it, i) {
     <div class="grow"><b data-ex="${esc(it.exercise_id)}" style="cursor:pointer">${esc(it.name)}</b> ${limBadge(it.limitation)}
     <div class="small muted">${it.kind === "cardio" ? `${plan.duration_min || ""} min · Z${plan.zone || ""}` : `${plan.sets || plan.reps || plan.duration_s ? `${plan.sets || ""}×${plan.reps || (plan.duration_s ? plan.duration_s + "s" : "")} ${plan.load_kg ? "· " + plan.load_kg + " kg" : ""} · ` : ""}descanso ${plan.rest_s || 90}s${plan.rir && !plan.deload ? ` · <span title="${RIR_TIP}">sobrar ${esc(plan.rir)} reps</span>` : ""}`}
     ${(it.warmup || []).length ? `<br>Aquecimento: ${esc(it.warmup.map((w) => `${w.reps}×${w.load_kg ? w.load_kg + " kg" : "~" + w.pct + "%"}`).join(" · "))}` : ""}
-    ${lastTxt ? `<br>Última: ${esc(lastTxt)}` : ""}${it.suggestion && it.suggestion.note ? `<br><b>${esc(it.suggestion.note)}</b>` : ""}${plan.notes ? `<br>${esc(plan.notes)}` : ""}</div></div></div>`;
+    ${lastTxt ? `<br>Última: ${esc(lastTxt)}` : ""}${it.suggestion && it.suggestion.note ? `<br><b>${esc(it.suggestion.note)}</b>` : ""}${plan.notes ? `<br>${esc(plan.notes)}` : ""}
+    ${it.from_partner && (it.sets || []).some((x) => x.partner_load != null) ? `<br>Carga de ${esc((state.session || {}).partner_name || "parceiro")}: ${esc(it.sets.map((x) => x.partner_load ?? "—").join(" · "))} kg (só referência)` : ""}</div></div></div>`;
   if (it.endurance) {
     const en = it.endurance; const meters = ["natacao", "remo"].includes(en.sport);
     return `<div class="card"><div><b>${SPORT_ICON[en.sport] || ""} ${esc(en.title)}</b> <span class="small muted">${esc(endSummary(en))}</span>
@@ -1688,7 +1818,7 @@ function sessionItemHtml(it, i) {
     <table class="set-table" style="margin-top:8px"><thead><tr><th>#</th><th>${timed ? "Tempo s" : "Reps"}</th><th>kg</th><th>RPE</th><th></th></tr></thead><tbody>
     ${it.sets.map((x, j) => `<tr class="${x.done ? "done" : ""}"><td>${j + 1}</td>
       <td><input class="num" inputmode="numeric" data-s="${timed ? "duration_s" : "reps"}" data-i="${i}" data-j="${j}" value="${esc(timed ? x.duration_s ?? "" : x.reps ?? "")}"></td>
-      <td><input class="num" inputmode="decimal" data-s="load_kg" data-i="${i}" data-j="${j}" value="${esc(x.load_kg ?? "")}"></td>
+      <td><input class="num" inputmode="decimal" data-s="load_kg" data-i="${i}" data-j="${j}" value="${esc(x.load_kg ?? "")}"${x.partner_load != null ? ` placeholder="${esc(x.partner_load)}" aria-label="Sua carga (a do parceiro foi ${esc(x.partner_load)} kg)"` : ""}></td>
       <td><select class="num" data-s="rpe" data-i="${i}" data-j="${j}"><option value=""></option>${[6, 7, 8, 9, 10].map((r) => `<option ${+x.rpe === r ? "selected" : ""}>${r}</option>`).join("")}</select></td>
       <td><button class="check ${x.done ? "on" : ""}" data-done="${i}:${j}" aria-label="Série feita">✓</button></td></tr>`).join("")}
     </tbody></table>
@@ -1747,6 +1877,7 @@ function bindSession() {
   $("#s-add").onclick = () => addEx();
   $("#s-cancel").onclick = () => { if (confirm("Descartar este treino?")) { store("gg_session", null); state.session = null; location.hash = "#hoje"; } };
   $("#s-finish").onclick = finishSession;
+  $$("[name=pmerge]").forEach((r) => { r.onchange = () => { s.merge_into = +r.value || null; store("gg_session", s); }; });
 }
 async function finishSession() {
     const s = state.session; const save = () => store("gg_session", s);
@@ -1767,6 +1898,8 @@ async function finishSession() {
     };
     if (!payload.items.length) return toast("Nada para salvar ainda: marque pelo menos uma série ou um cardio como feito.", 5000);
     payload.client_id = s.client_id || (s.client_id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
+    if (s.with_partner) payload.with_partner = s.with_partner;
+    if (s.merge_into) payload.merge_into = s.merge_into;
     save();
     const btn = $("#s-finish"); btn.disabled = true;
     let saved;
@@ -3173,7 +3306,7 @@ async function viewPerfil(openSec) {
   const g = await api("/api/garmin/status");
   const num = (k, label, extra = "") => `<div class="field"><label>${label}</label><input type="number" data-p="${k}" value="${esc(p[k] ?? "")}" ${extra}></div>`;
   state.me = await api("/api/auth/me").catch(() => state.me);
-  const [acctHtml, coachHtml, devHtml] = [await accountCard(), await coachMineCard(), await devicesCard()];
+  const [acctHtml, coachHtml, devHtml, partnerHtml] = [await accountCard(), await coachMineCard(), await devicesCard(), await partnerMineCard()];
   const canBackup = !(state.me && state.me.logged_in && !state.me.user.is_admin);
   const miss = profileMissing(p);
   const filled = PROFILE_REQ.length - miss.length;
@@ -3265,6 +3398,7 @@ async function viewPerfil(openSec) {
   
     ${devHtml}
     ${g.connected ? "" : `<button class="act" id="watch-skip" style="margin-top:10px">Não uso relógio por enquanto</button>`}`, g.needs_reconnect || openSec === "relogios")}
+  ${partnerHtml ? sect("parceiro", "🤝", "Treinar com alguém", "parceiro de treino e placar da semana", partnerHtml) : ""}
   ${coachHtml ? sect("coach", "🧑‍🏫", "Coach", "quem acompanha seus treinos", coachHtml) : ""}
   ${sect("conta", "🔒", "Conta e segurança", state.me && state.me.logged_in ? esc(state.me.user.email) : "criar login", `${acctHtml}
     ${canBackup ? `<h3>Backup${state.me && state.me.logged_in ? " (todas as contas)" : " dos seus dados"}</h3>

@@ -88,8 +88,8 @@ def parse_dt(v) -> datetime | None:
         dt = datetime.fromisoformat(s.replace("Z", "+00:00"))
     except ValueError:
         return None
-    if dt.tzinfo is not None:  # horário local do app (America/Sao_Paulo)
-        dt = dt.astimezone(clock.now().tzinfo).replace(tzinfo=None)
+    if dt.tzinfo is not None:  # horário local do app (America/Sao_Paulo), não o do servidor (que roda em UTC)
+        dt = dt.astimezone(clock.TZ).replace(tzinfo=None)
     return dt
 
 
