@@ -231,6 +231,50 @@ def _session_view(s: dict, weight_kg: float | None, detail: bool = True, minutes
             "watch": bool(s.get("garmin_activity_id") or s.get("ext_id")), "source": s.get("source") or "app"}
 
 
+def strength_ids(s: dict) -> set[str]:
+    return {it["exercise_id"] for it in s.get("items") or [] if _is_strength(it)}
+
+
+def same_workout(a: set, b: set) -> bool:
+    """Mesmo treino: pelo menos 60% dos exercícios do menor em comum (um pode ter pulado ou trocado um aparelho)."""
+    if not a or not b:
+        return False
+    return len(a & b) >= max(1, round(0.6 * min(len(a), len(b))))
+
+
+def pair(mine: list[dict], theirs: list[dict], uid: int, pid: int) -> dict[int, int | None]:
+    """Para cada treino MEU do dia (com séries): a qual treino do parceiro ele corresponde.
+    {id do meu treino: id do treino dele, ou None se é treino com ele sem par (ex.: treinou junto pelo planejado
+    e ele ainda não registrou)}. Treino meu que não aparece no resultado não tem relação com o parceiro."""
+    out: dict[int, int | None] = {}
+    th = [(t, strength_ids(t)) for t in theirs if strength_ids(t)]
+    for m in mine:
+        ids = strength_ids(m)
+        if not ids:
+            continue
+        best, best_n = None, 0
+        for t, tids in th:
+            n = len(ids & tids)
+            if n > best_n and (same_workout(ids, tids) or m.get("with_partner") == pid or t.get("with_partner") == uid):
+                best, best_n = t, n
+        if best is not None:
+            out[m["id"]] = best["id"]
+        elif m.get("with_partner") == pid:
+            out[m["id"]] = None
+    return out
+
+
+def registered_view(s: dict) -> dict:
+    """O que ficou salvo de um treino meu, para mostrar "✓ Você registrou"."""
+    st = [it for it in s.get("items") or [] if _is_strength(it)]
+    sets = [x for it in st for x in it["sets"] if x.get("done", True)]
+    t, est = session_time(s)
+    return {"id": s.get("id"), "title": s.get("day_name") or s.get("notes") or "Treino", "time": str(s.get("date"))[11:16],
+            "date": str(s.get("date"))[:10], "exercises": len(st), "sets": len(sets), "minutes": round(t), "minutes_estimated": est,
+            "no_load": sum(1 for x in sets if x.get("load_kg") in (None, "") and not x.get("duration_s")),
+            "with_partner": s.get("with_partner")}
+
+
 def _entry_view(e: dict) -> dict:
     items = []
     for it in e.get("items") or []:
@@ -254,10 +298,21 @@ def day(uid: int, pid: int, d: date) -> dict:
     mine = [s for s in db.list_sessions(uid, since=iso, limit=60) if str(s.get("date"))[:10] == iso and str(s.get("source")) != "passos"]
     planned = [e for e in db.list_schedule(iso, iso, user_id=pid) if e.get("status") in ("planejado", "perdido")]
     ov_me, ov_p = _shared_time(mine, theirs, uid, pid)  # treino feito junto: o mesmo tempo que o placar mostra
+    links = pair(mine, theirs, uid, pid)
+    done = []
+    for s in sorted(theirs, key=lambda s: str(s.get("date"))):
+        v = _session_view(s, w_p, minutes=ov_p.get(s.get("id")))
+        v["mine_ids"] = [mid for mid, tid in links.items() if tid == s.get("id")]   # o que EU já registrei desse treino
+        done.append(v)
+    mine_v = []
+    for s in sorted(mine, key=lambda s: str(s.get("date"))):
+        v = _session_view(s, w_me, detail=True, minutes=ov_me.get(s.get("id")))
+        v["linked"] = s.get("id") in links
+        v["registered"] = registered_view(s)
+        mine_v.append(v)
     return {"date": iso, "next": nxt, "partner": {"id": pid, "name": _names().get(pid, ""), "first": first_name(_names().get(pid, ""))},
-            "done": [_session_view(s, w_p, minutes=ov_p.get(s.get("id"))) for s in sorted(theirs, key=lambda s: str(s.get("date")))],
-            "planned": [_entry_view(e) for e in planned],
-            "mine": [_session_view(s, w_me, detail=False, minutes=ov_me.get(s.get("id"))) for s in sorted(mine, key=lambda s: str(s.get("date")))]}
+            "done": done, "planned": [_entry_view(e) for e in planned], "mine": mine_v,
+            "registered": [registered_view(s) for s in sorted(mine, key=lambda s: str(s.get("date"))) if s.get("id") in links]}
 
 
 def plan_items_from_session(s: dict) -> tuple[list[dict], dict[str, list[dict]]]:

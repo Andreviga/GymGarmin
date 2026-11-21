@@ -545,6 +545,16 @@ details.rec { padding: 2px 12px; }
 .prof-name { font-size: 20px; font-weight: 800; letter-spacing: -.4px; }
 .avatar.xl { width: 56px; height: 56px; font-size: 20px; flex: none; }
 .ok-txt { color: var(--ok); font-weight: 650; }
+.reg-box { background: var(--ok-bg); border-radius: 12px; padding: 10px 12px; margin: 6px 0 8px; }
+.reg-box.dup { background: var(--warn-bg); }
+.reg-box .reg-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; padding: 4px 0; }
+.reg-box .reg-row + .reg-row { border-top: 1px solid var(--line); }
+.no-load { color: var(--warn); font-weight: 650; }
+input.need-load { border: 2px solid var(--warn); background: var(--warn-bg); }
+.sv-list { margin: 6px 0 0; padding: 0; list-style: none; }
+.sv-list li { padding: 6px 0; border-top: 1px solid var(--line); }
+.sv-list li:first-child { border-top: 0; }
+.sess-row { cursor: pointer; }
 .sect { background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow); margin-bottom: 10px; overflow: hidden; }
 .sect > summary { display: flex; align-items: center; gap: 12px; padding: 14px 16px; min-height: 64px; list-style: none; cursor: pointer; }
 .sect > summary::-webkit-details-marker { display: none; }

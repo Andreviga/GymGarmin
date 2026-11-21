@@ -1247,6 +1247,21 @@ def create_session(body: dict = Body(...)):
                 body["duration_min"] = round(float(dm), 1)
             else:
                 body.pop("duration_min")
+        if body.get("with_partner") is not None and body.pop("allow_repeat", None) is not True:
+            acc = auth.current_account()
+            day_iso = str(body.get("date") or "")[:10]
+            twin = [x for x in db.list_sessions(since=day_iso or None, limit=60) if str(x.get("date"))[:10] == day_iso
+                    and x.get("client_id") != body.get("client_id")
+                    and partners.same_workout(partners.strength_ids(x), partners.strength_ids(body))
+                    # do relógio só conta se já tem dono (juntado com um treino anotado): o resto o salvar junta sozinho
+                    and (x.get("with_partner") == body["with_partner"] or x.get("merged")
+                         or not (x.get("garmin_activity_id") or x.get("ext_id")))] if acc and day_iso else []
+            if twin:
+                v = partners.registered_view(twin[0])
+                raise HTTPException(409, f"Você já registrou esse treino em {v['date'][8:10]}/{v['date'][5:7]} às {v['time']} "
+                                         f"({v['exercises']} exercícios, {v['sets']} séries). Para mudar, toque em Ver e corrigir "
+                                         f"no cartão do parceiro ou no Histórico.")
+        body.pop("allow_repeat", None)
         target = body.pop("merge_into", None)
         no_merge = body.pop("no_merge", None) is True   # a pessoa viu a atividade do relógio e disse "é outro treino"
         watch = db.get_session(target) if isinstance(target, int) and not isinstance(target, bool) else None
@@ -1257,7 +1272,7 @@ def create_session(body: dict = Body(...)):
             credit = schedule.credit_session(saved, _profile())
             saved = db.get_session(saved["id"]) or saved
             return {**saved, "prs": history.session_prs(db.list_sessions(limit=5000), saved, _profile().get("weight_kg")),
-                    "credit": credit}
+                    "credit": credit, **_saved_extra(saved)}
         twin = None if body.get("garmin_activity_id") or no_merge else \
             dedupe.find_twin(body, db.list_sessions(since=str(body.get("date") or "")[:10] or None, limit=200))
         if twin:  # o relógio já trouxe este treino: junta (séries do app + medidas do relógio)
@@ -1273,9 +1288,58 @@ def create_session(body: dict = Body(...)):
         credit = schedule.credit_session(saved, _profile())
         saved = db.get_session(saved["id"]) or saved
         return {**saved, "prs": history.session_prs(db.list_sessions(limit=5000), saved, _profile().get("weight_kg")),
-                "credit": credit}
+                "credit": credit, **_saved_extra(saved)}
     except ValueError as e:
         raise HTTPException(409, str(e)) from e
+
+
+def _saved_extra(saved: dict) -> dict:
+    """O que ficou salvo, para a tela mostrar na hora (exercícios, séries, cargas) e com quem."""
+    try:
+        v = partners._session_view(saved, _profile().get("weight_kg"))
+        pid = saved.get("with_partner")
+        return {"summary": {"items": [i for i in v["items"] if i["kind"] == "forca"], "registered": partners.registered_view(saved),
+                            "partner_name": partners.first_name(partners._names().get(int(pid), "")) if pid else None}}
+    except Exception:  # noqa: BLE001 — o resumo é só para a tela: nunca impede o treino de ser salvo
+        return {}
+
+
+@app.get("/api/sessions/{session_id}/summary")
+def session_summary(session_id: int):
+    s = db.get_session(session_id)
+    if not s:
+        raise HTTPException(404, "Sessão não encontrada")
+    v = partners._session_view(s, _profile().get("weight_kg"))
+    return {**v, **_saved_extra(s), "date_full": str(s.get("date"))[:16], "notes": s.get("notes") if s.get("day_name") else None}
+
+
+@app.get("/api/sessions/{session_id}/edit")
+def session_edit_draft(session_id: int):
+    """Um treino já salvo aberto na tela de treino para corrigir repetições e cargas (salvar troca o mesmo registro)."""
+    s = db.get_session(session_id)
+    if not s:
+        raise HTTPException(404, "Sessão não encontrada")
+    st = [it for it in s.get("items") or [] if partners._is_strength(it)]
+    if not st:
+        raise HTTPException(400, "Esse treino não tem séries de musculação para corrigir.")
+    plan_items = []
+    for it in st:
+        reps = [int(x["reps"]) for x in it["sets"] if x.get("reps")]
+        plan_items.append({"exercise_id": it["exercise_id"], "sets": len(it["sets"]), "reps": str(max(set(reps), key=reps.count)) if reps else "10",
+                           "rest_s": 90, "phase": "principal"})
+    items = _prefill_items(plan_items)
+    for it, orig in zip(items, st):
+        it["sets"] = [{"reps": x.get("reps"), "duration_s": x.get("duration_s"), "load_kg": x.get("load_kg"), "rpe": x.get("rpe"),
+                       "done": x.get("done", True)} for x in orig["sets"]]
+        it["warmup"] = []
+    pname = None
+    if s.get("with_partner"):
+        pname = partners.first_name(partners._names().get(int(s["with_partner"]), ""))
+    other = [partners._ex_name(it.get("exercise_id"), it) for it in s.get("items") or [] if not partners._is_strength(it)]
+    return {"edit_id": session_id, "date": str(s.get("date"))[:16], "day_name": s.get("day_name") or s.get("notes") or "Treino",
+            "notes": s.get("notes") if s.get("day_name") else None, "view": "lista", "items": items, "partner_name": pname,
+            "with_partner": s.get("with_partner"), "kept_items": other,
+            "duration_min": s.get("duration_min") if not (s.get("garmin_activity_id") or s.get("ext_id")) else None}
 
 
 @app.get("/api/sessions/{session_id}")
@@ -1291,12 +1355,28 @@ def put_session(session_id: int, body: dict = Body(...)):
     old = db.get_session(session_id)
     if not old:
         raise HTTPException(404, "Sessão não encontrada")
-    # a edição não apaga o vínculo com a agenda nem a decisão "foi o treino X / é um extra"
-    keep = {k: old[k] for k in ("schedule_id", "client_id", "extra", "match_pending") if k in old and k not in body}
+    body = dict(body)
+    for k in ("id", "created_at", "client_id", "merge_into", "no_merge", "allow_repeat", "time_set", "merged", "garmin_activity_id",
+              "ext_id", "source", "garmin_summary"):
+        body.pop(k, None)   # vínculo com o relógio, origem e identidade do treino não mudam numa correção
+    if body.pop("edit", None) is True:
+        # correção pela tela: ela só mexe nas séries de musculação; cardio, atividade do relógio e séries sem nome ficam
+        body = {k: body[k] for k in ("items", "date", "day_name", "notes", "duration_min") if k in body and body[k] is not None}
+        kept = [it for it in old.get("items") or [] if not partners._is_strength(it)]
+        body["items"] = [it for it in body.get("items") or [] if it.get("sets")] + kept
+        if old.get("garmin_activity_id") or old.get("ext_id"):
+            body.pop("duration_min", None)   # o tempo medido pelo relógio vale mais que o da tela
+    if "with_partner" in body:
+        acc = auth.current_account()
+        pid = body.get("with_partner")
+        if pid is not None and not (acc and isinstance(pid, int) and not isinstance(pid, bool) and partners.is_partner(acc["user_id"], pid)):
+            body.pop("with_partner")
+    # a edição não apaga o vínculo com a agenda, com o relógio, com o parceiro, nem a decisão "foi o treino X / é um extra"
+    keep = {k: v for k, v in old.items() if k not in ("id", "created_at") and k not in body}
     saved = db.save_session({**keep, **body}, session_id=session_id)
     from .credit import COVER_ASK
     schedule.reopen_for_session(saved, min_cover=COVER_ASK)  # editou até não cobrir mais o treino: ele volta à agenda
-    return saved
+    return {**saved, **_saved_extra(saved)}
 
 
 def _reopen_cardio_closed_by(saved: dict) -> None:
@@ -1407,6 +1487,12 @@ def session_prefill(plan_id: int, idx: int):
 # ----------------------------------------------------- evolução de cargas ----
 
 # ---- treinar com o companheiro: parceria, puxar o treino do outro, placar
+
+def _already(uid: int, pid: int, mine: list[dict], want: set) -> list[dict]:
+    """Treinos MEUS do dia que já são esse treino com essa pessoa (registrados juntos, puxados, ou mesmos exercícios)."""
+    return [partners.registered_view(x) for x in mine if partners.strength_ids(x) and (
+        x.get("with_partner") == pid or partners.same_workout(partners.strength_ids(x), want))]
+
 
 def _same_exercises(mine: dict, plan_items: list[dict]) -> bool:
     """Já tenho no dia um treino com (quase) os mesmos exercícios? (ex.: o treino do outro foi puxado do meu)"""
@@ -1529,7 +1615,9 @@ def partners_get():
         d = partners.day(uid, p["id"], today)
         p["today"] = {"planned": [{"id": e["id"], "title": e["title"], "has_sets": e["has_sets"]} for e in d["planned"]],
                       "done": [{"id": s["id"], "title": s["title"], "minutes": s["minutes"], "minutes_estimated": s["minutes_estimated"],
-                                "kcal": s["kcal"], "has_sets": s["has_sets"]} for s in d["done"]]}
+                                "kcal": s["kcal"], "has_sets": s["has_sets"], "mine_ids": s["mine_ids"],
+                                "from_me": s.get("with_partner") == uid} for s in d["done"]],
+                      "mine": d["registered"]}   # ✓ o que EU já registrei do treino com essa pessoa hoje
         du = partners.duel(uid, p["id"], today, today)
         p["duel"] = {"metrics": du["metrics"], "score": du["score"], "kcal_estimated": du["kcal_estimated"],
                      "est": {"me": du["me"]["kcal_estimated"], "partner": du["partner"]["kcal_estimated"]},
@@ -1539,7 +1627,7 @@ def partners_get():
         for back in (1, 2):
             prev = partners.day(uid, p["id"], today - timedelta(days=back))
             theirs = [s for s in prev["done"] if s["has_sets"]]
-            if theirs and not any(m.get("has_sets") for m in prev["mine"]):
+            if theirs and not any(m.get("has_sets") for m in prev["mine"]) and not any(t.get("with_partner") == uid for t in theirs):
                 p["recent"] = {"date": prev["date"], "days_ago": back, "id": theirs[-1]["id"], "title": theirs[-1]["title"],
                                "minutes": theirs[-1]["minutes"], "minutes_estimated": theirs[-1]["minutes_estimated"]}
                 break
@@ -1625,8 +1713,7 @@ def partners_draft(pid: int, body: dict = Body(...)):
                                       "title": x.get("notes") or x.get("day_name") or "Atividade do relógio",
                                       "match": dedupe.overlap(x, s) >= dedupe.MIN_OVERLAP} for x in watch],
                 "skipped_sets": skipped,
-                "already": [x["id"] for x in mine if any(i.get("sets") for i in x.get("items") or []) and (
-                    x.get("with_partner") == pid or _same_exercises(x, plan_items))]}
+                "already": _already(uid, pid, mine, {i["exercise_id"] for i in plan_items})}
     if body.get("entry_id") is not None:
         e = db.get_entry(int(body["entry_id"]), user_id=pid)
         if not e:
@@ -1634,8 +1721,11 @@ def partners_draft(pid: int, body: dict = Body(...)):
         plan_items = partners.plan_items_from_entry(e)
         if not plan_items:
             raise HTTPException(400, f"O treino de {who} nesse dia não tem musculação para fazer junto.")
+        today_iso = clock.today().isoformat()
+        mine_today = [x for x in db.list_sessions(uid, since=today_iso, limit=60) if str(x.get("date"))[:10] == today_iso]
         return {"date": clock.now().isoformat(timespec="minutes"), "day_name": f"{e.get('day_name') or 'Treino'} (com {who})",
-                "with_partner": pid, "partner_name": who, "items": _prefill_items(plan_items)}
+                "with_partner": pid, "partner_name": who, "items": _prefill_items(plan_items),
+                "already": _already(uid, pid, mine_today, {i["exercise_id"] for i in plan_items})}
     raise HTTPException(400, "Diga qual treino do parceiro (session_id ou entry_id)")
 
 
