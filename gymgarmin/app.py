@@ -1406,6 +1406,13 @@ def session_prefill(plan_id: int, idx: int):
 
 # ---- treinar com o companheiro: parceria, puxar o treino do outro, placar
 
+def _same_exercises(mine: dict, plan_items: list[dict]) -> bool:
+    """Já tenho no dia um treino com (quase) os mesmos exercícios? (ex.: o treino do outro foi puxado do meu)"""
+    want = {i["exercise_id"] for i in plan_items}
+    have = {i.get("exercise_id") for i in mine.get("items") or [] if i.get("sets")}
+    return bool(want) and len(want & have) >= max(1, round(len(want) * 0.6))
+
+
 def _me_id() -> int:
     acc = auth.current_account()
     if not acc:
@@ -1516,7 +1523,8 @@ def partners_get():
     for p in out["partners"]:
         d = partners.day(uid, p["id"], today)
         p["today"] = {"planned": [{"id": e["id"], "title": e["title"], "has_sets": e["has_sets"]} for e in d["planned"]],
-                      "done": [{"id": s["id"], "title": s["title"], "minutes": s["minutes"], "kcal": s["kcal"], "has_sets": s["has_sets"]} for s in d["done"]]}
+                      "done": [{"id": s["id"], "title": s["title"], "minutes": s["minutes"], "minutes_estimated": s["minutes_estimated"],
+                                "kcal": s["kcal"], "has_sets": s["has_sets"]} for s in d["done"]]}
         du = partners.duel(uid, p["id"], today, today)
         p["duel"] = {"metrics": du["metrics"], "score": du["score"], "kcal_estimated": du["kcal_estimated"],
                      "est": {"me": du["me"]["kcal_estimated"], "partner": du["partner"]["kcal_estimated"]},
@@ -1581,8 +1589,10 @@ def partners_draft(pid: int, body: dict = Body(...)):
         if not s or str(s.get("source")) == "passos":
             raise HTTPException(404, "Treino do parceiro não encontrado")
         plan_items, done = partners.plan_items_from_session(s)
+        skipped = partners.unnamed_sets(s)
         if not plan_items:
-            raise HTTPException(400, f"Esse treino de {who} não tem exercícios com séries para puxar (só tempo).")
+            raise HTTPException(400, f"As {skipped} séries desse treino de {who} vieram do relógio sem o nome do exercício. Quando {who} der nome a elas (Progresso → Conferir), dá para puxar."
+                                if skipped else f"Esse treino de {who} não tem exercícios com séries para puxar (só tempo).")
         items = _prefill_items(plan_items)
         for it in items:  # é um treino já feito: mesmas séries e repetições dele, marcadas; a carga é a minha (ou em branco)
             theirs = done.get(it["exercise_id"]) or []
@@ -1609,7 +1619,9 @@ def partners_draft(pid: int, body: dict = Body(...)):
                                       "kcal": round(partners.session_kcal(x, None)[0]) if not partners.session_kcal(x, None)[1] else None,
                                       "title": x.get("notes") or x.get("day_name") or "Atividade do relógio",
                                       "match": dedupe.overlap(x, s) >= dedupe.MIN_OVERLAP} for x in watch],
-                "already": [x["id"] for x in mine if x.get("with_partner") == pid and any(i.get("sets") for i in x.get("items") or [])]}
+                "skipped_sets": skipped,
+                "already": [x["id"] for x in mine if any(i.get("sets") for i in x.get("items") or []) and (
+                    x.get("with_partner") == pid or _same_exercises(x, plan_items))]}
     if body.get("entry_id") is not None:
         e = db.get_entry(int(body["entry_id"]), user_id=pid)
         if not e:

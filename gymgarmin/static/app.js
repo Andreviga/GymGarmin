@@ -890,7 +890,7 @@ function partnerCardsHtml(p) {
     <div class="row gap wrap"><button class="btn sm" data-paccept="${x.id}">Aceitar</button><button class="btn sm ghost" data-pdecline="${x.id}">Agora não</button></div></div>`).join("");
   const cards = (p.partners || []).map((x) => {
     const t = x.today || {}; const done = t.done || []; const plan = t.planned || [];
-    const status = done.length ? `Hoje ${esc(x.first)} já treinou: ${done.map((s) => `${esc(s.title)} (${s.minutes} min)`).join(", ")}.`
+    const status = done.length ? `Hoje ${esc(x.first)} já treinou: ${done.map((s) => `${esc(s.title)} (${s.minutes_estimated ? "~" : ""}${s.minutes} min)`).join(", ")}.`
       : plan.length ? `Hoje ${esc(x.first)} tem ${plan.map((e) => esc(e.title)).join(" + ")} na agenda.` : `${esc(x.first)} não tem treino hoje.`;
     const du = x.duel; const m = du ? Object.fromEntries(du.metrics.map((k) => [k.key, k])) : null;
     const lead = !du ? "" : du.score.lead === "me" ? "Você está na frente" : du.score.lead === "partner" ? `${esc(x.first)} está na frente` : "Empatados";
@@ -912,12 +912,16 @@ async function openPartnerDay(pid, first, day) {
   const name = d.partner.first || first || "parceiro";
   const itemsTxt = (its) => its.map((i) => i.kind === "forca" ? `${esc(i.name)}${i.n ? ` ${i.n}×${i.reps ? esc(String(i.reps)) : ""}` : ""}` : `${esc(i.name)}${i.minutes ? ` ${i.minutes} min` : ""}`).join(" · ");
   const prev = addDays(d.date, -1); const today = localISO().slice(0, 10);
+  const myId = state.me && state.me.user ? state.me.user.id : null;
   const body = openModal(`<h2>Treino de ${esc(name)}</h2>
     <div class="row between gap" style="margin:-4px 0 10px"><button class="btn sm ghost" data-go="${prev}">‹ ${ddmm(prev)}</button><b>${d.date === today ? "Hoje" : ddmm(d.date)}</b>
       <button class="btn sm ghost" data-go="${d.next}" ${d.date >= today ? "disabled" : ""}>${ddmm(d.next)} ›</button></div>
-    ${d.done.length ? `<h3>Já feito</h3>${d.done.map((s) => `<div class="pt-row"><div><b>${esc(s.title)}</b> <span class="small muted">· ${s.date.slice(11, 16)} · ${s.minutes} min · ${kcalTxt(s.kcal, s.kcal_estimated)}</span></div>
-      <div class="small muted">${itemsTxt(s.items) || "sem exercícios registrados (só tempo)"}</div>
-      ${s.has_sets ? `<button class="btn sm" data-pull="${s.id}">Fiz esse treino com ${esc(name)}: puxar</button>` : `<p class="small muted" style="margin:4px 0 0">Sem séries registradas: não há o que puxar.</p>`}</div>`).join("")}` : ""}
+    ${d.done.length ? `<h3>Já feito</h3>${d.done.map((s) => { const un = s.unnamed_sets || 0; const unTxt = un ? `${un} ${un === 1 ? "série" : "séries"} que o relógio gravou sem o nome do exercício` : "";
+      return `<div class="pt-row"><div><b>${esc(s.title)}</b> <span class="small muted">· ${s.date.slice(11, 16)} · ${s.minutes_estimated ? "~" : ""}${s.minutes} min · ${kcalTxt(s.kcal, s.kcal_estimated)}</span></div>
+      <div class="small muted">${itemsTxt(s.items) || (un ? unTxt : "sem exercícios registrados (só tempo)")}${un && s.has_sets ? ` · + ${unTxt} (ficam de fora ao puxar)` : ""}</div>
+      ${s.with_partner === myId ? `<p class="small muted" style="margin:4px 0 0">Esse treino ${esc(name)} puxou do seu: você já tem.</p>`
+        : s.has_sets ? `<button class="btn sm" data-pull="${s.id}">Fiz esse treino com ${esc(name)}: puxar</button>`
+        : `<p class="small muted" style="margin:4px 0 0">${un ? `Quando ${esc(name)} der nome a essas séries (Progresso → Conferir), dá para puxar.` : "Sem séries registradas: não há o que puxar."}</p>`}</div>`; }).join("")}` : ""}
     ${d.planned.length ? `<h3>Na agenda</h3>${d.planned.map((e) => `<div class="pt-row"><div><b>${esc(e.title)}</b></div><div class="small muted">${itemsTxt(e.items)}</div>
       ${e.has_sets ? `<button class="btn sm" data-join="${e.id}">Treinar junto agora</button>` : `<p class="small muted" style="margin:4px 0 0">Sem musculação nesse treino (corrida e cardio cada um faz no seu ritmo).</p>`}</div>`).join("")}` : ""}
     ${!d.done.length && !d.planned.length ? `<p class="muted">Nenhum treino de ${esc(name)} nesse dia.</p>` : ""}
@@ -933,7 +937,7 @@ async function openPartnerDay(pid, first, day) {
       const cur = store("gg_session");
       if (cur && (cur.items || []).length && !confirm("Há um treino em andamento guardado neste aparelho. Trocar por este?")) { t.disabled = false; return; }
       const hit = (draft.merge_candidates || []).filter((c) => c.match);  // só vem marcada a atividade do relógio no mesmo horário do treino
-      state.session = { ...draft, view: draft.pulled ? "lista" : undefined, merge_into: hit.length === 1 ? hit[0].id : null };
+      state.session = { ...draft, view: draft.pulled ? "lista" : undefined, merge_into: hit.length === 1 ? hit[0].id : null, merge_answered: hit.length === 1 };
       store("gg_session", state.session); closeModal();
       if (location.hash !== "#treinar/parceiro") location.hash = "#treinar/parceiro"; else renderSession();
     } catch (err) { t.disabled = false; toast(err.message, 5000); }
@@ -944,10 +948,11 @@ function partnerDraftHtml(s) {
   const cand = s.merge_candidates || [];
   const who = esc(s.partner_name || "quem treinou com você");
   return `<div class="rec small" style="margin-top:10px"><b>${s.pulled ? `Treino puxado de ${who}` : `Treinando com ${who}`}</b>
-    <p style="margin:4px 0">${s.pulled ? `Exercícios, séries e repetições são os de ${who}, já marcados como feitos. Confira as suas cargas (em cinza, a carga de ${who}), tire o que você não fez e salve.` : `Mesmos exercícios e séries do treino de ${who}, com as suas cargas.`}</p>
+    <p style="margin:4px 0">${s.pulled ? `Exercícios, séries e repetições são os de ${who}, já marcados como feitos. Confira as suas cargas (a carga de ${who} aparece embaixo do nome do exercício, só de referência), tire o que você não fez e salve.` : `Mesmos exercícios e séries do treino de ${who}, com as suas cargas.`}</p>
     ${cand.length ? `<p style="margin:6px 0 2px"><b>É a mesma atividade que o seu relógio gravou?</b> Se for, o tempo, a frequência cardíaca e as calorias dela ficam neste treino (sem contar duas vezes).</p>
       ${cand.map((c) => `<label class="row gap" style="margin:2px 0"><input type="radio" name="pmerge" value="${c.id}" ${s.merge_into === c.id ? "checked" : ""}> ${esc(c.title)} · ${esc(c.time)} · ${c.minutes} min${c.kcal ? ` · ${fmtN(c.kcal)} kcal` : ""}</label>`).join("")}
-      <label class="row gap" style="margin:2px 0"><input type="radio" name="pmerge" value="" ${s.merge_into ? "" : "checked"}> Não, é outro treino</label>` : ""}
+      <label class="row gap" style="margin:2px 0"><input type="radio" name="pmerge" value="" ${s.merge_answered && !s.merge_into ? "checked" : ""}> Não, é outro treino</label>` : ""}
+    ${s.skipped_sets ? `<p style="margin:6px 0 0"><b>Ficaram de fora ${s.skipped_sets} ${s.skipped_sets === 1 ? "série" : "séries"}</b> que o relógio de ${who} gravou sem o nome do exercício. Se você fez, use “+ Adicionar exercício” no fim da tela.</p>` : ""}
     ${s.pulled && s.duration_min ? `<label class="row gap" style="margin:8px 0 2px;align-items:center"><b>Tempo do treino</b> <input type="number" id="pdur" inputmode="numeric" min="5" max="400" value="${s.duration_min}" style="width:76px" aria-label="Tempo do treino em minutos"> min</label>
       <p class="muted" style="margin:0">O mesmo de ${who}; ajuste se o seu foi diferente.${cand.length ? " Se juntar com a atividade do relógio, vale o tempo que ela marcou." : ""}</p>` : ""}</div>`;
 }
@@ -1844,7 +1849,7 @@ function sessionItemHtml(it, i) {
     <table class="set-table" style="margin-top:8px"><thead><tr><th>#</th><th>${timed ? "Tempo s" : "Reps"}</th><th>kg</th><th>RPE</th><th></th></tr></thead><tbody>
     ${it.sets.map((x, j) => `<tr class="${x.done ? "done" : ""}"><td>${j + 1}</td>
       <td><input class="num" inputmode="numeric" data-s="${timed ? "duration_s" : "reps"}" data-i="${i}" data-j="${j}" value="${esc(timed ? x.duration_s ?? "" : x.reps ?? "")}"></td>
-      <td><input class="num" inputmode="decimal" data-s="load_kg" data-i="${i}" data-j="${j}" value="${esc(x.load_kg ?? "")}"${x.partner_load != null ? ` placeholder="${esc(x.partner_load)}" aria-label="Sua carga (a do parceiro foi ${esc(x.partner_load)} kg)"` : ""}></td>
+      <td><input class="num" inputmode="decimal" data-s="load_kg" data-i="${i}" data-j="${j}" value="${esc(x.load_kg ?? "")}"${x.partner_load != null ? ` placeholder="sua" aria-label="Sua carga (a do parceiro foi ${esc(x.partner_load)} kg)"` : ""}></td>
       <td><select class="num" data-s="rpe" data-i="${i}" data-j="${j}"><option value=""></option>${[6, 7, 8, 9, 10].map((r) => `<option ${+x.rpe === r ? "selected" : ""}>${r}</option>`).join("")}</select></td>
       <td><button class="check ${x.done ? "on" : ""}" data-done="${i}:${j}" aria-label="Série feita">✓</button></td></tr>`).join("")}
     </tbody></table>
@@ -1872,7 +1877,7 @@ function bindSession() {
       if (el.dataset.s === "load_kg" && e.type === "change") {  // ao sair do campo: leva a carga para as séries seguintes ainda vazias/iguais
         const from = el.dataset.was === undefined ? old : (el.dataset.was === "" ? null : +el.dataset.was);
         fxCarry(it, j, "load_kg", from, it.sets[j].load_kg);
-        it.sets.forEach((y, k) => { if (k > j && !y.done) { const inp = $(`input[data-s="load_kg"][data-i="${el.dataset.i}"][data-j="${k}"]`); if (inp) inp.value = y.load_kg ?? ""; } });
+        it.sets.forEach((y, k) => { if (k > j && (!y.done || it.from_partner)) { const inp = $(`input[data-s="load_kg"][data-i="${el.dataset.i}"][data-j="${k}"]`); if (inp) inp.value = y.load_kg ?? ""; } });
         delete el.dataset.was;
       } else if (el.dataset.s === "load_kg" && el.dataset.was === undefined) el.dataset.was = old ?? "";
     }
@@ -1903,11 +1908,19 @@ function bindSession() {
   $("#s-add").onclick = () => addEx();
   $("#s-cancel").onclick = () => { if (confirm("Descartar este treino?")) { store("gg_session", null); state.session = null; location.hash = "#hoje"; } };
   $("#s-finish").onclick = finishSession;
-  $$("[name=pmerge]").forEach((r) => { r.onchange = () => { s.merge_into = +r.value || null; store("gg_session", s); }; });
+  $$("[name=pmerge]").forEach((r) => { r.onchange = () => { s.merge_into = +r.value || null; s.merge_answered = true; store("gg_session", s); }; });
   const pdur = $("#pdur"); if (pdur) pdur.onchange = () => { const v = Math.round(+pdur.value); s.duration_min = v >= 5 && v <= 400 ? v : null; store("gg_session", s); };
 }
 async function finishSession() {
     const s = state.session; const save = () => store("gg_session", s);
+    if ((s.merge_candidates || []).length && !s.merge_answered) {  // decide se o treino conta uma ou duas vezes: não dá para pular
+      const box = $("[name=pmerge]"); if (box) box.scrollIntoView({ block: "center", behavior: "smooth" });
+      return toast("Antes de salvar, responda no alto da tela: é a mesma atividade que o seu relógio gravou?", 6500);
+    }
+    if (s.pulled) {  // treino puxado: a carga do parceiro é só dica; série sem a MINHA carga é salva em branco
+      const blank = s.items.reduce((n, it) => n + (it.from_partner ? (it.sets || []).filter((x) => x.done && x.partner_load != null && (x.load_kg == null || x.load_kg === "")).length : 0), 0);
+      if (blank && !confirm(`${blank} ${blank === 1 ? "série está" : "séries estão"} sem a sua carga (a de ${s.partner_name || "quem treinou com você"} aparece só como referência e não é salva). Salvar assim mesmo?`)) return;
+    }
     const main = s.items.filter((it) => (it.phase || "principal") === "principal");
     let anyDone = main.some((it) => it.kind === "cardio" ? it.done : (it.sets || []).some((x) => x.done));
     if (!anyDone) {
@@ -2301,7 +2314,8 @@ function fxCur(it, s) {
 const WARM_REST = 45, WARM_LAST_REST = 75;
 function fxCarry(it, k, f, old, val) {
   if (f !== "load_kg" || !it || !it.sets) return;
-  for (let j = k + 1; j < it.sets.length; j++) { const y = it.sets[j]; if (!y.done && (y.load_kg == null || y.load_kg === old)) y.load_kg = val; }
+  // no treino puxado as séries já vêm marcadas como feitas: a carga digitada desce do mesmo jeito para as que estão vazias/iguais
+  for (let j = k + 1; j < it.sets.length; j++) { const y = it.sets[j]; if ((!y.done || it.from_partner) && (y.load_kg == null || y.load_kg === old)) y.load_kg = val; }
 }
 // a série que acabou de ser feita (para corrigir repetições e carga enquanto o descanso já corre)
 function fxLast_(s) {

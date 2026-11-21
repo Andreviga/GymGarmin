@@ -438,3 +438,42 @@ def test_saying_they_are_two_workouts_stops_the_question(env):
     assert n.get("/api/partners").json()["merge_questions"] == []
     # e sessão de outra pessoa não entra na resposta
     assert a.post("/api/sessions/merge-answer", json={"watch_id": w, "app_id": mine["id"], "same": True}).status_code == 409
+
+
+# ------------------------------------------------------------------ achados da revisão: telas da parceria ---
+def test_unnamed_watch_sets_are_reported_and_my_own_workout_is_not_offered_back(env):
+    a, aid, n, nid, b, bid = env
+    _link(a, n, nid)
+    garmin = {"date": "2026-11-20T12:30", "source": "garmin", "garmin_activity_id": 77, "duration_min": 60, "day_name": "Força",
+              "items": [{"exercise_id": "Leg_Extensions", "sets": [{"reps": 12, "load_kg": 40}] * 3},
+                        {"exercise_id": "Garmin_desconhecido", "_name": "Exercício não identificado pelo relógio", "sets": [{"reps": 10, "load_kg": 30}] * 5}]}
+    sid = db.save_session(garmin, user_id=aid)["id"]
+    day = n.get(f"/api/partners/{aid}/day").json()["done"][0]
+    assert day["sets"] == 3 and day["unnamed_sets"] == 5 and day["has_sets"]
+    d = n.post(f"/api/partners/{aid}/draft", json={"session_id": sid}).json()
+    assert d["skipped_sets"] == 5 and [i["exercise_id"] for i in d["items"]] == ["Leg_Extensions"]
+    only = db.save_session({**garmin, "garmin_activity_id": 78, "date": "2026-11-19T12:30", "items": garmin["items"][1:]}, user_id=aid)["id"]
+    r = n.post(f"/api/partners/{aid}/draft", json={"session_id": only})
+    assert r.status_code == 400 and "sem o nome do exercício" in r.json()["detail"]
+    # ela salva o treino puxado; do lado dele, o treino dela aparece marcado como vindo do dele e puxar de volta avisa
+    n.post("/api/sessions", json={k: v for k, v in d.items() if k in ("date", "day_name", "items", "with_partner")})
+    hers = a.get(f"/api/partners/{nid}/day").json()["done"][0]
+    assert hers["with_partner"] == aid
+    back = a.post(f"/api/partners/{nid}/draft", json={"session_id": hers["id"]}).json()
+    assert back["already"] == [sid]                                           # ele já tem esse treino no dia
+
+
+def test_day_window_shows_the_same_shared_time_as_the_scoreboard(env):
+    a, aid, n, nid, b, bid = env
+    _link(a, n, nid)
+    w = dict(ANDRE_WORKOUT)
+    w.pop("duration_min")
+    sid = a.post("/api/sessions", json=w).json()["id"]
+    card = n.get("/api/partners").json()["partners"][0]["today"]["done"][0]
+    assert card["minutes_estimated"] and card["minutes"] < 62                 # antes de ela registrar: estimado, com "~" na tela
+    watch = _ingest(n, "OTHER_WORKOUT", "12:35", "13:37", 62).json()["imported"][0]["session_id"]
+    d = n.post(f"/api/partners/{aid}/draft", json={"session_id": sid}).json()
+    n.post("/api/sessions", json={**{k: v for k, v in d.items() if k in ("date", "day_name", "items", "with_partner")}, "merge_into": watch})
+    card = n.get("/api/partners").json()["partners"][0]["today"]["done"][0]
+    assert card["minutes"] == 62 and not card["minutes_estimated"]            # o mesmo número do placar, na frase do cartão e na janela
+    assert n.get(f"/api/partners/{aid}/day").json()["done"][0]["minutes"] == 62

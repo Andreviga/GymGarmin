@@ -197,6 +197,12 @@ def session_kcal(s: dict, weight_kg: float | None, minutes: float | None = None)
     return float(round(total / 10) * 10), True
 
 
+def unnamed_sets(s: dict) -> int:
+    """Séries gravadas pelo relógio sem exercício identificado (ainda não nomeadas): não dá para puxar."""
+    return sum(len(it["sets"]) for it in s.get("items") or []
+               if isinstance(it.get("sets"), list) and it["sets"] and not _is_strength(it))
+
+
 def _session_view(s: dict, weight_kg: float | None, detail: bool = True, minutes: float | None = None) -> dict:
     kcal, est = session_kcal(s, weight_kg, minutes)
     mins, mins_est = (minutes, False) if minutes is not None else session_time(s)
@@ -214,7 +220,7 @@ def _session_view(s: dict, weight_kg: float | None, detail: bool = True, minutes
                           "km": it.get("distance_km")})
     return {"id": s.get("id"), "date": str(s.get("date"))[:16], "title": s.get("day_name") or s.get("notes") or "Treino",
             "minutes": round(mins), "minutes_estimated": mins_est, "kcal": round(kcal), "kcal_estimated": est,
-            "sets": sum(i["n"] for i in items if i["kind"] == "forca"), "items": items,
+            "sets": sum(i["n"] for i in items if i["kind"] == "forca"), "items": items, "unnamed_sets": unnamed_sets(s),
             "has_sets": any(i["kind"] == "forca" for i in items), "with_partner": s.get("with_partner"),
             "watch": bool(s.get("garmin_activity_id") or s.get("ext_id")), "source": s.get("source") or "app"}
 
@@ -241,10 +247,11 @@ def day(uid: int, pid: int, d: date) -> dict:
     theirs = [s for s in db.list_sessions(pid, since=iso, limit=60) if str(s.get("date"))[:10] == iso and str(s.get("source")) != "passos"]
     mine = [s for s in db.list_sessions(uid, since=iso, limit=60) if str(s.get("date"))[:10] == iso and str(s.get("source")) != "passos"]
     planned = [e for e in db.list_schedule(iso, iso, user_id=pid) if e.get("status") in ("planejado", "perdido")]
+    ov_me, ov_p = _shared_time(mine, theirs, uid, pid)  # treino feito junto: o mesmo tempo que o placar mostra
     return {"date": iso, "next": nxt, "partner": {"id": pid, "name": _names().get(pid, ""), "first": first_name(_names().get(pid, ""))},
-            "done": [_session_view(s, w_p) for s in sorted(theirs, key=lambda s: str(s.get("date")))],
+            "done": [_session_view(s, w_p, minutes=ov_p.get(s.get("id"))) for s in sorted(theirs, key=lambda s: str(s.get("date")))],
             "planned": [_entry_view(e) for e in planned],
-            "mine": [_session_view(s, w_me, detail=False) for s in sorted(mine, key=lambda s: str(s.get("date")))]}
+            "mine": [_session_view(s, w_me, detail=False, minutes=ov_me.get(s.get("id"))) for s in sorted(mine, key=lambda s: str(s.get("date")))]}
 
 
 def plan_items_from_session(s: dict) -> tuple[list[dict], dict[str, list[dict]]]:
