@@ -2035,6 +2035,8 @@ def _readiness_view(day: date) -> dict | None:
         rhr = hr.get("rhr") or {}
         if rhr.get("delta") is not None:
             data["rhr_delta"] = rhr["delta"]
+        if hr.get("need"):
+            data["sleep_need_h"] = hr["need"][0]
         n = hr.get("last_night")
         if n and n["date"] == day.isoformat() and n.get("level") != "sem_dados":
             night = {"level": n["level"], "text": f"{health.fmt_h(n.get('duration_h'))} · sono {n['level']}"

@@ -23,7 +23,8 @@ from datetime import date, datetime, timedelta
 
 from . import clock, db, garmin_sync
 
-MAX_WORKOUTS = 60
+MAX_WORKOUTS = 150   # treinos novos gravados por envio
+MAX_SCAN = 1500      # treinos olhados por envio (os já conhecidos são só conferidos pelo id)
 
 
 # --------------------------------------------------------------- números
@@ -77,6 +78,11 @@ def minutes(v) -> float | None:
     if re.search(r"\d\s*s(eg)?\b", s):
         x = num(s)
         return x / 60 if x is not None else None
+    m = re.fullmatch(r"\s*(\d+):(\d{2})\s*", s)
+    if m and int(m.group(1)) >= 5:
+        # "45:10" é minutos:segundos (o formato do iPhone para menos de 1 h; com hora ele manda "1:02:15").
+        # Lido como horas:minutos, uma caminhada de 12 min virava 750 min. Abaixo de 5 fica como horas ("1:30" = 1h30).
+        return int(m.group(1)) + int(m.group(2)) / 60
     return num(v)
 
 
@@ -226,9 +232,10 @@ def save_days(days: list[dict], source: str) -> list[str]:
 def workout_session(w: dict, source: str, hr_max: int | None) -> dict | None:
     start = parse_dt(w.get("start") or w.get("start_date") or w.get("date"))
     dur = minutes(w.get("duration_min") if w.get("duration_min") is not None else w.get("duration"))
-    if dur is None and start and w.get("end"):
-        end = parse_dt(w.get("end"))
-        dur = (end - start).total_seconds() / 60 if end else None
+    end = parse_dt(w.get("end")) if start and w.get("end") else None
+    span = (end - start).total_seconds() / 60 if end else None
+    if span and span > 0 and (dur is None or dur > span * 1.5 + 5):
+        dur = span  # sem duração, ou duração impossível para o intervalo entre início e fim (texto mal lido)
     if not start or not dur or dur < 3 or dur > 24 * 60:
         return None
     gtype = garmin_type(w.get("type") or w.get("name"))
@@ -255,8 +262,23 @@ def workout_session(w: dict, source: str, hr_max: int | None) -> dict | None:
     summ = {k: act.get(src) for src, k in (("averageHR", "avg_hr"), ("maxHR", "max_hr"), ("calories", "kcal")) if act.get(src)}
     summ["duration_min"] = round(dur, 1)
     return {"date": start.isoformat(timespec="seconds"), "source": source, "ext_id": f"{source}:{ext}",
-            "notes": str(w.get("name") or w.get("type") or "")[:60] or None, "items": [item],
+            "notes": workout_title(w, item, gtype), "items": [item],
             "duration_min": round(dur, 1), "garmin_summary": summ}
+
+
+def workout_title(w: dict, item: dict, gtype: str) -> str:
+    """Nome que aparece nas telas. O relógio muitas vezes não dá título e o app manda o código do tipo
+    ("OTHER_WORKOUT", "WALKING"): nesse caso vale o nome em português do que o treino virou no HAX."""
+    name = str(w.get("name") or "").strip()
+    if name and not re.fullmatch(r"[A-Z0-9_ ]+", name) and name.lower() != str(w.get("type") or "").strip().lower():
+        return name[:60]
+    if item.get("_name"):
+        return item["_name"]
+    if item.get("exercise_id") == "atividade_outra":
+        return "Atividade do relógio"
+    from . import catalog
+
+    return garmin_sync.ACTIVITY_NAMES_PT.get(gtype) or (catalog.get(item.get("exercise_id")) or {}).get("name") or "Atividade do relógio"
 
 
 DELETED_KEY = "ingest_deleted"
@@ -276,16 +298,27 @@ def forget_workout(ext_id: str | None) -> None:
     db.kv_set(DELETED_KEY, json.dumps(([x for x in deleted_ids() if x != ext_id] + [ext_id])[-300:]))
 
 
+left_out: list[str] = []   # dias dos treinos que não couberam no último envio (lido por ingest() logo em seguida)
+
+
 def save_workouts(workouts: list[dict], source: str, hr_max: int | None, merge=None) -> tuple[list[dict], int]:
     since = (clock.today() - timedelta(days=60)).isoformat()
     known = {s.get("ext_id") for s in db.list_sessions(since=since, limit=2000) if s.get("ext_id")}
     known |= set(deleted_ids())  # treino do celular que a pessoa apagou no app não volta no próximo envio
     imported, skipped = [], 0
-    for w in workouts[:MAX_WORKOUTS]:
+    fresh = []
+    for w in workouts[:MAX_SCAN]:
         s = workout_session(w, source, hr_max)
         if not s:
             skipped += 1
-            continue
+        elif s["ext_id"] not in known:
+            fresh.append(s)
+    # o que já está aqui não ocupa vaga; entram primeiro os dias mais novos e, no mesmo dia, o treino mais longo
+    # (o aquecimento de 15 min não toma o lugar do treino de 50 min ao juntar com o que a pessoa anotou)
+    fresh.sort(key=lambda s: (s["date"][:10], s.get("duration_min") or 0), reverse=True)
+    left_out.clear()
+    left_out.extend(s["date"][:10] for s in fresh[MAX_WORKOUTS:])
+    for s in fresh[:MAX_WORKOUTS]:
         if s["ext_id"] in known:
             continue
         saved = (merge(s) if merge else None) or db.save_session(s)
@@ -305,7 +338,7 @@ def _diag(d) -> dict | None:
     for k in ("app",):
         if isinstance(d.get(k), str):
             out[k] = d[k][:12]
-    for k in ("window_days", "health_days", "sleep_days", "steps_days", "exercise_total"):
+    for k in ("window_days", "workout_days", "health_days", "sleep_days", "steps_days", "exercise_total"):
         v = num(d.get(k), integer=True)
         if v is not None:
             out[k] = int(v)
@@ -334,7 +367,8 @@ def ingest(payload: dict, hr_max: int | None, merge=None) -> dict:
     saved_days = save_days(days, source)
     imported, skipped = save_workouts(workouts, source, hr_max, merge)
     last = {"at": clock.now().isoformat(timespec="seconds"), "source": source, "days": saved_days,
-            "workouts": len(imported), "skipped": skipped, "sent": len(workouts), "diag": _diag(payload.get("diag")),
+            "workouts": len(imported), "skipped": skipped, "sent": len(workouts), "left_out": len(left_out),
+            "diag": _diag(payload.get("diag")),
             "sample": json.dumps({k: v for k, v in payload.items() if k != "diag"}, ensure_ascii=False)[:600]}
     db.kv_set("ingest_last", json.dumps(last, ensure_ascii=False))
-    return {"ok": True, "days": saved_days, "imported": imported, "skipped": skipped}
+    return {"ok": True, "days": saved_days, "imported": imported, "skipped": skipped, "left_out": len(left_out)}

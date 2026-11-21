@@ -129,3 +129,83 @@ def test_phone_workout_time_stays_in_the_persons_timezone():
     assert ingest.parse_dt("2026-11-20T12:35:00").isoformat() == "2026-11-20T12:35:00"   # sem fuso: já é hora local
     s = ingest.workout_session({"id": "z", "type": "OTHER_WORKOUT", "start": "2026-11-20T21:30:00-03:00", "duration_min": 40}, "android", 190)
     assert s["date"].startswith("2026-11-20T21:30")
+
+
+# ------------------------------------------------------------------ achados da revisão: entrega do relógio ---
+def _token(c):
+    c.post("/api/auth/setup", json={"email": "dono@x.com", "password": "senha-forte"})
+    return {"Authorization": "Bearer " + c.post("/api/account/ingest-token", json={}).json()["token"]}
+
+
+def test_readiness_is_not_invented_from_steps_alone_and_follows_sleep_hours(c):
+    h = _token(c)
+    c.post("/api/ingest", headers=h, json={"source": "android", "days": [{"date": "2026-11-16", "steps": 2056}, {"date": "2026-11-17", "steps": 7053}], "workouts": []})
+    rd = c.get("/api/readiness").json()
+    assert rd.get("score") is None and rd["level"] == "sem_dados"            # só passos: sem nota (antes: "70 · Alta")
+    from gymgarmin import readiness
+    assert readiness.score({}, form=5.0)["level"] == "sem_dados"             # carga de treino sozinha também não vira nota
+    bad = readiness.score({"sleep_h": 3.2, "sleep_need_h": 7}, form=0)
+    good = readiness.score({"sleep_h": 8.5, "sleep_need_h": 7}, form=0)
+    assert bad["score"] < 40 and bad["action"] in ("trocar", "descanso", "moderar") and good["score"] >= 75 and good["action"] == "seguir"
+    assert "sono de 3h12" in " ".join(bad["reasons"])
+    c.post("/api/ingest", headers=h, json={"source": "android", "days": [{"date": "2026-11-17", "sleep_h": 3.2, "sleep_start": "03:10", "sleep_end": "06:22"}], "workouts": []})
+    rd = c.get("/api/readiness").json()
+    assert rd["score"] is not None and rd["score"] < 45                       # noite de 3h12 derruba a nota
+
+
+def test_many_workouts_in_one_delivery_keep_the_newest_and_say_what_was_left(c):
+    h = _token(c)
+    ws = []
+    for i in range(170):  # 170 caminhadas em 29 dias, da mais antiga para a mais nova (como o app manda)
+        d = 19 + i // 6 if i < 72 else 1 + (i - 72) // 6
+        mth = "10" if i < 72 else "11"
+        ws.append({"id": f"w{i}", "type": "WALKING", "name": "WALKING", "start": f"2026-{mth}-{d:02d}T{6 + i % 6:02d}:00:00-03:00", "duration_min": 20})
+    r = c.post("/api/ingest", headers=h, json={"source": "android", "days": [], "workouts": ws}).json()
+    assert len(r["imported"]) == ingest.MAX_WORKOUTS and r["left_out"] == 170 - ingest.MAX_WORKOUTS
+    days = sorted(x["date"] for x in r["imported"])
+    assert days[-1] == "2026-11-17" and days[0] > "2026-10-19"               # entraram os mais novos; os mais antigos ficaram para o próximo envio
+    r2 = c.post("/api/ingest", headers=h, json={"source": "android", "days": [], "workouts": ws}).json()
+    assert len(r2["imported"]) == 170 - ingest.MAX_WORKOUTS and r2["left_out"] == 0   # reenviar traz o resto: o conhecido não ocupa vaga
+    assert c.get("/api/account/ingest").json()["last"]["left_out"] == 0
+
+
+def test_watch_workout_titles_are_shown_in_portuguese_not_as_codes(c):
+    h = _token(c)
+    c.post("/api/ingest", headers=h, json={"source": "android", "days": [], "workouts": [
+        {"id": "a", "type": "OTHER_WORKOUT", "name": "OTHER_WORKOUT", "start": "2026-11-16T07:05:00-03:00", "duration_min": 62},
+        {"id": "b", "type": "WALKING", "name": "", "start": "2026-11-16T18:00:00-03:00", "duration_min": 25, "distance_km": 2.1},
+        {"id": "c", "type": "STRENGTH_TRAINING", "name": "STRENGTH_TRAINING", "start": "2026-11-15T07:00:00-03:00", "duration_min": 40},
+        {"id": "d", "type": "YOGA", "name": "Yoga da manhã", "start": "2026-11-14T07:00:00-03:00", "duration_min": 30},
+        {"id": "e", "type": "HIIT", "name": "HIIT", "start": "2026-11-13T07:00:00-03:00", "duration_min": 30}]})
+    titles = {s["ext_id"].split(":")[1]: s["notes"] for s in c.get("/api/sessions?limit=20").json()}
+    assert titles["a"] == "Atividade do relógio" and titles["c"] == "Musculação (relógio)" and titles["d"] == "Yoga da manhã"
+    assert not any(t.isupper() and "_" in t for t in titles.values()) and titles["b"] and titles["e"] == "HIIT"
+    hiit = next(s for s in c.get("/api/sessions?limit=20").json() if s["ext_id"].endswith(":e"))
+    assert hiit["items"][0]["exercise_id"] == "atividade_hiit"                # aula de HIIT não entra como musculação
+
+
+def test_iphone_minutes_seconds_duration_is_not_read_as_hours():
+    assert ingest.minutes("12:30") == 12.5 and round(ingest.minutes("45:10"), 2) == 45.17
+    assert ingest.minutes("1:02:15") == 62.25 and ingest.minutes("0:45:00") == 45 and ingest.minutes("1:30") == 90
+    s = ingest.workout_session({"type": "Caminhada", "start": "2026-11-16T07:00:00-03:00", "end": "2026-11-16T07:12:30-03:00", "duration": "3:30"}, "apple", 186)
+    assert s["duration_min"] == 12.5                                          # início e fim desmentem a duração mal lida (3h30)
+
+
+def test_short_warm_up_recorded_by_the_watch_does_not_become_the_logged_workout(c):
+    h = _token(c)
+    body = {"date": "2026-11-16T18:00", "day_name": "Treino livre", "client_id": "x1", "duration_min": 65,
+            "items": [{"exercise_id": "Leg_Extensions", "sets": [{"reps": 12, "load_kg": 20}] * 4}]}
+    mine = c.post("/api/sessions", json=body).json()
+    warm = {"id": "warm", "type": "OTHER_WORKOUT", "start": "2026-11-16T18:02:00-03:00", "duration_min": 15, "kcal": 70}
+    main = {"id": "main", "type": "OTHER_WORKOUT", "start": "2026-11-16T18:20:00-03:00", "duration_min": 50, "kcal": 290}
+    r = c.post("/api/ingest", headers=h, json={"source": "android", "days": [], "workouts": [warm, main]}).json()
+    by = {x["session_id"]: x for x in r["imported"]}
+    assert by[mine["id"]]["merged"] is True and len(r["imported"]) == 2
+    s = db.get_session(mine["id"])
+    assert s["duration_min"] == 50 and s["garmin_summary"]["kcal"] == 290 and s["ext_id"].endswith(":main")   # juntou com o treino, não com o aquecimento
+    # aquecimento chegando sozinho antes: não vira o treino; quando o treino de verdade chega, junta
+    mine2 = c.post("/api/sessions", json={**body, "date": "2026-11-15T18:00", "client_id": "x2"}).json()
+    w2 = {**warm, "id": "warm2", "start": "2026-11-15T18:02:00-03:00"}
+    assert c.post("/api/ingest", headers=h, json={"source": "android", "days": [], "workouts": [w2]}).json()["imported"][0]["merged"] is False
+    m2 = {**main, "id": "main2", "start": "2026-11-15T18:20:00-03:00"}
+    assert c.post("/api/ingest", headers=h, json={"source": "android", "days": [], "workouts": [m2]}).json()["imported"][0]["session_id"] == mine2["id"]

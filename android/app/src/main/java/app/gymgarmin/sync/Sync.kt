@@ -30,15 +30,17 @@ object Sync {
         val server = (p.getString("server", DEFAULT_SERVER) ?: DEFAULT_SERVER).trim().trimEnd('/')
         if (token.isEmpty()) throw IllegalStateException("Cole o código pessoal (HAX → Perfil → Outros relógios).")
         val since = p.getLong("last_ok", 0L)
-        // primeira vez: 30 dias; depois, desde o último envio (com folga de 2 dias para dados atrasados)
-        val n = days ?: if (since == 0L) 30L else (((System.currentTimeMillis() - since) / 86_400_000L) + 2).coerceIn(2, 30)
+        // primeira vez (ou primeira vez desta versão do app): 30 dias; depois, desde o último envio com folga de 2 dias.
+        // Quem atualiza o app precisa reler tudo: a versão antiga descartava tipos de treino que esta envia.
+        val newVersion = p.getString("app_ver", "") != HealthReader.APP_VERSION
+        val n = days ?: if (since == 0L || newVersion) 30L else (((System.currentTimeMillis() - since) / 86_400_000L) + 2).coerceIn(2, 30)
         val payload = HealthReader(ctx).build(n)
         val res = post("$server/api/ingest", token, payload)
         val msg = "Enviado: ${res.optJSONArray("days")?.length() ?: 0} dia(s) de saúde, " +
             "${res.optJSONArray("imported")?.length() ?: 0} treino(s) novo(s)."
         val now = System.currentTimeMillis()
         val stamp = SimpleDateFormat("dd/MM HH:mm", Locale("pt", "BR")).format(Date(now))
-        p.edit().putLong("last_ok", now).putString("last_msg", "$stamp — $msg").apply()
+        p.edit().putLong("last_ok", now).putString("app_ver", HealthReader.APP_VERSION).putString("last_msg", "$stamp — $msg").apply()
         return msg
     }
 

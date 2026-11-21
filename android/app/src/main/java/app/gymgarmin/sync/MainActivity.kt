@@ -110,7 +110,7 @@ class MainActivity : ComponentActivity() {
                 if (!HealthReader(this@MainActivity).grantedAll()) {
                     say("Dê as permissões primeiro (botão 1)."); return@launch
                 }
-                val msg = Sync.run(this@MainActivity)
+                val msg = Sync.run(this@MainActivity, 30)  // toque em "Sincronizar": relê os últimos 30 dias (o servidor ignora o que já tem)
                 Sync.schedule(this@MainActivity)
                 say("$msg\nPronto: a partir de agora envia sozinho a cada ~6 h.")
             } catch (e: Exception) {

@@ -67,8 +67,8 @@ class HealthReader(context: Context) {
             ExerciseSessionRecord.EXERCISE_TYPE_STAIR_CLIMBING_MACHINE -> "STAIR_CLIMBING"
             ExerciseSessionRecord.EXERCISE_TYPE_STRENGTH_TRAINING,
             ExerciseSessionRecord.EXERCISE_TYPE_WEIGHTLIFTING,
-            ExerciseSessionRecord.EXERCISE_TYPE_CALISTHENICS,
-            ExerciseSessionRecord.EXERCISE_TYPE_HIGH_INTENSITY_INTERVAL_TRAINING -> "STRENGTH_TRAINING"
+            ExerciseSessionRecord.EXERCISE_TYPE_CALISTHENICS -> "STRENGTH_TRAINING"
+            ExerciseSessionRecord.EXERCISE_TYPE_HIGH_INTENSITY_INTERVAL_TRAINING -> "HIIT"  // aula de HIIT não é a musculação do dia
             // os demais entram no HAX como atividade genérica (tempo, FC e calorias): nada é descartado aqui.
             // Relógios como Amazfit/Zepp e Xiaomi costumam gravar a musculação como "outro exercício".
             ExerciseSessionRecord.EXERCISE_TYPE_YOGA -> "YOGA"
@@ -98,7 +98,7 @@ class HealthReader(context: Context) {
             else -> "OTHER_WORKOUT_$t"
         }
 
-        const val APP_VERSION = "1.1"
+        const val APP_VERSION = "1.2"
     }
 
     suspend fun grantedAll(): Boolean =
@@ -174,7 +174,10 @@ class HealthReader(context: Context) {
         }
 
         // diagnóstico: o que o Health Connect tinha para ler (o HAX mostra em Perfil → Outros relógios)
-        val diag = JSONObject().put("app", APP_VERSION).put("window_days", days)
+        // treinos: pelo menos 7 dias, porque o app do relógio (Zepp, Mi Fitness) às vezes entrega com dias de atraso
+        val workoutDays = maxOf(days, 7L)
+        val fromWorkouts = LocalDate.now(zone).minusDays(workoutDays).atStartOfDay(zone).toInstant()
+        val diag = JSONObject().put("app", APP_VERSION).put("window_days", days).put("workout_days", workoutDays)
         safe {
             val granted = client.permissionController.getGrantedPermissions()
             val missing = JSONArray()
@@ -189,14 +192,14 @@ class HealthReader(context: Context) {
 
         val workouts = JSONArray()
         safe {
-            for (s in readAll(ExerciseSessionRecord::class, from, now)) {
+            for (s in readAll(ExerciseSessionRecord::class, fromWorkouts, now)) {
                 val type = typeName(s.exerciseType) ?: "OTHER_WORKOUT"
                 typeCount[type] = (typeCount[type] ?: 0) + 1
                 origins.add(s.metadata.dataOrigin.packageName)
                 val w = JSONObject()
                     .put("id", s.metadata.id)
                     .put("type", type)
-                    .put("name", s.title ?: type)
+                    .put("name", s.title?.toString()?.takeIf { it.isNotBlank() } ?: "")  // sem título do relógio: o HAX dá o nome em português
                     .put("start", s.startTime.atOffset(s.startZoneOffset ?: ZoneOffset.UTC).toString())
                     .put("end", s.endTime.atOffset(s.endZoneOffset ?: ZoneOffset.UTC).toString())
                     .put("duration_min", Duration.between(s.startTime, s.endTime).seconds / 60.0)

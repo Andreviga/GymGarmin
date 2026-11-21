@@ -78,6 +78,19 @@ def overlap(a: dict, b: dict) -> float:
     return max(0.0, both) / short if short > 0 else 0.0
 
 
+MIN_COVER = 0.3   # a atividade do relógio tem de cobrir pelo menos isso do treino anotado (aquecimento de 15 min não é o treino de 65)
+
+
+def _covers(watch_s: dict, app_s: dict) -> bool:
+    """A atividade só-de-tempo do relógio e o treino anotado são o mesmo treino pelo horário?"""
+    sa, sb = _span(watch_s), _span(app_s)
+    if not sa or not sb:
+        return False
+    both = max(0.0, (min(sa[1], sb[1]) - max(sa[0], sb[0])).total_seconds())
+    app_len = (sb[1] - sb[0]).total_seconds()
+    return overlap(watch_s, app_s) >= MIN_OVERLAP and both >= MIN_COVER * app_len
+
+
 def _same_time_twin(new: dict, sessions: list[dict], day: str) -> dict | None:
     """Musculação anotada no app ↔ atividade sem tipo do relógio no mesmo horário: é o mesmo treino."""
     from_watch = _watch(new)
@@ -94,7 +107,7 @@ def _same_time_twin(new: dict, sessions: list[dict], day: str) -> dict | None:
         if not from_watch and not is_unknown_watch(s):
             continue
         o = overlap(new, s)
-        if o >= MIN_OVERLAP and o > best_o:
+        if o > best_o and _covers(*((new, s) if from_watch else (s, new))):
             best, best_o = s, o
     return best
 

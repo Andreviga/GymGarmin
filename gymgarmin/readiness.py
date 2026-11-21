@@ -136,11 +136,23 @@ def score(data: dict, form: float | None = None) -> dict:
         else:
             w = sum(p[1] for p in parts)
             base = sum(v * p for v, p in parts) / w
-    if base is None and form is None:
-        return {"score": None, "level": "sem_dados", "action": "seguir",
-                "reasons": ["Sem dados do relógio hoje: siga o plano pela sensação."]}
-    s = base if base is not None else 70.0
     rd = data.get("rhr_delta")
+    if base is None and data.get("sleep_h"):
+        # relógios sem nota de sono (Amazfit, Xiaomi, Samsung, Apple via celular): a base sai das horas dormidas
+        # frente ao mínimo recomendado para a pessoa
+        ratio = float(data["sleep_h"]) / float(data.get("sleep_need_h") or 7.0)
+        base = 80.0 if ratio >= 1 else 72.0 if ratio >= 0.93 else 62.0 if ratio >= 0.85 else 50.0 if ratio >= 0.75 else 38.0 if ratio >= 0.6 else 28.0
+        hh, mm = int(float(data["sleep_h"])), round(float(data["sleep_h"]) % 1 * 60)
+        reasons.append(f"sono de {hh}h{mm:02d}")
+    if base is None and rd is None:
+        # nada do corpo chegou hoje (nem sono, nem FC): passos e treinos sozinhos não dizem como a pessoa acordou
+        if form is not None and form < -30:  # sem relógio, a fadiga acumulada dos treinos ainda protege (sem inventar nota)
+            return {"score": None, "level": "sem_dados", "action": "moderar",
+                    "reasons": [f"forma {form:g} (muita fadiga acumulada pelos treinos)",
+                                "Sem sono nem frequência cardíaca do relógio hoje."]}
+        return {"score": None, "level": "sem_dados", "action": "seguir",
+                "reasons": ["Sem sono nem frequência cardíaca do relógio hoje: siga o plano pela sensação."]}
+    s = base if base is not None else 70.0
     if rd is not None and rd >= 5:  # FC de repouso acima da base da própria pessoa (dados de saúde do relógio)
         s -= 15 if rd >= 8 else 8
         reasons.append(f"FC de repouso +{rd:.0f} bpm acima do seu normal")
