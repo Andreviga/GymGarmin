@@ -586,6 +586,14 @@ def kv_get(key: str, user_id: int | None = None) -> str | None:
     return r["value"] if r else None
 
 
+def kv_prefix(prefix: str, user_id: int | None = None) -> dict[str, str]:
+    """Todas as chaves que começam com `prefix` numa consulta só (ex.: os dias de saúde, "health:")."""
+    user_id = user_id or current_user()
+    with conn() as c:
+        rows = c.execute("SELECT key, value FROM kv WHERE user_id = ? AND key LIKE ?", (user_id, prefix + "%")).fetchall()
+    return {r["key"]: r["value"] for r in rows if str(r["key"]).startswith(prefix)}
+
+
 def kv_set(key: str, value: str, user_id: int | None = None) -> None:
     user_id = user_id or current_user()
     with conn() as c:

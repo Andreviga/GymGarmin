@@ -199,9 +199,9 @@ function meter(label, done, target, unit = "") {
 
 async function viewHoje(weekDate) {
   const athletePromise = weekDate ? Promise.resolve("") : athleteCards().catch(() => "");
-  const [sch, rd, gst, prof] = await Promise.all([api(`/api/schedule${weekDate ? `?date=${weekDate}` : ""}`),
+  const [sch, rd, gst, prof, stp] = await Promise.all([api(`/api/schedule${weekDate ? `?date=${weekDate}` : ""}`),
     weekDate ? Promise.resolve(null) : api("/api/readiness").catch(() => null), api("/api/garmin/status").catch(() => null),
-    api("/api/profile").catch(() => null)]);
+    api("/api/profile").catch(() => null), weekDate ? Promise.resolve(null) : api("/api/steps").catch(() => null)]);
   if (!sch.plan) {
     const incomplete = profileMissing(state.profile || await api("/api/profile").catch(() => ({}))).length > 0;
     view.innerHTML = `${pageHead("Hoje")}${firstStepsHtml(false)}${installCardHtml("hoje")}<section class="today-card">
@@ -227,7 +227,7 @@ async function viewHoje(weekDate) {
   sch._sel = sel;
   const adjusted = plannedToday.some((e) => e.readiness_backup);
   view.innerHTML = `${weekDate ? pageHead(`Semana de ${ddmm(sch.week_start)}`) : pageHead("Hoje", true, sch.today)}
-  ${weekDate ? "" : firstStepsHtml(true) + statsHtml(rd, g, adjusted, plannedToday.length > 0) + (sch.pending || []).map(questionHtml).join("") + legacyHtml(sch) + focusChip(prof) + garminSyncCard(sch, gst) + installCardHtml("hoje")}${athleteHtml}
+  ${weekDate ? "" : firstStepsHtml(true) + statsHtml(rd, g, adjusted, plannedToday.length > 0) + (sch.pending || []).map(questionHtml).join("") + stepsAskHtml(stp, sch.today) + legacyHtml(sch) + focusChip(prof) + garminSyncCard(sch, gst) + installCardHtml("hoje")}${athleteHtml}
   ${missed.length ? `<div class="rec alerta"><b>Treino perdido:</b> ${missed.map((e) => `${e.weekday} ${ddmm(e.date)} – ${esc(e.day_name)}`).join(", ")}.
      <div class="row gap wrap" style="margin-top:6px">${missed.map((e) => `<button class="btn sm" data-skip="${e.id}">Ajustar a semana (${e.weekday})</button>`).join("")}</div></div>` : ""}
   <section class="week">
@@ -460,6 +460,7 @@ function bindAgenda(sch) {
         t.disabled = true; const r = await answerMatch(d.match);
         toast(r.closed ? `${r.closed.day_name} marcado como feito` : "Contou como treino extra", 3500); return again();
       }
+      if (d.stag) { t.disabled = true; toast(stepsTagToast(await answerSteps(d.stag)), 5000); return again(); }
       if (t.id === "legacy-clean" || t.id === "legacy-keep") {
         t.disabled = true; const keep = t.id === "legacy-keep";
         const r = await api("/api/schedule/legacy", { method: "POST", body: { keep } });
@@ -2859,6 +2860,77 @@ function stagesBar(sl) {
     <div class="small muted">${on.map((x) => `<span class="dot" style="background:${x[2]}"></span>${x[1]} ${nf(sl[x[0]])}%`).join(" ")}${sl.awake_min != null ? ` · acordado ${sl.awake_min} min` : ""}</div>`;
 }
 
+/* ---- passos: o total do relógio separado em treino × dia a dia; dia fora do costume pergunta o que foi ---- */
+const fmtN = (n) => (n == null ? "—" : Math.round(n).toLocaleString("pt-BR"));
+function stepsWhen(day, today) {
+  const diff = Math.round((new Date(today + "T12:00:00") - new Date(day + "T12:00:00")) / 864e5);
+  const wd = WD_LONG[new Date(day + "T12:00:00").getDay()];
+  return diff === 1 ? "Ontem" : diff === 2 ? "Anteontem" : `${wd[0].toUpperCase()}${wd.slice(1)} (${ddmm(day)})`;
+}
+function stepsAskHtml(s, today, { note = true } = {}) {
+  if (!s) return "";
+  today = today || localISO().slice(0, 10);
+  const lab = Object.fromEntries((s.options || []).map((o) => [o.id, o.label]));
+  const q = (s.pending || []).map((p) => {
+    const order = [p.hint, ...Object.keys(lab).filter((id) => id !== p.hint)].filter((id) => lab[id]);
+    return `<div class="rec atencao q-card steps-q"><b>${stepsWhen(p.date, today)} você deu ${fmtN(p.daily)} passos fora dos treinos. O que foi?</b>
+      <p class="small" style="margin:4px 0 8px">Seu costume é perto de ${fmtN(p.baseline)} por dia${p.workout ? ` (os ${fmtN(p.workout)} passos do treino desse dia já estão fora da conta)` : ""}. Com a resposta o app conta o esforço certo e não confunde esse dia com a sua rotina.</p>
+      <div class="row gap wrap">${order.map((id, i) => `<button class="btn sm ${i ? "ghost" : ""}" data-stag="${p.date}:${id}">${esc(lab[id])}</button>`).join("")}</div></div>`;
+  }).join("");
+  const ev = s.recent_event;
+  const walked = ev && ["festival", "passeio", "caminhada"].includes(ev.tag);
+  const noteHtml = note && ev && !q ? `<div class="rec small steps-note"><b>${stepsWhen(ev.date, today)}: ${esc(ev.label.toLowerCase())}</b> (${fmtN(ev.steps)} passos${ev.late_night ? ", e a noite foi curta" : ""}).
+    ${walked ? "Já entrou na sua carga como caminhada leve." : "Não conta como treino, mas explica um cansaço a mais."} Se as pernas estiverem pesadas hoje, baixe a carga ou encurte o treino: um dia mais leve não atrapalha a semana.</div>` : "";
+  return q + noteHtml;
+}
+async function answerSteps(v) {
+  const [day, tag] = v.split(":");
+  return api("/api/steps/tag", { method: "POST", body: { date: day, tag: tag === "limpar" ? null : tag } });
+}
+function stepsTagToast(r) {
+  const t = r && r.tag;
+  if (!t) return "Resposta desfeita";
+  if (t.session_id) return `Anotado. Entrou como caminhada leve de ${fmtDur(t.minutes)} na sua carga.`;
+  return t.tag === "nada" ? "Anotado: dia normal. Vou perguntar menos sobre dias assim." : "Anotado. Esse dia não conta como treino.";
+}
+const fmtDur = (min) => (min >= 60 ? `${Math.floor(min / 60)} h${min % 60 ? ` ${String(Math.round(min % 60)).padStart(2, "0")}` : ""}` : `${Math.round(min)} min`);
+function stepsChart(s) {
+  const ser = s.series || [];
+  if (ser.length < 3) return "";
+  const W = 340, H = 130, L = 34, Rm = 8, T = 10, B = 20;
+  const hi = Math.max(...ser.map((p) => p.total), s.baseline || 0, 1000);
+  const X = (i) => L + ((i + 0.5) / ser.length) * (W - L - Rm);
+  const Y = (v) => T + (1 - v / (hi * 1.08)) * (H - T - B);
+  const bw = Math.max(3, (W - L - Rm) / ser.length - 3);
+  const bar = (i, from, to, fill) => (to > from ? `<rect x="${(X(i) - bw / 2).toFixed(1)}" y="${Y(to).toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(0.5, Y(from) - Y(to)).toFixed(1)}" rx="1.5" fill="${fill}"/>` : "");
+  return `<svg class="hist-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Passos por dia nas últimas ${ser.length} dias: dia a dia, treinos e eventos">
+    ${s.baseline ? `<line x1="${L}" x2="${W - Rm}" y1="${Y(s.baseline)}" y2="${Y(s.baseline)}" class="grid" stroke-dasharray="4 3"/>` : ""}
+    ${ser.map((p, i) => { const ev = (p.parts || {}).evento || 0; const wk = p.workout - ev;
+      return bar(i, 0, p.daily, "var(--brand)") + bar(i, p.daily, p.daily + wk, "var(--ok)") + bar(i, p.daily + wk, p.total, "var(--warn)"); }).join("")}
+    <text x="${L - 4}" y="${Y(hi) + 4}" text-anchor="end" class="axis">${hi >= 10000 ? nf(hi / 1000, 0) + " mil" : nf(hi / 1000, 1) + " mil"}</text>
+    <text x="${L - 4}" y="${Y(0)}" text-anchor="end" class="axis">0</text>
+    <text x="${L}" y="${H - 4}" class="axis">${ddmm(ser[0].date)}</text><text x="${W - Rm}" y="${H - 4}" text-anchor="end" class="axis">${ddmm(ser[ser.length - 1].date)}</text>
+  </svg>
+  <div class="small muted"><span class="dot" style="background:var(--brand);margin-left:0"></span>dia a dia <span class="dot" style="background:var(--ok)"></span>treinos (corrida, caminhada)${ser.some((p) => (p.parts || {}).evento) ? ` <span class="dot" style="background:var(--warn)"></span>evento` : ""}${s.baseline ? " · tracejado: seu costume" : ""}</div>`;
+}
+function stepsCardHtml(s, today) {
+  if (!s || !s.has_data) return "";
+  const a = s.avg7 || {}, prev = (s.avg_prev || {}).daily;
+  const delta = a.daily != null && prev ? (a.daily - prev) / prev : null;
+  const trend = delta == null ? "" : Math.abs(delta) < 0.1 ? "no mesmo nível das 4 semanas anteriores" : `${delta > 0 ? "acima" : "abaixo"} das 4 semanas anteriores (${fmtN(prev)}/dia)`;
+  const tags = Object.entries(s.tags || {}).sort((x, y) => (x[0] < y[0] ? 1 : -1)).slice(0, 6);
+  return `<div class="card" id="steps-card"><h2>Passos: dia a dia × treinos</h2>
+    <p class="small muted" style="margin-top:0">O total do relógio mistura a corrida ou a caminhada com o resto do dia. Aqui eles ficam separados, para mostrar se a sua rotina ficou mais ativa e não só se você correu.</p>
+    <div class="grid2">
+      <div><div class="kpi">${fmtN(a.daily)}</div><div class="small muted">passos/dia no dia a dia (7 dias)${trend ? ` · ${trend}` : ""}</div></div>
+      <div><div class="kpi">${fmtN(a.workout)}</div><div class="small muted">passos/dia vindos de treinos${s.estimated ? " (parte estimada pela duração)" : ""}</div></div>
+    </div>
+    ${stepsChart(s)}
+    ${stepsAskHtml(s, today, { note: false })}
+    ${tags.length ? `<div class="small" style="margin-top:10px"><b>Dias que você explicou</b></div><ul class="plain small steps-tags">${tags.map(([d, t]) => `<li class="row between gap"><span>${ddmm(d)} · ${esc(t.label || t.tag)} <span class="muted">(${fmtN(t.steps)} passos${t.minutes ? `, contou ${fmtDur(t.minutes)} de caminhada leve` : ""})</span></span><button class="act" data-stag="${d}:limpar">Desfazer</button></li>`).join("")}</ul>` : ""}
+    <p class="small muted" style="margin-bottom:0">Quando o dia a dia passa muito do seu costume${s.threshold ? ` (hoje, acima de ${fmtN(s.threshold)} passos)` : ""} sem treino que explique, o app pergunta se foi festival, passeio ou outra coisa. Festival, passeio e caminhada entram na sua carga como caminhada leve.</p></div>`;
+}
+
 function healthChart(series, key, { label, unit = "", band = null, ref = null, bars = false, color = "var(--brand)" } = {}) {
   const pts = series.map((p, i) => [i, p[key]]).filter((p) => p[1] != null);
   if (pts.length < 3) return "";
@@ -2921,6 +2993,7 @@ async function viewSaude() {
       ${healthChart(h.series, "rhr", { label: "FC de repouso (bpm)", ref: h.rhr ? h.rhr.base : null, color: "var(--bad)", unit: "Subir 5+ bpm acima da sua base (tracejado) costuma indicar fadiga, estresse ou início de doença." })}
       ${healthChart(h.series, "stress", { label: "Estresse médio (0–100)", color: "var(--warn)" })}
     </div>
+    ${stepsCardHtml(h.steps)}
     ${Object.keys(wk).length ? `<div class="card"><h2>Indicadores do relógio</h2><div class="grid2">
       ${wk.vo2max ? `<div><div class="kpi">${nf(wk.vo2max, 1)}</div><div class="small muted">VO2máx${wk.vo2max_bike ? ` (bike ${nf(wk.vo2max_bike, 1)})` : ""}</div></div>` : ""}
       ${wk.fitness_age ? `<div><div class="kpi">${nf(wk.fitness_age, 1)}</div><div class="small muted">idade física${wk.chron_age ? ` (real ${nf(wk.chron_age)})` : ""}</div></div>` : ""}
@@ -2930,6 +3003,12 @@ async function viewSaude() {
   }
   const rb = $("#h-refresh");
   if (rb) rb.onclick = async () => { rb.disabled = true; try { await api("/api/health/refresh", { method: "POST" }); toast("Dados do relógio atualizados"); viewSaude(); } catch (e) { rb.disabled = false; toast(e.message, 5000); } };
+  const sc = $("#steps-card");
+  if (sc) sc.onclick = async (ev) => {
+    const b = ev.target.closest("[data-stag]"); if (!b || b.disabled) return;
+    b.disabled = true;
+    try { toast(stepsTagToast(await answerSteps(b.dataset.stag)), 5000); viewSaude(); } catch (e) { b.disabled = false; toast(e.message, 5000); }
+  };
 }
 
 /* -------------------------------------------------------------- PERFIL -- */

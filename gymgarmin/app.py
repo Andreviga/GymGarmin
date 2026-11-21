@@ -18,7 +18,7 @@ from datetime import date, timedelta
 
 from . import auth, coach, focus, gallery, ingest, my_gym, training_rules
 from . import (analysis, calibration, catalog, clock, db, dedupe, health, endurance, garmin_export, garmin_sync, generator, history, limitations,
-               load, plans_io, progression, readiness, schedule, sports, templates)
+               load, plans_io, progression, readiness, schedule, sports, steps, templates)
 from .muscles import EQUIPMENT_PT, HR_ZONES, MUSCLES, hr_max, zone_bpm
 
 STATIC = Path(__file__).resolve().parent / "static"
@@ -419,7 +419,7 @@ def _athlete_snapshot(today: date, coach_id: int) -> dict:
         snap["readiness"] = rv["score"]
         snap["readiness_level"] = rv.get("level")
     share_health = db.kv_get(f"coach_share_health:{coach_id}") != "0"  # o atleta pode não compartilhar
-    hd = health.load_days(db.kv_get, today, 36) if share_health else {}
+    hd = _health_days(today, 36) if share_health else {}
     snap["health_shared"] = share_health
     if hd:
         rep = health.report(hd, None, {}, prof, today)
@@ -1425,6 +1425,31 @@ def _remap_garmin_once(plan_ids: set) -> None:
         pass
 
 
+def _fill_activity_steps(by_activity: dict) -> int:
+    """Corridas e caminhadas importadas sem os passos da atividade: completa com o que o relógio informou."""
+    if not by_activity:
+        return 0
+    n = 0
+    since = (clock.today() - timedelta(days=45)).isoformat()
+    for s in db.list_sessions(since=since, limit=2000):
+        got = by_activity.get(str(s.get("garmin_activity_id") or ""))
+        if not got or not got.get("steps"):
+            continue
+        its = [it for it in s.get("items") or [] if load.sport_of(it) in ("corrida", "caminhada", "trilha")
+               or it.get("exercise_id") in garmin_sync.GYM_MACHINES.values()]
+        if len(its) != 1 or its[0].get("steps"):
+            continue
+        try:
+            its[0]["steps"] = int(float(got["steps"]))
+            if got.get("cadence") and 40 <= float(got["cadence"]) <= 260:
+                its[0]["cadence"] = round(float(got["cadence"]))
+        except (TypeError, ValueError):
+            continue
+        db.save_session(s, session_id=s["id"])
+        n += 1
+    return n
+
+
 def _run_sync(trigger: str) -> dict:
     t0 = time.monotonic()
     plan_ids = {it.get("exercise_id") for p in db.list_plans() for d in p.get("days", []) for it in d.get("items", [])}
@@ -1436,6 +1461,10 @@ def _run_sync(trigger: str) -> dict:
                              until=t0 + SYNC_BUDGET_S)
     except garmin_sync.GarminUnavailable as e:
         raise HTTPException(501, str(e)) from e
+    try:
+        _fill_activity_steps(r.pop("activity_steps", None) or {})
+    except Exception:  # noqa: BLE001 - opcional
+        pass
     if garmin_sync.current() is not None:  # mesmo se a importação parou num 429, a prontidão é outra chamada
         today = clock.today()
         until = t0 + EXTRAS_BUDGET_S
@@ -1612,7 +1641,7 @@ def _readiness_view(day: date) -> dict | None:
     if not raw:
         return None
     data = json.loads(raw)
-    hd = health.load_days(db.kv_get, day, 36)
+    hd = _health_days(day, 36)
     night = None
     if hd:
         hr = health.report(hd, None, {}, _profile(), day)
@@ -1670,8 +1699,11 @@ def _health_report(today: date) -> dict:
             continue
         if len(str(s["date"])) > 10:
             times.setdefault(t.date(), []).append(t.hour + t.minute / 60)
-    rep = health.report(health.load_days(db.kv_get, today, 56), json.loads(db.kv_get("health_weekly") or "{}"),
-                        daily, prof, today, times)
+    days = _health_days(today, 56)
+    sv = steps.summary(days, sessions, steps.load_tags(db.kv_get(STEP_TAGS_KEY)), today)
+    rep = health.report(days, json.loads(db.kv_get("health_weekly") or "{}"), daily, prof, today, times,
+                        steps_text=steps.activity_text(sv))
+    rep["steps"] = sv
     st = garmin_sync.status()
     rep["garmin"] = {"connected": st["connected"], "needs_reconnect": st["needs_reconnect"]}
     return rep
@@ -1680,6 +1712,78 @@ def _health_report(today: date) -> dict:
 @app.get("/api/health")
 def health_get():
     return _health_report(clock.today())
+
+
+# ---- passos: treino × dia a dia, dias fora do costume
+
+STEP_TAGS_KEY = "day_tags"
+STEP_WINDOW = 70
+
+
+def _health_days(today: date, days: int = 56) -> dict[str, dict]:
+    """Os registros diários do relógio (uma consulta só, em vez de uma por dia)."""
+    lo, hi = (today - timedelta(days=days - 1)).isoformat(), today.isoformat()
+    out = {}
+    for k, v in db.kv_prefix("health:").items():
+        d = k[7:]
+        if lo <= d <= hi:
+            try:
+                out[d] = json.loads(v)
+            except ValueError:
+                pass
+    return out
+
+
+def _steps_view(today: date) -> dict:
+    since = (today - timedelta(days=STEP_WINDOW)).isoformat()
+    return steps.summary(_health_days(today, STEP_WINDOW), db.list_sessions(since=since, limit=2000),
+                         steps.load_tags(db.kv_get(STEP_TAGS_KEY)), today)
+
+
+@app.get("/api/steps")
+def steps_get():
+    return _steps_view(clock.today())
+
+
+@app.post("/api/steps/tag")
+def steps_tag(body: dict = Body(...)):
+    """Resposta a "o que foi esse dia de muitos passos?": {date, tag}; tag nula desfaz a resposta."""
+    today = clock.today()
+    day, tag = str(body.get("date") or "")[:10], body.get("tag")
+    try:
+        d = date.fromisoformat(day)
+    except ValueError as e:
+        raise HTTPException(400, "Data inválida") from e
+    if tag is not None and tag not in steps.TAGS:
+        raise HTTPException(400, "Opção desconhecida")
+    if d > today or (today - d).days > STEP_WINDOW - steps.BASE_DAYS:
+        raise HTTPException(400, "Só dá para marcar dias das últimas semanas")
+    days = _health_days(today, STEP_WINDOW)
+    sessions = db.list_sessions(since=(today - timedelta(days=STEP_WINDOW)).isoformat(), limit=2000)
+    tags = steps.load_tags(db.kv_get(STEP_TAGS_KEY))
+    for s in [s for s in sessions if steps.is_event(s) and str(s.get("date"))[:10] == day]:
+        db.delete_session(s["id"])  # a caminhada estimada da resposta anterior sai; a nova (se houver) entra abaixo
+        sessions.remove(s)
+    tags.pop(day, None)
+    created = None
+    if tag:
+        rows = steps.split(days, sessions)
+        row = next((r for r in rows if r["date"] == day), None)
+        if not row:
+            raise HTTPException(404, "O relógio não mandou os passos desse dia")
+        base = steps.baseline(rows, before=day, tags=tags)
+        if base is None:
+            base = steps.baseline(rows, tags=tags) or 0
+        extra = max(0, row["daily"] - base)
+        tags[day] = {"tag": tag, "steps": row["daily"], "extra": round(extra), "at": clock.now().isoformat(timespec="minutes")}
+        sess = steps.event_session(day, extra, tag)
+        if sess:
+            created = db.save_session(sess)
+            tags[day]["session_id"] = created["id"]
+            tags[day]["minutes"] = sess["duration_min"]
+    cut = (today - timedelta(days=180)).isoformat()
+    db.kv_set(STEP_TAGS_KEY, json.dumps({k: v for k, v in tags.items() if k >= cut}))
+    return {"ok": True, "tag": tags.get(day), "session_id": created["id"] if created else None, **_steps_view(today)}
 
 
 @app.post("/api/health/refresh")

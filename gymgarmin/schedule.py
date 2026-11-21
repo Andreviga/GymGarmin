@@ -351,6 +351,8 @@ def sync_status(entries: list[dict], sessions: list[dict], today: date) -> list[
     for s in sessions:
         if s.get("schedule_id"):  # já ligada a um treino: não vale de novo para outro treino do MESMO tipo
             used.update((s.get("id"), c) for c in cls_of(by_entry.get(s["schedule_id"])))
+        if s.get("source") == "passos" and not any(it.get("event") == "caminhada" for it in s.get("items") or []):
+            continue  # festival/passeio estimado pelos passos: conta na carga, mas não é o treino do dia
         by_date[s["date"][:10]].append(s)
 
     def linked(e: dict) -> dict | None:

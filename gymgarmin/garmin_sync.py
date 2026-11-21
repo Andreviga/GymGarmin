@@ -571,6 +571,7 @@ def endurance_item(activity: dict, hr_max: int | None = None) -> dict | None:
                 item[k] = round(float(activity[k_src]), 1)
         if activity.get("poolLength"):
             item["pool_m"] = activity["poolLength"]
+        _steps_into(item, activity)
         if item.get("distance_km") and item["duration_min"]:
             secs = item["duration_min"] * 60
             if sport in ("corrida", "caminhada"):
@@ -584,8 +585,21 @@ def endurance_item(activity: dict, hr_max: int | None = None) -> dict | None:
         return item
     machine = GYM_MACHINES.get(type_key)
     if machine:
-        return {"exercise_id": machine, **base}
+        return _steps_into({"exercise_id": machine, **base}, activity)
     return None
+
+
+def _steps_into(item: dict, activity: dict) -> dict:
+    """Passos e cadência medidos na atividade (o total do dia do relógio inclui estes passos)."""
+    try:
+        if activity.get("steps") and float(activity["steps"]) > 0:
+            item["steps"] = int(float(activity["steps"]))
+        cad = activity.get("averageRunCadence") or activity.get("averageRunningCadenceInStepsPerMinute")
+        if cad and 40 <= float(cad) <= 260:
+            item["cadence"] = round(float(cad))
+    except (TypeError, ValueError):
+        pass
+    return item
 
 
 def recent_activities(days: int = 14) -> list[dict]:
@@ -597,6 +611,7 @@ def recent_activities(days: int = 14) -> list[dict]:
         "type": (a.get("activityType") or {}).get("typeKey"), "start": a.get("startTimeLocal"),
         "duration_min": round((a.get("duration") or 0) / 60), "avg_hr": a.get("averageHR"),
         "calories": a.get("calories"), "distance_km": round((a.get("distance") or 0) / 1000, 2) or None,
+        "steps": a.get("steps"), "cadence": a.get("averageRunningCadenceInStepsPerMinute"),
     } for a in acts or []]
 
 
@@ -612,7 +627,7 @@ def import_activity(activity_id: int, preferred_ids: set[str] | None = None, hr_
     }
     for k in ("duration", "averageHR", "maxHR", "calories", "distance", "averagePower", "normalizedPower", "avgPower",
               "normPower", "trainingStressScore", "elevationGain", "aerobicTrainingEffect", "anaerobicTrainingEffect",
-              "poolLength", "averageSpeed"):
+              "poolLength", "averageSpeed", "steps", "averageRunCadence"):
         v = summary.get(k) if summary.get(k) is not None else act.get(k)
         if v is not None:
             flat[k] = v
@@ -708,10 +723,13 @@ def sync(save_session, imported_ids: set, preferred_ids: set[str] | None = None,
     imported, skipped, errors, new = [], 0, [], []
     skip = _skipped()
     skip_changed = False
+    act_steps: dict = {}
     try:
         acts = recent_activities(days)
         for a in acts:
             aid = str(a.get("activity_id") or "")
+            if aid and a.get("steps"):
+                act_steps[aid] = {"steps": a["steps"], "cadence": a.get("cadence")}
             if not aid or aid in imported_ids or (skip.get(aid) or {}).get("final"):
                 continue
             if not importable_type(a.get("type")):
@@ -764,4 +782,4 @@ def sync(save_session, imported_ids: set, preferred_ids: set[str] | None = None,
                     trigger=trigger, last_imported=imported[-10:] if imported else [], needs_reconnect=False,
                     pending=max(0, len(new) - done), backfill_done=st.get("backfill_done") or (days >= FIRST_SYNC_DAYS and len(new) <= done))
     return {"ok": True, "imported": imported, "skipped": skipped, "errors": errors, "window_days": days,
-            "pending": max(0, len(new) - done)}
+            "pending": max(0, len(new) - done), "activity_steps": act_steps}

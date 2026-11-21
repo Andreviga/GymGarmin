@@ -201,6 +201,9 @@ label.chip { display: inline-flex; align-items: center; color: var(--ink); font-
 .hist-val b { color: var(--ink); min-width: 4.5em; text-align: right; }
 .spark { width: 80px; height: 24px; }
 .hist-chart { width: 100%; height: auto; display: block; margin: 6px 0; }
+.steps-q .btn { flex: 1 1 auto; }
+.steps-tags li { padding: 6px 0; border-bottom: 1px solid var(--line); align-items: center; }
+.steps-tags li:last-child { border-bottom: 0; }
 .hist-chart .grid { stroke: var(--line); stroke-width: 1; }
 .hist-chart .axis { fill: var(--ink-2); font-size: 12px; }
 .hist-chart .line1 { fill: none; stroke: var(--brand); stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }

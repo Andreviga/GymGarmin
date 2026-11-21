@@ -209,6 +209,12 @@ def collect(api, today: date, kv_get, kv_set, backfill: int = BACKFILL_PER_RUN, 
                     continue
             except (KeyError, ValueError):
                 pass
+        if cur and d == today - timedelta(days=1) and not cur.get("errors"):
+            try:  # ontem ainda aberto (o relógio pode sincronizar o fim da noite só de manhã): relê no máximo a cada 2 h
+                if now - datetime.fromisoformat(cur["fetched_at"]) < timedelta(hours=2):
+                    continue
+            except (KeyError, ValueError):
+                pass
         data = fetch_day(api, d)
         for k in ("sleep", "hrv", "rhr"):  # falha passageira não apaga o que já tinha vindo
             if cur and not data.get(k) and cur.get(k):
@@ -218,7 +224,10 @@ def collect(api, today: date, kv_get, kv_set, backfill: int = BACKFILL_PER_RUN, 
         # o dia já acabou: os totais não mudam mais — mas noite/FC que falharam ganham até 3 tentativas
         # o dia já acabou: os totais não mudam mais — só repete (até 3×) se a busca deu erro;
         # "sem dado" (relógio fora do pulso à noite) é resposta final
-        data["final"] = d < today and (not data.get("errors") or tries >= 3)
+        # ontem só fecha depois das 10 h: quem saiu à noite (festa, show) sincroniza o relógio de manhã e os passos
+        # do fim do dia chegam atrasados
+        closed = d < today - timedelta(days=1) or (d < today and now.hour >= 10)
+        data["final"] = closed and (not data.get("errors") or tries >= 3)
         kv_set(f"health:{d.isoformat()}", json.dumps(data))
         idx[d.isoformat()] = "final" if data["final"] else tries
         fetched.append(d.isoformat())
@@ -339,7 +348,7 @@ def _area(level: str, title: str, text: str, tip: str | None = None) -> dict:
 
 
 def report(days: dict[str, dict], weekly: dict | None, daily_load: dict[date, float], profile: dict,
-           today: date, session_times: dict[date, list[float]] | None = None) -> dict:
+           today: date, session_times: dict[date, list[float]] | None = None, steps_text: str | None = None) -> dict:
     """Painel de saúde: última noite, áreas (sono, recuperação, condicionamento, estresse, atividade),
     efeitos do treino e alertas. `daily_load` = carga (TSS) por dia; `session_times` = horas de início dos treinos."""
     weekly = weekly or {}
@@ -502,7 +511,7 @@ def report(days: dict[str, dict], weekly: dict | None, daily_load: dict[date, fl
         lvl = "ok" if week_im >= 150 else "atencao"
         parts = []
         if steps is not None:
-            parts.append(f"{steps:,.0f} passos/dia".replace(",", "."))
+            parts.append(steps_text or f"{steps:,.0f} passos/dia".replace(",", "."))
         parts.append(f"{week_im:.0f} min de intensidade na semana (meta da OMS: 150–300; vigorosa vale 2×)")
         out["areas"].append(_area(lvl, "Atividade diária", "; ".join(parts) + ".",
                                   None if lvl == "ok" else "Caminhadas de 10 min depois das refeições já ajudam a bater a meta."))

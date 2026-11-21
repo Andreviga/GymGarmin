@@ -72,11 +72,20 @@ def test_collect_backfills_gradually_and_marks_final():
     try:
         r = health.collect(api, TODAY, store.get, store.__setitem__)
         assert len(r["fetched"]) == 2 + health.BACKFILL_PER_RUN
-        assert json.loads(store["health:2026-11-16"])["final"] and not json.loads(store["health:2026-11-17"])["final"]
+        # ontem só fecha depois das 10 h (o fim da noite pode chegar ao relógio só de manhã); anteontem para trás já fecha
+        assert not json.loads(store["health:2026-11-16"])["final"] and not json.loads(store["health:2026-11-17"])["final"]
+        assert json.loads(store["health:2026-11-15"])["final"]
         assert "health_weekly" in store
         n = len(api.calls)
-        health.collect(api, TODAY, store.get, store.__setitem__)  # hoje recém-buscado, ontem final: só o backfill
+        health.collect(api, TODAY, store.get, store.__setitem__)  # hoje e ontem recém-buscados: só o backfill
         assert sum(1 for c in api.calls[n:] if c[1] in ("2026-11-17", "2026-11-16")) == 0
+        clock.freeze(datetime(2026, 11, 17, 11, 0))
+        n = len(api.calls)
+        health.collect(api, TODAY, store.get, store.__setitem__)  # depois das 10 h relê ontem uma vez e fecha
+        assert any(c[1] == "2026-11-16" for c in api.calls[n:]) and json.loads(store["health:2026-11-16"])["final"]
+        n = len(api.calls)
+        health.collect(api, TODAY, store.get, store.__setitem__)
+        assert not any(c[1] == "2026-11-16" for c in api.calls[n:])
     finally:
         clock.freeze(None)
 
