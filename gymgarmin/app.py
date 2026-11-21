@@ -1250,17 +1250,20 @@ def create_session(body: dict = Body(...)):
         if body.get("with_partner") is not None and body.pop("allow_repeat", None) is not True:
             acc = auth.current_account()
             day_iso = str(body.get("date") or "")[:10]
+            new_ids = partners.strength_ids(body)
             twin = [x for x in db.list_sessions(since=day_iso or None, limit=60) if str(x.get("date"))[:10] == day_iso
                     and x.get("client_id") != body.get("client_id")
-                    and partners.same_workout(partners.strength_ids(x), partners.strength_ids(body))
+                    # mesmo treino de verdade: mesmos exercícios (um treino diferente com a mesma pessoa no dia passa)
+                    and partners.same_copy(partners.strength_ids(x), new_ids)
                     # do relógio só conta se já tem dono (juntado com um treino anotado): o resto o salvar junta sozinho
                     and (x.get("with_partner") == body["with_partner"] or x.get("merged")
                          or not (x.get("garmin_activity_id") or x.get("ext_id")))] if acc and day_iso else []
             if twin:
                 v = partners.registered_view(twin[0])
-                raise HTTPException(409, f"Você já registrou esse treino em {v['date'][8:10]}/{v['date'][5:7]} às {v['time']} "
-                                         f"({v['exercises']} exercícios, {v['sets']} séries). Para mudar, toque em Ver e corrigir "
-                                         f"no cartão do parceiro ou no Histórico.")
+                return JSONResponse({"detail": f"Você já registrou esse treino em {v['date'][8:10]}/{v['date'][5:7]} às {v['time']} "
+                                               f"({v['exercises']} exercícios, {v['sets']} séries). Para mudar, toque em Ver e corrigir "
+                                               f"no cartão do parceiro ou no Histórico.", "existing_id": v["id"], "existing": v},
+                                    status_code=409)
         body.pop("allow_repeat", None)
         target = body.pop("merge_into", None)
         no_merge = body.pop("no_merge", None) is True   # a pessoa viu a atividade do relógio e disse "é outro treino"
@@ -1332,6 +1335,8 @@ def session_edit_draft(session_id: int):
         it["sets"] = [{"reps": x.get("reps"), "duration_s": x.get("duration_s"), "load_kg": x.get("load_kg"), "rpe": x.get("rpe"),
                        "done": x.get("done", True)} for x in orig["sets"]]
         it["warmup"] = []
+        if orig.get("deload"):
+            it["plan"] = {**(it.get("plan") or {}), "deload": True}
     pname = None
     if s.get("with_partner"):
         pname = partners.first_name(partners._names().get(int(s["with_partner"]), ""))
@@ -1363,7 +1368,19 @@ def put_session(session_id: int, body: dict = Body(...)):
         # correção pela tela: ela só mexe nas séries de musculação; cardio, atividade do relógio e séries sem nome ficam
         body = {k: body[k] for k in ("items", "date", "day_name", "notes", "duration_min") if k in body and body[k] is not None}
         kept = [it for it in old.get("items") or [] if not partners._is_strength(it)]
-        body["items"] = [it for it in body.get("items") or [] if it.get("sets")] + kept
+        olds: dict[str, list[dict]] = {}
+        for it in old.get("items") or []:
+            if partners._is_strength(it):
+                olds.setdefault(it["exercise_id"], []).append(it)
+        new_items = []
+        for it in body.get("items") or []:
+            if it.get("sets"):
+                prev = (olds.get(it.get("exercise_id")) or [None]).pop(0) if olds.get(it.get("exercise_id")) else None
+                # deload, palpite/nome do relógio, categoria etc. continuam: a correção só troca as séries
+                new_items.append({**{k: v for k, v in (prev or {}).items() if k != "sets"}, **it})
+            elif it.get("duration_min"):
+                new_items.append(it)   # cardio acrescentado na correção
+        body["items"] = new_items + kept
         if old.get("garmin_activity_id") or old.get("ext_id"):
             body.pop("duration_min", None)   # o tempo medido pelo relógio vale mais que o da tela
     if "with_partner" in body:
@@ -1375,7 +1392,15 @@ def put_session(session_id: int, body: dict = Body(...)):
     keep = {k: v for k, v in old.items() if k not in ("id", "created_at") and k not in body}
     saved = db.save_session({**keep, **body}, session_id=session_id)
     from .credit import COVER_ASK
-    schedule.reopen_for_session(saved, min_cover=COVER_ASK)  # editou até não cobrir mais o treino: ele volta à agenda
+    if str(old.get("date"))[:10] != str(saved.get("date"))[:10]:
+        # mudou o dia: o treino da agenda que ele fechava no dia antigo volta, e o do dia novo é avaliado
+        schedule.reopen_for_session(old)
+        if saved.get("schedule_id"):
+            saved = db.save_session({**saved, "schedule_id": None}, session_id=session_id)
+        schedule.credit_session(saved, _profile())
+        saved = db.get_session(session_id) or saved
+    else:
+        schedule.reopen_for_session(saved, min_cover=COVER_ASK)  # editou até não cobrir mais o treino: ele volta à agenda
     return {**saved, **_saved_extra(saved)}
 
 
@@ -1488,10 +1513,22 @@ def session_prefill(plan_id: int, idx: int):
 
 # ---- treinar com o companheiro: parceria, puxar o treino do outro, placar
 
+def _already_for(uid: int, pid: int, s: dict, mine: list[dict]) -> list[dict]:
+    """Treinos MEUS do dia que já são ESTE treino da pessoa (comparando com todos os treinos dela no dia: cada um meu
+    fica com o treino dela mais parecido)."""
+    day_iso = str(s.get("date"))[:10]
+    theirs = [x for x in db.list_sessions(pid, since=day_iso, limit=60) if str(x.get("date"))[:10] == day_iso]
+    links = partners.pair(mine, theirs or [s], uid, pid)
+    return [partners.registered_view(x) for x in mine if links.get(x["id"]) == s["id"]]
+
+
 def _already(uid: int, pid: int, mine: list[dict], want: set) -> list[dict]:
-    """Treinos MEUS do dia que já são esse treino com essa pessoa (registrados juntos, puxados, ou mesmos exercícios)."""
+    """Treinos MEUS do dia que já são ESSE treino (o planejado da pessoa): mesma lista de exercícios. Outro treino
+    com a mesma pessoa no mesmo dia (pernas de manhã, braços à noite) não conta."""
     return [partners.registered_view(x) for x in mine if partners.strength_ids(x) and (
-        x.get("with_partner") == pid or partners.same_workout(partners.strength_ids(x), want))]
+        partners.same_copy(partners.strength_ids(x), want)
+        or (x.get("with_partner") == pid and partners.linked_overlap(partners.strength_ids(x), want)
+            and len(partners.strength_ids(x) & want) * 2 > max(len(want), len(partners.strength_ids(x)))))]
 
 
 def _same_exercises(mine: dict, plan_items: list[dict]) -> bool:
@@ -1617,7 +1654,7 @@ def partners_get():
                       "done": [{"id": s["id"], "title": s["title"], "minutes": s["minutes"], "minutes_estimated": s["minutes_estimated"],
                                 "kcal": s["kcal"], "has_sets": s["has_sets"], "mine_ids": s["mine_ids"],
                                 "from_me": s.get("with_partner") == uid} for s in d["done"]],
-                      "mine": d["registered"]}   # ✓ o que EU já registrei do treino com essa pessoa hoje
+                      "mine": d["registered"], "dups": d["duplicates"]}   # ✓ o que EU já registrei do treino com essa pessoa hoje
         du = partners.duel(uid, p["id"], today, today)
         p["duel"] = {"metrics": du["metrics"], "score": du["score"], "kcal_estimated": du["kcal_estimated"],
                      "est": {"me": du["me"]["kcal_estimated"], "partner": du["partner"]["kcal_estimated"]},
@@ -1627,7 +1664,7 @@ def partners_get():
         for back in (1, 2):
             prev = partners.day(uid, p["id"], today - timedelta(days=back))
             theirs = [s for s in prev["done"] if s["has_sets"]]
-            if theirs and not any(m.get("has_sets") for m in prev["mine"]) and not any(t.get("with_partner") == uid for t in theirs):
+            if theirs and not any(m.get("has_sets") for m in prev["mine"]):
                 p["recent"] = {"date": prev["date"], "days_ago": back, "id": theirs[-1]["id"], "title": theirs[-1]["title"],
                                "minutes": theirs[-1]["minutes"], "minutes_estimated": theirs[-1]["minutes_estimated"]}
                 break
@@ -1713,7 +1750,7 @@ def partners_draft(pid: int, body: dict = Body(...)):
                                       "title": x.get("notes") or x.get("day_name") or "Atividade do relógio",
                                       "match": dedupe.overlap(x, s) >= dedupe.MIN_OVERLAP} for x in watch],
                 "skipped_sets": skipped,
-                "already": _already(uid, pid, mine, {i["exercise_id"] for i in plan_items})}
+                "already": _already_for(uid, pid, s, mine)}
     if body.get("entry_id") is not None:
         e = db.get_entry(int(body["entry_id"]), user_id=pid)
         if not e:

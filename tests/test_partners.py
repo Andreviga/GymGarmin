@@ -271,7 +271,7 @@ def test_second_strength_workout_of_the_day_never_overwrites_the_one_joined_with
     assert first["id"] == w and first["merged"] and first["duration_min"] == 62
     sid2 = a.post("/api/sessions", json=ARMS).json()["id"]
     d2 = n.post(f"/api/partners/{aid}/draft", json={"session_id": sid2}).json()
-    assert [x["id"] for x in d2["already"]] == [w] and d2["merge_candidates"] == []          # a atividade do relógio já tem dono
+    assert d2["already"] == [] and d2["merge_candidates"] == []      # braços é OUTRO treino (pernas não conta); o relógio já tem dono
     body = {k: v for k, v in d2.items() if k in ("date", "day_name", "items", "with_partner", "duration_min")}
     second = n.post("/api/sessions", json={**body, "client_id": "n-2"}).json()
     ss = _day_sessions(n)
@@ -629,3 +629,88 @@ def test_correcting_keeps_cardio_and_the_agenda_link(env):
     fixed = n.put(f"/api/sessions/{s['id']}", json={"edit": True, "date": ed["date"], "schedule_id": None, "items": [
         {"exercise_id": "Leg_Extensions", "sets": [{"reps": 12, "load_kg": 25}] * 3}]}).json()
     assert [i["exercise_id"] for i in fixed["items"]] == ["Leg_Extensions", "cardio_eliptico"] and fixed["schedule_id"] == 999
+
+
+# ------------------------------------------------------------------ revisão: outro treino no mesmo dia, correção completa ---
+LEGS = {"date": "2026-11-20T07:30", "day_name": "Pernas", "client_id": "a-legs", "duration_min": 55,
+        "items": [{"exercise_id": "Leg_Press", "sets": [{"reps": 10, "load_kg": 120}] * 3},
+                  {"exercise_id": "Leg_Extensions", "sets": [{"reps": 12, "load_kg": 50}] * 3},
+                  {"exercise_id": "Seated_Leg_Curl", "sets": [{"reps": 12, "load_kg": 40}] * 3},
+                  {"exercise_id": "Crunches", "sets": [{"reps": 20}] * 3}]}
+ABS = {"date": "2026-11-20T19:00", "day_name": "Abdômen e panturrilha", "client_id": "a-abs",
+       "items": [{"exercise_id": "Crunches", "sets": [{"reps": 20}] * 3},
+                 {"exercise_id": "Standing_Calf_Raises", "sets": [{"reps": 15, "load_kg": 60}] * 3}]}
+
+
+def _body(d, **more):
+    return {**{k: v for k, v in d.items() if k in ("date", "day_name", "items", "with_partner", "duration_min")}, **more}
+
+
+def test_a_different_workout_with_the_same_person_on_the_same_day_is_not_already_registered(env):
+    a, aid, n, nid, b, bid = env
+    _link(a, n, nid)
+    legs = a.post("/api/sessions", json=LEGS).json()["id"]
+    d = n.post(f"/api/partners/{aid}/draft", json={"session_id": legs}).json()
+    mine_legs = n.post("/api/sessions", json=_body(d, client_id="n-legs")).json()
+    arms = a.post("/api/sessions", json=ARMS).json()["id"]
+    d2 = n.post(f"/api/partners/{aid}/draft", json={"session_id": arms}).json()
+    assert d2["already"] == []                                                # braços não é o treino de pernas
+    r = n.post("/api/sessions", json=_body(d2, client_id="n-arms"))
+    assert r.status_code == 200 and len(_day_sessions(n)) == 2
+    abs_ = a.post("/api/sessions", json=ABS).json()["id"]                    # 1 exercício em comum com pernas (abdominal)
+    d3 = n.post(f"/api/partners/{aid}/draft", json={"session_id": abs_}).json()
+    assert d3["already"] == [] and n.post("/api/sessions", json=_body(d3, client_id="n-abs")).status_code == 200
+    card = n.get("/api/partners").json()["partners"][0]["today"]
+    assert len(card["mine"]) == 3 and card["dups"] == []                       # três treinos de verdade, nenhum aviso de repetido
+    # e a cópia do de pernas continua recusada, dizendo qual registro já existe
+    r = n.post("/api/sessions", json=_body(d, client_id="n-legs-2"))
+    assert r.status_code == 409 and r.json()["existing_id"] == mine_legs["id"]
+    assert n.post("/api/sessions", json=_body(d, client_id="n-legs-3", allow_repeat=True)).status_code == 200   # "foi outro treino"
+    dups = n.get("/api/partners").json()["partners"][0]["today"]["dups"]
+    assert len(dups) == 1 and mine_legs["id"] in dups[0]                       # agora sim: o mesmo treino 2 vezes
+
+
+def test_same_split_at_different_times_without_training_together_is_not_together(env):
+    a, aid, n, nid, b, bid = env
+    _link(a, n, nid)
+    a.post("/api/sessions", json={**LEGS, "date": "2026-11-20T19:30"})
+    n.post("/api/sessions", json={**LEGS, "client_id": "n-alone", "date": "2026-11-20T07:00"})   # cada um sozinho
+    card = n.get("/api/partners").json()["partners"][0]["today"]
+    assert card["mine"] == [] and card["done"][0]["mine_ids"] == []
+
+
+def test_partner_with_only_the_watch_time_can_pull_the_workout_logged_from_his_plan(env):
+    a, aid, n, nid, b, bid = env
+    _link(a, n, nid)
+    e = db.save_entry(dict(CHEST_PLAN), user_id=aid)
+    live = n.post(f"/api/partners/{aid}/draft", json={"entry_id": e["id"]}).json()
+    hers = n.post("/api/sessions", json={"date": "2026-11-20T11:56", "day_name": live["day_name"], "client_id": "n1", "with_partner": aid,
+                                         "items": [{"exercise_id": "Dumbbell_Bench_Press", "sets": [{"reps": 12, "load_kg": 12}] * 4},
+                                                   {"exercise_id": "Triceps_Pushdown", "sets": [{"reps": 15, "load_kg": 13}] * 2}]}).json()
+    tok = a.post("/api/account/ingest-token", json={}).json()["token"]
+    a.post("/api/ingest", headers={"Authorization": f"Bearer {tok}"}, json={"source": "android", "days": [], "workouts": [
+        {"id": "w", "type": "OTHER_WORKOUT", "start": "2026-11-20T11:55:00-03:00", "duration_min": 62, "kcal": 400}]})
+    day = a.get(f"/api/partners/{nid}/day").json()
+    assert day["done"][0]["with_partner"] == aid and day["done"][0]["mine_ids"] == []   # ele não tem séries: pode puxar
+    d = a.post(f"/api/partners/{nid}/draft", json={"session_id": hers["id"]}).json()
+    assert d["already"] == [] and [i["exercise_id"] for i in d["items"]] == ["Dumbbell_Bench_Press", "Triceps_Pushdown"]
+
+
+def test_correction_keeps_deload_watch_guess_and_new_cardio_and_moves_the_day(env):
+    a, aid, n, nid, b, bid = env
+    s = db.save_session({"date": "2026-11-20T09:00", "client_id": "x", "source": "garmin", "garmin_activity_id": 55,
+                         "items": [{"exercise_id": "Leg_Press", "deload": True, "guess": True, "garmin": {"category": "SQUAT"},
+                                    "sets": [{"reps": 10, "load_kg": 90}, {"reps": 10, "load_kg": None}]}]}, user_id=nid)
+    ed = n.get(f"/api/sessions/{s['id']}/edit").json()
+    assert ed["items"][0]["plan"]["deload"] is True
+    fixed = n.put(f"/api/sessions/{s['id']}", json={"edit": True, "date": ed["date"], "items": [
+        {"exercise_id": "Leg_Press", "deload": True, "sets": [{"reps": 10, "load_kg": 90}, {"reps": 10, "load_kg": 90}]},
+        {"exercise_id": "cardio_esteira_corrida", "duration_min": 10, "zone": 2}]}).json()
+    lp = fixed["items"][0]
+    assert lp["deload"] and lp["guess"] and lp["garmin"] == {"category": "SQUAT"} and [x["load_kg"] for x in lp["sets"]] == [90, 90]
+    assert [i["exercise_id"] for i in fixed["items"]] == ["Leg_Press", "cardio_esteira_corrida"] and fixed["garmin_activity_id"] == 55
+    e = db.save_entry({"date": "2026-11-20", "kind": "forca", "status": "feito", "day_name": "Pernas", "plan_id": None,
+                       "done_by": {"session_id": s["id"], "how": "vinculo"}, "items": [{"exercise_id": "Leg_Press", "sets": 2, "reps": "10"}]}, user_id=nid)
+    moved = n.put(f"/api/sessions/{s['id']}", json={"edit": True, "date": "2026-11-19T09:00", "items": [
+        {"exercise_id": "Leg_Press", "sets": [{"reps": 10, "load_kg": 90}] * 2}]}).json()
+    assert moved["date"].startswith("2026-11-19") and db.get_entry(e["id"], user_id=nid)["status"] != "feito"   # o treino de 20/11 volta

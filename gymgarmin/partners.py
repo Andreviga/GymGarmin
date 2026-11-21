@@ -15,7 +15,8 @@ Tudo aqui é leitura do banco + contas simples; quem grava a sessão é o fluxo 
 from __future__ import annotations
 
 import json
-from datetime import date, timedelta
+import math
+from datetime import date, datetime, timedelta
 
 from . import catalog, clock, db, load
 
@@ -242,10 +243,43 @@ def same_workout(a: set, b: set) -> bool:
     return len(a & b) >= max(1, round(0.6 * min(len(a), len(b))))
 
 
+def same_copy(a: set, b: set) -> bool:
+    """Cópia do mesmo treino (mais rígido): pelo menos 70% dos exercícios do MAIOR em comum, e no mínimo 2
+    (um abdominal em comum não faz o treino de pernas ser o mesmo que o de abdômen)."""
+    if not a or not b:
+        return False
+    if len(a) == 1 and len(b) == 1:
+        return a == b
+    common = len(a & b)
+    return common >= 2 and common >= math.ceil(0.7 * max(len(a), len(b)))
+
+
+def linked_overlap(a: set, b: set) -> bool:
+    """Treino marcado como feito com a pessoa: é o par de um treino dela se a maioria dos exercícios do menor bate."""
+    common = len(a & b)
+    # e também uma parte de verdade do maior: o abdominal do fim do treino de pernas não faz dele o "abdômen" da noite
+    return bool(a and b) and common >= max(1, math.ceil(0.5 * min(len(a), len(b)))) and common >= math.ceil(len(a | b) / 3)
+
+
+def _when(s: dict) -> datetime | None:
+    try:
+        return datetime.fromisoformat(str(s.get("date"))[:19]) if len(str(s.get("date") or "")) > 10 else None
+    except ValueError:
+        return None
+
+
+def _near(a: dict, b: dict, hours: float = 3) -> bool:
+    ta, tb = _when(a), _when(b)
+    return bool(ta and tb) and abs((ta - tb).total_seconds()) <= hours * 3600
+
+
 def pair(mine: list[dict], theirs: list[dict], uid: int, pid: int) -> dict[int, int | None]:
     """Para cada treino MEU do dia (com séries): a qual treino do parceiro ele corresponde.
     {id do meu treino: id do treino dele, ou None se é treino com ele sem par (ex.: treinou junto pelo planejado
-    e ele ainda não registrou)}. Treino meu que não aparece no resultado não tem relação com o parceiro."""
+    e ele ainda não registrou)}. Treino meu que não aparece no resultado não tem relação com o parceiro.
+    Com vínculo (um puxou do outro / treinou junto): basta a maioria dos exercícios do menor. Sem vínculo: só se é
+    o mesmo treino de verdade (mesmos exercícios) e em horário próximo; cada um fazer a mesma divisão em horários
+    diferentes não é "treinaram juntos"."""
     out: dict[int, int | None] = {}
     th = [(t, strength_ids(t)) for t in theirs if strength_ids(t)]
     for m in mine:
@@ -255,13 +289,35 @@ def pair(mine: list[dict], theirs: list[dict], uid: int, pid: int) -> dict[int, 
         best, best_n = None, 0
         for t, tids in th:
             n = len(ids & tids)
-            if n > best_n and (same_workout(ids, tids) or m.get("with_partner") == pid or t.get("with_partner") == uid):
+            linked = m.get("with_partner") == pid or t.get("with_partner") == uid
+            ok = linked_overlap(ids, tids) if linked else (same_copy(ids, tids) and _near(m, t))
+            if ok and n > best_n:
                 best, best_n = t, n
         if best is not None:
             out[m["id"]] = best["id"]
         elif m.get("with_partner") == pid:
             out[m["id"]] = None
     return out
+
+
+def duplicates(mine: list[dict], links: dict[int, int | None]) -> list[list[int]]:
+    """Registros meus que são o MESMO treino (ligados ao mesmo treino da pessoa, ou cópias um do outro): devem virar um."""
+    groups: list[list[int]] = []
+    by_t: dict[int, list[int]] = {}
+    for mid, tid in links.items():
+        if tid is not None:
+            by_t.setdefault(tid, []).append(mid)
+    groups += [g for g in by_t.values() if len(g) > 1]
+    loose = [m for m in mine if m.get("id") in links and links[m["id"]] is None]
+    used: set = set()
+    for i, a in enumerate(loose):
+        if a["id"] in used:
+            continue
+        g = [a["id"]] + [b["id"] for b in loose[i + 1:] if b["id"] not in used and same_copy(strength_ids(a), strength_ids(b))]
+        if len(g) > 1:
+            used.update(g)
+            groups.append(g)
+    return groups
 
 
 def registered_view(s: dict) -> dict:
@@ -312,7 +368,8 @@ def day(uid: int, pid: int, d: date) -> dict:
         mine_v.append(v)
     return {"date": iso, "next": nxt, "partner": {"id": pid, "name": _names().get(pid, ""), "first": first_name(_names().get(pid, ""))},
             "done": done, "planned": [_entry_view(e) for e in planned], "mine": mine_v,
-            "registered": [registered_view(s) for s in sorted(mine, key=lambda s: str(s.get("date"))) if s.get("id") in links]}
+            "registered": [registered_view(s) for s in sorted(mine, key=lambda s: str(s.get("date"))) if s.get("id") in links],
+            "duplicates": duplicates(mine, links)}
 
 
 def plan_items_from_session(s: dict) -> tuple[list[dict], dict[str, list[dict]]]:

@@ -42,6 +42,7 @@ async function api(path, opts = {}) {
     let msg = r.statusText; let j = null;
     try { j = await r.json(); msg = j.detail || msg; } catch (_) { /* sem corpo */ }
     if (r.status === 401 && j && j.login) { showAuth("login"); const e = new Error(msg); e.auth = true; throw e; }
+    if (r.status === 409 && j && j.existing_id) { const e = new Error(msg); e.status = 409; e.body = j; throw e; }
     throw new Error(msg);
   }
   const ct = r.headers.get("content-type") || "";
@@ -864,6 +865,13 @@ function bindPartnerMine() {
 }
 // botões dos cartões de parceria (Hoje, com ou sem treino montado). Devolve true se o toque era de parceria.
 async function partnerAction(d, t, again) {
+  if (d.oxuse || d.oxdrop) {
+    const cs = store("gg_outbox_conflict") || []; const c = cs[+(d.oxuse || d.oxdrop)]; if (!c) { again(); return true; }
+    t.disabled = true;
+    if (d.oxuse) { await api(`/api/sessions/${c.existing_id}`, { method: "PUT", body: { ...c.payload, edit: true } }); toast("Pronto: ficou o treino guardado no celular (um registro só).", 5000); }
+    else toast("Ok, ficou o registro que já estava.", 4000);
+    cs.splice(+(d.oxuse || d.oxdrop), 1); store("gg_outbox_conflict", cs.length ? cs : null); again(); return true;
+  }
   if (d.msame || d.mdiff) {  // "é o mesmo treino que o relógio gravou?"
     const [w, a] = (d.msame || d.mdiff).split(":").map(Number); t.disabled = true;
     const r = await api("/api/sessions/merge-answer", { method: "POST", body: { watch_id: w, app_id: a, same: !!d.msame } });
@@ -884,12 +892,17 @@ async function partnerAction(d, t, again) {
 const kcalTxt = (v, est) => `${est ? "~" : ""}${fmtN(v)} kcal`;
 // "✓ Você registrou": o que ficou salvo do treino com essa pessoa (e aviso quando o mesmo treino foi registrado 2 vezes)
 const regLine = (r) => `${esc(r.title)} · ${esc(r.time)} · ${r.exercises} ${r.exercises === 1 ? "exercício" : "exercícios"} · ${r.sets} ${r.sets === 1 ? "série" : "séries"}${r.minutes ? ` · ${r.minutes_estimated ? "~" : ""}${r.minutes} min` : ""}${r.no_load ? ` · <span class="no-load">${r.no_load} sem carga</span>` : ""}`;
-function registeredHtml(reg, who, together) {
+function registeredHtml(reg, who, together, dups) {
   if (!reg || !reg.length) return "";
-  if (reg.length === 1) return `<div class="reg-box small"><div class="reg-row"><span><b class="ok-txt">✓ ${together ? "Vocês treinaram juntos e você registrou" : "Você registrou"}</b><br>${regLine(reg[0])}</span>
-    <button class="btn sm ghost" data-myses="${reg[0].id}">Ver e corrigir</button></div></div>`;
-  return `<div class="reg-box dup small"><b>Você registrou esse treino ${reg.length} vezes${reg[0].date === localISO().slice(0, 10) ? " hoje" : ""}.</b> Fique com um só (o outro conta em dobro no placar e na semana):
-    ${reg.map((r) => `<div class="reg-row"><span>${regLine(r)}</span><span class="row gap"><button class="btn sm ghost" data-myses="${r.id}">Ver</button><button class="btn sm ghost" data-mydel="${r.id}">Apagar</button></span></div>`).join("")}</div>`;
+  const groups = (dups || []).filter((g) => g.length > 1);
+  const inDup = new Set(groups.flat());
+  const ok = reg.filter((r) => !inDup.has(r.id));
+  const okHtml = ok.length ? `<div class="reg-box small"><b class="ok-txt">✓ ${together ? "Vocês treinaram juntos e você registrou" : "Você registrou"}</b>
+    ${ok.map((r) => `<div class="reg-row"><span>${regLine(r)}</span><button class="btn sm ghost" data-myses="${r.id}">Ver e corrigir</button></div>`).join("")}</div>` : "";
+  const dupHtml = groups.map((g) => { const rs = g.map((id) => reg.find((r) => r.id === id)).filter(Boolean);
+    return `<div class="reg-box dup small"><b>Você registrou o mesmo treino ${rs.length} vezes${rs[0] && rs[0].date === localISO().slice(0, 10) ? " hoje" : ""}.</b> Fique com um só (o outro conta em dobro no placar e na semana):
+    ${rs.map((r) => `<div class="reg-row"><span>${regLine(r)}</span><span class="row gap"><button class="btn sm ghost" data-myses="${r.id}">Ver</button><button class="btn sm ghost" data-mydel="${r.id}">Apagar</button></span></div>`).join("")}</div>`; }).join("");
+  return dupHtml + okHtml;
 }
 // um treino MEU salvo: o que ficou registrado, com corrigir e apagar
 async function openMySession(id, onChange) {
@@ -929,9 +942,17 @@ function watchMergeHtml(qs) {
     <p class="small" style="margin:4px 0 8px">${ddmm(q.date)}: o relógio gravou <b>${/relógio/i.test(q.watch.title) ? "" : esc(q.watch.title) + " · "}${q.watch.minutes} min</b> às ${esc(q.watch.time)}${q.watch.kcal ? ` (${fmtN(q.watch.kcal)} kcal)` : ""} e você anotou <b>${esc(q.app.title)}</b>${q.app.time ? ` às ${esc(q.app.time)}` : ""} (${q.app.sets} ${q.app.sets === 1 ? "série" : "séries"}). Se for o mesmo, vira um treino só, com o tempo e as calorias do relógio.</p>
     <div class="row gap wrap"><button class="btn sm" data-msame="${q.watch.id}:${q.app.id}">Sim, é o mesmo</button><button class="btn sm ghost" data-mdiff="${q.watch.id}:${q.app.id}">Não, são dois treinos</button></div></div>`).join("");
 }
+function outboxConflictHtml() {
+  const cs = store("gg_outbox_conflict") || [];
+  return cs.map((c, k) => { const n = (c.payload.items || []).reduce((a, it) => a + (it.sets || []).length, 0);
+    const nl = (c.payload.items || []).reduce((a, it) => a + (it.sets || []).filter((x) => x.load_kg == null || x.load_kg === "").length, 0);
+    return `<div class="rec atencao q-card"><b>Esse treino ficou registrado duas vezes</b>
+    <p class="small" style="margin:4px 0 8px">O treino que ficou guardado no celular sem internet (${esc(c.payload.day_name || "Treino")} · ${esc(String(c.payload.date || "").slice(11, 16))} · ${n} séries${nl ? `, ${nl} sem carga` : ""}) já tinha sido registrado de novo: ${c.existing ? regLine(c.existing) : "outro registro"}. Qual fica?</p>
+    <div class="row gap wrap"><button class="btn sm" data-oxuse="${k}">Ficar com o do celular</button><button class="btn sm ghost" data-oxdrop="${k}">Ficar com o que já está</button></div></div>`; }).join("");
+}
 function partnerCardsHtml(p) {
-  if (!p) return "";
-  if (!p.enabled) return watchMergeHtml(p.merge_questions);
+  if (!p) return outboxConflictHtml();
+  if (!p.enabled) return outboxConflictHtml() + watchMergeHtml(p.merge_questions);
   const req = (p.requests || []).map((x) => `<div class="rec atencao q-card"><b>${esc(x.name || x.first)} quer treinar com você</b> <span class="small muted">${partnerWho(x)}</span>
     <p class="small" style="margin:4px 0 8px">Vocês passam a ver o treino um do outro (exercícios, séries, tempo e calorias) e um placar da semana. Nada de saúde, sono ou passos.</p>
     <div class="row gap wrap"><button class="btn sm" data-paccept="${x.id}">Aceitar</button><button class="btn sm ghost" data-pdecline="${x.id}">Agora não</button></div></div>`).join("");
@@ -946,13 +967,13 @@ function partnerCardsHtml(p) {
     const rc = x.recent;  // treino de ontem/anteontem que eu ainda não registrei
     const recent = rc ? `<p class="small" style="margin:0 0 8px">${rc.days_ago === 1 ? "Ontem" : "Anteontem"} ${esc(x.first)} fez ${esc(rc.title)} (${rc.minutes_estimated ? "~" : ""}${rc.minutes} min). Se você fez junto e não registrou, dá para puxar.</p>` : "";
     return `<section class="card partner-card"><div class="row between gap"><b>Treino com ${esc(x.first)}</b>${du ? `<span class="pill ${du.score.lead === "me" ? "ok" : ""}">${lead}</span>` : ""}</div>
-      <p class="small" style="margin:4px 0 8px">${status}</p>${registeredHtml(reg, x.first, together)}${recent}
+      <p class="small" style="margin:4px 0 8px">${status}</p>${registeredHtml(reg, x.first, together, t.dups)}${recent}
       ${m ? `<div class="duel-mini small"><span>Semana</span><span>você <b>${m.sessions.me}</b> × <b>${m.sessions.partner}</b> treinos</span><span><b>${(du.est_min || {}).me ? "~" : ""}${fmtN(m.minutes.me)}</b> × <b>${(du.est_min || {}).partner ? "~" : ""}${fmtN(m.minutes.partner)}</b> min</span><span><b>${kcalTxt(m.kcal.me, (du.est || {}).me)}</b> × <b>${kcalTxt(m.kcal.partner, (du.est || {}).partner)}</b></span></div>` : ""}
       <div class="row gap wrap" style="margin-top:8px"><button class="btn sm ${reg.length ? "ghost" : ""}" data-pday="${x.id}" data-pname="${esc(x.first)}">${reg.length ? `Ver treinos de ${esc(x.first)}` : done.length || plan.length ? "Treinar junto / puxar o treino" : "Ver treinos"}</button>
         ${rc ? `<button class="btn sm ${done.length || plan.length ? "ghost" : ""}" data-pday="${x.id}" data-pname="${esc(x.first)}" data-pdate="${rc.date}">Puxar o de ${rc.days_ago === 1 ? "ontem" : "anteontem"}</button>` : ""}
         <button class="btn sm ghost" data-pduel="${x.id}">Placar da semana</button></div></section>`;
   }).join("");
-  return watchMergeHtml(p.merge_questions) + req + cards;
+  return outboxConflictHtml() + watchMergeHtml(p.merge_questions) + req + cards;
 }
 // o dia do parceiro: o que ele planejou e o que já fez; daqui sai o MEU treino com as minhas cargas
 async function openPartnerDay(pid, first, day) {
@@ -965,11 +986,11 @@ async function openPartnerDay(pid, first, day) {
   const body = openModal(`<h2>Treino de ${esc(name)}</h2>
     <div class="row between gap" style="margin:-4px 0 10px"><button class="btn sm ghost" data-go="${prev}">‹ ${ddmm(prev)}</button><b>${d.date === today ? "Hoje" : ddmm(d.date)}</b>
       <button class="btn sm ghost" data-go="${d.next}" ${d.date >= today ? "disabled" : ""}>${ddmm(d.next)} ›</button></div>
-    ${(d.registered || []).length ? `<h3>O que você registrou ${d.date === today ? "hoje" : "nesse dia"}</h3>${registeredHtml(d.registered, name, d.done.some((s) => (s.mine_ids || []).length))}` : ""}
+    ${(d.registered || []).length ? `<h3>O que você registrou ${d.date === today ? "hoje" : "nesse dia"}</h3>${registeredHtml(d.registered, name, d.done.some((s) => (s.mine_ids || []).length), d.duplicates)}` : ""}
     ${d.done.length ? `<h3>Treino de ${esc(name)}</h3>${d.done.map((s) => { const un = s.unnamed_sets || 0; const unTxt = un ? `${un} ${un === 1 ? "série" : "séries"} que o relógio gravou sem o nome do exercício` : "";
       return `<div class="pt-row"><div><b>${esc(s.title)}</b> <span class="small muted">· ${s.date.slice(11, 16)} · ${s.minutes_estimated ? "~" : ""}${s.minutes} min · ${kcalTxt(s.kcal, s.kcal_estimated)}</span></div>
       <div class="small muted">${itemsTxt(s.items) || (un ? unTxt : "sem exercícios registrados (só tempo)")}${un && s.has_sets ? ` · + ${unTxt} (ficam de fora ao puxar)` : ""}</div>
-      ${s.with_partner === myId ? `<p class="small muted" style="margin:4px 0 0">Esse treino ${esc(name)} puxou do seu: você já tem.</p>`
+      ${s.with_partner === myId && (s.mine_ids || []).length ? `<p class="small muted" style="margin:4px 0 0">Esse treino ${esc(name)} fez junto com você: você já registrou o seu.</p>`
         : (s.mine_ids || []).length ? `<p class="small ok-txt" style="margin:4px 0 0">✓ Você já registrou esse treino (acima).</p>
           <button class="act" data-pull="${s.id}" data-replace="${s.mine_ids[0]}">Refazer o meu a partir deste (substitui o que salvei)</button>`
         : s.has_sets ? `<button class="btn sm" data-pull="${s.id}">Fiz esse treino com ${esc(name)}: puxar</button>`
@@ -995,6 +1016,7 @@ async function openPartnerDay(pid, first, day) {
         return chooseAlready(draft, name, (choice) => {
           if (choice === "ver") return openMySession(draft.already[0].id, again);
           if (choice === "refazer") return startPartnerDraft(draft, draft.already[0].id);
+          if (choice === "outro") return startPartnerDraft(draft, null, true);
         });
       }
       return startPartnerDraft(draft, replaceId);
@@ -1008,15 +1030,16 @@ function chooseAlready(draft, name, done) {
     <p class="small">Puxar de novo criaria um segundo registro do mesmo treino (contaria em dobro no placar e na semana).</p>
     <div class="stack"><button class="btn block" data-ch="ver">Ver o que salvei (e corrigir)</button>
       <button class="btn ghost block" data-ch="refazer">Refazer a partir do treino de ${esc(name)} (substitui o meu)</button>
+      <button class="btn ghost block" data-ch="outro">Foi outro treino: registrar separado</button>
       <button class="act" data-ch="nada">Cancelar</button></div>`);
   body.onclick = (e) => { const b = e.target.closest("[data-ch]"); if (!b) return; closeModal(); if (b.dataset.ch !== "nada") done(b.dataset.ch); };
 }
-function startPartnerDraft(draft, replaceId) {
+function startPartnerDraft(draft, replaceId, allowRepeat) {
   const cur = store("gg_session");
   if (cur && (cur.items || []).length && !confirm("Há um treino em andamento guardado neste aparelho. Trocar por este?")) return;
   const hit = (draft.merge_candidates || []).filter((c) => c.match);  // só vem marcada a atividade do relógio no mesmo horário do treino
   // refazer: a atividade do relógio já está no registro que vai ser substituído
-  state.session = { ...draft, view: draft.pulled ? "lista" : undefined, replace_id: replaceId || null,
+  state.session = { ...draft, view: draft.pulled ? "lista" : undefined, replace_id: replaceId || null, allow_repeat: !!allowRepeat,
     merge_candidates: replaceId ? [] : draft.merge_candidates, merge_into: !replaceId && hit.length === 1 ? hit[0].id : null, merge_answered: hit.length === 1 };
   store("gg_session", state.session); closeModal();
   if (location.hash !== "#treinar/parceiro") location.hash = "#treinar/parceiro"; else renderSession();
@@ -2051,6 +2074,7 @@ async function finishSession() {
     payload.client_id = s.client_id || (s.client_id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
     if (s.with_partner) payload.with_partner = s.with_partner;
     if (s.date_touched) payload.time_set = true;  // a pessoa digitou a hora do treino: vale como horário de verdade ao comparar com o relógio
+    if (s.allow_repeat) payload.allow_repeat = true;  // a pessoa disse que é outro treino
     if (s.merge_into) payload.merge_into = s.merge_into;
     else {
       if (s.pulled && s.duration_min) payload.duration_min = s.duration_min;  // sem relógio: o tempo do treino feito junto
@@ -2068,6 +2092,7 @@ async function finishSession() {
     let saved;
     try { saved = await api("/api/sessions", { method: "POST", body: payload }); } catch (err) {
       btn.disabled = false;
+      if (err.status === 409 && err.body) return chooseOnConflict(s, err.body);
       if (!err.offline) return toast(err.message, 5000);
       // academia sem sinal: guarda no celular e envia sozinho quando a conexão voltar
       const box = store("gg_outbox") || []; if (!box.some((x) => x.client_id === payload.client_id)) box.push(payload); store("gg_outbox", box);
@@ -2085,6 +2110,20 @@ async function finishSession() {
     location.hash = "#hoje";
 }
 
+// ao salvar, o servidor avisou que esse treino já está registrado: a pessoa escolhe (nada se perde)
+function chooseOnConflict(s, info) {
+  const body = openModal(`<h2>Esse treino já está registrado</h2>
+    <div class="reg-box small"><div class="reg-row"><span><b class="ok-txt">✓</b> ${info.existing ? regLine(info.existing) : ""}</span></div></div>
+    <p class="small">Salvar de novo criaria um segundo registro do mesmo treino (contaria em dobro). O que você anotou agora continua aqui.</p>
+    <div class="stack"><button class="btn block" data-cf="trocar">Usar o que anotei agora (substitui o registro)</button>
+      <button class="btn ghost block" data-cf="ver">Ver o que já está salvo</button>
+      <button class="btn ghost block" data-cf="outro">Foi outro treino: salvar separado</button>
+      <button class="act" data-cf="nada">Voltar ao treino</button></div>`);
+  body.onclick = (e) => { const b = e.target.closest("[data-cf]"); if (!b) return; closeModal(); const c = b.dataset.cf;
+    if (c === "trocar") { s.replace_id = info.existing_id; store("gg_session", s); return finishSession(); }
+    if (c === "outro") { s.allow_repeat = true; store("gg_session", s); return finishSession(); }
+    if (c === "ver") return openMySession(info.existing_id); };
+}
 // correção de um treino salvo (ou "refazer a partir do treino do parceiro"): atualiza o MESMO registro
 async function saveOver(s, payload) {
   const id = s.edit_id || s.replace_id;
@@ -3875,9 +3914,19 @@ async function flushOutbox() {
 }
 async function sendOutbox(box) {
   const left = [];
-  for (const p of box) { try { await api("/api/sessions", { method: "POST", body: p }); } catch (e) { if (e.offline) left.push(p); } }
+  const conflicts = store("gg_outbox_conflict") || [];
+  for (const p of box) {
+    try { await api("/api/sessions", { method: "POST", body: p }); } catch (e) {
+      if (e.offline) left.push(p);
+      // já existe esse treino no servidor (registrado de novo em casa, por exemplo): a pessoa escolhe qual fica
+      else if (e.status === 409 && e.body && e.body.existing_id && !conflicts.some((c) => c.payload.client_id === p.client_id))
+        conflicts.push({ payload: p, existing: e.body.existing, existing_id: e.body.existing_id });
+    }
+  }
   store("gg_outbox", left.length ? left : null);
-  const sent = box.length - left.length;
+  store("gg_outbox_conflict", conflicts.length ? conflicts : null);
+  const sent = box.length - left.length - conflicts.length;
+  if (conflicts.length) toast("Um treino guardado sem internet já estava registrado de outro jeito: escolha no Hoje qual fica.", 7000);
   if (sent) { toast(`${sent} treino${sent > 1 ? "s" : ""} guardado${sent > 1 ? "s" : ""} sem internet enviado${sent > 1 ? "s" : ""} ✔`); if (!location.hash || location.hash.startsWith("#hoje")) route(); }
 }
 window.addEventListener("online", flushOutbox);
