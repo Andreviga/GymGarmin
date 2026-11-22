@@ -235,6 +235,11 @@ async function viewHoje(weekDate) {
   const cyc = sch.cycle;
   const athleteHtml = await athletePromise;
   const plannedToday = sch.entries.filter((e) => e.date === sch.today && e.status === "planejado");
+  sch._garmin = !!(gst && gst.connected);
+  { const dr = store("gg_session");
+    const started = dr && (dr.items || []).some((it) => it.done || (it.sets || []).some((x) => x.done));
+    const ent = dr && dr.schedule_id && sch.entries.find((e) => String(e.id) === String(dr.schedule_id));
+    if (dr && !started && !dr.edit_id && ent && ent.status !== "planejado") store("gg_session", null); }
   // dia aberto: hoje; se hoje já foi feito ou é descanso, o próximo treino
   let sel = weekDate ? (sch.entries.find((e) => e.status === "planejado") || sch.entries[0] || {}).date || sch.week_start : sch.today;
   if (!weekDate && !plannedToday.length) {
@@ -425,6 +430,7 @@ function dayPanel(sch, date) {
     ${extra.length ? `<details class="small sub"><summary>Aquecimento e alongamento · ${extra.length}</summary>${itemsByPhase(extra)}</details>` : ""}
     ${es.some((e) => (e.changes || []).length || e.skip_result) ? `<details class="small sub"><summary>O que mudou neste dia</summary><ul class="small changes">${es.flatMap((e) => [...(e.changes || []), ...((e.skip_result || {}).changes || [])]).map((c) => `<li>${esc(c)}</li>`).join("")}</ul></details>` : ""}
     <div class="tc-actions">
+      ${planned.length && date <= sch.today && sch._garmin ? `<button class="act" data-gsync="1">⌚ Fiz no relógio — buscar agora</button>` : ""}
       ${planned.filter((e) => e.kind === "forca" && date >= sch.today).map((e) => `<button class="act" data-alt="${e.id}">🔀 Outra opção</button>`).join("")}
       ${!planned.length && date === sch.today && es.every((e) => e.status === "feito") ? `<button class="act" data-gen="1">✨ Treinar mais hoje</button>` : ""}
       ${planned.length ? `<button class="act" data-move="${first.id}" data-date="${date}">Mover</button>
@@ -509,6 +515,12 @@ function bindAgenda(sch) {
       if (d.wok) { t.disabled = true; await api(`/api/watch/inbox/${d.wok}/ok`, { method: "POST" }); toast("Ok, fica como o relógio mandou"); return again(); }
       if (d.alt) return openAlternative(+d.alt, again);
       if (d.gen) return openAlternative(null, again);
+      if (d.gsync) {
+        t.disabled = true; t.textContent = "Buscando no Garmin…";
+        const r = await syncAll("");
+        toast(syncToast(r) || "Nada novo no Garmin ainda. Confira se o relógio já sincronizou com o app Garmin Connect no celular e tente de novo.", 7000);
+        updateGarminPill(); return again();
+      }
       if (d.comeback) { const e = sch.entries.find((x) => x.date === sch.today && x.status === "planejado" && x.kind === "forca"); return openAlternative(e ? e.id : null, again, { reason: "tempo", opts: { minutes: 25 } }); }
       if (d.altundo) { t.disabled = true; const e = await api(`/api/alternative/undo/${d.altundo}`, { method: "POST" }); toast(`Treino original de volta${e.garmin_outdated ? ". Reenvie ao relógio para atualizar" : ""}`, 4000); return again(); }
       if (d.altwhy) { const e = sch.entries.find((x) => String(x.id) === d.altwhy); if (e && e.alt) openModal(altResultHtml(e.alt, null) + `<button class="btn block" onclick="closeModal()">Ok</button>`); return; }
@@ -2022,7 +2034,8 @@ function watchInboxHtml(w) {
 }
 async function openWatchCheck(id) {
   const cur = store("gg_session");
-  if (cur && (cur.items || []).length && cur.edit_id !== id && !confirm(`Você tem um treino aberto (“${cur.day_name || "Treino"}”). Trocar pela conferência do relógio? (o treino aberto é descartado)`)) return;
+  const started = cur && (cur.items || []).some((it) => it.done || (it.sets || []).some((x) => x.done));
+  if (cur && started && cur.edit_id !== id && !confirm(`Você começou a anotar “${cur.day_name || "um treino"}” no app e não salvou. Descartar essas anotações e conferir o treino do relógio?`)) return;
   const d = await api(`/api/sessions/${id}/edit`);
   state.session = d; store("gg_session", d);
   if (location.hash !== "#treinar/editar") location.hash = "#treinar/editar"; else renderSession();
@@ -3976,7 +3989,7 @@ async function viewPerfil(openSec) {
   const nextStep = Object.entries(STEP).find(([, v]) => !v[1] && v[2] !== "opcional");
   const sect = (id, icon, title, sub, body, open = false) => {
     const st = STEP[id];
-    const badge = st ? (st[1] ? `<span class="sect-st ok" aria-label="feito">✓</span>` : `<span class="sect-st ${st[2] === "opcional" ? "opt" : "todo"}">${st[2] === "opcional" ? "opcional" : "falta"}</span>`) : "";
+    const badge = st ? (st[1] ? `<span class="sect-st sst-ok" aria-label="feito">✓</span>` : `<span class="sect-st ${st[2] === "opcional" ? "sst-opt" : "sst-todo"}">${st[2] === "opcional" ? "opcional" : "falta"}</span>`) : "";
     return `<details class="sect" id="sec-${id}" ${open || openSec === id ? "open" : ""}>
     <summary>${st ? `<span class="sect-n ${st[1] ? "ok" : ""}" aria-hidden="true">${st[0]}</span>` : `<span class="sect-ico" aria-hidden="true">${icon}</span>`}<span class="grow"><b>${title}</b><span class="small muted">${sub}</span></span>${badge}<span class="chev" aria-hidden="true">›</span></summary>
     <div class="sect-body">${body}</div></details>`;
@@ -4114,9 +4127,9 @@ async function viewPerfil(openSec) {
     const req = ["dados", "treino", "limites", "pers", "relogios"];
     const m2 = profileMissing(state.profile);
     const done2 = { dados: ["name", "age", "weight_kg", "sex"].every((k) => !m2.some((x) => x[0] === k)), treino: ["goal", "training_months", "available_days"].every((k) => !m2.some((x) => x[0] === k)), limites: true };
-    const nx = req.find((id) => id in done2 ? !done2[id] : !($(`#sec-${id} .sect-st.ok`)));
+    const nx = req.find((id) => id in done2 ? !done2[id] : !($(`#sec-${id} .sect-st.sst-ok`)));
     $$(".sect[open]").forEach((d) => { if (["dados", "treino", "limites"].includes(d.id.slice(4))) d.open = false; });
-    ["dados", "treino", "limites"].forEach((id) => { if (done2[id]) { const sm = $(`#sec-${id} summary`); if (sm && !sm.querySelector(".sect-st.ok")) { const b0 = sm.querySelector(".sect-st"); if (b0) { b0.className = "sect-st ok"; b0.textContent = "✓"; } const n0 = sm.querySelector(".sect-n"); if (n0) n0.classList.add("ok"); } } });
+    ["dados", "treino", "limites"].forEach((id) => { if (done2[id]) { const sm = $(`#sec-${id} summary`); if (sm && !sm.querySelector(".sect-st.sst-ok")) { const b0 = sm.querySelector(".sect-st"); if (b0) { b0.className = "sect-st sst-ok"; b0.textContent = "✓"; } const n0 = sm.querySelector(".sect-n"); if (n0) n0.classList.add("ok"); } } });
     if (nx) { const el = $(`#sec-${nx}`); if (el) { el.open = true; setTimeout(() => el.scrollIntoView({ block: "start", behavior: "smooth" }), 80); } }
     const head = $(".prof-head"); if (head) { const m = profileMissing(state.profile); head.querySelector(".meter span").style.width = `${Math.round(100 * (PROFILE_REQ.length - m.length) / PROFILE_REQ.length)}%`; }
   };

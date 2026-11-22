@@ -2173,12 +2173,16 @@ def _run_sync(trigger: str) -> dict:
 
 @app.post("/api/garmin/sync")
 def g_sync(auto: bool = False):
-    """Sincroniza agora. Com auto=1 (ao abrir o app) só roda se a última tiver mais de 6 h."""
+    """Sincroniza agora. Com auto=1 (ao abrir o app) só roda se a última tiver mais de 1 h (20 min com treino de hoje aberto)."""
     if auto:
         st = garmin_sync.status()
         if not st["has_tokens"]:
             return {"ok": True, "ran": False, "imported": []}
-        if not garmin_sync.due() and db.kv_get("garmin_remap_v2"):
+        # depois de treinar a pessoa abre o app para ver: com treino planejado hoje ainda aberto, busca a cada 20 min;
+        # nos outros casos, a cada 1 h (antes era 6 h e o treino do relógio demorava a aparecer)
+        today0 = clock.today().isoformat()
+        open_today = any(e.get("status") == "planejado" for e in db.list_schedule(today0, today0))
+        if not garmin_sync.due(1 / 3 if open_today else 1.0) and db.kv_get("garmin_remap_v2"):
             # sem sincronizar atividades, mas a prontidão de hoje pode ter chegado (o relógio sincroniza a noite ao acordar)
             today = clock.today()
             try:

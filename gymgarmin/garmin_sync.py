@@ -734,7 +734,7 @@ def import_activity(activity_id: int, preferred_ids: set[str] | None = None, hr_
 # Sincronização automática (cron diário + ao abrir o app)
 # ---------------------------------------------------------------------------
 
-AUTO_MIN_HOURS = 6     # ao abrir o app, só sincroniza se a última tiver mais que isso
+AUTO_MIN_HOURS = 1     # ao abrir o app, só sincroniza se a última tiver mais que isso (20 min com treino de hoje aberto)
 MAX_PER_RUN = 15       # limite de importações por execução (gentil com a API)
 FIRST_SYNC_DAYS = 42   # 6 semanas: o condicionamento (CTL) precisa do passado para não começar do zero
 LOOKBACK_DAYS = 14     # o relógio pode passar dias sem sincronizar: sempre olha 2 semanas para trás

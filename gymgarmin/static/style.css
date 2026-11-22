@@ -978,10 +978,10 @@ body.timer-on { padding-bottom: calc(72px + 70px + env(safe-area-inset-bottom));
 .sect-n { flex: none; width: 30px; height: 30px; border-radius: 50%; display: inline-grid; place-items: center; font-weight: 800; font-size: 14px;
   background: var(--brand-soft); color: var(--brand); }
 .sect-n.ok { background: var(--ok); color: var(--ok-ink); }
-.sect-st { flex: none; font-size: 12px; font-weight: 700; border-radius: 999px; padding: 2px 8px; margin-right: 4px; }
-.sect-st.ok { background: var(--ok-bg, var(--brand-soft)); color: var(--ok); }
-.sect-st.todo { background: var(--warn-bg); color: var(--warn); }
-.sect-st.opt { color: var(--ink-2); border: 1px solid var(--line); }
+.sect-st { flex: none; white-space: nowrap; font-size: 12px; font-weight: 700; border-radius: 999px; padding: 2px 8px; margin-right: 4px; }
+.sect-st.sst-ok { background: var(--ok-bg, var(--brand-soft)); color: var(--ok); }
+.sect-st.sst-todo { background: var(--warn-bg); color: var(--warn); }
+.sect-st.sst-opt { color: var(--ink-2); border: 1px solid var(--line); }
 .next-step { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; font: inherit; color: var(--ink); cursor: pointer;
   background: var(--card); border: 2px solid var(--brand); border-radius: var(--radius); padding: 12px 14px; margin: 0 0 12px; box-shadow: var(--shadow); }
 .next-step .grow { display: flex; flex-direction: column; }
