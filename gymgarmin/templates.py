@@ -109,15 +109,53 @@ TEMPLATES = {
 }
 
 
+# ---- modelos especiais: inspirados em treinos que pessoas famosas divulgaram (data/famous.json)
+def _load_famous() -> dict:
+    import json
+    from pathlib import Path
+    p = Path(__file__).resolve().parent / "data" / "famous.json"
+    return json.loads(p.read_text()) if p.exists() else {"templates": []}
+
+
+FAMOUS = _load_famous()
+for _f in FAMOUS["templates"]:
+    TEMPLATES["famoso_" + _f["id"]] = {
+        "name": f"{_f['person']}: {_f['title']}", "description": _f["about"], "days_per_week": _f["days_per_week"],
+        "special": True, "days": _f["days"],
+        "notes": f"Inspirado em {_f['person']} ({_f['confidence']}). {FAMOUS.get('disclaimer', '')}",
+    }
+
+
+def famous() -> dict:
+    out = []
+    for f in FAMOUS["templates"]:
+        n_ex = sum(1 for d in f["days"] for i in d["items"] if not (catalog.get(i["exercise_id"]) or {}).get("kind") == "cardio")
+        out.append({**f, "template_id": "famoso_" + f["id"], "n_exercises": n_ex,
+                    "days": [{"name": d["name"], "items": [{**i, "name": (catalog.get(i["exercise_id"]) or {}).get("name", i["exercise_id"])}
+                                                            for i in d["items"]]} for d in f["days"]]})
+    return {"disclaimer": FAMOUS.get("disclaimer"), "updated": FAMOUS.get("updated"), "templates": out}
+
+
 def list_templates() -> list[dict]:
-    return [{"id": k, "name": v["name"], "description": v["description"]} for k, v in TEMPLATES.items()]
+    return [{"id": k, "name": v["name"], "description": v["description"]} for k, v in TEMPLATES.items() if not v.get("special")]
 
 
 def build(template_id: str, profile: dict | None) -> dict | None:
     tpl = TEMPLATES.get(template_id)
     if not tpl:
         return None
-    plan = copy.deepcopy({k: v for k, v in tpl.items() if k != "description"})
+    plan = copy.deepcopy({k: v for k, v in tpl.items() if k not in ("description", "special")})
+    base_notes = plan.pop("notes", "")
+    # o mesmo treino repetido na semana (ex.: corpo inteiro 3×): a agenda precisa de um dia da planilha por sessão
+    dpw = int(plan.get("days_per_week") or len(plan["days"]))
+    if 0 < len(plan["days"]) < dpw:
+        base = plan["days"]
+        plan["days"] = []
+        for i in range(dpw):
+            d = copy.deepcopy(base[i % len(base)])
+            if len(base) == 1:
+                d["name"] = f"{d['name'].split(' (')[0]} ({i + 1}/{dpw})"
+            plan["days"].append(d)
     lims = (profile or {}).get("limitations") or []
     mz = max_zone(lims)
     swaps = []
@@ -148,5 +186,7 @@ def build(template_id: str, profile: dict | None) -> dict | None:
                 it["notes"] = (it.get("notes", "") + " (substituído pelas suas limitações)").strip()
                 used.add(alt)
     plan["notes"] = "Trocas automáticas: " + "; ".join(f"{s['from']} → {s['to']}" for s in swaps) if swaps else ""
+    if base_notes:
+        plan["notes"] = (base_notes + (" " + plan["notes"] if plan["notes"] else "")).strip()
     plan["days_per_week"] = (profile or {}).get("days_per_week") or plan["days_per_week"]
     return plan

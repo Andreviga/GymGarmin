@@ -1,0 +1,1640 @@
+{
+ "updated": "2026-11",
+ "disclaimer": "Inspirado no que a pessoa divulgou (livros, entrevistas, posts oficiais ou treinadores). Não é endossado por ela. O app troca o que não serve às suas limitações; o resto fica como a fonte.",
+ "templates": [
+  {
+   "id": "arnold_golden_six",
+   "person": "Arnold Schwarzenegger",
+   "title": "Golden Six (corpo inteiro)",
+   "icon": "🏆",
+   "about": "Rotina de seis exercícios básicos, 3× por semana, atribuída ao começo da carreira do Arnold (influência do Reg Park). Pouco exercício, muita base: ótima para iniciante e para quem volta.",
+   "level": "iniciante",
+   "days_per_week": 3,
+   "confidence": "atribuído",
+   "cautions": "O desenvolvimento por trás da nuca original foi trocado pelo desenvolvimento sentado pela frente (mais seguro para o ombro).",
+   "sources": [
+    "https://fitnessvolt.com/arnold-golden-six-routine/",
+    "https://www.fitnessandpower.com/training/workout-routines/arnold-schwarzenegger-golden-six"
+   ],
+   "days": [
+    {
+     "name": "Golden Six (seg, qua, sex)",
+     "items": [
+      {
+       "exercise_id": "Barbell_Squat",
+       "sets": 4,
+       "reps": "10",
+       "rest_s": 120
+      },
+      {
+       "exercise_id": "Wide-Grip_Barbell_Bench_Press",
+       "sets": 3,
+       "reps": "10",
+       "rest_s": 120
+      },
+      {
+       "exercise_id": "Chin-Up",
+       "sets": 3,
+       "reps": "máx",
+       "rest_s": 120,
+       "notes": "até perto do limite"
+      },
+      {
+       "exercise_id": "Seated_Barbell_Military_Press",
+       "sets": 4,
+       "reps": "10",
+       "rest_s": 90,
+       "notes": "original: atrás da nuca"
+      },
+      {
+       "exercise_id": "Barbell_Curl",
+       "sets": 3,
+       "reps": "10",
+       "rest_s": 90
+      },
+      {
+       "exercise_id": "Sit-Up",
+       "sets": 3,
+       "reps": "máx",
+       "rest_s": 60
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "arnold_basico",
+   "person": "Arnold Schwarzenegger",
+   "title": "Programa Básico, nível 1 (do livro)",
+   "icon": "📘",
+   "about": "Do livro The New Encyclopedia of Modern Bodybuilding: cada grupo 2× por semana numa divisão em 3 treinos repetidos (6 dias), abdominal em todo treino. Estrutura do livro; séries e exercícios aproximados de fontes secundárias.",
+   "level": "intermediario",
+   "days_per_week": 6,
+   "confidence": "aproximado",
+   "cautions": "Volume alto, de outra época do fisiculturismo. Se não recuperar, use 4 dias (A, B, C, A…).",
+   "sources": [
+    "https://www.slideshare.net/slideshow/arnolds-basic-training-program/3321936",
+    "https://www.strengthlog.com/arnold-split",
+    "https://www.liftosaur.com/programs/arnold-split"
+   ],
+   "days": [
+    {
+     "name": "A – Peito e costas",
+     "items": [
+      {
+       "exercise_id": "Barbell_Bench_Press_-_Medium_Grip",
+       "sets": 4,
+       "reps": "10",
+       "rest_s": 120
+      },
+      {
+       "exercise_id": "Barbell_Incline_Bench_Press_-_Medium_Grip",
+       "sets": 4,
+       "reps": "10",
+       "rest_s": 120
+      },
+      {
+       "exercise_id": "Bent-Arm_Dumbbell_Pullover",
+       "sets": 3,
+       "reps": "10",
+       "rest_s": 90
+      },
+      {
+       "exercise_id": "Chin-Up",
+       "sets": 4,
+       "reps": "máx",
+       "rest_s": 120
+      },
+      {
+       "exercise_id": "Bent_Over_Barbell_Row",
+       "sets": 4,
+       "reps": "10",
+       "rest_s": 120
+      },
+      {
+       "exercise_id": "Barbell_Deadlift",
+       "sets": 3,
+       "reps": "6-10",
+       "rest_s": 180
+      },
+      {
+       "exercise_id": "Crunches",
+       "sets": 5,
+       "reps": "25",
+       "rest_s": 45
+      }
+     ]
+    },
+    {
+     "name": "B – Ombros e braços",
+     "items": [
+      {
+       "exercise_id": "Clean_and_Press",
+       "sets": 4,
+       "reps": "8-10",
+       "rest_s": 120
+      },
+      {
+       "exercise_id": "Side_Lateral_Raise",
+       "sets": 4,
+       "reps": "10",
+       "rest_s": 90
+      },
+      {
+       "exercise_id": "Barbell_Curl",
+       "sets": 4,
+       "reps": "10",
+       "rest_s": 90
+      },
+      {
+       "exercise_id": "Dumbbell_Bicep_Curl",
+       "sets": 4,
+       "reps": "10",
+       "rest_s": 90,
+       "notes": "sentado"
+      },
+      {
+       "exercise_id": "Close-Grip_Barbell_Bench_Press",
+       "sets": 4,
+       "reps": "10",
+       "rest_s": 90
+      },
+      {
+       "exercise_id": "Standing_Dumbbell_Triceps_Extension",
+       "sets": 4,
+       "reps": "10",
+       "rest_s": 90
+      },
+      {
+       "exercise_id": "Palms-Up_Barbell_Wrist_Curl_Over_A_Bench",
+       "sets": 3,
+       "reps": "15",
+       "rest_s": 45
+      },
+      {
+       "exercise_id": "Palms-Down_Wrist_Curl_Over_A_Bench",
+       "sets": 3,
+       "reps": "15",
+       "rest_s": 45
+      },
+      {
+       "exercise_id": "Crunches",
+       "sets": 5,
+       "reps": "25",
+       "rest_s": 45
+      }
+     ]
+    },
+    {
+     "name": "C – Pernas e lombar",
+     "items": [
+      {
+       "exercise_id": "Barbell_Squat",
+       "sets": 4,
+       "reps": "10",
+       "rest_s": 150
+      },
+      {
+       "exercise_id": "Barbell_Lunge",
+       "sets": 3,
+       "reps": "10",
+       "rest_s": 90
+      },
+      {
+       "exercise_id": "Lying_Leg_Curls",
+       "sets": 4,
+       "reps": "10",
+       "rest_s": 90
+      },
+      {
+       "exercise_id": "Standing_Calf_Raises",
+       "sets": 5,
+       "reps": "15",
+       "rest_s": 60
+      },
+      {
+       "exercise_id": "Stiff-Legged_Barbell_Deadlift",
+       "sets": 3,
+       "reps": "10",
+       "rest_s": 120
+      },
+      {
+       "exercise_id": "Crunches",
+       "sets": 5,
+       "reps": "25",
+       "rest_s": 45
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "reg_park_5x5",
+   "person": "Reg Park",
+   "title": "5×5 — fase 1 (do manual dele, 1960)",
+   "icon": "🏋️",
+   "about": "Do manual Strength & Bulk Training: os três básicos, 3× por semana, 5 séries de 5 (as 2 primeiras de aquecimento, as 3 últimas pesadas). Força e massa com pouca coisa.",
+   "level": "iniciante",
+   "days_per_week": 3,
+   "confidence": "documentado",
+   "cautions": "As duas primeiras séries são de aproximação; suba a carga quando fechar 3×5 na carga de trabalho.",
+   "sources": [
+    "https://superstrengthtraining.com/strength-and-bulk-training-reg-park",
+    "https://www.muscleandstrength.com/node/49409"
+   ],
+   "days": [
+    {
+     "name": "5×5 (seg, qua, sex)",
+     "items": [
+      {
+       "exercise_id": "Hyperextensions_Back_Extensions",
+       "sets": 3,
+       "reps": "10",
+       "rest_s": 60,
+       "notes": "aquecimento"
+      },
+      {
+       "exercise_id": "Barbell_Squat",
+       "sets": 5,
+       "reps": "5",
+       "rest_s": 180,
+       "notes": "2 de aproximação + 3 pesadas"
+      },
+      {
+       "exercise_id": "Barbell_Bench_Press_-_Medium_Grip",
+       "sets": 5,
+       "reps": "5",
+       "rest_s": 180,
+       "notes": "2 de aproximação + 3 pesadas"
+      },
+      {
+       "exercise_id": "Barbell_Deadlift",
+       "sets": 5,
+       "reps": "5",
+       "rest_s": 180,
+       "notes": "2 de aproximação + 3 pesadas"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "steve_reeves",
+   "person": "Steve Reeves",
+   "title": "Físico clássico — corpo inteiro 3×",
+   "icon": "🏛️",
+   "about": "Do livro Building the Classic Physique the Natural Way: corpo inteiro 3× por semana, parte de cima primeiro e pernas no fim, 3 séries de 8–12. Era 'natural', antes dos esteroides. Lista de exercícios aproximada (as fontes variam).",
+   "level": "intermediario",
+   "days_per_week": 3,
+   "confidence": "aproximado",
+   "cautions": "Sessão longa. Iniciante: 1 série de ~20 repetições por exercício (versão do próprio livro).",
+   "sources": [
+    "https://www.muscleandstrength.com/articles/steve-reeves-solution-size-strength-health.html",
+    "https://thebarbell.com/steve-reeves-training/"
+   ],
+   "days": [
+    {
+     "name": "Corpo inteiro (seg, qua, sex)",
+     "items": [
+      {
+       "exercise_id": "Upright_Barbell_Row",
+       "sets": 3,
+       "reps": "8-12",
+       "rest_s": 60
+      },
+      {
+       "exercise_id": "Dumbbell_Shoulder_Press",
+       "sets": 3,
+       "reps": "8-12",
+       "rest_s": 60
+      },
+      {
+       "exercise_id": "Side_Lateral_Raise",
+       "sets": 3,
+       "reps": "15",
+       "rest_s": 45
+      },
+      {
+       "exercise_id": "Incline_Dumbbell_Press",
+       "sets": 3,
+       "reps": "8-12",
+       "rest_s": 60
+      },
+      {
+       "exercise_id": "Wide-Grip_Lat_Pulldown",
+       "sets": 3,
+       "reps": "8-12",
+       "rest_s": 60
+      },
+      {
+       "exercise_id": "One-Arm_Dumbbell_Row",
+       "sets": 3,
+       "reps": "8-12",
+       "rest_s": 60
+      },
+      {
+       "exercise_id": "Incline_Dumbbell_Curl",
+       "sets": 3,
+       "reps": "8-12",
+       "rest_s": 45
+      },
+      {
+       "exercise_id": "Triceps_Pushdown",
+       "sets": 3,
+       "reps": "8-12",
+       "rest_s": 45
+      },
+      {
+       "exercise_id": "Front_Barbell_Squat",
+       "sets": 3,
+       "reps": "15",
+       "rest_s": 90
+      },
+      {
+       "exercise_id": "Lying_Leg_Curls",
+       "sets": 3,
+       "reps": "8-12",
+       "rest_s": 60
+      },
+      {
+       "exercise_id": "Standing_Calf_Raises",
+       "sets": 3,
+       "reps": "15-20",
+       "rest_s": 45
+      },
+      {
+       "exercise_id": "caminhada_rua",
+       "duration_min": 30,
+       "zone": 2,
+       "notes": "ele fazia caminhadas rápidas"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "bruce_lee",
+   "person": "Bruce Lee",
+   "title": "Força geral em 20 minutos",
+   "icon": "🥋",
+   "about": "Das anotações dele (livro de John Little): sessão curta com barra, 3× por semana em dias alternados, para dar força sem atrapalhar as artes marciais. Nos outros dias: corrida, corda e bicicleta.",
+   "level": "iniciante",
+   "days_per_week": 3,
+   "confidence": "documentado",
+   "cautions": "Poucas séries: use uma carga desafiadora, mas sem ir à falha.",
+   "sources": [
+    "https://www.artofmanliness.com/strength/fitness/bruce-lee-workout/",
+    "https://bodybuilding.com/fun/getting-fit-and-strong-the-bruce-lee-way.htm"
+   ],
+   "days": [
+    {
+     "name": "Força (dias alternados)",
+     "items": [
+      {
+       "exercise_id": "Clean_and_Press",
+       "sets": 2,
+       "reps": "8",
+       "rest_s": 90
+      },
+      {
+       "exercise_id": "Barbell_Squat",
+       "sets": 2,
+       "reps": "12",
+       "rest_s": 90
+      },
+      {
+       "exercise_id": "Bent-Arm_Barbell_Pullover",
+       "sets": 2,
+       "reps": "8",
+       "rest_s": 60
+      },
+      {
+       "exercise_id": "Barbell_Bench_Press_-_Medium_Grip",
+       "sets": 2,
+       "reps": "6",
+       "rest_s": 90
+      },
+      {
+       "exercise_id": "Good_Morning",
+       "sets": 2,
+       "reps": "8",
+       "rest_s": 60
+      },
+      {
+       "exercise_id": "Barbell_Curl",
+       "sets": 2,
+       "reps": "8",
+       "rest_s": 60
+      }
+     ]
+    },
+    {
+     "name": "Corrida e corda",
+     "items": [
+      {
+       "exercise_id": "corrida_rua",
+       "duration_min": 25,
+       "zone": 2,
+       "notes": "aproximado: corrida leve"
+      },
+      {
+       "exercise_id": "cardio_corda",
+       "duration_min": 10,
+       "zone": 3
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "mentzer_heavy_duty",
+   "person": "Mike Mentzer",
+   "title": "Heavy Duty — 1 série até a falha",
+   "icon": "⚡",
+   "about": "Dos livros Heavy Duty: pouquíssimo volume e muita intensidade — 1 série por exercício até a falha, com pré-exaustão (isolado emendado no composto) e 4 dias ou mais de descanso entre treinos.",
+   "level": "intermediario",
+   "days_per_week": 2,
+   "confidence": "método documentado, exercícios aproximados",
+   "cautions": "Falha só com técnica boa e alguém para ajudar no supino. Faça 1–2 séries leves de aquecimento antes de cada exercício.",
+   "sources": [
+    "https://www.ironmanmagazine.com/heavy-duty-mike-mentzers-most-productive-routine",
+    "https://www.strengthlog.com/mike-mentzer-workout-routine/"
+   ],
+   "days": [
+    {
+     "name": "1 – Peito e costas",
+     "items": [
+      {
+       "exercise_id": "Butterfly",
+       "sets": 1,
+       "reps": "6-10",
+       "rest_s": 0,
+       "superset": "A",
+       "notes": "até a falha · emende já no próximo"
+      },
+      {
+       "exercise_id": "Barbell_Incline_Bench_Press_-_Medium_Grip",
+       "sets": 1,
+       "reps": "1-3",
+       "rest_s": 180,
+       "superset": "A",
+       "notes": "até a falha"
+      },
+      {
+       "exercise_id": "Machine_Pullover",
+       "sets": 1,
+       "reps": "6-10",
+       "rest_s": 0,
+       "superset": "B",
+       "notes": "até a falha · emende já no próximo"
+      },
+      {
+       "exercise_id": "Underhand_Cable_Pulldowns",
+       "sets": 1,
+       "reps": "6-10",
+       "rest_s": 180,
+       "superset": "B",
+       "notes": "até a falha"
+      },
+      {
+       "exercise_id": "Barbell_Deadlift",
+       "sets": 1,
+       "reps": "5-8",
+       "rest_s": 180,
+       "notes": "até a falha técnica"
+      }
+     ]
+    },
+    {
+     "name": "2 – Pernas",
+     "items": [
+      {
+       "exercise_id": "Leg_Extensions",
+       "sets": 1,
+       "reps": "8-15",
+       "rest_s": 0,
+       "superset": "A",
+       "notes": "até a falha · emende já no próximo"
+      },
+      {
+       "exercise_id": "Leg_Press",
+       "sets": 1,
+       "reps": "8-15",
+       "rest_s": 180,
+       "superset": "A",
+       "notes": "até a falha"
+      },
+      {
+       "exercise_id": "Lying_Leg_Curls",
+       "sets": 1,
+       "reps": "6-10",
+       "rest_s": 120,
+       "notes": "até a falha"
+      },
+      {
+       "exercise_id": "Standing_Calf_Raises",
+       "sets": 1,
+       "reps": "12-20",
+       "rest_s": 90,
+       "notes": "até a falha"
+      }
+     ]
+    },
+    {
+     "name": "3 – Ombros e braços",
+     "items": [
+      {
+       "exercise_id": "Side_Lateral_Raise",
+       "sets": 1,
+       "reps": "6-10",
+       "rest_s": 120,
+       "notes": "até a falha"
+      },
+      {
+       "exercise_id": "Seated_Bent-Over_Rear_Delt_Raise",
+       "sets": 1,
+       "reps": "6-10",
+       "rest_s": 120,
+       "notes": "até a falha"
+      },
+      {
+       "exercise_id": "Barbell_Curl",
+       "sets": 1,
+       "reps": "6-10",
+       "rest_s": 120,
+       "notes": "até a falha"
+      },
+      {
+       "exercise_id": "Triceps_Pushdown",
+       "sets": 1,
+       "reps": "6-10",
+       "rest_s": 0,
+       "superset": "A",
+       "notes": "até a falha · emende já no próximo"
+      },
+      {
+       "exercise_id": "Dips_-_Triceps_Version",
+       "sets": 1,
+       "reps": "3-5",
+       "rest_s": 120,
+       "superset": "A",
+       "notes": "até a falha"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "dorian_yates",
+   "person": "Dorian Yates",
+   "title": "Blood and Guts — 4 dias",
+   "icon": "🩸",
+   "about": "A divisão dos anos 1990 (Mr. Olympia): 4 dias, 1–2 séries leves de aquecimento e UMA série de trabalho até a falha por exercício. Exercícios aproximados (a ordem varia nas fontes).",
+   "level": "avancado",
+   "days_per_week": 4,
+   "confidence": "aproximado",
+   "cautions": "Intensidade muito alta e outra época do fisiculturismo; ele mesmo se lesionou. Para avançados.",
+   "sources": [
+    "https://generationiron.com/dorian-yates-blood-guts-workout/",
+    "https://www.muscleandstrength.com/node/47131"
+   ],
+   "days": [
+    {
+     "name": "Peito e bíceps",
+     "items": [
+      {
+       "exercise_id": "Barbell_Incline_Bench_Press_-_Medium_Grip",
+       "sets": 1,
+       "reps": "6-10",
+       "rest_s": 180,
+       "notes": "+1–2 de aquecimento; até a falha"
+      },
+      {
+       "exercise_id": "Dumbbell_Bench_Press",
+       "sets": 1,
+       "reps": "6-10",
+       "rest_s": 150,
+       "notes": "até a falha"
+      },
+      {
+       "exercise_id": "Incline_Dumbbell_Flyes",
+       "sets": 1,
+       "reps": "6-10",
+       "rest_s": 120,
+       "notes": "até a falha"
+      },
+      {
+       "exercise_id": "Cable_Crossover",
+       "sets": 1,
+       "reps": "8-12",
+       "rest_s": 120,
+       "notes": "até a falha"
+      },
+      {
+       "exercise_id": "Incline_Dumbbell_Curl",
+       "sets": 1,
+       "reps": "6-10",
+       "rest_s": 120,
+       "notes": "até a falha"
+      },
+      {
+       "exercise_id": "Preacher_Curl",
+       "sets": 1,
+       "reps": "6-10",
+       "rest_s": 120,
+       "notes": "até a falha"
+      }
+     ]
+    },
+    {
+     "name": "Costas",
+     "items": [
+      {
+       "exercise_id": "Machine_Pullover",
+       "sets": 1,
+       "reps": "6-10",
+       "rest_s": 120,
+       "notes": "até a falha"
+      },
+      {
+       "exercise_id": "Close-Grip_Front_Lat_Pulldown",
+       "sets": 1,
+       "reps": "6-10",
+       "rest_s": 150,
+       "notes": "até a falha"
+      },
+      {
+       "exercise_id": "Reverse_Grip_Bent-Over_Rows",
+       "sets": 1,
+       "reps": "6-10",
+       "rest_s": 150,
+       "notes": "até a falha"
+      },
+      {
+       "exercise_id": "One-Arm_Dumbbell_Row",
+       "sets": 1,
+       "reps": "6-10",
+       "rest_s": 120,
+       "notes": "até a falha"
+      },
+      {
+       "exercise_id": "Seated_Bent-Over_Rear_Delt_Raise",
+       "sets": 1,
+       "reps": "8-12",
+       "rest_s": 90,
+       "notes": "até a falha"
+      },
+      {
+       "exercise_id": "Barbell_Deadlift",
+       "sets": 1,
+       "reps": "6-8",
+       "rest_s": 180,
+       "notes": "até a falha técnica"
+      }
+     ]
+    },
+    {
+     "name": "Ombros e tríceps",
+     "items": [
+      {
+       "exercise_id": "Machine_Shoulder_Military_Press",
+       "sets": 1,
+       "reps": "6-10",
+       "rest_s": 150,
+       "notes": "até a falha"
+      },
+      {
+       "exercise_id": "Side_Lateral_Raise",
+       "sets": 1,
+       "reps": "8-12",
+       "rest_s": 90,
+       "notes": "sentado; até a falha"
+      },
+      {
+       "exercise_id": "Cable_Seated_Lateral_Raise",
+       "sets": 1,
+       "reps": "8-12",
+       "rest_s": 90,
+       "notes": "até a falha"
+      },
+      {
+       "exercise_id": "Triceps_Pushdown",
+       "sets": 1,
+       "reps": "8-12",
+       "rest_s": 90,
+       "notes": "até a falha"
+      },
+      {
+       "exercise_id": "EZ-Bar_Skullcrusher",
+       "sets": 1,
+       "reps": "6-10",
+       "rest_s": 120,
+       "notes": "até a falha"
+      },
+      {
+       "exercise_id": "Cable_One_Arm_Tricep_Extension",
+       "sets": 1,
+       "reps": "8-12",
+       "rest_s": 90,
+       "notes": "até a falha"
+      }
+     ]
+    },
+    {
+     "name": "Pernas",
+     "items": [
+      {
+       "exercise_id": "Leg_Extensions",
+       "sets": 1,
+       "reps": "8-12",
+       "rest_s": 90,
+       "notes": "até a falha"
+      },
+      {
+       "exercise_id": "Leg_Press",
+       "sets": 1,
+       "reps": "8-12",
+       "rest_s": 180,
+       "notes": "até a falha"
+      },
+      {
+       "exercise_id": "Hack_Squat",
+       "sets": 1,
+       "reps": "8-12",
+       "rest_s": 180,
+       "notes": "até a falha"
+      },
+      {
+       "exercise_id": "Lying_Leg_Curls",
+       "sets": 1,
+       "reps": "8-12",
+       "rest_s": 90,
+       "notes": "até a falha"
+      },
+      {
+       "exercise_id": "Stiff-Legged_Barbell_Deadlift",
+       "sets": 1,
+       "reps": "8-12",
+       "rest_s": 120,
+       "notes": "até a falha"
+      },
+      {
+       "exercise_id": "Standing_Calf_Raises",
+       "sets": 1,
+       "reps": "8-12",
+       "rest_s": 60,
+       "notes": "até a falha"
+      },
+      {
+       "exercise_id": "Seated_Calf_Raise",
+       "sets": 1,
+       "reps": "8-12",
+       "rest_s": 60,
+       "notes": "até a falha"
+      }
+     ]
+    },
+    {
+     "name": "Cardio (dias sem musculação)",
+     "items": [
+      {
+       "exercise_id": "cardio_bike_vertical",
+       "duration_min": 20,
+       "zone": 2,
+       "notes": "15–20 min nos dias de folga"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hugh_jackman",
+   "person": "Hugh Jackman",
+   "title": "Wolverine — força primeiro",
+   "icon": "🐺",
+   "about": "Preparo para o filme com o treinador Mike Ryan: cada dia gira em torno de um levantamento principal em onda de 4 semanas (% do 1RM: 60–75, 65–85, 70–90, semana leve), depois acessórios de musculação. Ondas e acessórios aproximados.",
+   "level": "intermediario",
+   "days_per_week": 4,
+   "confidence": "aproximado",
+   "cautions": "Era preparo de filme (pico), com dieta específica. Use cargas que você conhece; a semana 4 é leve.",
+   "sources": [
+    "https://www.muscleandstrength.com/workouts/hugh-jackman-workout-routine",
+    "https://bodybuilding.com/fun/the-true-beast-unleashed-how-hugh-jackman-became-the-wolverine.html"
+   ],
+   "days": [
+    {
+     "name": "Supino + peito",
+     "items": [
+      {
+       "exercise_id": "Barbell_Bench_Press_-_Medium_Grip",
+       "sets": 4,
+       "reps": "5",
+       "rest_s": 120,
+       "notes": "onda: 60–75% do 1RM na semana 1, sobe até ~90% na 3, leve na 4"
+      },
+      {
+       "exercise_id": "Incline_Dumbbell_Press",
+       "sets": 4,
+       "reps": "8-12",
+       "rest_s": 90
+      },
+      {
+       "exercise_id": "Dips_-_Triceps_Version",
+       "sets": 3,
+       "reps": "10",
+       "rest_s": 90,
+       "notes": "com peso se der"
+      },
+      {
+       "exercise_id": "Cable_Crossover",
+       "sets": 3,
+       "reps": "12",
+       "rest_s": 60
+      }
+     ]
+    },
+    {
+     "name": "Agachamento + pernas",
+     "items": [
+      {
+       "exercise_id": "Barbell_Squat",
+       "sets": 4,
+       "reps": "5",
+       "rest_s": 150,
+       "notes": "onda do 1RM (ver supino)"
+      },
+      {
+       "exercise_id": "Front_Barbell_Squat",
+       "sets": 4,
+       "reps": "10",
+       "rest_s": 120
+      },
+      {
+       "exercise_id": "Romanian_Deadlift",
+       "sets": 4,
+       "reps": "10",
+       "rest_s": 120
+      },
+      {
+       "exercise_id": "Standing_Calf_Raises",
+       "sets": 4,
+       "reps": "12",
+       "rest_s": 60
+      }
+     ]
+    },
+    {
+     "name": "Terra + costas",
+     "items": [
+      {
+       "exercise_id": "Barbell_Deadlift",
+       "sets": 4,
+       "reps": "5",
+       "rest_s": 180,
+       "notes": "onda do 1RM"
+      },
+      {
+       "exercise_id": "Weighted_Pull_Ups",
+       "sets": 4,
+       "reps": "6-10",
+       "rest_s": 120
+      },
+      {
+       "exercise_id": "Bent_Over_Barbell_Row",
+       "sets": 4,
+       "reps": "8-12",
+       "rest_s": 90
+      },
+      {
+       "exercise_id": "Barbell_Curl",
+       "sets": 3,
+       "reps": "10",
+       "rest_s": 60
+      }
+     ]
+    },
+    {
+     "name": "Ombros + braços",
+     "items": [
+      {
+       "exercise_id": "Standing_Military_Press",
+       "sets": 4,
+       "reps": "5",
+       "rest_s": 120,
+       "notes": "onda do 1RM"
+      },
+      {
+       "exercise_id": "Side_Lateral_Raise",
+       "sets": 3,
+       "reps": "12",
+       "rest_s": 60
+      },
+      {
+       "exercise_id": "EZ-Bar_Curl",
+       "sets": 3,
+       "reps": "10",
+       "rest_s": 60
+      },
+      {
+       "exercise_id": "EZ-Bar_Skullcrusher",
+       "sets": 3,
+       "reps": "10",
+       "rest_s": 60
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "the_rock",
+   "person": "Dwayne Johnson",
+   "title": "Black Adam — volume e controle",
+   "icon": "🪨",
+   "about": "Preparo com o treinador Dave Rienzi: um grupo por dia, muito volume, descidas lentas e bi-sets; cardio de manhã em jejum (30–50 min). O dia de braço é o publicado; os outros, aproximados.",
+   "level": "avancado",
+   "days_per_week": 5,
+   "confidence": "braço documentado; resto aproximado",
+   "cautions": "Volume muito alto, preparo de filme. Séries de 12: 4 reps com 3 s na descida + 4 paradas + 4 normais.",
+   "sources": [
+    "https://menshealth.com.au/your-guide-to-the-rocks-complete-arm-building-routine-for-black-adam/",
+    "https://www.coachweb.com/workouts/celebrity-workouts/the-rocks-trainer-shares-his-black-adam-workouts-and-theyre-brutal"
+   ],
+   "days": [
+    {
+     "name": "Braços (publicado)",
+     "items": [
+      {
+       "exercise_id": "cardio_eliptico",
+       "duration_min": 30,
+       "zone": 2,
+       "notes": "de manhã"
+      },
+      {
+       "exercise_id": "Triceps_Pushdown_-_Rope_Attachment",
+       "sets": 4,
+       "reps": "20",
+       "rest_s": 60
+      },
+      {
+       "exercise_id": "Lying_Dumbbell_Tricep_Extension",
+       "sets": 4,
+       "reps": "12",
+       "rest_s": 60,
+       "notes": "4 lentas + 4 paradas + 4 normais"
+      },
+      {
+       "exercise_id": "Triceps_Pushdown",
+       "sets": 4,
+       "reps": "10",
+       "rest_s": 60,
+       "notes": "dois cabos"
+      },
+      {
+       "exercise_id": "Barbell_Curl",
+       "sets": 4,
+       "reps": "20",
+       "rest_s": 60
+      },
+      {
+       "exercise_id": "Concentration_Curls",
+       "sets": 4,
+       "reps": "12",
+       "rest_s": 60,
+       "notes": "4 lentas + 4 paradas + 4 normais"
+      }
+     ]
+    },
+    {
+     "name": "Costas",
+     "items": [
+      {
+       "exercise_id": "cardio_esteira_caminhada",
+       "duration_min": 30,
+       "zone": 2,
+       "notes": "de manhã"
+      },
+      {
+       "exercise_id": "Underhand_Cable_Pulldowns",
+       "sets": 4,
+       "reps": "12",
+       "rest_s": 0,
+       "superset": "A",
+       "notes": "emende já na remada"
+      },
+      {
+       "exercise_id": "Bent_Over_Barbell_Row",
+       "sets": 4,
+       "reps": "12",
+       "rest_s": 90,
+       "superset": "A"
+      },
+      {
+       "exercise_id": "Seated_Cable_Rows",
+       "sets": 4,
+       "reps": "20",
+       "rest_s": 60,
+       "notes": "pegada fechada"
+      },
+      {
+       "exercise_id": "Straight-Arm_Pulldown",
+       "sets": 3,
+       "reps": "15",
+       "rest_s": 60
+      }
+     ]
+    },
+    {
+     "name": "Peito",
+     "items": [
+      {
+       "exercise_id": "cardio_eliptico",
+       "duration_min": 30,
+       "zone": 2,
+       "notes": "de manhã"
+      },
+      {
+       "exercise_id": "Incline_Dumbbell_Press",
+       "sets": 4,
+       "reps": "12",
+       "rest_s": 90,
+       "notes": "3 s na descida"
+      },
+      {
+       "exercise_id": "Machine_Bench_Press",
+       "sets": 4,
+       "reps": "12",
+       "rest_s": 90
+      },
+      {
+       "exercise_id": "Cable_Crossover",
+       "sets": 4,
+       "reps": "15",
+       "rest_s": 60
+      },
+      {
+       "exercise_id": "Dips_-_Triceps_Version",
+       "sets": 3,
+       "reps": "máx",
+       "rest_s": 60
+      }
+     ]
+    },
+    {
+     "name": "Ombros",
+     "items": [
+      {
+       "exercise_id": "cardio_eliptico",
+       "duration_min": 30,
+       "zone": 2,
+       "notes": "de manhã"
+      },
+      {
+       "exercise_id": "Seated_Dumbbell_Press",
+       "sets": 4,
+       "reps": "12",
+       "rest_s": 90
+      },
+      {
+       "exercise_id": "Side_Lateral_Raise",
+       "sets": 4,
+       "reps": "15",
+       "rest_s": 45
+      },
+      {
+       "exercise_id": "Seated_Bent-Over_Rear_Delt_Raise",
+       "sets": 4,
+       "reps": "15",
+       "rest_s": 45
+      },
+      {
+       "exercise_id": "Upright_Barbell_Row",
+       "sets": 3,
+       "reps": "12",
+       "rest_s": 60
+      }
+     ]
+    },
+    {
+     "name": "Pernas (o dia mais duro)",
+     "items": [
+      {
+       "exercise_id": "Leg_Press",
+       "sets": 4,
+       "reps": "20",
+       "rest_s": 120
+      },
+      {
+       "exercise_id": "Hack_Squat",
+       "sets": 4,
+       "reps": "12",
+       "rest_s": 120
+      },
+      {
+       "exercise_id": "Split_Squat_with_Dumbbells",
+       "sets": 3,
+       "reps": "12",
+       "rest_s": 90
+      },
+      {
+       "exercise_id": "Lying_Leg_Curls",
+       "sets": 4,
+       "reps": "15",
+       "rest_s": 60
+      },
+      {
+       "exercise_id": "Leg_Extensions",
+       "sets": 4,
+       "reps": "15",
+       "rest_s": 60
+      },
+      {
+       "exercise_id": "Standing_Calf_Raises",
+       "sets": 4,
+       "reps": "20",
+       "rest_s": 45
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "kipchoge",
+   "person": "Eliud Kipchoge",
+   "title": "Maratonista: 3 sessões-chave + força leve",
+   "icon": "🏃",
+   "about": "Como treina a equipe dele (técnico Patrick Sang): 3 sessões fortes por semana (tiros na pista, longão, fartlek), o resto fácil; e 2 sessões de 60 min de força e mobilidade no colchonete e elástico, 'sem sofrer'. Volume da corrida reduzido para gente comum (ele faz 180–220 km por semana).",
+   "level": "todos",
+   "days_per_week": 5,
+   "confidence": "estrutura documentada, volumes adaptados",
+   "cautions": "Comece com o volume que você já corre; aumente aos poucos. As sessões de força servem para qualquer nível.",
+   "sources": [
+    "https://www.outsideonline.com/running/eliud-kipchoge-marathon-workout-training-principles/",
+    "https://runnersworldonline.com.au/how-to-train-like-eliud-kipchoge/"
+   ],
+   "days": [
+    {
+     "name": "Tiros (ter)",
+     "items": [
+      {
+       "exercise_id": "corrida_rua",
+       "duration_min": 15,
+       "zone": 2,
+       "notes": "aquecimento"
+      },
+      {
+       "exercise_id": "corrida_pista",
+       "duration_min": 25,
+       "zone": 4,
+       "notes": "ex.: 8–12 × 400 m forte, 1 min trotando"
+      },
+      {
+       "exercise_id": "corrida_rua",
+       "duration_min": 10,
+       "zone": 1,
+       "notes": "soltar"
+      }
+     ]
+    },
+    {
+     "name": "Longão (qui)",
+     "items": [
+      {
+       "exercise_id": "corrida_rua",
+       "duration_min": 80,
+       "zone": 2,
+       "notes": "o mais longo da semana"
+      }
+     ]
+    },
+    {
+     "name": "Fartlek (sáb)",
+     "items": [
+      {
+       "exercise_id": "corrida_rua",
+       "duration_min": 45,
+       "zone": 3,
+       "notes": "1 min forte / 1 min leve, ~20×"
+      }
+     ]
+    },
+    {
+     "name": "Força e mobilidade A",
+     "items": [
+      {
+       "exercise_id": "Butt_Lift_Bridge",
+       "sets": 3,
+       "reps": "12",
+       "rest_s": 45
+      },
+      {
+       "exercise_id": "Plank",
+       "sets": 3,
+       "reps": null,
+       "duration_s": 40,
+       "rest_s": 45
+      },
+      {
+       "exercise_id": "Side_Bridge",
+       "sets": 3,
+       "reps": null,
+       "duration_s": 30,
+       "rest_s": 45
+      },
+      {
+       "exercise_id": "Kettlebell_One-Legged_Deadlift",
+       "sets": 3,
+       "reps": "10",
+       "rest_s": 45,
+       "notes": "sem peso"
+      },
+      {
+       "exercise_id": "Monster_Walk",
+       "sets": 3,
+       "reps": "12",
+       "rest_s": 45
+      },
+      {
+       "exercise_id": "Single_Leg_Balance",
+       "sets": 3,
+       "reps": null,
+       "duration_s": 30,
+       "rest_s": 30
+      }
+     ]
+    },
+    {
+     "name": "Força e mobilidade B + corrida fácil",
+     "items": [
+      {
+       "exercise_id": "corrida_rua",
+       "duration_min": 40,
+       "zone": 1,
+       "notes": "bem fácil"
+      },
+      {
+       "exercise_id": "Butt_Lift_Bridge",
+       "sets": 3,
+       "reps": "12",
+       "rest_s": 45
+      },
+      {
+       "exercise_id": "Plank",
+       "sets": 3,
+       "reps": null,
+       "duration_s": 40,
+       "rest_s": 45
+      },
+      {
+       "exercise_id": "Monster_Walk",
+       "sets": 3,
+       "reps": "12",
+       "rest_s": 45
+      },
+      {
+       "exercise_id": "Single_Leg_Balance",
+       "sets": 3,
+       "reps": null,
+       "duration_s": 30,
+       "rest_s": 30
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "kayla_bbg",
+   "person": "Kayla Itsines",
+   "title": "BBG — circuitos de 28 min em casa",
+   "icon": "🔥",
+   "about": "Do programa BBG (app Sweat): 3 treinos de 28 min (pernas, braços e abdômen, corpo inteiro) em circuitos de 7 min fazendo o máximo de voltas, mais caminhadas (LISS) e alongamento. Quase sem equipamento. Exercícios aproximados.",
+   "level": "iniciante",
+   "days_per_week": 4,
+   "confidence": "estrutura documentada, exercícios aproximados",
+   "cautions": "Muito salto: joelho sensível, troque o agachamento com salto pelo normal.",
+   "sources": [
+    "https://www.sweat.com/pages/bbg",
+    "https://kaylaitsines.com/blogs/education/bbg-zero-equipment"
+   ],
+   "days": [
+    {
+     "name": "Pernas e cardio (circuitos de 7 min)",
+     "items": [
+      {
+       "exercise_id": "Freehand_Jump_Squat",
+       "sets": 4,
+       "reps": "15",
+       "rest_s": 0,
+       "notes": "circuito: o máximo de voltas em 7 min"
+      },
+      {
+       "exercise_id": "Bodyweight_Walking_Lunge",
+       "sets": 4,
+       "reps": "24",
+       "rest_s": 0
+      },
+      {
+       "exercise_id": "Step-up_with_Knee_Raise",
+       "sets": 4,
+       "reps": "24",
+       "rest_s": 0
+      },
+      {
+       "exercise_id": "Burpee_Broad_Jump",
+       "sets": 4,
+       "reps": "10",
+       "rest_s": 60,
+       "notes": "burpee"
+      }
+     ]
+    },
+    {
+     "name": "Braços e abdômen",
+     "items": [
+      {
+       "exercise_id": "Pushups",
+       "sets": 4,
+       "reps": "10",
+       "rest_s": 0,
+       "notes": "circuito de 7 min"
+      },
+      {
+       "exercise_id": "Bench_Dips",
+       "sets": 4,
+       "reps": "15",
+       "rest_s": 0
+      },
+      {
+       "exercise_id": "Air_Bike",
+       "sets": 4,
+       "reps": "40",
+       "rest_s": 0,
+       "notes": "abdominal bicicleta"
+      },
+      {
+       "exercise_id": "Mountain_Climbers",
+       "sets": 4,
+       "reps": "40",
+       "rest_s": 60
+      }
+     ]
+    },
+    {
+     "name": "Corpo inteiro",
+     "items": [
+      {
+       "exercise_id": "Freehand_Jump_Squat",
+       "sets": 4,
+       "reps": "12",
+       "rest_s": 0,
+       "notes": "circuito de 7 min"
+      },
+      {
+       "exercise_id": "Pushups",
+       "sets": 4,
+       "reps": "10",
+       "rest_s": 0
+      },
+      {
+       "exercise_id": "Bodyweight_Walking_Lunge",
+       "sets": 4,
+       "reps": "20",
+       "rest_s": 0
+      },
+      {
+       "exercise_id": "Mountain_Climbers",
+       "sets": 4,
+       "reps": "30",
+       "rest_s": 60
+      }
+     ]
+    },
+    {
+     "name": "Caminhada (LISS)",
+     "items": [
+      {
+       "exercise_id": "caminhada_rua",
+       "duration_min": 35,
+       "zone": 2,
+       "notes": "30–45 min, ritmo de conversa"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "ramon_dino",
+   "person": "Ramon Dino",
+   "title": "Off-season 2025 — 6 treinos",
+   "icon": "🇧🇷",
+   "about": "Divisão revelada pelo treinador Fabrício Pacholok para o off-season de 2025: 6 sessões e 2 descansos, prioridade em peito e costas. Estrutura da fonte; exercícios e séries aproximados.",
+   "level": "avancado",
+   "days_per_week": 6,
+   "confidence": "estrutura documentada, exercícios aproximados",
+   "cautions": "Contexto de atleta de elite (Classic Physique). Ajuste o volume à sua recuperação.",
+   "sources": [
+    "https://www.lance.com.br/mais-esportes/ramon-dino-revela-peso-atual-dieta-e-protocolo-de-treinamentos-veja.html",
+    "https://www.correio24horas.com.br/esportes/revelado-saiba-qual-e-o-peso-atual-dieta-e-protocolo-de-treinamentos-de-ramon-dino-0325"
+   ],
+   "days": [
+    {
+     "name": "1 – Costas e bíceps (puxadas)",
+     "items": [
+      {
+       "exercise_id": "Wide-Grip_Lat_Pulldown",
+       "sets": 4,
+       "reps": "8-12",
+       "rest_s": 90
+      },
+      {
+       "exercise_id": "Pullups",
+       "sets": 3,
+       "reps": "máx",
+       "rest_s": 90
+      },
+      {
+       "exercise_id": "Straight-Arm_Pulldown",
+       "sets": 3,
+       "reps": "12",
+       "rest_s": 90
+      },
+      {
+       "exercise_id": "Barbell_Curl",
+       "sets": 3,
+       "reps": "8-12",
+       "rest_s": 90
+      },
+      {
+       "exercise_id": "Incline_Dumbbell_Curl",
+       "sets": 3,
+       "reps": "10-12",
+       "rest_s": 90
+      }
+     ]
+    },
+    {
+     "name": "2 – Peito, ombro e tríceps (peito)",
+     "items": [
+      {
+       "exercise_id": "Incline_Dumbbell_Press",
+       "sets": 4,
+       "reps": "8-12",
+       "rest_s": 90
+      },
+      {
+       "exercise_id": "Machine_Bench_Press",
+       "sets": 3,
+       "reps": "8-12",
+       "rest_s": 90
+      },
+      {
+       "exercise_id": "Cable_Crossover",
+       "sets": 3,
+       "reps": "12",
+       "rest_s": 90
+      },
+      {
+       "exercise_id": "Side_Lateral_Raise",
+       "sets": 3,
+       "reps": "12-15",
+       "rest_s": 60
+      },
+      {
+       "exercise_id": "Triceps_Pushdown",
+       "sets": 3,
+       "reps": "10-12",
+       "rest_s": 60
+      }
+     ]
+    },
+    {
+     "name": "3 – Pernas (quadríceps)",
+     "items": [
+      {
+       "exercise_id": "Hack_Squat",
+       "sets": 4,
+       "reps": "8-12",
+       "rest_s": 150
+      },
+      {
+       "exercise_id": "Leg_Press",
+       "sets": 3,
+       "reps": "10-12",
+       "rest_s": 120
+      },
+      {
+       "exercise_id": "Leg_Extensions",
+       "sets": 3,
+       "reps": "12-15",
+       "rest_s": 60
+      },
+      {
+       "exercise_id": "Lying_Leg_Curls",
+       "sets": 3,
+       "reps": "10-12",
+       "rest_s": 60
+      }
+     ]
+    },
+    {
+     "name": "4 – Costas e bíceps (remadas)",
+     "items": [
+      {
+       "exercise_id": "Bent_Over_Barbell_Row",
+       "sets": 4,
+       "reps": "8-12",
+       "rest_s": 120
+      },
+      {
+       "exercise_id": "Seated_Cable_Rows",
+       "sets": 3,
+       "reps": "10-12",
+       "rest_s": 90
+      },
+      {
+       "exercise_id": "One-Arm_Dumbbell_Row",
+       "sets": 3,
+       "reps": "10-12",
+       "rest_s": 90
+      },
+      {
+       "exercise_id": "Hammer_Curls",
+       "sets": 3,
+       "reps": "10-12",
+       "rest_s": 60
+      }
+     ]
+    },
+    {
+     "name": "5 – Peito, ombro e tríceps (ombro)",
+     "items": [
+      {
+       "exercise_id": "Seated_Dumbbell_Press",
+       "sets": 4,
+       "reps": "8-12",
+       "rest_s": 90
+      },
+      {
+       "exercise_id": "Side_Lateral_Raise",
+       "sets": 4,
+       "reps": "12-15",
+       "rest_s": 60
+      },
+      {
+       "exercise_id": "Seated_Bent-Over_Rear_Delt_Raise",
+       "sets": 3,
+       "reps": "15",
+       "rest_s": 45
+      },
+      {
+       "exercise_id": "Incline_Dumbbell_Press",
+       "sets": 3,
+       "reps": "10-12",
+       "rest_s": 90
+      },
+      {
+       "exercise_id": "Cable_Rope_Overhead_Triceps_Extension",
+       "sets": 3,
+       "reps": "10-12",
+       "rest_s": 60
+      }
+     ]
+    },
+    {
+     "name": "6 – Pernas (posterior e glúteo)",
+     "items": [
+      {
+       "exercise_id": "Romanian_Deadlift",
+       "sets": 4,
+       "reps": "8-10",
+       "rest_s": 150
+      },
+      {
+       "exercise_id": "Lying_Leg_Curls",
+       "sets": 3,
+       "reps": "10-12",
+       "rest_s": 90
+      },
+      {
+       "exercise_id": "Barbell_Hip_Thrust",
+       "sets": 3,
+       "reps": "8-12",
+       "rest_s": 120
+      },
+      {
+       "exercise_id": "Split_Squat_with_Dumbbells",
+       "sets": 3,
+       "reps": "10",
+       "rest_s": 90
+      },
+      {
+       "exercise_id": "Standing_Calf_Raises",
+       "sets": 4,
+       "reps": "12-15",
+       "rest_s": 45
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

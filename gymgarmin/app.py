@@ -885,6 +885,21 @@ def plans():
     return db.list_plans()
 
 
+@app.get("/api/templates/especiais")
+def famous_templates():
+    """Modelos especiais inspirados em treinos de pessoas famosas (com fontes e o que é aproximado)."""
+    return templates.famous()
+
+
+@app.post("/api/plans/{plan_id}/use")
+def plan_use(plan_id: int):
+    """Usar esta planilha na agenda: a semana é remontada com ela (histórico e cargas continuam)."""
+    _plan_or_404(plan_id)
+    db.save_profile({"schedule_plan_id": plan_id})
+    schedule.rebuild_week(_profile())
+    return {"ok": True}
+
+
 @app.post("/api/plans")
 def create_plan(body: dict = Body(...)):
     if body.get("template"):

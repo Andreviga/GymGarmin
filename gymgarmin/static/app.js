@@ -1546,6 +1546,7 @@ async function viewPlanilhas() {
   };
   $("#tpl-plan").onclick = () => {
     const body = openModal(`<h2>Modelos</h2><p class="small muted">Exercícios marcados como “evitar” nas suas limitações são trocados automaticamente.</p>
+      <a class="btn ghost block" href="#especiais" onclick="closeModal()" style="margin-bottom:10px">⭐ Especiais: inspirados em treinos de famosos</a>
       <ul class="list">${state.meta.templates.map((t) => `<li><b>${esc(t.name)}</b><div class="small muted">${esc(t.description)}</div>
       <button class="btn sm" style="margin-top:6px" data-tpl="${t.id}">Usar este modelo</button></li>`).join("")}</ul>`);
     body.onclick = async (e) => {
@@ -1910,6 +1911,7 @@ async function viewTreinar(planId, idx) {
         || (agenda.length ? "" : `<p class="muted">Sem planilhas ativas.</p>`)}
       <button class="btn block" id="gen-now" style="margin-top:14px">✨ Gerar um treino agora</button>
       <a class="btn ghost block" href="#bemestar" style="margin-top:8px">🧘 Yoga, Pilates, alongamento e respiração</a>
+      <a class="btn ghost block" href="#especiais" style="margin-top:8px">⭐ Treinos inspirados em famosos</a>
       <button class="btn ghost block" id="free" style="margin-top:8px">Treino livre</button>`;
     $("#gen-now").onclick = () => openAlternative(null, () => viewTreinar());
     const r = $("#resume"); if (r) r.onclick = () => { state.session = draft; renderSession(); };
@@ -3298,6 +3300,50 @@ function openShare(sessionId, title, after) {
       store("gg_soc_vis", st.vis); store("gg_soc_loads", st.loads ? 1 : 0);
       closeModal(); toast("Publicado na comunidade ✔"); if (after) after(); else if (location.hash === "#social") viewSocial(); else location.hash = "#social";
     } catch (err) { t.disabled = false; t.textContent = "Publicar"; toast(err.message, 5000); }
+  };
+}
+
+
+// ---------------------------------------------------------------- modelos especiais: treinos de famosos
+const LEVEL_TXT = { iniciante: "iniciante", intermediario: "intermediário", avancado: "avançado", todos: "todos os níveis" };
+let FAM = null;
+async function viewEspeciais(id) {
+  FAM = FAM || await api("/api/templates/especiais");
+  if (id) return famDetail(FAM.templates.find((t) => t.id === id));
+  view.innerHTML = `<p class="small muted" style="margin:0 2px 10px">${esc(FAM.disclaimer)}</p>
+    <div class="ws-list">${FAM.templates.map((t) => `<a class="ws-card" href="#especiais/${esc(t.id)}"><span class="ws-ico" aria-hidden="true">${t.icon}</span>
+      <span class="grow"><b>${esc(t.person)}</b><span class="small">${esc(t.title)}</span><span class="small muted">${t.days_per_week}×/semana · ${esc(LEVEL_TXT[t.level] || t.level)} · ${esc(t.confidence)}</span></span>
+      <span class="chev" aria-hidden="true">›</span></a>`).join("")}</div>`;
+}
+function famDetail(t) {
+  if (!t) { location.hash = "#especiais"; return; }
+  const itTxt = (i) => i.duration_min ? `${i.duration_min} min` : i.duration_s ? `${i.sets} × ${i.duration_s} s` : `${i.sets} × ${i.reps}`;
+  view.innerHTML = `<section class="card ws-head"><div class="ws-ico big" aria-hidden="true">${t.icon}</div>
+      <div class="small muted">Inspirado em</div><h2 style="margin:2px 0">${esc(t.person)}</h2><div><b>${esc(t.title)}</b></div>
+      <div class="tc-chips" style="margin-top:8px"><span>${t.days_per_week}×/semana</span><span>${esc(LEVEL_TXT[t.level] || t.level)}</span><span class="${/aproximad|atribu/.test(t.confidence) ? "warn" : "ok"}">${esc(t.confidence)}</span></div>
+      <p style="margin:10px 0 6px">${esc(t.about)}</p>
+      <p class="small muted">⚠️ ${esc(t.cautions)}</p>
+      <button class="btn block" id="fam-use" style="margin-top:10px">Usar este modelo</button></section>
+    ${t.days.map((d) => `<h2 class="sec-title">${esc(d.name)}</h2><ul class="ws-steps">${d.items.map((i) => `<li data-ex="${esc(i.exercise_id)}">${mediaHtml(i.exercise_id, "s")}
+      <span class="grow"><b>${esc(i.name)}</b><span class="small muted">${esc(itTxt(i))}${i.rest_s ? ` · descanso ${i.rest_s} s` : ""}${i.superset ? ` · bi-set ${esc(i.superset)}` : ""}</span>
+      ${i.notes ? `<span class="small">${esc(i.notes)}</span>` : ""}</span></li>`).join("")}</ul>`).join("")}
+    <details class="adv"><summary class="small">De onde vem (fontes)</summary><ul class="plain small">${t.sources.map((u) => `<li><a href="${esc(u)}" target="_blank" rel="noopener">${esc(u.replace(/^https?:\/\/(www\.)?/, "").split("/")[0])}</a></li>`).join("")}</ul>
+      <p class="small muted">${esc(FAM.disclaimer)}</p></details>
+    <a class="act" href="#especiais" style="display:block;margin-top:10px">‹ Todos os modelos especiais</a>`;
+  view.onclick = async (e) => {
+    const ex = e.target.closest("[data-ex]"); if (ex && !e.target.closest("button")) return showExercise(ex.dataset.ex);
+    if (e.target.id !== "fam-use") return;
+    e.target.disabled = true;
+    let p; try { p = await api("/api/plans", { method: "POST", body: { template: t.template_id } }); } catch (err) { e.target.disabled = false; return toast(err.message, 5000); }
+    const body = openModal(`<h2>${t.icon} Planilha criada</h2><p>“${esc(p.name)}” está em Planos.</p>${p.notes && /Trocas/.test(p.notes) ? `<p class="small rec">${esc(p.notes.split("Trocas")[1] ? "Trocas" + p.notes.split("Trocas")[1] : "")}</p>` : ""}
+      <button class="btn block" id="fam-agenda">Usar na minha agenda a partir de agora</button>
+      <a class="btn ghost block" href="#plano/${p.id}" style="margin-top:8px">Ver e ajustar a planilha</a>`);
+    body.onclick = async (ev) => {
+      if (ev.target.id !== "fam-agenda") return;
+      ev.target.disabled = true;
+      try { await api(`/api/plans/${p.id}/use`, { method: "POST" }); closeModal(); toast("Agenda montada com este modelo ✔", 5000); location.hash = "#hoje"; }
+      catch (err) { ev.target.disabled = false; toast(err.message, 5000); }
+    };
   };
 }
 
@@ -4819,7 +4865,7 @@ async function doRoute(ctl) {
   if (name !== "treinar") fxLeave();
   if (name !== "bemestar" || b !== "play") { clearInterval(wsInt); wsInt = null; WS = null; }
   $$(".tabbar a").forEach((el) => el.classList.toggle("active", el.dataset.tab === ({ plano: "planilhas", exercicios: "planilhas", aparelhos: "planilhas", evolucao: "analise", saude: "analise", esportes: "perfil", coach: "perfil", dev: "perfil", bemvindo: "hoje" }[name] || name)));
-  const TITLES = { planilhas: "Planos", exercicios: "Planos", aparelhos: "Planos", plano: "Planilha", treinar: "Treinar", social: "Comunidade", bemestar: "Bem-estar", analise: "Progresso", evolucao: "Evolução", saude: "Saúde e sono", perfil: "Perfil", esportes: "Esportes", coach: "Coach", dev: "Desenvolvedor" };
+  const TITLES = { planilhas: "Planos", exercicios: "Planos", aparelhos: "Planos", plano: "Planilha", treinar: "Treinar", social: "Comunidade", especiais: "Treinos de famosos", bemestar: "Bem-estar", analise: "Progresso", evolucao: "Evolução", saude: "Saúde e sono", perfil: "Perfil", esportes: "Esportes", coach: "Coach", dev: "Desenvolvedor" };
   const pt = $("#page-title"); pt.textContent = TITLES[name] || ""; pt.hidden = !TITLES[name] || (name === "treinar" && a);
   const sn = $("#subnav"); sn.hidden = !["planilhas", "exercicios", "aparelhos"].includes(name);
   $$("#subnav a").forEach((x) => x.classList.toggle("on", x.dataset.sub === name));
@@ -4842,7 +4888,7 @@ async function doRoute(ctl) {
         document.querySelector(".topbar").insertAdjacentHTML("afterend", `<div id="eph" class="rec atencao small" style="margin:8px 16px 0">Versão de teste online: os dados podem ser apagados pelo servidor. Use <a href="#perfil">Perfil → Backup</a> para salvar e restaurar.</div>`);
       }
     }
-    const routes = { hoje: () => viewHoje(a), planilhas: viewPlanilhas, plano: () => viewPlano(a), treinar: () => viewTreinar(a, b), social: viewSocial, bemestar: () => viewBemEstar(a, b), analise: viewAnalise, evolucao: () => viewEvolucao(decodeURIComponent(a || "")), esportes: viewEsportes, saude: viewSaude, exercicios: viewExercicios, aparelhos: () => viewAparelhos(a), perfil: () => viewPerfil(a), coach: viewCoach, dev: viewDev, bemvindo: viewBemVindo };
+    const routes = { hoje: () => viewHoje(a), planilhas: viewPlanilhas, plano: () => viewPlano(a), treinar: () => viewTreinar(a, b), social: viewSocial, especiais: () => viewEspeciais(a), bemestar: () => viewBemEstar(a, b), analise: viewAnalise, evolucao: () => viewEvolucao(decodeURIComponent(a || "")), esportes: viewEsportes, saude: viewSaude, exercicios: viewExercicios, aparelhos: () => viewAparelhos(a), perfil: () => viewPerfil(a), coach: viewCoach, dev: viewDev, bemvindo: viewBemVindo };
     const render = async () => {
       await (routes[name] || viewHoje)();
       if (!view.onclick) view.onclick = (e) => { const id = e.target.dataset && e.target.dataset.ex; if (id) showExercise(id); };
