@@ -220,14 +220,21 @@ async function viewHoje(weekDate) {
 
   if (!sch.plan) {
     const incomplete = profileMissing(state.profile || await api("/api/profile").catch(() => ({}))).length > 0;
-    view.innerHTML = `${pageHead("Hoje")}${firstStepsHtml(false)}${partnerCardsHtml(prt)}${installCardHtml("hoje")}<section class="today-card">
+    view.innerHTML = `${pageHead("Hoje")}${watchInboxHtml(wib)}${firstStepsHtml(false)}${partnerCardsHtml(prt)}${installCardHtml("hoje")}<section class="today-card">
       <div class="eyebrow">Comece por aqui</div><div class="tc-title">Monte seu treino</div>
       <p class="muted">Diga há quanto tempo treina, os dias e o tempo que tem. O app monta musculação e corrida juntas, respeita suas limitações e reorganiza a semana quando você faltar.</p>
       ${incomplete ? `<a class="btn block" id="wiz-open" href="#bemvindo">✨ Responder 7 perguntas e montar meu treino</a>` : `<button class="btn block" id="gen-open">Gerar meu treino</button>`}
       <a class="btn ghost block" href="#planilhas" style="margin-top:8px">Montar manualmente</a></section>`;
     const go = $("#gen-open"); if (go) go.onclick = () => openGenerator();
     bindSteps();
-    view.onclick = async (ev) => { const t = ev.target.closest("button"); if (!t) return; try { await partnerAction(t.dataset, t, () => viewHoje()); } catch (e) { toast(e.message, 5000); } };
+    view.onclick = async (ev) => {
+      const t = ev.target.closest("button"); if (!t) return;
+      try {
+        if (t.dataset.wrev) { t.disabled = true; return await openWatchCheck(+t.dataset.wrev).finally(() => { t.disabled = false; }); }
+        if (t.dataset.wok) { t.disabled = true; await api(`/api/watch/inbox/${t.dataset.wok}/ok`, { method: "POST" }); toast("Ok, fica como o relógio mandou"); return viewHoje(); }
+        await partnerAction(t.dataset, t, () => viewHoje());
+      } catch (e) { toast(e.message, 5000); }
+    };
     return;
   }
   const g = sch.goals;
@@ -2052,6 +2059,47 @@ function watchHeadHtml(s) {
     ${pick ? `<br><b>${pick} ${pick === 1 ? "bloco precisa" : "blocos precisam"} do nome do exercício.</b>` : ""}${guess ? `<br>${guess} ${guess === 1 ? "exercício é palpite" : "exercícios são palpites"} do relógio.` : ""}
     <br><span class="muted">O que você trocar o app aprende: as próximas séries desse tipo já chegam com o nome certo.</span></div>`;
 }
+// correção/conferência: o relógio juntou séries de exercícios diferentes → mover a série para o exercício certo,
+// separar daqui em diante como outro exercício, ou apagar
+const isSetItem = (it) => it && Array.isArray(it.sets) && it.kind !== "cardio" && !it.endurance && (it.phase || "principal") === "principal";
+function neighborItem(s, i, dir) {
+  for (let k = i + dir; k >= 0 && k < s.items.length; k += dir) if (isSetItem(s.items[k])) return k;
+  return -1;
+}
+function setOps(s, i, j, op) {
+  const it = s.items[i]; if (!it || !it.sets[j]) return;
+  if (op === "split") {
+    const rest = it.sets.splice(j);
+    s.items.splice(i + 1, 0, { exercise_id: "Garmin_desconhecido", orig_id: "Garmin_desconhecido", name: "Exercício: qual foi?", kind: "strength",
+      plan: { rest_s: 90 }, phase: "principal", need_pick: true, images: [], warmup: [], sets: rest, suggest: null });
+    return;
+  }
+  const [x] = it.sets.splice(j, 1);
+  if (op === "up" || op === "down") {
+    const k = neighborItem(s, i, op === "up" ? -1 : 1); if (k < 0) { it.sets.splice(j, 0, x); return; }
+    if (op === "up") s.items[k].sets.push(x); else s.items[k].sets.unshift(x);
+  }
+  if (!it.sets.length) s.items.splice(i, 1);   // ficou sem séries: o exercício sai
+}
+function openSetMenu(s, i, j, after) {
+  const it = s.items[i]; const x = it.sets[j];
+  const up = neighborItem(s, i, -1), down = neighborItem(s, i, 1);
+  const nm = (k) => esc((s.items[k] || {}).name || "exercício");
+  const desc = `${x.reps ?? "?"} reps${x.load_kg != null && x.load_kg !== "" ? ` × ${x.load_kg} kg` : ""}`;
+  const body = openModal(`<h2>Série ${j + 1} de ${esc(it.name)}</h2><p class="small muted">${desc}. O relógio às vezes junta séries de exercícios diferentes: arrume aqui.</p>
+    <div class="stack">
+      ${up >= 0 ? `<button class="btn ghost block" data-sop="up">⬆ Passar para ${nm(up)} (o de cima)</button>` : ""}
+      ${down >= 0 ? `<button class="btn ghost block" data-sop="down">⬇ Passar para ${nm(down)} (o de baixo)</button>` : ""}
+      <button class="btn ghost block" data-sop="split">✂ ${j === 0 ? "Esta série e as seguintes são de outro exercício" : `Separar a partir desta: outro exercício`}</button>
+      <button class="btn ghost block danger" data-sop="del">🗑 Apagar esta série</button>
+    </div>`);
+  body.onclick = (e) => {
+    const b = e.target.closest("[data-sop]"); if (!b) return;
+    if (b.dataset.sop === "del" && !confirm("Apagar esta série?")) return;
+    setOps(s, i, j, b.dataset.sop); closeModal(); after();
+    toast(b.dataset.sop === "split" ? "Separado: escolha qual exercício foi" : b.dataset.sop === "del" ? "Série apagada" : "Série movida");
+  };
+}
 function swapItem(it, ex) {
   it.exercise_id = ex.id; it.name = ex.name; it.need_pick = false; it.suggest = null; it.confirm_guess = false;
   if (ex.images) it.images = ex.images; if (ex.timed !== undefined) it.timed = ex.timed; if (ex.limitation) it.limitation = ex.limitation;
@@ -2306,12 +2354,12 @@ function sessionItemHtml(it, i) {
   const pickBox = it.need_pick ? `<div class="rec atencao small wpick"><b>⌚ O relógio não disse qual exercício foi.</b> Pelas séries abaixo, qual foi?
       <div class="row gap wrap" style="margin-top:6px">${it.suggest ? `<button class="btn sm" data-pickto="${i}" data-pid="${esc(it.suggest.id)}" data-pname="${esc(it.suggest.name)}">Foi ${esc(it.suggest.name)}</button>` : ""}
       <button class="btn sm ghost" data-swap="${i}">${it.suggest ? "Outro" : "Escolher o exercício"}</button></div>
-      ${it.sets.length > 1 ? `<div class="muted" style="margin-top:6px">Tem dois exercícios aqui? Toque em ✂ na série em que o outro começou.</div>` : ""}</div>`
+      ${it.sets.length > 1 ? `<div class="muted" style="margin-top:6px">Tem dois exercícios aqui? Toque no número da série em que o outro começou e em “Separar”.</div>` : ""}</div>`
     : it.watch_guess && !it.confirm_guess && it.exercise_id === it.orig_id ? `<div class="rec small wguess">⌚ O relógio só disse “${esc(it.watch_guess)}”; o app chutou este exercício.
       <div class="row gap wrap" style="margin-top:6px"><button class="btn sm" data-gok="${i}">✓ Está certo</button><button class="btn sm ghost" data-swap="${i}">Trocar</button></div></div>` : "";
   return `<div class="card${it.need_pick ? " need-pick" : ""}">${head}${pickBox}
     <table class="set-table" style="margin-top:8px"><thead><tr><th>#</th><th>${timed ? "Tempo s" : "Reps"}</th><th>kg</th><th>RPE</th><th></th></tr></thead><tbody>
-    ${it.sets.map((x, j) => `<tr class="${x.done ? "done" : ""}"><td>${j + 1}${it.need_pick && j > 0 ? ` <button class="mini" data-split="${i}:${j}" aria-label="Outro exercício começa na série ${j + 1}">✂</button>` : ""}</td>
+    ${it.sets.map((x, j) => `<tr class="${x.done ? "done" : ""}"><td>${s0.edit_id ? `<button class="set-n" data-setmenu="${i}:${j}" aria-label="Série ${j + 1}: mover, separar ou apagar">${j + 1}<span aria-hidden="true">⋯</span></button>` : j + 1}</td>
       <td><input class="num" inputmode="numeric" data-s="${timed ? "duration_s" : "reps"}" data-i="${i}" data-j="${j}" value="${esc(timed ? x.duration_s ?? "" : x.reps ?? "")}"></td>
       <td><input class="num" inputmode="decimal" data-s="load_kg" data-i="${i}" data-j="${j}" value="${esc(x.load_kg ?? "")}"${x.partner_load != null ? ` placeholder="sua" aria-label="Sua carga (a do parceiro foi ${esc(x.partner_load)} kg)"` : ""}></td>
       <td><select class="num" data-s="rpe" data-i="${i}" data-j="${j}"><option value=""></option>${[6, 7, 8, 9, 10].map((r) => `<option ${+x.rpe === r ? "selected" : ""}>${r}</option>`).join("")}</select></td>
@@ -2391,12 +2439,8 @@ function bindSession() {
     if (t.dataset.swap) { const it = s.items[+t.dataset.swap]; return pickExercise("strength", (ex) => { swapItem(it, ex); save(); renderSession(); }, { missing: s.missing }); }
     if (t.dataset.pickto) { swapItem(s.items[+t.dataset.pickto], { id: t.dataset.pid, name: t.dataset.pname }); save(); return renderSession(); }
     if (t.dataset.gok) { s.items[+t.dataset.gok].confirm_guess = true; save(); return renderSession(); }
-    if (t.dataset.split) {
-      const [i, j] = t.dataset.split.split(":").map(Number); const it = s.items[i];
-      const rest = it.sets.splice(j);
-      s.items.splice(i + 1, 0, { ...it, sets: rest, name: "Exercício seguinte: qual foi?", suggest: null, exercise_id: it.orig_id || it.exercise_id });
-      save(); return renderSession();
-    }
+    const smb = t.closest && t.closest("[data-setmenu]");
+    if (smb) { const [i, j] = smb.dataset.setmenu.split(":").map(Number); return openSetMenu(s, i, j, () => { save(); renderSession(); }); }
     if (t.id === "w-plan" && s.planned) {
       s.planned.items.forEach((p) => { const it = JSON.parse(JSON.stringify(p)); (it.sets || []).forEach((x) => { x.done = true; }); s.items.push(it); });
       s.planned_used = true; save(); toast("Treino planejado preenchido: ajuste repetições e cargas do que você fez, e tire o que não fez", 6000); return renderSession();
