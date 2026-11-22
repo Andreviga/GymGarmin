@@ -1090,4 +1090,4 @@ body.timer-on { padding-bottom: calc(72px + 70px + env(safe-area-inset-bottom));
 .fam-banner .grow { display: flex; flex-direction: column; gap: 2px; }
 .fam-faces { font-size: 20px; letter-spacing: -4px; flex: none; }
 .hero-start .tc-title { font-size: 26px; }
-.text-link { display: block; text-align: center; margin-top: 12px; color: var(--brand); text-decoration: underline; text-underline-offset: 3px; }
+.text-link { display: block; text-align: center; margin-top: 4px; padding: 10px 0; min-height: 40px; color: var(--brand); text-decoration: underline; text-underline-offset: 3px; }

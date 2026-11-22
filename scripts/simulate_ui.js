@@ -305,10 +305,11 @@ async function flows(page, base, persona, tag) {
         if (go_ && tb && (go_.y + go_.height > tb.y + 1 || go_.y < 0)) issue("treino guiado: botão da série fora da tela", W(`y=${Math.round(go_.y)}`));
         await click("[data-st='reps:1']", "+1 repetição");
         await click("[data-fx='set']", "série feita (guiado)");
-        if (!(await page.locator(".fx-rest #fx-clock").count())) issue("treino guiado: descanso não começou", W("treinar"));
+        if (!(await page.locator(".fx-restbar #fx-rclock").count())) issue("treino guiado: descanso não começou", W("treinar"));
         else {
           await audit(page, W("treino guiado: descanso"));
           // a série recém-feita continua editável com o cronômetro correndo
+          await page.evaluate(() => { const d = document.querySelector(".fx-just-wrap"); if (d) d.open = true; });
           const just = page.locator(".fx-just [data-lst='load_kg:2.5']");
           if (!(await just.count())) issue("descanso: não dá para ajustar a série que acabou de fazer", W("treinar"));
           else {
@@ -317,7 +318,7 @@ async function flows(page, base, persona, tag) {
             const after = await page.locator(".fx-just [data-lv='load_kg']").inputValue();
             if (before === after) issue("descanso: +2,5 kg na série feita não mudou o valor", W(`${before} → ${after}`));
             await page.locator(".fx-just [data-lv='reps'], .fx-just [data-lv='duration_s']").first().fill("9");
-            if (!(await page.locator(".fx-rest #fx-clock").count())) issue("descanso: editar a série apagou o cronômetro", W("treinar"));
+            if (!(await page.locator(".fx-restbar #fx-rclock").count())) issue("descanso: editar a série apagou o cronômetro", W("treinar"));
             const saved = await page.evaluate(() => { const s = JSON.parse(localStorage.getItem("gg_session") || "{}"); const L = s.lastSet; if (!L) return null; const it = s.items[L.i]; return (L.w ? it.warmup : it.sets)[L.k]; });
             if (!saved || +saved.load_kg !== +after) issue("descanso: ajuste da série feita não foi guardado", W(JSON.stringify(saved)));
           }
@@ -401,8 +402,10 @@ async function flows(page, base, persona, tag) {
     let nSets = 0;
     for (let k = 0; k < 8 && (await page.locator("[data-fx='set']").count()); k++) {
       await click("[data-fx='set']", "série feita (livre)"); nSets++;
-      if (!(await page.locator(".fx-rest .fx-just [data-lv='load_kg']").count())) { issue("treino livre guiado: depois de marcar a série não dá para ajustar carga/repetições", W(`série ${nSets}`)); break; }
-      if (!(await page.locator(".fx-rest #fx-clock").count())) issue("treino livre guiado: sem cronômetro depois da série", W(`série ${nSets}`));
+      // descanso = barra no topo; a série recém-feita é ajustada em "Ajustar a série que você acabou de fazer"
+      await page.evaluate(() => { const d = document.querySelector(".fx-just-wrap"); if (d) d.open = true; });
+      if (!(await page.locator(".fx-just [data-lv='load_kg']").count())) { issue("treino livre guiado: depois de marcar a série não dá para ajustar carga/repetições", W(`série ${nSets}`)); break; }
+      if (!(await page.locator(".fx-restbar #fx-rclock").count())) issue("treino livre guiado: sem cronômetro depois da série", W(`série ${nSets}`));
       await page.locator(".fx-just [data-lst='load_kg:2.5']").click(); await page.waitForTimeout(40);
       if (k === 0) await audit(page, W("treino livre guiado: descanso"));
       await click("[data-fx='r-skip']", "Estou pronto / Terminei");
@@ -413,6 +416,10 @@ async function flows(page, base, persona, tag) {
     await click("[data-fx='list']", "Ver lista");
     await click("#s-finish", "Finalizar treino livre");
     await page.waitForSelector(".saved-card", { timeout: 5000 }).catch(() => issue("treino livre: tela de resumo não apareceu", W("treino livre")));
+    // logo depois de salvar o app pergunta "quão puxado foi": responde como a pessoa faria
+    await page.waitForTimeout(900);
+    const eff = page.locator("#modal:not([hidden]) [data-eff='7']");
+    if (await eff.count()) { await audit(page, W("nota de esforço")); await eff.click(); await page.waitForTimeout(300); }
     await audit(page, W("treino livre salvo"));
     const q = page.locator(".saved-card [data-match]").first();
     if (await q.count()) { await q.scrollIntoViewIfNeeded(); await q.click(); await page.waitForTimeout(300); await audit(page, W("treino livre: respondeu se foi o treino do dia")); }
@@ -425,7 +432,7 @@ async function flows(page, base, persona, tag) {
   await go(page, "#perfil", W("perfil"));
   await page.evaluate(() => { const d = document.querySelector("#sec-dados"); if (d) d.open = true; });
   await page.waitForTimeout(100);
-  const save = page.locator("#view button", { hasText: /Salvar/ }).first();
+  const save = page.locator("#save-profile");
   if (await save.count()) { await save.scrollIntoViewIfNeeded(); await save.click(); await page.waitForTimeout(300);
     const t = await page.evaluate(() => { const t = document.getElementById("toast"); return t && !t.hidden ? t.innerText : null; });
     if (!t) issue("salvar perfil sem confirmação visível", W("perfil"));
