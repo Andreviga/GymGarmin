@@ -17,6 +17,7 @@ from fastapi.staticfiles import StaticFiles
 from datetime import date, timedelta
 
 from . import alternative, auth, coach, focus, gallery, ingest, my_gym, partners, training_rules
+from . import watch_review as wrv
 from . import (analysis, calibration, catalog, clock, db, dedupe, health, endurance, garmin_export, garmin_sync, generator, history, limitations,
                load, plans_io, progression, readiness, schedule, sports, steps, templates, watch_labels)
 from .muscles import EQUIPMENT_PT, HR_ZONES, MUSCLES, hr_max, zone_bpm
@@ -363,7 +364,8 @@ async def ingest_data(request: Request, authorization: str | None = Header(None)
 def _ingest_sync(body) -> dict:
     p = _profile()
     try:
-        r = ingest.ingest(body, hr_max(p.get("age"), p.get("hr_max")), merge=_merge_garmin)
+        r = ingest.ingest(body, hr_max(p.get("age"), p.get("hr_max")), merge=_merge_garmin,
+                          cat_prefs=watch_labels.category_prefs(_watch_prefs()))
     except ValueError as e:
         raise HTTPException(400, str(e)) from e
     today = clock.today()
@@ -1324,6 +1326,8 @@ def session_edit_draft(session_id: int):
     s = db.get_session(session_id)
     if not s:
         raise HTTPException(404, "Sessão não encontrada")
+    if wrv._is_watch(s) and (wrv._strength_items(s) or wrv.time_only_strength(s)):
+        return _watch_edit_draft(s)
     st = [it for it in s.get("items") or [] if partners._is_strength(it)]
     if not st:
         raise HTTPException(400, "Esse treino não tem séries de musculação para corrigir.")
@@ -1349,6 +1353,82 @@ def session_edit_draft(session_id: int):
             "duration_min": s.get("duration_min") if not (s.get("garmin_activity_id") or s.get("ext_id")) else None}
 
 
+def _edit_item(eid: str, sets: list[dict]) -> dict | None:
+    reps = [int(x["reps"]) for x in sets if x.get("reps")]
+    pre = _prefill_items([{"exercise_id": eid, "sets": len(sets), "rest_s": 90, "phase": "principal",
+                           "reps": str(max(set(reps), key=reps.count)) if reps else "10"}])
+    if not pre:
+        return None
+    it = pre[0]
+    it["sets"] = [{"reps": x.get("reps"), "duration_s": x.get("duration_s"), "load_kg": x.get("load_kg"), "rpe": x.get("rpe"),
+                   "done": x.get("done", True)} for x in sets]
+    it["warmup"] = []
+    it["suggestion"] = None   # conferência do que já foi feito: sem sugestão de carga para a próxima vez
+    ex = catalog.get(eid) or {}
+    it.update(pm=ex.get("primaryMuscles") or [], sm=ex.get("secondaryMuscles") or [], orig_id=eid)
+    return it
+
+
+def _watch_edit_draft(s: dict) -> dict:
+    """Treino do relógio aberto para conferir: um exercício por item, os blocos sem nome separados (com sugestão pelo
+    treino planejado do dia), os palpites do relógio marcados, e — se o relógio só gravou o tempo — o treino planejado
+    do dia pronto para preencher."""
+    day = str(s.get("date"))[:10]
+    entries = db.list_schedule(day, day)
+    entry = next((e for e in entries if e.get("kind") == "forca"), None)
+    cands = [e for e in watch_labels._plan_candidates(entry, s) if catalog.get(e)]
+    items, n_unknown = [], 0
+    for blk in wrv.edit_blocks(s):
+        if blk["unknown"]:
+            n_unknown += 1
+            sug = cands.pop(0) if cands else None
+            items.append({"exercise_id": watch_labels.UNKNOWN_ID, "name": f"Exercício {len(items) + 1}: qual foi?", "kind": "strength",
+                          "plan": {"rest_s": 90}, "phase": "principal", "need_pick": True, "images": [], "warmup": [],
+                          "suggest": {"id": sug, "name": catalog.get(sug)["name"]} if sug else None, "orig_id": watch_labels.UNKNOWN_ID,
+                          "sets": [{"reps": x.get("reps"), "duration_s": x.get("duration_s"), "load_kg": x.get("load_kg"), "done": True}
+                                   for x in blk["sets"]]})
+            continue
+        src = blk["item"]
+        it = _edit_item(src["exercise_id"], src["sets"])
+        if not it:
+            continue
+        if src.get("deload"):
+            it["plan"] = {**(it.get("plan") or {}), "deload": True}
+        if src.get("guess"):
+            it["watch_guess"] = wrv.category_pt((src.get("garmin") or {}).get("category"))
+        items.append(it)
+    sm = wrv.summary(s)
+    planned = None
+    if entry and not items:
+        planned = {"name": entry.get("day_name"), "items": [x for x in _prefill_items(entry.get("items") or [])
+                                                           if x.get("phase") == "principal" and x.get("kind") == "strength"]}
+        for x in planned["items"]:
+            ex = catalog.get(x["exercise_id"]) or {}
+            x.update(pm=ex.get("primaryMuscles") or [], sm=ex.get("secondaryMuscles") or [], orig_id=None, fresh=True)
+    other = [partners._ex_name(it.get("exercise_id"), it) for it in s.get("items") or []
+             if not it.get("sets") and not wrv.is_generic(it)]
+    return {"edit_id": s["id"], "watch_review": True, "date": str(s.get("date"))[:16],
+            "day_name": s.get("day_name") or (s.get("notes") if not sm["time_only"] else None) or "Musculação",
+            "notes": s.get("notes") if s.get("day_name") else None, "view": "lista", "items": items, "kept_items": other,
+            "watch": sm, "planned": planned, "duration_min": None}
+
+
+@app.get("/api/watch/inbox")
+def watch_inbox():
+    today = clock.today()
+    sessions = db.list_sessions(since=(today - timedelta(days=wrv.INBOX_DAYS + 1)).isoformat(), limit=200)
+    return {"items": wrv.inbox(sessions, today)}
+
+
+@app.post("/api/watch/inbox/{session_id}/ok")
+def watch_inbox_ok(session_id: int):
+    s = db.get_session(session_id)
+    if not s:
+        raise HTTPException(404, "Sessão não encontrada")
+    db.save_session({**{k: v for k, v in s.items() if k not in ("id", "created_at")}, "reviewed": True}, session_id=session_id)
+    return {"ok": True}
+
+
 @app.get("/api/sessions/{session_id}")
 def get_session(session_id: int):
     s = db.get_session(session_id)
@@ -1366,10 +1446,33 @@ def put_session(session_id: int, body: dict = Body(...)):
     for k in ("id", "created_at", "client_id", "merge_into", "no_merge", "allow_repeat", "time_set", "merged", "garmin_activity_id",
               "ext_id", "source", "garmin_summary"):
         body.pop(k, None)   # vínculo com o relógio, origem e identidade do treino não mudam numa correção
+    watch_rev = bool(body.pop("watch_review", None)) and wrv._is_watch(old)
+    was_time_only = watch_rev and wrv.time_only_strength(old)
+    learned: dict[str, str] = {}
     if body.pop("edit", None) is True:
         # correção pela tela: ela só mexe nas séries de musculação; cardio, atividade do relógio e séries sem nome ficam
         body = {k: body[k] for k in ("items", "date", "day_name", "notes", "duration_min") if k in body and body[k] is not None}
         kept = [it for it in old.get("items") or [] if not partners._is_strength(it)]
+        if watch_rev:
+            # conferência do relógio: a tela mandou TODOS os blocos (os sem nome que sobraram vão de volta como sem nome)
+            kept = [it for it in kept if it.get("exercise_id") != watch_labels.UNKNOWN_ID]
+            if any(isinstance(it.get("sets"), list) and it["sets"] for it in body.get("items") or []):
+                drop = [it for it in kept if wrv.is_generic(it)]
+                if drop:
+                    old = {**old, "garmin_summary": wrv.lift_measures(old, drop)}
+                    kept = [it for it in kept if it not in drop]
+            clean_items = []
+            for it in body.get("items") or []:
+                it = dict(it)
+                if it.get("exercise_id") == watch_labels.UNKNOWN_ID:
+                    if it.get("sets"):
+                        clean_items.append({"exercise_id": watch_labels.UNKNOWN_ID, "_name": watch_labels.UNKNOWN_NAME,
+                                            "sets": it["sets"], "garmin": {"category": "UNKNOWN", "name": None}})
+                    continue
+                if not catalog.get(it.get("exercise_id")):
+                    continue
+                clean_items.append(it)
+            body["items"] = clean_items
         olds: dict[str, list[dict]] = {}
         for it in old.get("items") or []:
             if partners._is_strength(it):
@@ -1377,9 +1480,28 @@ def put_session(session_id: int, body: dict = Body(...)):
         new_items = []
         for it in body.get("items") or []:
             if it.get("sets"):
-                prev = (olds.get(it.get("exercise_id")) or [None]).pop(0) if olds.get(it.get("exercise_id")) else None
+                it = dict(it)
+                if it.get("exercise_id") == watch_labels.UNKNOWN_ID:
+                    new_items.append(it)
+                    continue
+                key = it.pop("orig_id", None) or it.get("exercise_id")
+                confirm = bool(it.pop("confirm_guess", None))
+                prev = (olds.get(key) or [None]).pop(0) if olds.get(key) else None
                 # deload, palpite/nome do relógio, categoria etc. continuam: a correção só troca as séries
-                new_items.append({**{k: v for k, v in (prev or {}).items() if k != "sets"}, **it})
+                merged = {**{k: v for k, v in (prev or {}).items() if k != "sets"}, **it}
+                if prev and (prev.get("exercise_id") != it.get("exercise_id") or confirm):
+                    # a pessoa trocou (ou confirmou) o exercício: deixa de ser palpite; a categoria do relógio aprende
+                    cat = (prev.get("garmin") or {}).get("category")
+                    if prev.get("guess") and cat and cat != "UNKNOWN":
+                        learned[cat] = it["exercise_id"]
+                    for k in ("guess", "_name"):
+                        merged.pop(k, None)
+                    merged["labeled"] = "tela"
+                elif not prev and (it.get("orig_id") == watch_labels.UNKNOWN_ID or key == watch_labels.UNKNOWN_ID):
+                    merged["labeled"] = "bloco"
+                if not prev and watch_rev:
+                    merged.setdefault("labeled", "bloco")
+                new_items.append(merged)
             elif it.get("duration_min"):
                 new_items.append(it)   # cardio acrescentado na correção
         body["items"] = new_items + kept
@@ -1391,14 +1513,25 @@ def put_session(session_id: int, body: dict = Body(...)):
         if pid is not None and not (acc and isinstance(pid, int) and not isinstance(pid, bool) and partners.is_partner(acc["user_id"], pid)):
             body.pop("with_partner")
     # a edição não apaga o vínculo com a agenda, com o relógio, com o parceiro, nem a decisão "foi o treino X / é um extra"
+    if watch_rev:
+        body["reviewed"] = True
     keep = {k: v for k, v in old.items() if k not in ("id", "created_at") and k not in body}
     saved = db.save_session({**keep, **body}, session_id=session_id)
+    if learned:
+        prefs = _watch_prefs()
+        prefs.setdefault("categories", {}).update(learned)   # os próximos treinos do relógio já chegam com o nome certo
+        db.kv_set(watch_labels.PREFS_KEY, json.dumps(prefs))
     from .credit import COVER_ASK
     if str(old.get("date"))[:10] != str(saved.get("date"))[:10]:
         # mudou o dia: o treino da agenda que ele fechava no dia antigo volta, e o do dia novo é avaliado
         schedule.reopen_for_session(old)
         if saved.get("schedule_id"):
             saved = db.save_session({**saved, "schedule_id": None}, session_id=session_id)
+        schedule.credit_session(saved, _profile())
+        saved = db.get_session(session_id) or saved
+    elif was_time_only and not saved.get("schedule_id") and any(it.get("sets") for it in saved.get("items") or []):
+        # o relógio só tinha o tempo: agora com os exercícios, o treino pode fechar o que estava na agenda
+        _reopen_cardio_closed_by(saved)
         schedule.credit_session(saved, _profile())
         saved = db.get_session(session_id) or saved
     else:

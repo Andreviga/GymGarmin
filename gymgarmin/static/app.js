@@ -216,6 +216,7 @@ async function viewHoje(weekDate) {
     weekDate ? Promise.resolve(null) : api("/api/readiness").catch(() => null), api("/api/garmin/status").catch(() => null),
     api("/api/profile").catch(() => null), weekDate ? Promise.resolve(null) : api("/api/steps").catch(() => null)]);
   const prt = weekDate || actAs() ? null : await api("/api/partners").catch(() => null);
+  const wib = weekDate || actAs() ? null : await api("/api/watch/inbox").catch(() => null);
 
   if (!sch.plan) {
     const incomplete = profileMissing(state.profile || await api("/api/profile").catch(() => ({}))).length > 0;
@@ -243,7 +244,7 @@ async function viewHoje(weekDate) {
   sch._sel = sel;
   const adjusted = plannedToday.some((e) => e.readiness_backup);
   view.innerHTML = `${weekDate ? pageHead(`Semana de ${ddmm(sch.week_start)}`) : pageHead("Hoje", true, sch.today)}
-  ${weekDate ? "" : firstStepsHtml(true) + statsHtml(rd, g, adjusted, plannedToday.length > 0) + (sch.pending || []).map(questionHtml).join("") + stepsAskHtml(stp, sch.today) + partnerCardsHtml(prt) + legacyHtml(sch) + focusChip(prof) + garminSyncCard(sch, gst) + installCardHtml("hoje")}${athleteHtml}
+  ${weekDate ? "" : firstStepsHtml(true) + statsHtml(rd, g, adjusted, plannedToday.length > 0) + (sch.pending || []).map(questionHtml).join("") + watchInboxHtml(wib) + stepsAskHtml(stp, sch.today) + partnerCardsHtml(prt) + legacyHtml(sch) + focusChip(prof) + garminSyncCard(sch, gst) + installCardHtml("hoje")}${athleteHtml}
   ${missed.length ? `<div class="rec alerta"><b>Treino perdido:</b> ${missed.map((e) => `${e.weekday} ${ddmm(e.date)} – ${esc(e.day_name)}`).join(", ")}.
      <div class="row gap wrap" style="margin-top:6px">${missed.map((e) => `<button class="btn sm" data-skip="${e.id}">Ajustar a semana (${e.weekday})</button>`).join("")}</div></div>` : ""}
   <section class="week">
@@ -492,6 +493,8 @@ function bindAgenda(sch) {
       }
       if (d.undo) { await api(`/api/schedule/${d.undo}/undo`, { method: "POST" }); toast("Ajuste desfeito"); return again(); }
       if (d.rundo) { await api(`/api/readiness/undo/${d.rundo}`, { method: "POST" }); toast("Treino original de volta"); return again(); }
+      if (d.wrev) { t.disabled = true; return openWatchCheck(+d.wrev).finally(() => { t.disabled = false; }); }
+      if (d.wok) { t.disabled = true; await api(`/api/watch/inbox/${d.wok}/ok`, { method: "POST" }); toast("Ok, fica como o relógio mandou"); return again(); }
       if (d.alt) return openAlternative(+d.alt, again);
       if (d.gen) return openAlternative(null, again);
       if (d.altundo) { t.disabled = true; const e = await api(`/api/alternative/undo/${d.altundo}`, { method: "POST" }); toast(`Treino original de volta${e.garmin_outdated ? ". Reenvie ao relógio para atualizar" : ""}`, 4000); return again(); }
@@ -1879,6 +1882,48 @@ async function viewTreinar(planId, idx) {
   renderSession();
 }
 
+// ---------------------------------------------------------------- treino do relógio: conferir exercício por exercício
+function watchInboxHtml(w) {
+  const list = (w && w.items) || []; if (!list.length) return "";
+  return list.map((x) => {
+    const when = fmtDate(x.date) + " " + String(x.date).slice(11, 16);
+    const bits = [x.guesses ? `${x.guesses} ${x.guesses === 1 ? "exercício com palpite" : "exercícios com palpite"} do relógio` : "",
+      x.unknown_sets ? `${x.unknown_sets} ${x.unknown_sets === 1 ? "série sem nome" : "séries sem nome"}` : "",
+      x.no_load ? `${x.no_load} ${x.no_load === 1 ? "série sem carga" : "séries sem carga"}` : ""].filter(Boolean);
+    const msg = x.time_only ? "O relógio gravou só o tempo, a FC e as calorias. Anote os exercícios para contar no músculo, na semana e na evolução de cargas."
+      : bits.length ? `Para conferir: ${bits.join(", ")}.` : "Confira nomes, repetições e cargas.";
+    return `<section class="card wbox"><div class="eyebrow">⌚ Chegou do ${esc(x.source)}</div>
+      <b>${esc(x.title)}</b> <span class="small muted">· ${esc(when)}${x.duration_min ? ` · ${x.duration_min} min` : ""}${x.sets ? ` · ${x.sets} séries` : ""}</span>
+      <p class="small" style="margin:6px 0 10px">${esc(msg)}</p>
+      <div class="row gap wrap"><button class="btn sm" data-wrev="${x.id}">${x.time_only ? "Anotar os exercícios" : "Conferir exercício por exercício"}</button>
+        <button class="act" data-wok="${x.id}">${x.time_only ? "Deixar só o tempo" : "Está tudo certo"}</button></div></section>`;
+  }).join("");
+}
+async function openWatchCheck(id) {
+  const cur = store("gg_session");
+  if (cur && (cur.items || []).length && cur.edit_id !== id && !confirm(`Você tem um treino aberto (“${cur.day_name || "Treino"}”). Trocar pela conferência do relógio? (o treino aberto é descartado)`)) return;
+  const d = await api(`/api/sessions/${id}/edit`);
+  state.session = d; store("gg_session", d);
+  if (location.hash !== "#treinar/editar") location.hash = "#treinar/editar"; else renderSession();
+}
+function watchHeadHtml(s) {
+  const w = s.watch || {};
+  const meas = [w.duration_min ? `${w.duration_min} min` : "", w.avg_hr ? `FC média ${Math.round(w.avg_hr)}` : "", w.kcal ? `${Math.round(w.kcal)} kcal` : ""].filter(Boolean).join(" · ");
+  if (w.time_only && !s.items.length) return `<div class="rec small" style="margin-top:10px"><b>⌚ O ${esc(w.source || "relógio")} gravou ${meas || "o treino"}, sem os exercícios.</b>
+    Anote o que você fez: o tempo, a FC e as calorias do relógio continuam valendo.
+    <div class="row gap wrap" style="margin-top:8px">${s.planned && s.planned.items.length && !s.planned_used ? `<button class="btn sm" id="w-plan">Preencher com o planejado (${esc(s.planned.name || "treino do dia")})</button>` : ""}</div></div>`;
+  const pick = s.items.filter((it) => it.need_pick).length, guess = s.items.filter((it) => it.watch_guess && !it.confirm_guess && it.exercise_id === it.orig_id).length;
+  return `<div class="rec small" style="margin-top:10px"><b>⌚ Treino do ${esc(w.source || "relógio")}${meas ? ` · ${meas}` : ""}</b><br>
+    Confira cada exercício: o nome, as repetições e a carga. Toque em 🔁 para trocar um exercício e em 🗑 para tirar o que não fez.
+    ${pick ? `<br><b>${pick} ${pick === 1 ? "bloco precisa" : "blocos precisam"} do nome do exercício.</b>` : ""}${guess ? `<br>${guess} ${guess === 1 ? "exercício é palpite" : "exercícios são palpites"} do relógio.` : ""}
+    <br><span class="muted">O que você trocar o app aprende: as próximas séries desse tipo já chegam com o nome certo.</span></div>`;
+}
+function swapItem(it, ex) {
+  it.exercise_id = ex.id; it.name = ex.name; it.need_pick = false; it.suggest = null; it.confirm_guess = false;
+  if (ex.images) it.images = ex.images; if (ex.timed !== undefined) it.timed = ex.timed; if (ex.limitation) it.limitation = ex.limitation;
+  it.pm = ex.primaryMuscles || it.pm || []; it.sm = ex.secondaryMuscles || it.sm || []; it.last = null; it.suggestion = null;
+}
+
 // ---------------------------------------------------------------- outra opção para hoje / gerar treino agora
 function altResultHtml(p, entryId) {
   const ch = (c) => c.type === "troca" ? `<b>${esc(c.from_name)}</b> → <b>${esc(c.to_name)}</b>: ${esc(c.why)}`
@@ -2053,7 +2098,7 @@ function renderSession() {
   const mainIt = s.items.filter((it) => phaseOf(it) === "principal");
   const doneN = mainIt.filter((it) => it.kind === "cardio" || it.endurance ? it.done : (it.sets || []).length && it.sets.every((x) => x.done)).length;
   const when = (() => { try { const d = new Date(s.date); return d.toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "2-digit" }) + " · " + d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }); } catch (_) { return ""; } })();
-  view.innerHTML = `<section class="today-card sess-head"><div class="eyebrow">${s.edit_id ? "Corrigindo treino salvo" : s.replace_id ? "Refazendo treino salvo" : "Treino em andamento"}</div>
+  view.innerHTML = `<section class="today-card sess-head"><div class="eyebrow">${s.watch_review ? "Conferindo treino do relógio" : s.edit_id ? "Corrigindo treino salvo" : s.replace_id ? "Refazendo treino salvo" : "Treino em andamento"}</div>
       <div class="tc-title">${esc(s.day_name || "Treino")}</div>
       <button class="btn block" id="to-focus" style="margin:2px 0 12px">▶ Treinar um exercício por vez</button>
       <div class="tc-chips"><span id="s-prog" class="${doneN && doneN === mainIt.length ? "ok" : ""}">${doneN} de ${mainIt.length} ${mainIt.length === 1 ? "exercício feito" : "exercícios feitos"}</span></div>
@@ -2061,8 +2106,9 @@ function renderSession() {
       <details class="small sub" style="margin-top:8px"><summary>Data e hora: ${esc(when)}</summary>
         <div class="field" style="margin:0 0 6px"><label for="s-date">Data e hora do treino</label><input type="datetime-local" id="s-date" value="${esc((s.date || "").slice(0, 16))}"></div></details>
       ${s.deload ? `<p class="small rec">Semana de deload: menos séries, carga −10%, RPE ~6.</p>` : ""}
+      ${s.watch_review ? watchHeadHtml(s) : ""}
       ${s.generated && s.alt ? `<details class="rec small" style="margin-top:10px"><summary><b>✨ Gerado: ${esc(s.alt.label.toLowerCase())}</b></summary><ul class="plain">${(s.alt.why || []).map((w) => `<li>${esc(w)}</li>`).join("")}</ul></details>` : ""}
-      ${s.edit_id ? `<div class="rec small" style="margin-top:10px"><b>Você está corrigindo um treino já registrado.</b> Mude repetições e cargas e toque em Salvar correção: o mesmo registro é atualizado (não cria outro).${(s.kept_items || []).length ? ` Ficam como estão: ${esc(s.kept_items.join(", "))}.` : ""}</div>` : partnerDraftHtml(s)}</section>
+      ${s.edit_id && !s.watch_review ? `<div class="rec small" style="margin-top:10px"><b>Você está corrigindo um treino já registrado.</b> Mude repetições e cargas e toque em Salvar correção: o mesmo registro é atualizado (não cria outro).${(s.kept_items || []).length ? ` Ficam como estão: ${esc(s.kept_items.join(", "))}.` : ""}</div>` : partnerDraftHtml(s)}</section>
     ${missingChipsHtml(s)}
     ${compactCard("preparo", "Aquecimento — elevar, ativar, potencializar")}
     ${idxs.filter(([it]) => phaseOf(it) === "principal").map(([it, i]) => sessionItemHtml(it, i)).join("")}
@@ -2070,7 +2116,7 @@ function renderSession() {
     ${compactCard("pos", "Pós-treino — alongamento")}
     <div class="card"><div class="row gap wrap"><button class="btn sm ghost" id="s-add">+ Adicionar exercício</button><button class="btn sm ghost" id="s-sug">✨ Sugerir exercício</button></div>
       <div class="field" style="margin-top:10px"><label>Como foi o treino?</label><textarea id="s-notes" placeholder="Sensações, dores, energia…">${esc(s.notes || "")}</textarea></div>
-      <button class="btn block" id="s-finish">${s.edit_id ? "Salvar correção" : s.replace_id ? "Salvar (substitui o registro anterior)" : "Finalizar e salvar"}</button>
+      <button class="btn block" id="s-finish">${s.watch_review ? "Salvar conferência" : s.edit_id ? "Salvar correção" : s.replace_id ? "Salvar (substitui o registro anterior)" : "Finalizar e salvar"}</button>
       <button class="act" id="s-cancel" style="margin-top:10px">${s.edit_id ? "Cancelar correção" : "Descartar treino"}</button></div>`;
   bindSession();
 }
@@ -2119,15 +2165,23 @@ function sessionItemHtml(it, i) {
       <button class="act drop-ex" data-dropitem="${i}" style="margin-top:8px" aria-label="Tirar ${esc(it.name)} do treino">🗑 Tirar do treino</button></div>`;
   }
   const timed = it.timed && it.sets.some((x) => x.duration_s);
-  return `<div class="card">${head}
+  const s0 = state.session || {};
+  const pickBox = it.need_pick ? `<div class="rec atencao small wpick"><b>⌚ O relógio não disse qual exercício foi.</b> Pelas séries abaixo, qual foi?
+      <div class="row gap wrap" style="margin-top:6px">${it.suggest ? `<button class="btn sm" data-pickto="${i}" data-pid="${esc(it.suggest.id)}" data-pname="${esc(it.suggest.name)}">Foi ${esc(it.suggest.name)}</button>` : ""}
+      <button class="btn sm ghost" data-swap="${i}">${it.suggest ? "Outro" : "Escolher o exercício"}</button></div>
+      ${it.sets.length > 1 ? `<div class="muted" style="margin-top:6px">Tem dois exercícios aqui? Toque em ✂ na série em que o outro começou.</div>` : ""}</div>`
+    : it.watch_guess && !it.confirm_guess && it.exercise_id === it.orig_id ? `<div class="rec small wguess">⌚ O relógio só disse “${esc(it.watch_guess)}”; o app chutou este exercício.
+      <div class="row gap wrap" style="margin-top:6px"><button class="btn sm" data-gok="${i}">✓ Está certo</button><button class="btn sm ghost" data-swap="${i}">Trocar</button></div></div>` : "";
+  return `<div class="card${it.need_pick ? " need-pick" : ""}">${head}${pickBox}
     <table class="set-table" style="margin-top:8px"><thead><tr><th>#</th><th>${timed ? "Tempo s" : "Reps"}</th><th>kg</th><th>RPE</th><th></th></tr></thead><tbody>
-    ${it.sets.map((x, j) => `<tr class="${x.done ? "done" : ""}"><td>${j + 1}</td>
+    ${it.sets.map((x, j) => `<tr class="${x.done ? "done" : ""}"><td>${j + 1}${it.need_pick && j > 0 ? ` <button class="mini" data-split="${i}:${j}" aria-label="Outro exercício começa na série ${j + 1}">✂</button>` : ""}</td>
       <td><input class="num" inputmode="numeric" data-s="${timed ? "duration_s" : "reps"}" data-i="${i}" data-j="${j}" value="${esc(timed ? x.duration_s ?? "" : x.reps ?? "")}"></td>
       <td><input class="num" inputmode="decimal" data-s="load_kg" data-i="${i}" data-j="${j}" value="${esc(x.load_kg ?? "")}"${x.partner_load != null ? ` placeholder="sua" aria-label="Sua carga (a do parceiro foi ${esc(x.partner_load)} kg)"` : ""}></td>
       <td><select class="num" data-s="rpe" data-i="${i}" data-j="${j}"><option value=""></option>${[6, 7, 8, 9, 10].map((r) => `<option ${+x.rpe === r ? "selected" : ""}>${r}</option>`).join("")}</select></td>
       <td><button class="check ${x.done ? "on" : ""}" data-done="${i}:${j}" aria-label="Série feita">✓</button></td></tr>`).join("")}
     </tbody></table>
     <div class="row gap wrap" style="margin-top:6px"><button class="btn sm ghost" data-addset="${i}">+ série</button><button class="btn sm ghost" data-rmset="${i}">− série</button>
+      ${s0.edit_id && !it.need_pick ? `<button class="btn sm ghost" data-swap="${i}">🔁 Trocar exercício</button>` : ""}
       <button class="act drop-ex" data-dropitem="${i}" aria-label="Tirar ${esc(it.name)} do treino">🗑 Tirar do treino</button></div></div>`;
 }
 
@@ -2197,6 +2251,19 @@ function bindSession() {
     if (t.dataset.addset) { const it = s.items[+t.dataset.addset]; const last = it.sets[it.sets.length - 1] || {}; it.sets.push({ ...last, done: !!(s.edit_id || s.replace_id || s.pulled) }); renderSession(); }
     if (t.dataset.rmset) { const it = s.items[+t.dataset.rmset]; it.sets.pop(); renderSession(); }
     if (t.dataset.dropitem && removeSessionItem(+t.dataset.dropitem)) return renderSession();
+    if (t.dataset.swap) { const it = s.items[+t.dataset.swap]; return pickExercise("strength", (ex) => { swapItem(it, ex); save(); renderSession(); }, { missing: s.missing }); }
+    if (t.dataset.pickto) { swapItem(s.items[+t.dataset.pickto], { id: t.dataset.pid, name: t.dataset.pname }); save(); return renderSession(); }
+    if (t.dataset.gok) { s.items[+t.dataset.gok].confirm_guess = true; save(); return renderSession(); }
+    if (t.dataset.split) {
+      const [i, j] = t.dataset.split.split(":").map(Number); const it = s.items[i];
+      const rest = it.sets.splice(j);
+      s.items.splice(i + 1, 0, { ...it, sets: rest, name: "Exercício seguinte: qual foi?", suggest: null, exercise_id: it.orig_id || it.exercise_id });
+      save(); return renderSession();
+    }
+    if (t.id === "w-plan" && s.planned) {
+      s.planned.items.forEach((p) => { const it = JSON.parse(JSON.stringify(p)); (it.sets || []).forEach((x) => { x.done = true; }); s.items.push(it); });
+      s.planned_used = true; save(); toast("Treino planejado preenchido: ajuste repetições e cargas do que você fez, e tire o que não fez", 6000); return renderSession();
+    }
     const mk = t.closest("[data-miss]");
     if (mk) addEx(mk.dataset.miss);
   };
@@ -2217,6 +2284,11 @@ async function finishSession() {
       if (s.view !== "lista") { s.view = "lista"; save(); renderSession(); }  // no modo "um exercício por vez" a pergunta fica na lista
       const box = $("[name=pmerge]"); if (box) box.scrollIntoView({ block: "center", behavior: "smooth" });
       return toast("Antes de salvar, responda aqui: é a mesma atividade que o seu relógio gravou?", 6500);
+    }
+    if (s.watch_review && !s.unpicked_ack) {
+      const n = s.items.filter((it) => it.need_pick && (it.sets || []).some((x) => x.done)).length;
+      if (n) { s.unpicked_ack = true; save(); const el = $(".need-pick"); if (el) el.scrollIntoView({ block: "center" });
+        return toast(`${n} ${n === 1 ? "bloco de séries ficou" : "blocos de séries ficaram"} sem o exercício: ${n === 1 ? "conta" : "contam"} só no total de séries da semana (não no músculo nem na evolução). Escolha o exercício, ou salve de novo para deixar assim.`, 9000); }
     }
     if ((s.edit_id || s.replace_id) && !s.unchecked_ack) {  // correção: linha preenchida sem ✓ seria descartada sem aviso
       const off = s.items.reduce((n, it) => n + (fxStrength(it) ? (it.sets || []).filter((x) => !x.done && (x.reps || x.duration_s)).length : 0), 0);
@@ -2245,7 +2317,7 @@ async function finishSession() {
         ? (it.done ? endPayload(it) : null)
         : it.kind === "cardio"
         ? (it.done ? { exercise_id: it.exercise_id, duration_min: it.duration_min, zone: it.zone, avg_hr: it.avg_hr } : null)
-        : { exercise_id: it.exercise_id, ...((it.plan && it.plan.deload) ? { deload: true } : {}), sets: it.sets.filter((x) => x.done).map(({ reps, load_kg, rpe, duration_s }) => ({ reps, load_kg, rpe, duration_s })) })
+        : { exercise_id: it.exercise_id, ...(it.orig_id ? { orig_id: it.orig_id } : {}), ...(it.confirm_guess ? { confirm_guess: true } : {}), ...((it.plan && it.plan.deload) ? { deload: true } : {}), sets: it.sets.filter((x) => x.done).map(({ reps, load_kg, rpe, duration_s }) => ({ reps, load_kg, rpe, duration_s })) })
         .filter((it) => it && (it.duration_min || (it.sets && it.sets.length))),
     };
     if (!payload.items.length) return toast("Nada para salvar ainda: marque pelo menos uma série ou um cardio como feito.", 5000);
@@ -2308,10 +2380,10 @@ async function saveOver(s, payload) {
   const id = s.edit_id || s.replace_id;
   const btn = $("#s-finish"); if (btn) btn.disabled = true;
   let saved;
-  try { saved = await api(`/api/sessions/${id}`, { method: "PUT", body: { ...payload, edit: true, ...(s.replace_id && s.with_partner ? { with_partner: s.with_partner } : {}) } }); }
+  try { saved = await api(`/api/sessions/${id}`, { method: "PUT", body: { ...payload, edit: true, ...(s.watch_review ? { watch_review: true } : {}), ...(s.replace_id && s.with_partner ? { with_partner: s.with_partner } : {}) } }); }
   catch (err) { if (btn) btn.disabled = false; return toast(err.message, 6000); }
   store("gg_session", null); state.session = null; stopTimer(); fxLeave();
-  view.innerHTML = `<section class="today-card saved-card"><div class="eyebrow">${s.edit_id ? "Correção salva ✓" : "Registro refeito ✓"}</div>
+  view.innerHTML = `<section class="today-card saved-card"><div class="eyebrow">${s.watch_review ? "Treino do relógio conferido ✓" : s.edit_id ? "Correção salva ✓" : "Registro refeito ✓"}</div>
     <div class="tc-title">${esc(saved.day_name || "Treino")}</div>
     <p class="small">O mesmo registro foi atualizado: continua um treino só no histórico, no placar e na semana.</p>
     ${savedListHtml(saved.summary)}
@@ -2813,7 +2885,7 @@ function renderFocus() {
       <p class="muted">${doneN} de ${order.length} exercícios · ${sets} séries feitas</p>
       ${s.edit_id ? "" : `<button class="btn ghost block" data-fx="sug" style="margin-bottom:10px">✨ Sugerir 1–2 exercícios extras</button>`}
       <div class="field"><label for="s-notes">Como foi o treino?</label><textarea id="s-notes" placeholder="Sensações, dores, energia…">${esc(s.notes || "")}</textarea></div>
-      <button class="btn block" id="s-finish">${s.edit_id ? "Salvar correção" : s.replace_id ? "Salvar (substitui o registro anterior)" : "Finalizar e salvar"}</button>
+      <button class="btn block" id="s-finish">${s.watch_review ? "Salvar conferência" : s.edit_id ? "Salvar correção" : s.replace_id ? "Salvar (substitui o registro anterior)" : "Finalizar e salvar"}</button>
       <button class="act" data-fx="list" style="margin-top:10px">Revisar na lista</button> <button class="act" id="s-cancel" style="margin-top:10px">${s.edit_id ? "Cancelar correção" : "Descartar treino"}</button></section>`;
   } else {
     const i = order[pos]; const p = it.plan || {};

@@ -928,3 +928,9 @@ body:has(.wz) { padding-bottom: 0; }
 .sug-row { display: flex; gap: 10px; align-items: center; padding: 8px 0; }
 .sug-list .sug-row + .sug-row { border-top: 1px solid var(--line); }
 .next-sug { border: 1px dashed var(--brand); }
+
+/* treino do relógio para conferir */
+.wbox { border-left: 4px solid var(--brand); }
+.card.need-pick { border: 1px solid var(--warn); }
+.wpick, .wguess { margin-top: 8px; }
+button.mini { border: 1px solid var(--line); background: var(--card); color: var(--ink); border-radius: 8px; padding: 0 6px; min-height: 26px; font-size: 13px; }

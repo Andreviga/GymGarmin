@@ -229,7 +229,7 @@ def save_days(days: list[dict], source: str) -> list[str]:
 
 
 # --------------------------------------------------------------- treinos
-def workout_session(w: dict, source: str, hr_max: int | None) -> dict | None:
+def workout_session(w: dict, source: str, hr_max: int | None, cat_prefs: dict | None = None) -> dict | None:
     start = parse_dt(w.get("start") or w.get("start_date") or w.get("date"))
     dur = minutes(w.get("duration_min") if w.get("duration_min") is not None else w.get("duration"))
     end = parse_dt(w.get("end")) if start and w.get("end") else None
@@ -258,11 +258,20 @@ def workout_session(w: dict, source: str, hr_max: int | None) -> dict | None:
                 item[k] = act[k_src]
     if not item:
         return None
+    sets_items = []
+    if gtype == "strength_training" and isinstance(w.get("segments"), list):
+        # relógio que grava as séries no Health Connect (Samsung, Pixel Watch…): vira treino com séries para conferir
+        from . import watch_review
+        sets_items = watch_review.segment_items(w["segments"][:300], cat_prefs)
     ext = str(w.get("id") or "") or f"{start.isoformat(timespec='minutes')}|{gtype}"
     summ = {k: act.get(src) for src, k in (("averageHR", "avg_hr"), ("maxHR", "max_hr"), ("calories", "kcal")) if act.get(src)}
     summ["duration_min"] = round(dur, 1)
+    if sets_items:
+        for k in ("avg_hr", "max_hr", "kcal"):
+            if item.get(k) and not summ.get(k):
+                summ[k] = item[k]
     return {"date": start.isoformat(timespec="seconds"), "source": source, "ext_id": f"{source}:{ext}",
-            "notes": workout_title(w, item, gtype), "items": [item],
+            "notes": workout_title(w, item, gtype), "items": sets_items or [item],
             "duration_min": round(dur, 1), "garmin_summary": summ}
 
 
@@ -301,14 +310,15 @@ def forget_workout(ext_id: str | None) -> None:
 left_out: list[str] = []   # dias dos treinos que não couberam no último envio (lido por ingest() logo em seguida)
 
 
-def save_workouts(workouts: list[dict], source: str, hr_max: int | None, merge=None) -> tuple[list[dict], int]:
+def save_workouts(workouts: list[dict], source: str, hr_max: int | None, merge=None,
+                  cat_prefs: dict | None = None) -> tuple[list[dict], int]:
     since = (clock.today() - timedelta(days=60)).isoformat()
     known = {s.get("ext_id") for s in db.list_sessions(since=since, limit=2000) if s.get("ext_id")}
     known |= set(deleted_ids())  # treino do celular que a pessoa apagou no app não volta no próximo envio
     imported, skipped = [], 0
     fresh = []
     for w in workouts[:MAX_SCAN]:
-        s = workout_session(w, source, hr_max)
+        s = workout_session(w, source, hr_max, cat_prefs)
         if not s:
             skipped += 1
         elif s["ext_id"] not in known:
@@ -351,7 +361,7 @@ def _diag(d) -> dict | None:
     return out
 
 
-def ingest(payload: dict, hr_max: int | None, merge=None) -> dict:
+def ingest(payload: dict, hr_max: int | None, merge=None, cat_prefs: dict | None = None) -> dict:
     if not isinstance(payload, dict):
         raise ValueError("Formato inválido: envie um objeto JSON.")
     source = str(payload.get("source") or "apple").lower()
@@ -365,7 +375,7 @@ def ingest(payload: dict, hr_max: int | None, merge=None) -> dict:
         workouts = [workouts]
     workouts = [w for w in workouts if isinstance(w, dict)]
     saved_days = save_days(days, source)
-    imported, skipped = save_workouts(workouts, source, hr_max, merge)
+    imported, skipped = save_workouts(workouts, source, hr_max, merge, cat_prefs)
     last = {"at": clock.now().isoformat(timespec="seconds"), "source": source, "days": saved_days,
             "workouts": len(imported), "skipped": skipped, "sent": len(workouts), "left_out": len(left_out),
             "diag": _diag(payload.get("diag")),

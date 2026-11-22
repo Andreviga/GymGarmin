@@ -5,6 +5,7 @@ import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.permission.HealthPermission
 import androidx.health.connect.client.records.ActiveCaloriesBurnedRecord
 import androidx.health.connect.client.records.DistanceRecord
+import androidx.health.connect.client.records.ExerciseSegment
 import androidx.health.connect.client.records.ExerciseSessionRecord
 import androidx.health.connect.client.records.HeartRateRecord
 import androidx.health.connect.client.records.HeartRateVariabilityRmssdRecord
@@ -98,8 +99,58 @@ class HealthReader(context: Context) {
             else -> "OTHER_WORKOUT_$t"
         }
 
-        const val APP_VERSION = "1.3.1"
+        const val APP_VERSION = "1.3.2"
     }
+
+    /** Tipo do segmento (série) do Health Connect → nome que o HAX entende. */
+    private fun segmentName(t: Int): String? = when (t) {
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_ARM_CURL -> "ARM_CURL"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_BACK_EXTENSION -> "BACK_EXTENSION"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_BARBELL_SHOULDER_PRESS -> "BARBELL_SHOULDER_PRESS"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_BENCH_PRESS -> "BENCH_PRESS"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_BENCH_SIT_UP -> "BENCH_SIT_UP"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_CRUNCH -> "CRUNCH"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_DEADLIFT -> "DEADLIFT"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_DOUBLE_ARM_TRICEPS_EXTENSION -> "DOUBLE_ARM_TRICEPS_EXTENSION"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_DUMBBELL_CURL_LEFT_ARM -> "DUMBBELL_CURL_LEFT_ARM"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_DUMBBELL_CURL_RIGHT_ARM -> "DUMBBELL_CURL_RIGHT_ARM"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_DUMBBELL_FRONT_RAISE -> "DUMBBELL_FRONT_RAISE"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_DUMBBELL_LATERAL_RAISE -> "DUMBBELL_LATERAL_RAISE"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_DUMBBELL_ROW -> "DUMBBELL_ROW"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_DUMBBELL_TRICEPS_EXTENSION_LEFT_ARM -> "DUMBBELL_TRICEPS_EXTENSION_LEFT_ARM"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_DUMBBELL_TRICEPS_EXTENSION_RIGHT_ARM -> "DUMBBELL_TRICEPS_EXTENSION_RIGHT_ARM"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_DUMBBELL_TRICEPS_EXTENSION_TWO_ARM -> "DUMBBELL_TRICEPS_EXTENSION_TWO_ARM"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_FRONT_RAISE -> "FRONT_RAISE"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_HIP_THRUST -> "HIP_THRUST"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_KETTLEBELL_SWING -> "KETTLEBELL_SWING"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_LATERAL_RAISE -> "LATERAL_RAISE"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_LAT_PULL_DOWN -> "LAT_PULL_DOWN"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_LEG_CURL -> "LEG_CURL"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_LEG_EXTENSION -> "LEG_EXTENSION"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_LEG_PRESS -> "LEG_PRESS"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_LEG_RAISE -> "LEG_RAISE"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_LUNGE -> "LUNGE"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_PLANK -> "PLANK"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_PULL_UP -> "PULL_UP"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_SHOULDER_PRESS -> "SHOULDER_PRESS"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_SINGLE_ARM_TRICEPS_EXTENSION -> "SINGLE_ARM_TRICEPS_EXTENSION"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_SIT_UP -> "SIT_UP"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_SQUAT -> "SQUAT"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_WEIGHTLIFTING -> "WEIGHTLIFTING"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_OTHER_WORKOUT -> "OTHER_WORKOUT"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_UNKNOWN -> "UNKNOWN"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_REST -> "REST"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_PAUSE -> "PAUSE"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_RUNNING -> "RUNNING"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_RUNNING_TREADMILL -> "RUNNING_TREADMILL"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_BIKING -> "BIKING"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_BIKING_STATIONARY -> "BIKING_STATIONARY"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_ELLIPTICAL -> "ELLIPTICAL"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_ROWING_MACHINE -> "ROWING_MACHINE"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_JUMP_ROPE -> "JUMP_ROPE"
+            ExerciseSegment.EXERCISE_SEGMENT_TYPE_BURPEE -> "BURPEE"
+            else -> null
+        }
 
     suspend fun grantedAll(): Boolean =
         client.permissionController.getGrantedPermissions().containsAll(PERMISSIONS - HealthPermission.PERMISSION_READ_HEALTH_DATA_IN_BACKGROUND)
@@ -191,6 +242,7 @@ class HealthReader(context: Context) {
         val origins = sortedSetOf<String>()
 
         val workouts = JSONArray()
+        var segTotal = 0
         safe {
             for (s in readAll(ExerciseSessionRecord::class, fromWorkouts, now)) {
                 val type = typeName(s.exerciseType) ?: "OTHER_WORKOUT"
@@ -203,6 +255,17 @@ class HealthReader(context: Context) {
                     .put("start", s.startTime.atOffset(s.startZoneOffset ?: ZoneOffset.UTC).toString())
                     .put("end", s.endTime.atOffset(s.endZoneOffset ?: ZoneOffset.UTC).toString())
                     .put("duration_min", Duration.between(s.startTime, s.endTime).seconds / 60.0)
+                // séries que o relógio gravou (Samsung, Pixel Watch e outros): um segmento por série, com repetições
+                if (s.segments.isNotEmpty()) {
+                    val segs = JSONArray()
+                    for (sg in s.segments.take(300)) {
+                        val name = segmentName(sg.segmentType) ?: continue
+                        segs.put(JSONObject().put("type", name).put("reps", sg.repetitions)
+                            .put("start", sg.startTime.atOffset(s.startZoneOffset ?: ZoneOffset.UTC).toLocalDateTime().toString())
+                            .put("end", sg.endTime.atOffset(s.startZoneOffset ?: ZoneOffset.UTC).toLocalDateTime().toString()))
+                    }
+                    if (segs.length() > 0) { w.put("segments", segs); segTotal += segs.length() }
+                }
                 val range = TimeRangeFilter.between(s.startTime, s.endTime)
                 safe {
                     val a = client.aggregate(AggregateRequest(setOf(HeartRateRecord.BPM_AVG, HeartRateRecord.BPM_MAX), range))
@@ -222,6 +285,7 @@ class HealthReader(context: Context) {
             }
         }
         diag.put("exercise_total", workouts.length())
+        diag.put("segments_total", segTotal)
         diag.put("exercise_types", JSONObject(typeCount as Map<*, *>))
         diag.put("exercise_apps", JSONArray(origins.toList()))
         return JSONObject()
