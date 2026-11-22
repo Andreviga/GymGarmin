@@ -114,6 +114,40 @@ def fetch(api, day: date, known: dict | None = None) -> dict:
     return out
 
 
+def baseline(days: dict[str, dict], day: date) -> dict:
+    """Sono e VFC da última semana contra o normal da própria pessoa (Plews 2012; Vesterinen 2016).
+
+    VFC: média de ln(RMSSD) dos últimos 7 dias × média ± 0,5 desvio dos 60 dias anteriores. Só vale com 4+ medidas na
+    semana e 14+ na base (menos que isso é ruído). Sono: média de horas dos últimos 7 dias (3+ noites)."""
+    import math
+
+    def get(i):
+        return days.get((day - timedelta(days=i)).isoformat()) or {}
+
+    def hrv(i):
+        v = (get(i).get("hrv") or {}).get("last_night")
+        try:
+            v = float(v)
+        except (TypeError, ValueError):
+            return None
+        return math.log(v) if v > 0 else None
+
+    week = [x for x in (hrv(i) for i in range(0, 7)) if x is not None]
+    base = [x for x in (hrv(i) for i in range(7, 67)) if x is not None]
+    out: dict = {}
+    if len(week) >= 4 and len(base) >= 14:
+        mb = sum(base) / len(base)
+        sd = math.sqrt(sum((x - mb) ** 2 for x in base) / (len(base) - 1)) or 0.0001
+        m7 = sum(week) / len(week)
+        out["hrv_band"] = "baixa" if m7 < mb - 0.5 * sd else "alta" if m7 > mb + 0.5 * sd else "normal"
+        out["hrv_z"] = round((m7 - mb) / sd, 2)
+    sl = [float((get(i).get("sleep") or {}).get("duration_h") or 0) for i in range(0, 7)]
+    sl = [x for x in sl if x >= 1]
+    if len(sl) >= 3:
+        out["sleep_avg7"] = round(sum(sl) / len(sl), 2)
+    return out
+
+
 def score(data: dict, form: float | None = None) -> dict:
     """Nota 0–100, nível, ação e motivos."""
     reasons = []
@@ -155,6 +189,17 @@ def score(data: dict, form: float | None = None) -> dict:
     if base is None:
         reasons.append("sem sono do relógio hoje: nota só pela frequência cardíaca de repouso")
     s = base if base is not None else 70.0
+    # a semana contra o seu próprio normal (não o de outra pessoa): pesa menos que o dia, mas não some
+    if data.get("hrv_band") == "baixa" and data.get("hrv_status") not in ("LOW", "POOR"):
+        s -= 10
+        reasons.append("variabilidade cardíaca da semana abaixo do seu normal")
+    sa = data.get("sleep_avg7")
+    if sa is not None and sa < 6:
+        s -= 8
+        reasons.append(f"média de sono de {sa:.1f} h nos últimos 7 dias".replace(".", ","))
+    elif sa is not None and sa < 6.5:
+        s -= 4
+        reasons.append(f"média de sono de {sa:.1f} h na semana".replace(".", ","))
     if rd is not None and rd >= 5:  # FC de repouso acima da base da própria pessoa (dados de saúde do relógio)
         s -= 15 if rd >= 8 else 8
         reasons.append(f"FC de repouso +{rd:.0f} bpm acima do seu normal")

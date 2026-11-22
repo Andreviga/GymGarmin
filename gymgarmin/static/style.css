@@ -939,3 +939,11 @@ button.mini { border: 1px solid var(--line); background: var(--card); color: var
 .pq { margin: 10px 0; }
 .pq > label { display: block; font-weight: 600; margin-bottom: 6px; color: var(--ink); }
 .chip.pc.on { border-color: var(--brand); background: var(--brand); color: var(--brand-ink); }
+
+/* nota de esforço, dados e calor */
+.effort-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 6px; }
+.chip.eff { display: flex; flex-direction: column; align-items: flex-start; border-radius: 12px; text-align: left; }
+.chip.eff b { font-size: 18px; }
+.chip.eff span { font-size: 12px; opacity: .8; }
+.wx-moderado, .wx-alto { border-left-color: var(--warn); }
+.wx-perigo { border-left-color: var(--bad); }

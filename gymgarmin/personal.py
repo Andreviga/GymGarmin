@@ -87,6 +87,8 @@ QUESTIONS = [
         {"id": "stress", "type": "single", "label": "Nas últimas 2 semanas, quanto se sentiu sobrecarregado(a)?", "options": [
             ["nada", "Nada"], ["pouco", "Pouco"], ["moderado", "Moderado"], ["muito", "Muito"]]},
         {"id": "caregiver", "type": "single", "label": "Cuida de criança pequena ou de familiar?", "options": [["nao", "Não"], ["sim", "Sim"]]},
+        {"id": "city", "type": "text", "label": "Cidade onde treina ao ar livre (para avisar do calor e sugerir o melhor horário):",
+         "placeholder": "ex.: Belo Horizonte"},
     ]},
 ]
 

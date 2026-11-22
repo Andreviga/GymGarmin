@@ -247,6 +247,7 @@ async function viewHoje(weekDate) {
   ${weekDate ? "" : firstStepsHtml(true) + statsHtml(rd, g, adjusted, plannedToday.length > 0) + (sch.pending || []).map(questionHtml).join("") + watchInboxHtml(wib) + stepsAskHtml(stp, sch.today) + partnerCardsHtml(prt) + legacyHtml(sch) + focusChip(prof) + garminSyncCard(sch, gst) + installCardHtml("hoje")}${athleteHtml}
   ${missed.length ? `<div class="rec alerta"><b>Treino perdido:</b> ${missed.map((e) => `${e.weekday} ${ddmm(e.date)} – ${esc(e.day_name)}`).join(", ")}.
      <div class="row gap wrap" style="margin-top:6px">${missed.map((e) => `<button class="btn sm" data-skip="${e.id}">Ajustar a semana (${e.weekday})</button>`).join("")}</div></div>` : ""}
+  ${weekDate ? "" : `<div id="hx"></div>`}
   ${!weekDate && sch.comeback ? `<section class="card wbox"><div class="eyebrow">Que bom te ver</div><b>${sch.comeback.days} dias sem treinar — tudo bem, acontece.</b>
     <p class="small" style="margin:6px 0 10px">Para voltar sem sofrer: um treino curto de 25 min hoje. Uma série por exercício com esforço já mantém força e músculo, e voltar logo é o que mais segura o hábito.</p>
     <button class="btn sm" data-comeback="1">Voltar com 25 min</button></section>` : ""}
@@ -273,6 +274,7 @@ async function viewHoje(weekDate) {
     <button class="btn ghost block" id="rebuild">Refazer a semana pela planilha</button></div></details>`;
   sch._rd = rd;
   bindAgenda(sch);
+  if (!weekDate) hojeExtras(sch).catch(() => {});
 }
 
 // o que fica faltando na semana, por músculo, mesmo com os treinos que ainda estão na agenda
@@ -1887,6 +1889,56 @@ async function viewTreinar(planId, idx) {
   renderSession();
 }
 
+// ---------------------------------------------------------------- nota de esforço, dados que ajustam o plano e calor
+const EFFORT_TXT = ["Nada", "Muito leve", "Leve", "Moderado", "Um pouco puxado", "Puxado", "Puxado+", "Muito puxado", "Muito puxado+", "Quase máximo", "Máximo"];
+function askEffort(id) {
+  if (!$("#modal").hidden) return;  // outra janela aberta (ex.: pergunta da agenda): não empilha
+  const body = openModal(`<h2>Quão puxado foi o treino?</h2><p class="small muted">De 0 a 10, o treino inteiro. Com essa nota o app mede a carga da semana e percebe quando você precisa de uma semana mais leve.</p>
+    <div class="effort-grid">${EFFORT_TXT.map((t, k) => `<button class="chip eff" data-eff="${k}"><b>${k}</b><span>${t}</span></button>`).join("")}</div>
+    <button class="act" id="eff-skip" style="margin-top:10px">Agora não</button>`);
+  body.onclick = async (e) => {
+    const t = e.target.closest("button"); if (!t) return;
+    if (t.id === "eff-skip") return closeModal();
+    if (t.dataset.eff !== undefined) {
+      t.disabled = true;
+      try { await api(`/api/sessions/${id}`, { method: "PUT", body: { srpe: +t.dataset.eff } }); closeModal(); toast("Anotado ✔"); }
+      catch (err) { t.disabled = false; toast(err.message, 5000); }
+    }
+  };
+}
+async function hojeExtras(sch) {
+  const box = $("#hx"); if (!box) return;
+  const outdoor = sch.entries.some((e) => e.date === sch.today && e.status === "planejado" && (e.items || []).some((it) => it.endurance
+    && ["corrida", "ciclismo", "caminhada", "trilha"].includes(it.endurance.sport) && !["esteira", "indoor", "rolo", "piscina"].includes(it.endurance.env)));
+  const [ad, wx] = await Promise.all([api("/api/adaptive").catch(() => null), outdoor ? api("/api/weather/today").catch(() => null) : Promise.resolve(null)]);
+  let html = "";
+  const w = wx && wx.advice;
+  if (w && w.show) {
+    const at = w.at || w.worst;
+    html += `<section class="card wbox wx-${esc(w.level)}"><div class="eyebrow">🌡️ Calor hoje${w.city ? ` · ${esc(w.city)}` : ""}</div>
+      <b>${w.at ? `No seu horário (${w.at.hour}h)` : `No pico (${w.worst.hour}h)`}: ${at.temp.toFixed(0)}°C, umidade ${at.rh}% · índice de calor ${at.wbgt.toFixed(0)}</b>
+      <p class="small" style="margin:6px 0 0">${esc(w.text)} Melhor horário hoje: <b>${w.best.hour}h</b> (${w.best.temp.toFixed(0)}°C).</p></section>`;
+  }
+  for (const p of (ad && ad.items) || []) {
+    html += `<section class="card wbox ad-card"><div class="eyebrow">📈 Pelos seus dados</div><b>${esc(p.title)}</b>
+      <ul class="plain small" style="margin:6px 0 8px">${(p.why || []).map((x) => `<li>${esc(x)}</li>`).join("")}</ul>
+      <div class="row gap wrap"><button class="btn sm" data-adapply="${esc(p.kind)}">${esc(p.action)}</button><button class="act" data-addismiss="${esc(p.kind)}">Agora não</button></div></section>`;
+  }
+  box.innerHTML = html;
+  box.onclick = async (e) => {
+    const t = e.target.closest("button"); if (!t) return;
+    try {
+      if (t.dataset.adapply) {
+        t.disabled = true;
+        const r = await api("/api/adaptive/apply", { method: "POST", body: { kind: t.dataset.adapply } });
+        toast(t.dataset.adapply === "deload" ? `Semana leve aplicada${r.changed.length ? `: ${r.changed.join(", ")}` : ""}. Dá para desfazer em cada dia.` : `Feito: ${r.changed.join("; ") || "sem mudança"}. Vale a partir da próxima semana.`, 6000);
+        return viewHoje();
+      }
+      if (t.dataset.addismiss) { await api("/api/adaptive/dismiss", { method: "POST", body: { kind: t.dataset.addismiss } }); t.closest(".card").remove(); }
+    } catch (err) { t.disabled = false; toast(err.message, 5000); }
+  };
+}
+
 // ---------------------------------------------------------------- personalização detalhada (saúde, fase, corpo, corrida, rotina)
 function persSummary(p) {
   const a = p.personal || {};
@@ -1910,6 +1962,7 @@ function persForm(p) {
     if (q.type === "multi") return `<div class="pq"><label>${esc(q.label)}</label><div class="chips">${q.options.map(([k, t]) => `<button type="button" class="chip pc ${(v || []).includes(k) ? "on" : ""}" data-pm="${q.id}" data-pv="${k}" aria-pressed="${(v || []).includes(k)}">${esc(t)}</button>`).join("")}</div></div>`;
     if (q.type === "single") return `<div class="pq"><label>${esc(q.label)}</label><div class="chips">${q.options.map(([k, t]) => `<button type="button" class="chip pc ${v === k ? "on" : ""}" data-ps="${q.id}" data-pv="${k}" aria-pressed="${v === k}">${esc(t)}</button>`).join("")}</div></div>`;
     if (q.type === "number") return `<div class="pq field"><label>${esc(q.label)}</label><input type="number" inputmode="numeric" data-pn="${q.id}" value="${esc(v ?? "")}" min="${q.min ?? 0}" max="${q.max ?? 999}"></div>`;
+    if (q.type === "text") return `<div class="pq field"><label>${esc(q.label)}</label><input data-ptx="${q.id}" value="${esc(v ?? "")}" placeholder="${esc(q.placeholder || "")}" maxlength="60"></div>`;
     if (q.type === "exercises") return `<div class="pq"><label>${esc(q.label)}</label><div class="chips">${(v || []).map((id) => `<button type="button" class="chip pc on" data-pxdel="${esc(id)}">${esc(exName(id))} ✕</button>`).join("")}<button type="button" class="chip" data-pxadd="${q.id}">+ exercício</button></div></div>`;
     return "";
   };
@@ -1929,6 +1982,7 @@ function persForm(p) {
     if (d.pxadd) return pickExercise(null, (ex) => { a.dislikes = [...new Set([...(a.dislikes || []), ex.id])]; a._names = { ...(a._names || {}), [ex.id]: ex.name }; closeModal(); render(); });
     if (t.id === "pers-save" || t.id === "pers-regen") {
       $$("[data-pn]", box).forEach((i) => { a[i.dataset.pn] = i.value === "" ? null : +i.value; });
+      $$("[data-ptx]", box).forEach((i) => { a[i.dataset.ptx] = i.value.trim() || null; });
       t.disabled = true;
       try {
         state.profile = await api("/api/profile", { method: "PUT", body: { personal: a } });
@@ -1939,7 +1993,7 @@ function persForm(p) {
       } catch (err) { toast(err.message, 5000); } finally { t.disabled = false; }
     }
   };
-  box.oninput = (e) => { const i = e.target; if (i.dataset.pn) a[i.dataset.pn] = i.value === "" ? null : +i.value; };
+  box.oninput = (e) => { const i = e.target; if (i.dataset.pn) a[i.dataset.pn] = i.value === "" ? null : +i.value; if (i.dataset.ptx) a[i.dataset.ptx] = i.value.trim() || null; };
 }
 
 // ---------------------------------------------------------------- treino do relógio: conferir exercício por exercício
@@ -2415,6 +2469,7 @@ async function finishSession() {
       location.hash = "#hoje"; return;
     }
     store("gg_session", null); state.session = null; stopTimer(); fxLeave();
+    if (saved && saved.id) setTimeout(() => askEffort(saved.id), 700);
     const prs = (saved && saved.prs) || [];
     const prTxt = prs.length ? `🏆 Recorde em ${prs.map((p) => `${p.name} (${prText(p)})`).join(", ")}` : "";
     const cr = saved && saved.credit;
@@ -2446,6 +2501,7 @@ async function saveOver(s, payload) {
   try { saved = await api(`/api/sessions/${id}`, { method: "PUT", body: { ...payload, edit: true, ...(s.watch_review ? { watch_review: true } : {}), ...(s.replace_id && s.with_partner ? { with_partner: s.with_partner } : {}) } }); }
   catch (err) { if (btn) btn.disabled = false; return toast(err.message, 6000); }
   store("gg_session", null); state.session = null; stopTimer(); fxLeave();
+  if (s.watch_review && saved && saved.id && saved.srpe == null) setTimeout(() => askEffort(saved.id), 700);
   view.innerHTML = `<section class="today-card saved-card"><div class="eyebrow">${s.watch_review ? "Treino do relógio conferido ✓" : s.edit_id ? "Correção salva ✓" : "Registro refeito ✓"}</div>
     <div class="tc-title">${esc(saved.day_name || "Treino")}</div>
     <p class="small">O mesmo registro foi atualizado: continua um treino só no histórico, no placar e na semana.</p>

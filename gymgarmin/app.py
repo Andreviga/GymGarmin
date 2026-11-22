@@ -16,9 +16,9 @@ from fastapi.staticfiles import StaticFiles
 
 from datetime import date, timedelta
 
-from . import alternative, auth, coach, focus, gallery, ingest, my_gym, partners, training_rules
+from . import adaptive, alternative, auth, coach, focus, gallery, ingest, my_gym, partners, training_rules
 from . import watch_review as wrv
-from . import personal
+from . import personal, weather
 from . import (analysis, calibration, catalog, clock, db, dedupe, health, endurance, garmin_export, garmin_sync, generator, history, limitations,
                load, plans_io, progression, readiness, schedule, sports, steps, templates, watch_labels)
 from .muscles import EQUIPMENT_PT, HR_ZONES, MUSCLES, hr_max, zone_bpm
@@ -1446,6 +1446,15 @@ def put_session(session_id: int, body: dict = Body(...)):
     if not old:
         raise HTTPException(404, "Sessão não encontrada")
     body = dict(body)
+    if set(body) == {"srpe"}:
+        # só a nota de esforço depois do treino (0–10): não mexe em mais nada
+        try:
+            v = int(body["srpe"])
+        except (TypeError, ValueError):
+            raise HTTPException(400, "Nota de 0 a 10") from None
+        if not 0 <= v <= 10:
+            raise HTTPException(400, "Nota de 0 a 10")
+        return db.save_session({**{k: x for k, x in old.items() if k not in ("id", "created_at")}, "srpe": v}, session_id=session_id)
     for k in ("id", "created_at", "client_id", "merge_into", "no_merge", "allow_repeat", "time_set", "merged", "garmin_activity_id",
               "ext_id", "source", "garmin_summary"):
         body.pop(k, None)   # vínculo com o relógio, origem e identidade do treino não mudam numa correção
@@ -2316,7 +2325,8 @@ def _readiness_view(day: date) -> dict | None:
     if not raw:
         return None
     data = json.loads(raw)
-    hd = _health_days(day, 36)
+    hd = _health_days(day, 67)
+    data.update(readiness.baseline(hd, day))   # a semana contra o normal da própria pessoa
     night = None
     if hd:
         hr = health.report(hd, None, {}, _profile(), day)
@@ -2734,6 +2744,79 @@ def suggest_next(body: dict = Body(...)):
             sug["item"].update(pm=ex.get("primaryMuscles") or [], sm=ex.get("secondaryMuscles") or [])
     res["suggestions"] = [x for x in res["suggestions"] if x.get("item")]
     return res
+
+
+# ------------------------------------------- treino que aprende com o histórico ----
+
+ADAPTIVE_KEY = "adaptive_state"
+
+
+def _adaptive_state() -> dict:
+    return adaptive.load_state(db.kv_get(ADAPTIVE_KEY))
+
+
+@app.get("/api/adaptive")
+def adaptive_get():
+    today = clock.today()
+    prof = _profile()
+    plan = schedule.schedule_plan(prof)
+    sessions = db.list_sessions(since=(today - timedelta(days=adaptive.WINDOW_DAYS + 7)).isoformat(), limit=600)
+    hb = readiness.baseline(_health_days(today, 67), today)
+    res = adaptive.proposals(plan, sessions, today, hb, _adaptive_state())
+    return {"items": res["items"], "srpe": res.get("srpe"), "health": hb,
+            "muscles": {m: {"status": v["status"], "pt": v["pt"], "lifts": v["lifts"]} for m, v in (res.get("muscles") or {}).items()}}
+
+
+@app.post("/api/adaptive/apply")
+def adaptive_apply(body: dict = Body(...)):
+    kind = body.get("kind")
+    today = clock.today()
+    st = _adaptive_state()
+    cur = adaptive_get()
+    prop = next((p for p in cur["items"] if p["kind"] == kind), None)
+    if not prop:
+        raise HTTPException(400, "Essa sugestão não vale mais (os dados mudaram)")
+    changed: list[str] = []
+    if kind == "deload":
+        anchors = sports.anchors_of(_profile())
+        end = schedule.week_start(today) + timedelta(days=6)
+        for e in db.list_schedule(today.isoformat(), end.isoformat()):
+            new = readiness.adjust_entry(e, "trocar", anchors, force=True)
+            if new:
+                new.setdefault("changes", []).append("Semana leve pelos seus dados")
+                db.save_entry(new)
+                changed.append(e.get("day_name"))
+        st.setdefault("snooze", {})["deload"] = (today + timedelta(days=10)).isoformat()
+    else:
+        plan = schedule.schedule_plan(_profile())
+        changed = adaptive.apply_volume(plan, prop["muscles"], 1 if kind == "volume_up" else -1)
+        if changed:
+            gen = plan.setdefault("generator", {})
+            gen.setdefault("adaptive_log", []).append({"date": today.isoformat(), "kind": kind, "changes": changed})
+            db.update_plan(plan["id"], plan)
+        st["last_volume"] = today.isoformat()
+    db.kv_set(ADAPTIVE_KEY, json.dumps(st))
+    return {"ok": True, "changed": changed}
+
+
+@app.get("/api/weather/today")
+def weather_today():
+    """Calor do dia para quem treina ao ar livre (cidade informada no perfil detalhado)."""
+    a = personal.answers(_profile())
+    city = str(a.get("city") or "").strip()
+    if not city:
+        return {"advice": None}
+    fc = weather.forecast(city[:60], clock.today(), db.kv_get, db.kv_set, clock.now())
+    return {"advice": weather.advice(fc, a.get("run_time"))}
+
+
+@app.post("/api/adaptive/dismiss")
+def adaptive_dismiss(body: dict = Body(...)):
+    kind = "deload" if body.get("kind") == "deload" else "volume"
+    st = _adaptive_state()
+    st.setdefault("snooze", {})[kind] = (clock.today() + timedelta(days=7)).isoformat()
+    db.kv_set(ADAPTIVE_KEY, json.dumps(st))
+    return {"ok": True}
 
 
 # ----------------------------------------------------- gerador automático ----
