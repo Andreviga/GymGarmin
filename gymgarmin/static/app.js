@@ -220,11 +220,13 @@ async function viewHoje(weekDate) {
 
   if (!sch.plan) {
     const incomplete = profileMissing(state.profile || await api("/api/profile").catch(() => ({}))).length > 0;
-    view.innerHTML = `${pageHead("Hoje")}${watchInboxHtml(wib)}${firstStepsHtml(false)}${partnerCardsHtml(prt)}${installCardHtml("hoje")}<section class="today-card">
-      <div class="eyebrow">Comece por aqui</div><div class="tc-title">Monte seu treino</div>
-      <p class="muted">Diga há quanto tempo treina, os dias e o tempo que tem. O app monta musculação e corrida juntas, respeita suas limitações e reorganiza a semana quando você faltar.</p>
+    view.innerHTML = `${pageHead("Hoje")}${watchInboxHtml(wib)}<section class="today-card hero-start">
+      <div class="eyebrow">Bem-vindo(a) ao HAX 👋</div><div class="tc-title">Monte seu treino em 1 minuto</div>
+      <p class="muted">Diga seu objetivo, os dias e o tempo que tem. O app monta a semana (musculação, corrida, aquecimento e progressão de carga) e reorganiza quando você faltar.</p>
       ${incomplete ? `<a class="btn block" id="wiz-open" href="#bemvindo">✨ Responder 7 perguntas e montar meu treino</a>` : `<button class="btn block" id="gen-open">Gerar meu treino</button>`}
-      <a class="btn ghost block" href="#planilhas" style="margin-top:8px">Montar manualmente</a></section>`;
+      <a class="btn ghost block" href="#especiais" style="margin-top:8px">⭐ Começar com um treino de famoso</a>
+      <a class="small text-link" href="#planilhas">ou montar minha planilha manualmente</a></section>
+      ${discoverHtml(true)}${partnerCardsHtml(prt)}${installCardHtml("hoje")}`;
     const go = $("#gen-open"); if (go) go.onclick = () => openGenerator();
     bindSteps();
     view.onclick = async (ev) => {
@@ -276,7 +278,7 @@ async function viewHoje(weekDate) {
     const rest = partnerCardsHtml(prt) + legacyHtml(sch) + focusChip(prof) + garminSyncCard(sch, gst);
     const setup = firstStepsHtml(true) + installCardHtml("hoje");
     return `<div class="hoje-group">${todo}</div>${athleteHtml}
-      ${rest.trim() ? `<div class="hoje-group">${rest}</div>` : ""}${setup.trim() ? `<h2 class="sec-title">Configurar</h2>${setup}` : ""}`;
+      ${rest.trim() ? `<div class="hoje-group">${rest}</div>` : ""}${discoverHtml(false)}${setup.trim() ? `<h2 class="sec-title">Configurar</h2>${setup}` : ""}`;
   })()}
   ${(sch.time_warnings || []).length ? `<details class="rec atencao small"><summary><b>⏱ ${sch.time_warnings.length} ${sch.time_warnings.length > 1 ? "dias passam" : "dia passa"} do seu tempo de treino</b></summary><ul class="plain">${sch.time_warnings.map((w) => `<li>${esc(w)}</li>`).join("")}</ul></details>` : ""}
   ${cyc && cyc.deload ? `<p class="small rec">Semana de deload: menos séries, carga −10% e RPE ~6 para o corpo assimilar o ciclo.</p>` : ""}
@@ -400,7 +402,9 @@ function dayPanel(sch, date) {
     return `<section class="today-card rest"><div class="eyebrow">${lbl} · ${ddmm(date)}</div><div class="tc-title">Descanso</div>
       <p class="muted">Caminhar, alongar e dormir bem também contam.</p>
       ${date === sch.today ? `<button class="btn block" data-gen="1">✨ Gerar um treino para agora</button>` : ""}
-      ${nx ? `<button class="btn ghost block" data-day="${nx.date}" style="margin-top:8px">Próximo: ${esc(dayLabel(nx.date, sch))} · ${esc(shortName(nx))}</button>` : ""}</section>`;
+      ${nx ? `<button class="btn ghost block" data-day="${nx.date}" style="margin-top:8px">Próximo: ${esc(dayLabel(nx.date, sch))} · ${esc(shortName(nx))}</button>`
+        : sch.plan && date === sch.today && (((state.profile || {}).available_days) || []).length ? `<button class="btn ghost block" data-week="${addDays(sch.week_start, 7)}" style="margin-top:8px">
+          ${sch.goals && sch.goals.sessions && sch.goals.sessions.done ? "Próximo treino" : "Seu primeiro treino"}: ${["segunda", "terça", "quarta", "quinta", "sexta", "sábado", "domingo"][Math.min(...state.profile.available_days)]} · ver a próxima semana ›</button>` : ""}</section>`;
   }
   const planned = es.filter((e) => e.status === "planejado");
   const first = planned[0] || es[0];
@@ -1281,7 +1285,8 @@ function renderWiz() {
     <ul class="wz-sum"><li><span>Objetivo</span><b>${goalT}</b></li><li><span>Treinos</span><b>${d.available_days.length} dias possíveis · ${d.session_minutes} min</b></li>
       <li><span>Onde</span><b>${(WIZ_PLACES.find((x) => x[0] === d.place) || [])[1] || "—"}</b></li><li><span>Cuidados</span><b>${d.none ? "nenhum" : d.lims.map((k) => esc(((state.meta.limitations || []).find((l) => l.id === k) || {}).label || k)).join(", ")}</b></li>
       <li><span>Corrida</span><b>${+d.run ? `${d.run}× por semana` : "não"}</b></li></ul>
-    <p class="small muted">Vou montar a semana com aquecimento, descanso e progressão de carga. Você pode mudar tudo depois no Perfil.</p>`;
+    <p class="small muted">Vou montar a semana com aquecimento, descanso e progressão de carga. Você pode mudar tudo depois no Perfil.</p>
+    <p class="small" style="margin-top:10px">Prefere seguir o treino de alguém conhecido? <a href="#especiais">⭐ Ver treinos de famosos</a> (Arnold, Bruce Lee, Kipchoge…)</p>`;
   const last = st >= N;
   view.innerHTML = `<div class="wz"><div class="wz-top"><span class="small muted">${last ? "Pronto para montar" : `Pergunta ${st + 1} de ${N}`}</span>
       <div class="meter"><span style="width:${Math.round(100 * Math.min(st, N) / N)}%"></span></div></div>
@@ -1319,7 +1324,7 @@ async function wizFinish() {
   const prof = { name: d.name.trim(), sex: d.sex, age: +d.age, weight_kg: +d.weight_kg, height_cm: d.height_cm ? +d.height_cm : null,
     goal: d.goal, training_months: +d.training_months, available_days: d.available_days, session_minutes: +d.session_minutes,
     equipment: ["casa", "corpo"].includes(d.place) ? [] : (WIZ_PLACES.find((x) => x[0] === d.place) || [, , , []])[3], gym_type: { elite: "premium", academia: "completa" }[d.place] || "basica",
-    ...(["casa", "corpo"].includes(d.place) ? { gym: { id: "casa", name: "Em casa" }, home_kit: d.place === "casa" ? ["halteres", "elastico"] : [] } : {}), limitations: d.none ? [] : d.lims.map((k) => ({ key: k, severity: "cuidado" })),
+    ...(["casa", "corpo"].includes(d.place) ? { gym: { id: "casa", name: "Em casa" }, home_kit: d.place === "casa" ? ["halteres", "elastico"] : [] } : {}), limitations: d.none ? [] : d.lims.map((k) => ({ key: k, severity: "cuidado" })), limitations_none: !!d.none,
     endurance: end, same_session: true };
   if (d.goal === "hibrido" && !(+d.run)) prof.endurance.sports.corrida = { ...prof.endurance.sports.corrida, enabled: true, sessions: 2 };
   await api("/api/profile", { method: "PUT", body: { ...p, ...prof } });
@@ -1532,6 +1537,8 @@ function bindAccount() {
 async function viewPlanilhas() {
   const plans = await api("/api/plans");
   view.innerHTML = `
+  <a class="fam-banner" href="#especiais"><span class="fam-faces" aria-hidden="true">🏆🥋🏃🪨</span><span class="grow"><b>Treinos inspirados em famosos</b>
+    <span class="small">Arnold, Bruce Lee, Reg Park, Kipchoge, The Rock, Ramon Dino e mais — com fontes</span></span><span class="chev" aria-hidden="true">›</span></a>
   <div class="card"><div class="row between wrap gap"><h2>Suas planilhas</h2>
     <div class="row gap wrap"><button class="btn sm" id="gen-plan">Gerar automático</button><button class="btn sm ghost" id="new-plan">Nova</button><button class="btn sm ghost" id="tpl-plan">Modelos</button><button class="btn sm ghost" id="csv-plan">Importar CSV</button></div></div>
     ${plans.length ? `<ul class="list">${plans.map((p) => `<li><a href="#plano/${p.id}" class="row between" style="text-decoration:none;color:inherit">
@@ -1907,7 +1914,7 @@ async function viewTreinar(planId, idx) {
       <button class="btn block" id="resume">${draft.edit_id ? "Continuar a correção" : "Continuar"}</button><button class="act" id="discard" style="margin-top:8px">${draft.edit_id ? "Descartar a correção" : "Descartar"}</button></section>` : ""}
       ${agenda.length ? `<h2 class="sec-title">Da sua agenda</h2><div class="picks">${agenda.slice(0, 7).map((e) => row(`#treinar/agenda/${e.id}`, `${dayLabel(e.date, sch)} · ${shortName(e)}`,
         `${e.time ? `~${Math.round(e.time.total)} min · ` : ""}${dayKind(e)}`, e.date === sch.today)).join("")}</div>` : ""}
-      ${plans.map((p) => `<h2 class="sec-title">${esc(p.name)}</h2><div class="picks">${p.days.map((d, i) => row(`#treinar/${p.id}/${i}`, d.name, `${(d.items || []).length || ""} ${(d.items || []).length ? "exercícios" : "da planilha"}`)).join("")}</div>`).join("")
+      ${plans.map((p) => `<h2 class="sec-title">${esc(p.name)}</h2><div class="picks">${p.days.map((d, i) => row(`#treinar/${p.id}/${i}`, d.name, (() => { const n = (d.items || []).filter((x) => (x.phase || "principal") === "principal").length; return n ? `${n} exercícios + aquecimento e alongamento` : "da planilha"; })())).join("")}</div>`).join("")
         || (agenda.length ? "" : `<p class="muted">Sem planilhas ativas.</p>`)}
       <button class="btn block" id="gen-now" style="margin-top:14px">✨ Gerar um treino agora</button>
       <a class="btn ghost block" href="#bemestar" style="margin-top:8px">🧘 Yoga, Pilates, alongamento e respiração</a>
@@ -3304,6 +3311,13 @@ function openShare(sessionId, title, after) {
 }
 
 
+// atalhos para o que é novo e fácil de não achar: famosos, bem-estar, comunidade, casa
+function discoverHtml(first) {
+  const tiles = [["#especiais", "⭐", "Treinos de famosos", "Arnold, Bruce Lee, Kipchoge…"], ["#bemestar", "🧘", "Yoga e alongamento", "estresse, corrida, articulações"],
+    ["#social", "👥", "Comunidade", "mostre que treinou"], ["#perfil/treino", "🏠", "Treinar em casa", "ou em outra academia"]];
+  return `${first ? `<h2 class="sec-title">Também tem</h2>` : `<h2 class="sec-title">Descubra</h2>`}
+    <div class="disc">${tiles.map(([h, i, t, s]) => `<a class="disc-t" href="${h}"><span class="disc-i" aria-hidden="true">${i}</span><b>${t}</b><span class="small muted">${s}</span></a>`).join("")}</div>`;
+}
 // ---------------------------------------------------------------- modelos especiais: treinos de famosos
 const LEVEL_TXT = { iniciante: "iniciante", intermediario: "intermediário", avancado: "avançado", todos: "todos os níveis" };
 let FAM = null;
