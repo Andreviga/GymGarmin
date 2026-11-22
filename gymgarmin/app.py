@@ -116,6 +116,10 @@ class AuthMiddleware:
 
 
 app.add_middleware(AuthMiddleware)
+# respostas JSON/JS/CSS comprimidas: a planilha (~90 KB) vira ~10 KB — faz diferença no 4G fraco da academia
+from fastapi.middleware.gzip import GZipMiddleware  # noqa: E402
+
+app.add_middleware(GZipMiddleware, minimum_size=1024)
 
 COACH_ACTION_PT = [("/api/plans", "mudou a planilha"), ("/api/generator/apply", "gerou uma planilha nova"),
                    ("/api/schedule", "ajustou a agenda"), ("/api/profile", "ajustou o perfil"),

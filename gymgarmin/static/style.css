@@ -1099,3 +1099,6 @@ body.timer-on { padding-bottom: calc(72px + 70px + env(safe-area-inset-bottom));
 
 /* cartões de atalho do perfil: título em cima, explicação embaixo */
 .link-card .grow { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+
+/* tela baixa (celular deitado): a barra de descanso não fica presa no topo (cobriria o exercício) */
+@media (max-height: 480px) { .fx-restbar { position: relative; } }
