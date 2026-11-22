@@ -129,6 +129,28 @@ CREATE TABLE IF NOT EXISTS kv (
     updated_at TEXT NOT NULL,
     PRIMARY KEY (user_id, key)
 );
+CREATE TABLE IF NOT EXISTS posts (
+    id INTEGER PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    session_id INTEGER,
+    visibility TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    data TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS post_reacts (
+    post_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    kind TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (post_id, user_id)
+);
+CREATE TABLE IF NOT EXISTS post_comments (
+    id INTEGER PRIMARY KEY,
+    post_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    text TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
 """
 
 DEFAULT_PROFILE = {
@@ -175,7 +197,7 @@ def db_path() -> Path:
 
 
 _ready: set[str] = set()
-ID_TABLES = ("users", "plans", "sessions", "schedule", "garmin_pushes")
+ID_TABLES = ("users", "plans", "sessions", "schedule", "garmin_pushes", "posts", "post_comments")
 
 
 def now() -> str:

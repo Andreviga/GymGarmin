@@ -425,7 +425,7 @@ function dayPanel(sch, date) {
       <div>${esc((e.alt.why || [])[0] || "")}</div>
       <div class="row gap wrap" style="margin-top:6px"><button class="btn sm ghost" data-altwhy="${e.id}">Por quê?</button><button class="btn sm ghost" data-altundo="${e.id}">Voltar ao original</button></div></div>`).join("")}
     ${es.filter((e) => e.status === "planejado" && e.kind === "forca" && date >= sch.today).map((e) => e.gym_day
-      ? `<div class="rec small gym-day"><b>📍 ${esc(e.gym_day.name)} neste dia</b>${(e.gym_changes || []).length ? `<div>Trocado: ${esc(e.gym_changes.join(" · "))}</div>` : `<div>Nada precisou mudar.</div>`}
+      ? `<div class="rec small gym-day"><b>📍 ${esc(e.gym_day.name)} neste dia</b>${(e.gym_changes || []).length ? `<details><summary>${e.gym_changes.length} ${e.gym_changes.length === 1 ? "troca" : "trocas"} para o que tem lá</summary><ul class="plain">${e.gym_changes.map((c) => `<li>${esc(c)}</li>`).join("")}</ul></details>` : `<div>Nada precisou mudar.</div>`}
         <div class="row gap wrap" style="margin-top:6px"><button class="btn sm ghost" data-dgym="${e.id}">Outra academia</button><button class="btn sm ghost" data-dgymundo="${e.id}">Voltar à de sempre</button></div></div>`
       : `<button class="gym-line" data-dgym="${e.id}">📍 ${esc(((state.profile || {}).gym || {}).name || "Minha academia")} <span class="muted">· vai treinar em outro lugar?</span></button>`).join("")}
     ${planned.length ? `<a class="btn block go" href="#treinar/agenda/${first.id}">${date === sch.today ? "Começar treino" : date < sch.today ? "Registrar treino" : "Treinar agora"}</a>` : ""}
@@ -2741,10 +2741,13 @@ function showSaved(saved, cr, prTxt) {
       <p class="small muted" style="margin:6px 0 0">Séries de trabalho por músculo (aquecimento não conta; músculo auxiliar conta metade).</p>` : ""}
     <div id="sv-bal">${balanceAfterHtml(cr.balance)}</div>
     ${savedListHtml(sm)}
-    <a class="btn block" href="#hoje" style="margin-top:16px">Ver minha semana</a></section>`;
+    <button class="btn block" data-share="${saved.id}" style="margin-top:16px">📣 Compartilhar na comunidade</button>
+    <a class="btn ghost block" href="#hoje" style="margin-top:8px">Ver minha semana</a></section>`;
   window.scrollTo(0, 0);
   view.oninput = view.onchange = null;
   view.onclick = async (e) => {
+    const sh = e.target.closest("[data-share]");
+    if (sh) return openShare(+sh.dataset.share, saved.day_name || "", () => { sh.textContent = "Compartilhado ✓ · ver na comunidade"; sh.onclick = () => { location.hash = "#social"; }; sh.removeAttribute("data-share"); });
     const b = e.target.closest("[data-match]"); if (!b) return;
     b.disabled = true;
     try {
@@ -3191,6 +3194,111 @@ async function wsLog(b) {
     toast("Registrado ✔ (conta como atividade leve)");
     location.hash = "#bemestar";
   } catch (err) { b.disabled = false; toast(err.message, 5000); }
+}
+
+
+// ---------------------------------------------------------------- comunidade: mostrar que treinou (e o quê)
+const VIS_TXT = { todos: "🌎 Todos do HAX", parceiros: "🤝 Só parceiros", eu: "🔒 Só eu" };
+const REACTS = ["💪", "🔥", "👏"];
+const ago = (iso) => { const m = Math.max(1, Math.round((Date.now() - new Date(iso).getTime()) / 60000)); return m < 60 ? `${m} min` : m < 1440 ? `${Math.round(m / 60)} h` : `${Math.round(m / 1440)} d`; };
+function postHtml(p) {
+  const w = p.workout || {};
+  const ini = esc((p.author || "?").trim().split(/\s+/).slice(0, 2).map((x) => x[0]).join("").toUpperCase());
+  return `<article class="post card" data-post="${p.id}">
+    <header class="post-h"><span class="post-av">${ini}</span><span class="grow"><b>${esc(p.author)}</b><span class="small muted">${ago(p.created_at)} · ${esc(VIS_TXT[p.visibility] || "")}</span></span>
+      <button class="act" data-pmenu="${p.id}" aria-label="Opções">⋯</button></header>
+    ${p.caption ? `<p class="post-cap">${esc(p.caption)}</p>` : ""}
+    ${p.photo_url ? `<img class="post-photo" loading="lazy" src="${esc(p.photo_url)}" alt="Foto do treino">` : ""}
+    <div class="post-w"><b>${esc(w.title || "Treino")}</b>
+      <div class="tc-chips">${w.minutes ? `<span>⏱ ${w.minutes} min</span>` : ""}${w.sets ? `<span>${w.sets} séries</span>` : ""}${w.kcal ? `<span>🔥 ${w.kcal} kcal</span>` : ""}${w.with_partner ? `<span>🤝 com parceiro</span>` : ""}</div>
+      ${(w.prs || []).length ? `<div class="post-pr">🏆 Recorde: ${esc(w.prs.join(", "))}</div>` : ""}
+      <ul class="post-ex">${(w.items || []).map((it) => `<li data-ex="${esc(it.exercise_id || "")}">${mediaHtml(it.exercise_id || "x", "s", it.kind === "cardio" ? "run" : null)}<span class="grow">${esc(it.name)}</span>
+        <span class="small muted">${it.kind === "forca" ? `${it.n} séries${it.best ? ` · ${esc(it.best)}` : ""}` : `${it.minutes || ""} min${it.km ? ` · ${it.km} km` : ""}`}</span></li>`).join("")}</ul></div>
+    <div class="post-re">${REACTS.map((k) => `<button class="re ${p.my_react === k ? "on" : ""}" data-react="${p.id}" data-k="${k}" aria-pressed="${p.my_react === k}">${k} <span>${p.reacts[k] || ""}</span></button>`).join("")}
+      <span class="grow"></span><button class="act" data-pcom="${p.id}">💬 ${p.comments.length || ""}</button></div>
+    <div class="post-c" ${p.comments.length ? "" : "hidden"} id="pc-${p.id}">${p.comments.map((c) => `<div class="pc"><b>${esc(c.author)}</b> ${esc(c.text)}${c.can_delete ? ` <button class="act" data-cdel="${c.id}" aria-label="Apagar comentário">✕</button>` : ""}</div>`).join("")}
+      <form class="pc-new" data-cform="${p.id}"><input maxlength="300" placeholder="Comentar…" aria-label="Comentar"><button class="btn sm">Enviar</button></form></div>
+  </article>`;
+}
+async function viewSocial() {
+  const d = await api("/api/social");
+  view.innerHTML = `<p class="small muted" style="margin:0 2px 10px">Mostre que treinou: no fim do treino, toque em “📣 Compartilhar”. Você escolhe quem vê, se aparece a carga e pode pôr uma foto.</p>
+    <button class="btn ghost block" id="soc-new" style="margin-bottom:12px">📣 Compartilhar um treino que já fiz</button>
+    <div id="feed">${d.posts.length ? d.posts.map(postHtml).join("") : `<section class="card"><p class="muted" style="margin:0">Ninguém compartilhou ainda. Seja o primeiro!</p></section>`}</div>
+    ${d.posts.length >= 20 ? `<button class="act" id="soc-more" style="display:block;margin:10px auto">Ver mais</button>` : ""}`;
+  bindFeed(d);
+}
+function bindFeed(d) {
+  const replace = (p) => { const el = $(`[data-post="${p.id}"]`); if (el) { const open = !$(`#pc-${p.id}`).hidden; el.outerHTML = postHtml(p); if (open) $(`#pc-${p.id}`).hidden = false; } };
+  view.onsubmit = async (e) => {
+    const f = e.target.closest("[data-cform]"); if (!f) return; e.preventDefault();
+    const inp = f.querySelector("input"); const txt = inp.value.trim(); if (!txt) return;
+    try { replace(await api(`/api/social/${f.dataset.cform}/comments`, { method: "POST", body: { text: txt } })); $(`#pc-${f.dataset.cform}`).hidden = false; } catch (err) { toast(err.message, 5000); }
+  };
+  view.onclick = async (e) => {
+    const t = e.target.closest("button,[data-ex]"); if (!t) return;
+    const ds = t.dataset;
+    try {
+      if (ds.ex && t.tagName !== "BUTTON") return showExercise(ds.ex);
+      if (t.id === "soc-new") return openSharePicker();
+      if (t.id === "soc-more") {
+        const last = d.posts[d.posts.length - 1]; const more = await api(`/api/social?before=${last.id}`);
+        d.posts.push(...more.posts); $("#feed").insertAdjacentHTML("beforeend", more.posts.map(postHtml).join("")); if (more.posts.length < 20) t.remove(); return;
+      }
+      if (ds.react) { const p = d.posts.find((x) => x.id === +ds.react); const k = p && p.my_react === ds.k ? null : ds.k; return replace(await api(`/api/social/${ds.react}/react`, { method: "POST", body: { kind: k } })); }
+      if (ds.pcom) { const c = $(`#pc-${ds.pcom}`); c.hidden = !c.hidden; if (!c.hidden) c.querySelector("input").focus(); return; }
+      if (ds.cdel) { if (!confirm("Apagar este comentário?")) return; await api(`/api/social/comments/${ds.cdel}`, { method: "DELETE" }); return viewSocial(); }
+      if (ds.pmenu) {
+        const p = d.posts.find((x) => x.id === +ds.pmenu); if (!p) return;
+        const body = openModal(`<h2>Post de ${esc(p.author)}</h2><div class="stack">${p.mine ? `<button class="btn ghost block danger" data-pdel="1">🗑 Apagar meu post</button>` : `<button class="btn ghost block" data-phide="1">🙈 Não quero ver este post</button>`}</div>`);
+        body.onclick = async (ev) => {
+          const b = ev.target.closest("button"); if (!b) return;
+          if (b.dataset.pdel && confirm("Apagar o post? O treino continua no seu histórico.")) { await api(`/api/social/${p.id}`, { method: "DELETE" }); closeModal(); toast("Post apagado"); viewSocial(); }
+          if (b.dataset.phide) { await api(`/api/social/${p.id}/hide`, { method: "POST" }); closeModal(); toast("Ocultado. O administrador fica sabendo, se for o caso de avaliar."); viewSocial(); }
+        };
+      }
+    } catch (err) { toast(err.message, 5000); }
+  };
+}
+// escolher um treino já salvo para compartilhar
+async function openSharePicker() {
+  const body = openModal(`<h2>Qual treino?</h2><div class="sk"><span class="sk-line"></span></div>`);
+  const [ss, d] = await Promise.all([api("/api/sessions?limit=15"), api("/api/social")]);
+  const list = (ss.sessions || ss).filter((x) => x.source !== "passos");
+  body.innerHTML = `<h2>Qual treino?</h2><div class="picks">${list.map((x) => `<button class="pick" data-sh="${x.id}"><span class="grow"><b>${esc(x.day_name || x.notes || "Treino")}</b>
+    <span class="small muted">${fmtDate(x.date)}${d.shared.includes(x.id) ? " · já compartilhado" : ""}</span></span><span class="chev">›</span></button>`).join("") || `<p class="muted">Nenhum treino salvo ainda.</p>`}</div>`;
+  body.onclick = (e) => { const b = e.target.closest("[data-sh]"); if (b) openShare(+b.dataset.sh, b.querySelector("b").textContent); };
+}
+// compartilhar: legenda, foto, quem vê, mostrar cargas
+function openShare(sessionId, title, after) {
+  const st = { vis: store("gg_soc_vis") || "todos", loads: !!store("gg_soc_loads"), photo: null };
+  const body = openModal("");
+  const draw = () => {
+    body.innerHTML = `<h2>📣 Compartilhar ${title ? `“${esc(title)}”` : "o treino"}</h2>
+      <textarea id="sh-cap" maxlength="500" rows="3" placeholder="Como foi? (opcional)" style="width:100%"></textarea>
+      <div class="row gap wrap" style="margin:10px 0"><label class="btn ghost sm" style="cursor:pointer">📷 ${st.photo ? "Trocar foto" : "Pôr uma foto"}<input type="file" accept="image/*" id="sh-photo" hidden></label>
+        ${st.photo ? `<img src="${st.photo}" alt="" class="sh-thumb"><button class="act" id="sh-nophoto">tirar</button>` : ""}</div>
+      <label>Quem vê</label><div class="chips">${Object.entries(VIS_TXT).map(([k, t]) => `<button type="button" class="chip pc ${st.vis === k ? "on" : ""}" data-vis="${k}">${t}</button>`).join("")}</div>
+      <label class="row gap" style="margin-top:10px"><input type="checkbox" id="sh-loads" ${st.loads ? "checked" : ""}> <span>Mostrar as cargas (melhor série de cada exercício)</span></label>
+      <button class="btn block" id="sh-go" style="margin-top:14px">Publicar</button>`;
+  };
+  draw();
+  body.onchange = async (e) => {
+    if (e.target.id === "sh-loads") st.loads = e.target.checked;
+    if (e.target.id === "sh-photo" && e.target.files[0]) { const cap = $("#sh-cap", body).value; try { st.photo = await shrinkPhoto(e.target.files[0], 1080, 0.78); } catch (err) { toast(err.message, 5000); } draw(); $("#sh-cap", body).value = cap; }
+  };
+  body.onclick = async (e) => {
+    const t = e.target.closest("button"); if (!t) return;
+    if (t.dataset.vis) { const cap = $("#sh-cap", body).value; st.vis = t.dataset.vis; draw(); $("#sh-cap", body).value = cap; return; }
+    if (t.id === "sh-nophoto") { const cap = $("#sh-cap", body).value; st.photo = null; draw(); $("#sh-cap", body).value = cap; return; }
+    if (t.id !== "sh-go") return;
+    t.disabled = true; t.textContent = "Publicando…";
+    try {
+      await api("/api/social", { method: "POST", body: { session_id: sessionId, caption: $("#sh-cap", body).value, visibility: st.vis, show_loads: st.loads, photo: st.photo } });
+      store("gg_soc_vis", st.vis); store("gg_soc_loads", st.loads ? 1 : 0);
+      closeModal(); toast("Publicado na comunidade ✔"); if (after) after(); else if (location.hash === "#social") viewSocial(); else location.hash = "#social";
+    } catch (err) { t.disabled = false; t.textContent = "Publicar"; toast(err.message, 5000); }
+  };
 }
 
 async function loadMyGym() {
@@ -4711,7 +4819,7 @@ async function doRoute(ctl) {
   if (name !== "treinar") fxLeave();
   if (name !== "bemestar" || b !== "play") { clearInterval(wsInt); wsInt = null; WS = null; }
   $$(".tabbar a").forEach((el) => el.classList.toggle("active", el.dataset.tab === ({ plano: "planilhas", exercicios: "planilhas", aparelhos: "planilhas", evolucao: "analise", saude: "analise", esportes: "perfil", coach: "perfil", dev: "perfil", bemvindo: "hoje" }[name] || name)));
-  const TITLES = { planilhas: "Planos", exercicios: "Planos", aparelhos: "Planos", plano: "Planilha", treinar: "Treinar", bemestar: "Bem-estar", analise: "Progresso", evolucao: "Evolução", saude: "Saúde e sono", perfil: "Perfil", esportes: "Esportes", coach: "Coach", dev: "Desenvolvedor" };
+  const TITLES = { planilhas: "Planos", exercicios: "Planos", aparelhos: "Planos", plano: "Planilha", treinar: "Treinar", social: "Comunidade", bemestar: "Bem-estar", analise: "Progresso", evolucao: "Evolução", saude: "Saúde e sono", perfil: "Perfil", esportes: "Esportes", coach: "Coach", dev: "Desenvolvedor" };
   const pt = $("#page-title"); pt.textContent = TITLES[name] || ""; pt.hidden = !TITLES[name] || (name === "treinar" && a);
   const sn = $("#subnav"); sn.hidden = !["planilhas", "exercicios", "aparelhos"].includes(name);
   $$("#subnav a").forEach((x) => x.classList.toggle("on", x.dataset.sub === name));
@@ -4722,7 +4830,7 @@ async function doRoute(ctl) {
   view.oninput = view.onchange = view.onclick = null;
   prefetchStop();
   const seq = route.seq = (route.seq || 0) + 1;
-  const live = ["treinar", "plano"].includes(name);  // telas com edição em andamento: sempre direto da rede
+  const live = ["treinar", "plano", "social"].includes(name);  // telas com edição em andamento: sempre direto da rede
   view.dataset.route = ""; view.setAttribute("aria-busy", "true");
   const skel = setTimeout(() => { if (route.seq === seq) view.innerHTML = skeletonHtml(name); }, 90);
   SWR.mode = live ? null : "cache"; SWR.used = new Set();
@@ -4734,7 +4842,7 @@ async function doRoute(ctl) {
         document.querySelector(".topbar").insertAdjacentHTML("afterend", `<div id="eph" class="rec atencao small" style="margin:8px 16px 0">Versão de teste online: os dados podem ser apagados pelo servidor. Use <a href="#perfil">Perfil → Backup</a> para salvar e restaurar.</div>`);
       }
     }
-    const routes = { hoje: () => viewHoje(a), planilhas: viewPlanilhas, plano: () => viewPlano(a), treinar: () => viewTreinar(a, b), bemestar: () => viewBemEstar(a, b), analise: viewAnalise, evolucao: () => viewEvolucao(decodeURIComponent(a || "")), esportes: viewEsportes, saude: viewSaude, exercicios: viewExercicios, aparelhos: () => viewAparelhos(a), perfil: () => viewPerfil(a), coach: viewCoach, dev: viewDev, bemvindo: viewBemVindo };
+    const routes = { hoje: () => viewHoje(a), planilhas: viewPlanilhas, plano: () => viewPlano(a), treinar: () => viewTreinar(a, b), social: viewSocial, bemestar: () => viewBemEstar(a, b), analise: viewAnalise, evolucao: () => viewEvolucao(decodeURIComponent(a || "")), esportes: viewEsportes, saude: viewSaude, exercicios: viewExercicios, aparelhos: () => viewAparelhos(a), perfil: () => viewPerfil(a), coach: viewCoach, dev: viewDev, bemvindo: viewBemVindo };
     const render = async () => {
       await (routes[name] || viewHoje)();
       if (!view.onclick) view.onclick = (e) => { const id = e.target.dataset && e.target.dataset.ex; if (id) showExercise(id); };

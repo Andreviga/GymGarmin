@@ -18,7 +18,7 @@ from datetime import date, timedelta
 
 from . import adaptive, alternative, auth, coach, focus, gallery, ingest, my_gym, partners, training_rules
 from . import watch_review as wrv
-from . import gyms, loads, personal, weather, wellness
+from . import gyms, loads, personal, social, weather, wellness
 from . import (analysis, calibration, catalog, clock, db, dedupe, health, endurance, garmin_export, garmin_sync, generator, history, limitations,
                load, plans_io, progression, readiness, schedule, sports, steps, templates, watch_labels)
 from .muscles import EQUIPMENT_PT, HR_ZONES, MUSCLES, hr_max, zone_bpm
@@ -1080,6 +1080,69 @@ def plan_swap(plan_id: int, body: dict = Body(...)):
         raise HTTPException(400, "Exercício desconhecido")
     _plan_or_404(plan_id)
     return {"changed": _swap_everywhere(plan_id, src, [dst])["changed"]}
+
+
+# ------------------------------------------------------------- área social ----
+
+def _social(fn, *a, **k):
+    try:
+        return fn(*a, **k)
+    except LookupError as e:
+        raise HTTPException(404, str(e))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.get("/api/social")
+def social_feed(before: int | None = None, only: int | None = None):
+    uid, _, adm = _me_ids()
+    return {"posts": social.feed(uid, before, 20, only, adm), "me": uid, "shared": sorted(social.shared_session_ids(uid))}
+
+
+@app.post("/api/social")
+def social_post(body: dict = Body(...)):
+    uid, _, _ = _me_ids()
+    return _social(social.create, uid, body.get("session_id"), body.get("caption") or "", body.get("visibility") or "todos",
+                   body.get("photo"), bool(body.get("show_loads")))
+
+
+@app.get("/api/social/{post_id}")
+def social_get(post_id: int):
+    uid, _, adm = _me_ids()
+    return _social(social.get, uid, post_id, adm)
+
+
+@app.post("/api/social/{post_id}/react")
+def social_react(post_id: int, body: dict = Body(default={})):
+    uid, _, _ = _me_ids()
+    return _social(social.react, uid, post_id, body.get("kind"))
+
+
+@app.post("/api/social/{post_id}/comments")
+def social_comment(post_id: int, body: dict = Body(...)):
+    uid, _, _ = _me_ids()
+    return _social(social.comment, uid, post_id, body.get("text") or "")
+
+
+@app.delete("/api/social/comments/{comment_id}")
+def social_comment_delete(comment_id: int):
+    uid, _, adm = _me_ids()
+    _social(social.delete_comment, uid, comment_id, adm)
+    return {"ok": True}
+
+
+@app.delete("/api/social/{post_id}")
+def social_delete(post_id: int):
+    uid, _, adm = _me_ids()
+    _social(social.delete, uid, post_id, adm)
+    return {"ok": True}
+
+
+@app.post("/api/social/{post_id}/hide")
+def social_hide(post_id: int):
+    uid, _, _ = _me_ids()
+    social.hide(uid, post_id)
+    return {"ok": True}
 
 
 # ------------------------------------------------------------- bem-estar ----
