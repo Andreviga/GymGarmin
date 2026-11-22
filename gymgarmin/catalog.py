@@ -44,6 +44,22 @@ MUSCLE_FIXES = {
 
 # Nomes em português dos exercícios mais comuns de academia no Brasil
 NAMES_PT = {
+    # treino em casa / hotel (opção "fora da academia")
+    "Back_Flyes_-_With_Bands": "Crucifixo invertido com elástico",
+    "Band_Assisted_Pull-Up": "Barra fixa com elástico (assistida)",
+    "Band_Good_Morning": "Good morning com elástico",
+    "Band_Hip_Adductions": "Adução de quadril com elástico",
+    "Bench_Press_-_With_Bands": "Supino com elástico",
+    "Calf_Raises_-_With_Bands": "Panturrilha com elástico",
+    "Cross_Over_-_With_Bands": "Crucifixo com elástico",
+    "Decline_Push-Up": "Flexão de braço com pés elevados",
+    "Dumbbell_Floor_Press": "Supino no chão com halteres",
+    "Hip_Extension_with_Bands": "Extensão de quadril com elástico",
+    "Inverted_Row": "Remada invertida (sob mesa ou barra baixa)",
+    "Lateral_Raise_-_With_Bands": "Elevação lateral com elástico",
+    "Natural_Glute_Ham_Raise": "Flexão nórdica (posterior de coxa)",
+    "Seated_Band_Hamstring_Curl": "Flexora sentada com elástico",
+    "Shoulder_Press_-_With_Bands": "Desenvolvimento com elástico",
     "Shoulder_Stretch": "Alongamento de ombro",
     "Hamstring_Stretch": "Alongamento de posteriores da coxa",
     "Overhead_Lat": "Alongamento de dorsal acima da cabeça",

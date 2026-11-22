@@ -16,7 +16,7 @@ from fastapi.staticfiles import StaticFiles
 
 from datetime import date, timedelta
 
-from . import auth, coach, focus, gallery, ingest, my_gym, partners, training_rules
+from . import alternative, auth, coach, focus, gallery, ingest, my_gym, partners, training_rules
 from . import (analysis, calibration, catalog, clock, db, dedupe, health, endurance, garmin_export, garmin_sync, generator, history, limitations,
                load, plans_io, progression, readiness, schedule, sports, steps, templates, watch_labels)
 from .muscles import EQUIPMENT_PT, HR_ZONES, MUSCLES, hr_max, zone_bpm
@@ -2445,6 +2445,157 @@ def readiness_undo(entry_id: int):
         return db.save_entry(readiness.undo_entry(e))
     except ValueError as err:
         raise HTTPException(400, str(err)) from err
+
+
+# ------------------------------------------------- outra opção para hoje ----
+
+def _alt_ctx(seed: int = 0, budget: float | None = None) -> "alternative.Ctx":
+    prof = _profile()
+    today = clock.today()
+    sessions = db.list_sessions(since=(today - timedelta(days=28)).isoformat(), limit=400)
+    try:
+        bal = schedule.balance(prof, today)
+    except Exception:  # noqa: BLE001 — sem semana montada: só não sabe o que falta
+        bal = []
+    mine = {m.get("exercise_id") for m in my_gym._mine() if m.get("exercise_id")}
+    return alternative.Ctx(prof, sessions=sessions, recovery=analysis.recovery(sessions), balance=bal, my_ids=mine,
+                           budget=budget, seed=seed)
+
+
+def _alt_opts(body: dict) -> dict:
+    o = body.get("opts") or {}
+    out = {}
+    if o.get("minutes"):
+        try:
+            out["minutes"] = max(10, min(180, int(o["minutes"])))
+        except (TypeError, ValueError):
+            raise HTTPException(400, "Minutos inválidos") from None
+    if o.get("region"):
+        out["region"] = str(o["region"])
+    if isinstance(o.get("muscles"), list):
+        out["muscles"] = [str(x) for x in o["muscles"] if str(x) in alternative.MUSCLE_GROUPS]
+    if isinstance(o.get("kit"), list):
+        out["kit"] = [str(x) for x in o["kit"] if str(x) in {k["id"] for k in alternative.KITS}]
+    return out
+
+
+def _alt_base(ctx) -> tuple[list[dict], str]:
+    """Sem treino de força hoje: o molde que mais repõe a semana com músculos recuperados."""
+    sore = ctx.sore(70)
+    key = alternative._best_template(ctx, avoid=sore) or "FB_A"
+    return alternative.build_template(key, ctx, avoid_muscles=sore), generator.DAY_TEMPLATES[key][0]
+
+
+def _alt_proposal(body: dict) -> tuple[dict, dict | None]:
+    reason = body.get("reason")
+    if reason not in alternative.REASON_IDS:
+        raise HTTPException(400, "Escolha um motivo")
+    seed = int(body.get("seed") or 0)
+    entry = None
+    if body.get("entry_id"):
+        entry = _entry_or_404(int(body["entry_id"]))
+        if entry.get("kind") != "forca" and not any(alternative.is_strength(i) for i in entry.get("items") or []):
+            raise HTTPException(400, "A outra opção é para treino de musculação")
+        if entry.get("status") not in ("planejado", None):
+            raise HTTPException(400, "Esse treino já foi feito ou pulado")
+    ctx = _alt_ctx(seed)
+    if entry:
+        base = (entry.get("alt_backup") or {}).get("items") or entry.get("items") or []
+        name = (entry.get("alt_backup") or {}).get("day_name") or entry.get("day_name")
+    else:
+        base, name = _alt_base(ctx)
+    try:
+        prop = alternative.propose(base, reason, ctx, _alt_opts(body), name)
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from e
+    prop["seed"] = seed
+    return prop, entry
+
+
+@app.get("/api/alternative/options")
+def alternative_options():
+    ctx = _alt_ctx()
+    sore = ctx.sore(70)
+    sore_groups = [g for g, v in alternative.MUSCLE_GROUPS.items() if set(v["muscles"]) & sore]
+    return {"reasons": alternative.REASONS, "regions": alternative.REGIONS, "kits": alternative.KITS,
+            "muscle_groups": [{"id": k, "label": v["label"]} for k, v in alternative.MUSCLE_GROUPS.items()],
+            "sore_groups": sore_groups, "minutes": round(ctx.budget)}
+
+
+@app.post("/api/alternative/preview")
+def alternative_preview(body: dict = Body(...)):
+    prop, entry = _alt_proposal(body)
+    prop["preview"] = [{"exercise_id": i["exercise_id"], "name": (catalog.get(i["exercise_id"]) or {}).get("name"),
+                        "sets": i.get("sets"), "reps": i.get("reps"), "duration_s": i.get("duration_s"), "notes": i.get("notes"),
+                        "superset": i.get("superset")}
+                       for i in prop["items"] if alternative.is_strength(i)]
+    prop["entry_id"] = entry["id"] if entry else None
+    return prop
+
+
+@app.post("/api/alternative/apply")
+def alternative_apply(body: dict = Body(...)):
+    """Troca o treino de hoje na agenda pela outra opção (dá para voltar ao original)."""
+    if not body.get("entry_id"):
+        raise HTTPException(400, "Qual treino da agenda?")
+    prop, e = _alt_proposal(body)
+    e = dict(e)
+    e["alt_backup"] = e.get("alt_backup") or {"items": e.get("items"), "day_name": e.get("day_name")}
+    e["items"] = prop["items"]
+    e["day_name"] = prop["day_name"]
+    e["alt"] = {"reason": prop["reason"], "label": prop["label"], "why": prop["why"], "base": prop["base"],
+                "changes": prop["changes"], "warnings": prop["warnings"], "seed": prop["seed"], "minutes": prop["minutes"]}
+    e.setdefault("changes", []).append(f"Outra opção: {prop['label'].lower()}")
+    if e.get("garmin_workout_id"):
+        e["garmin_outdated"] = True
+    return db.save_entry(e)
+
+
+@app.post("/api/alternative/undo/{entry_id}")
+def alternative_undo(entry_id: int):
+    e = dict(_entry_or_404(entry_id))
+    b = e.get("alt_backup")
+    if not b:
+        raise HTTPException(400, "Esse treino está como foi planejado")
+    if e.get("status") not in ("planejado", None):
+        raise HTTPException(400, "Esse treino já foi feito ou pulado")
+    e["items"], e["day_name"] = b.get("items") or [], b.get("day_name") or e.get("day_name")
+    e.pop("alt_backup", None)
+    e.pop("alt", None)
+    e.setdefault("changes", []).append("Voltou ao treino original")
+    if e.get("garmin_workout_id"):
+        e["garmin_outdated"] = True
+    return db.save_entry(e)
+
+
+@app.post("/api/alternative/draft")
+def alternative_draft(body: dict = Body(...)):
+    """Um treino pronto para fazer agora, fora da agenda (dia sem treino, ou "quero treinar mais hoje")."""
+    body = {**body, "entry_id": None}
+    prop, _ = _alt_proposal(body)
+    return {"date": clock.now().strftime("%Y-%m-%dT%H:%M"), "day_name": prop["day_name"].replace(" (alternativo)", " (gerado)"),
+            "items": _prefill_items(prop["items"]), "alt": {k: prop[k] for k in ("reason", "label", "why", "base", "changes", "warnings")},
+            "view": "lista", "generated": True, "kit": _alt_opts(body).get("kit") if body.get("reason") == "fora" else None}
+
+
+@app.post("/api/suggest/next")
+def suggest_next(body: dict = Body(...)):
+    """O próximo exercício que faz sentido (treino livre) ou 1–2 extras para o treino de hoje."""
+    items = [i for i in body.get("items") or [] if isinstance(i, dict) and catalog.get(i.get("exercise_id"))]
+    n = max(1, min(4, int(body.get("n") or 3)))
+    seed = int(body.get("seed") or 0)
+    ctx = _alt_ctx(seed, budget=body.get("minutes"))
+    if isinstance(body.get("kit"), list):
+        ctx.set_kit([str(x) for x in body["kit"]])
+    res = alternative.next_exercises(items, ctx, n=n, extra=bool(body.get("extra")))
+    for sug in res["suggestions"]:
+        pre = _prefill_items([{k: v for k, v in sug.items() if k not in ("name", "why", "known", "minutes")}])
+        sug["item"] = pre[0] if pre else None
+        if sug["item"]:
+            ex = catalog.get(sug["exercise_id"]) or {}
+            sug["item"].update(pm=ex.get("primaryMuscles") or [], sm=ex.get("secondaryMuscles") or [])
+    res["suggestions"] = [x for x in res["suggestions"] if x.get("item")]
+    return res
 
 
 # ----------------------------------------------------- gerador automático ----

@@ -913,3 +913,18 @@ body:has(.wz) { padding-bottom: 0; }
 .fx-rest.has-just .fx-dock .fx-clock, .fx-dock .fx-clock { font-size: 44px; margin: 0; letter-spacing: -1px; min-width: 104px; text-align: left; line-height: 1; }
 .fx-dock .fx-skip { position: static; flex: 1; margin: 0; min-height: 52px; box-shadow: none; }
 .fx-rest.has-just { padding-bottom: 8px; }
+
+/* outra opção / gerar treino / sugestões */
+.alt-reasons .pick { width: 100%; border: 0; background: none; text-align: left; font: inherit; cursor: pointer; }
+.alt-reasons .pick + .pick { border-top: 1px solid var(--line); }
+.alt-ic { font-size: 22px; width: 30px; text-align: center; flex: none; }
+.alt-why { padding-left: 18px; margin: 6px 0 10px; }
+.alt-why li { margin: 4px 0; }
+.alt-list { padding-left: 20px; margin: 4px 0 10px; }
+.alt-list li { margin: 6px 0; }
+.alt-ch li { margin: 6px 0; }
+.alt-on { margin: 8px 0; }
+.chip[data-k].on { border-color: var(--brand); background: var(--brand); color: var(--brand-ink); }
+.sug-row { display: flex; gap: 10px; align-items: center; padding: 8px 0; }
+.sug-list .sug-row + .sug-row { border-top: 1px solid var(--line); }
+.next-sug { border: 1px dashed var(--brand); }

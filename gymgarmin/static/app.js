@@ -374,7 +374,8 @@ function dayPanel(sch, date) {
     const nx = sch.entries.find((x) => x.date > date && x.status === "planejado");
     return `<section class="today-card rest"><div class="eyebrow">${lbl} · ${ddmm(date)}</div><div class="tc-title">Descanso</div>
       <p class="muted">Caminhar, alongar e dormir bem também contam.</p>
-      ${nx ? `<button class="btn ghost block" data-day="${nx.date}">Próximo: ${esc(dayLabel(nx.date, sch))} · ${esc(shortName(nx))}</button>` : ""}</section>`;
+      ${date === sch.today ? `<button class="btn block" data-gen="1">✨ Gerar um treino para agora</button>` : ""}
+      ${nx ? `<button class="btn ghost block" data-day="${nx.date}" style="margin-top:8px">Próximo: ${esc(dayLabel(nx.date, sch))} · ${esc(shortName(nx))}</button>` : ""}</section>`;
   }
   const planned = es.filter((e) => e.status === "planejado");
   const first = planned[0] || es[0];
@@ -395,6 +396,9 @@ function dayPanel(sch, date) {
         ${es.some((e) => e.race) ? `<span class="bad">prova</span>` : ""}${status ? `<span class="${status[1]}">${status[0]}</span>` : ""}
         ${es.some((e) => e.garmin_outdated) ? `<span class="warn">Garmin desatualizado</span>` : es.some((e) => e.garmin_workout_id) ? `<span class="ok">no relógio</span>` : ""}</div></div>
       ${thumbId ? `<span class="tc-thumb">${mediaHtml(thumbId, "m")}</span>` : runs.length ? `<span class="tc-thumb">${pictoHtml(SPORT_PICTO[runs[0].endurance.sport] || "run", "m")}</span>` : ""}</div>
+    ${es.filter((e) => e.alt && e.status === "planejado").map((e) => `<div class="rec small alt-on"><b>🔀 Outra opção: ${esc(e.alt.label.toLowerCase())}</b>
+      <div>${esc((e.alt.why || [])[0] || "")}</div>
+      <div class="row gap wrap" style="margin-top:6px"><button class="btn sm ghost" data-altwhy="${e.id}">Por quê?</button><button class="btn sm ghost" data-altundo="${e.id}">Voltar ao original</button></div></div>`).join("")}
     ${planned.length ? `<a class="btn block go" href="#treinar/agenda/${first.id}">${date === sch.today ? "Começar treino" : date < sch.today ? "Registrar treino" : "Treinar agora"}</a>` : ""}
     ${es.some((e) => e.status === "perdido") ? `<button class="btn block" data-skip="${es.find((e) => e.status === "perdido").id}">Ajustar a semana</button>` : ""}
     <ul class="exlist">${main.map((it) => {
@@ -408,6 +412,8 @@ function dayPanel(sch, date) {
     ${extra.length ? `<details class="small sub"><summary>Aquecimento e alongamento · ${extra.length}</summary>${itemsByPhase(extra)}</details>` : ""}
     ${es.some((e) => (e.changes || []).length || e.skip_result) ? `<details class="small sub"><summary>O que mudou neste dia</summary><ul class="small changes">${es.flatMap((e) => [...(e.changes || []), ...((e.skip_result || {}).changes || [])]).map((c) => `<li>${esc(c)}</li>`).join("")}</ul></details>` : ""}
     <div class="tc-actions">
+      ${planned.filter((e) => e.kind === "forca" && date >= sch.today).map((e) => `<button class="act" data-alt="${e.id}">🔀 Outra opção</button>`).join("")}
+      ${!planned.length && date === sch.today && es.every((e) => e.status === "feito") ? `<button class="act" data-gen="1">✨ Treinar mais hoje</button>` : ""}
       ${planned.length ? `<button class="act" data-move="${first.id}" data-date="${date}">Mover</button>
         <button class="act" data-skip="${first.id}">Não vou treinar</button>
         <button class="act" data-push="${first.id}">Enviar ao relógio</button>
@@ -486,6 +492,10 @@ function bindAgenda(sch) {
       }
       if (d.undo) { await api(`/api/schedule/${d.undo}/undo`, { method: "POST" }); toast("Ajuste desfeito"); return again(); }
       if (d.rundo) { await api(`/api/readiness/undo/${d.rundo}`, { method: "POST" }); toast("Treino original de volta"); return again(); }
+      if (d.alt) return openAlternative(+d.alt, again);
+      if (d.gen) return openAlternative(null, again);
+      if (d.altundo) { t.disabled = true; const e = await api(`/api/alternative/undo/${d.altundo}`, { method: "POST" }); toast(`Treino original de volta${e.garmin_outdated ? ". Reenvie ao relógio para atualizar" : ""}`, 4000); return again(); }
+      if (d.altwhy) { const e = sch.entries.find((x) => String(x.id) === d.altwhy); if (e && e.alt) openModal(altResultHtml(e.alt, null) + `<button class="btn block" onclick="closeModal()">Ok</button>`); return; }
       if (t.id === "rd-open") return openReadiness(sch._rd);
       if (t.id === "rd-apply") { t.disabled = true; const r = await api("/api/readiness/apply", { method: "POST", body: {} }); toast(r.changed.length ? `Ajustado: ${r.changed.join(", ")}` : "Nada para ajustar hoje", 5000); return viewHoje(); }
       if (t.id === "rd-refresh") { t.disabled = true; await api("/api/readiness/refresh", { method: "POST" }); return viewHoje(); }
@@ -1811,8 +1821,8 @@ async function showExercise(id) {
 
 /* ------------------------------------------------------------- TREINAR -- */
 async function viewTreinar(planId, idx) {
-  if (planId === "parceiro" || planId === "editar") {  // treino puxado do parceiro, "treinar junto" ou correção: o rascunho já está montado
-    const ok = (x) => x && (planId === "editar" ? x.edit_id : x.with_partner);
+  if (planId === "parceiro" || planId === "editar" || planId === "pronto") {  // treino puxado do parceiro, "treinar junto", correção ou gerado: o rascunho já está montado
+    const ok = (x) => x && (planId === "editar" ? x.edit_id : planId === "pronto" ? x.generated : x.with_partner);
     const draft = ok(state.session) ? state.session : store("gg_session");
     if (ok(draft)) { state.session = draft; return renderSession(); }
     return viewTreinar();
@@ -1855,7 +1865,9 @@ async function viewTreinar(planId, idx) {
         `${e.time ? `~${Math.round(e.time.total)} min · ` : ""}${dayKind(e)}`, e.date === sch.today)).join("")}</div>` : ""}
       ${plans.map((p) => `<h2 class="sec-title">${esc(p.name)}</h2><div class="picks">${p.days.map((d, i) => row(`#treinar/${p.id}/${i}`, d.name, `${(d.items || []).length || ""} ${(d.items || []).length ? "exercícios" : "da planilha"}`)).join("")}</div>`).join("")
         || (agenda.length ? "" : `<p class="muted">Sem planilhas ativas.</p>`)}
-      <button class="btn ghost block" id="free" style="margin-top:14px">Treino livre</button>`;
+      <button class="btn block" id="gen-now" style="margin-top:14px">✨ Gerar um treino agora</button>
+      <button class="btn ghost block" id="free" style="margin-top:8px">Treino livre</button>`;
+    $("#gen-now").onclick = () => openAlternative(null, () => viewTreinar());
     const r = $("#resume"); if (r) r.onclick = () => { state.session = draft; renderSession(); };
     const d = $("#discard"); if (d) d.onclick = () => { store("gg_session", null); viewTreinar(); };
     $("#free").onclick = () => startFree(sch);
@@ -1865,6 +1877,157 @@ async function viewTreinar(planId, idx) {
   if (draft && String(draft.plan_id) === String(planId) && draft.day_name && draft._idx === +idx) state.session = draft;
   else { state.session = await api(`/api/sessions/prefill/${planId}/${idx}`); state.session._idx = +idx; }
   renderSession();
+}
+
+// ---------------------------------------------------------------- outra opção para hoje / gerar treino agora
+function altResultHtml(p, entryId) {
+  const ch = (c) => c.type === "troca" ? `<b>${esc(c.from_name)}</b> → <b>${esc(c.to_name)}</b>: ${esc(c.why)}`
+    : c.type === "sai" ? `Sai <b>${esc(c.from_name)}</b>: ${esc(c.why)}` : c.type === "entra" ? `Entra <b>${esc(c.to_name)}</b>: ${esc(c.why)}`
+    : `<b>${esc(c.from_name)}</b>: ${esc(c.why)}`;
+  const mins = p.minutes || {};
+  return `<h2>${esc(p.label)}</h2>
+    <ul class="alt-why">${(p.why || []).map((w) => `<li>${esc(w)}</li>`).join("")}</ul>
+    ${mins.after ? `<p class="small muted">⏱ ${entryId !== null && mins.before ? `~${mins.before} → ` : "~"}${mins.after} min${p.sets ? ` · ${entryId !== null && p.sets.before ? `${p.sets.before} → ` : ""}${p.sets.after} séries` : ""}</p>` : ""}
+    ${(p.warnings || []).map((w) => `<p class="rec atencao small">${esc(w)}</p>`).join("")}
+    ${(p.preview || []).length ? `<h3>Como fica</h3><ol class="alt-list">${p.preview.map((x) => `<li><b>${esc(x.name)}</b> <span class="small muted">${x.sets ? `${x.sets} × ${x.reps || (x.duration_s ? x.duration_s + "s" : "")}` : ""}${x.superset ? ` · bi-set ${esc(x.superset)}` : ""}</span>${x.notes ? `<div class="small muted">${esc(x.notes)}</div>` : ""}</li>`).join("")}</ol>` : ""}
+    ${(p.changes || []).length ? `<details class="small sub"><summary>O que mudou · ${p.changes.length}</summary><ul class="plain alt-ch">${p.changes.map((c) => `<li>${ch(c)}</li>`).join("")}</ul></details>` : ""}
+    ${p.base ? `<details class="small sub"><summary>Por que funciona</summary><p>${esc(p.base)}</p></details>` : ""}`;
+}
+async function openAlternative(entryId, again) {
+  let o; try { o = await api("/api/alternative/options"); } catch (e) { return toast(e.message, 5000); }
+  const st = { reason: null, opts: {}, seed: 0 };
+  const body = openModal("");
+  const title = entryId ? "Outra opção para hoje" : "Gerar um treino agora";
+  const chips = (list, key, multi) => `<div class="chips">${list.map((x) => { const on = multi ? (st.opts[key] || []).includes(x.id) : st.opts[key] === x.id;
+    return `<button class="chip ${on ? "on" : ""}" data-k="${key}" data-v="${esc(x.id)}" data-multi="${multi ? 1 : ""}" aria-pressed="${on}">${esc(x.label)}</button>`; }).join("")}</div>`;
+  const step1 = () => {
+    st.reason = null; st.opts = {}; st.seed = 0;
+    body.innerHTML = `<h2>${title}</h2><p class="small muted">O que está acontecendo? O app troca só o necessário e explica cada mudança.</p>
+      <div class="picks alt-reasons">${o.reasons.filter((r) => entryId || r.id !== "variar").map((r) => `<button class="pick" data-r="${r.id}"><span class="alt-ic" aria-hidden="true">${r.icon}</span>
+        <span class="grow"><b>${esc(entryId || r.id !== "falta" ? r.label : "O que está faltando na semana")}</b><span class="small muted">${esc(r.hint)}</span></span><span class="chev" aria-hidden="true">›</span></button>`).join("")}</div>`;
+  };
+  const step2 = () => {
+    const r = o.reasons.find((x) => x.id === st.reason);
+    if (!r.asks) return preview();
+    if (r.asks === "muscles" && !st.opts.muscles) st.opts.muscles = [...(o.sore_groups || [])];
+    if (r.asks === "minutes" && !st.opts.minutes) st.opts.minutes = Math.max(15, Math.round(o.minutes * 0.6 / 5) * 5);
+    body.innerHTML = `<h2>${r.icon} ${esc(r.label)}</h2>
+      ${r.asks === "minutes" ? `<div class="field"><label for="alt-min">Quantos minutos você tem?</label><input id="alt-min" type="number" inputmode="numeric" min="10" max="180" value="${st.opts.minutes}"></div>
+        <div class="chips">${[20, 30, 40, 45].map((m) => `<button class="chip" data-min="${m}">${m} min</button>`).join("")}</div>` : ""}
+      ${r.asks === "region" ? `<p class="small muted">Onde está doendo?</p>${chips(o.regions, "region", false)}<p class="small muted" style="margin-top:8px">Dor forte, que piora, com inchaço ou formigamento: não treine a região e procure avaliação.</p>` : ""}
+      ${r.asks === "muscles" ? `<p class="small muted">O que ainda está dolorido?${(o.sore_groups || []).length ? " (já marquei o que você treinou há pouco)" : ""}</p>${chips(o.muscle_groups, "muscles", true)}` : ""}
+      ${r.asks === "kit" ? `<p class="small muted">O que você tem aí? (nada marcado = só o peso do corpo)</p>${chips(o.kits.filter((k) => k.id !== "corpo"), "kit", true)}` : ""}
+      <button class="btn block" id="alt-go" style="margin-top:14px">Ver a opção</button><button class="act" id="alt-back" style="margin-top:8px">‹ Outro motivo</button>`;
+  };
+  const preview = async () => {
+    body.innerHTML = `<h2>${title}</h2><p class="muted">Montando…</p>`;
+    try {
+      const p = await api("/api/alternative/preview", { method: "POST", body: { entry_id: entryId, reason: st.reason, opts: st.opts, seed: st.seed } });
+      body.innerHTML = `${altResultHtml(p, entryId)}
+        <button class="btn block" id="alt-use" style="margin-top:12px">${entryId ? "Usar esta opção hoje" : "Começar este treino"}</button>
+        <div class="row gap wrap" style="margin-top:8px"><button class="act" id="alt-more">↻ Gerar outra</button><button class="act" id="alt-back">‹ Outro motivo</button></div>
+        ${entryId ? `<p class="small muted">O treino original fica guardado: no Hoje, “Voltar ao original” desfaz.</p>` : ""}`;
+    } catch (e) {
+      body.innerHTML = `<h2>${title}</h2><p class="rec atencao">${esc(e.message)}</p><button class="act" id="alt-back">‹ Outro motivo</button>`;
+    }
+  };
+  const use = async (btn) => {
+    btn.disabled = true;
+    const payload = { entry_id: entryId, reason: st.reason, opts: st.opts, seed: st.seed };
+    if (entryId) {
+      const e = await api("/api/alternative/apply", { method: "POST", body: payload });
+      closeModal(); toast(`Treino de hoje trocado${e.garmin_workout_id ? ". Reenvie ao relógio para atualizar" : ""}. Dá para voltar ao original.`, 5000);
+      return again && again();
+    }
+    const cur = store("gg_session");
+    if (cur && (cur.items || []).length && !confirm(`Você tem um treino em andamento (“${cur.day_name || "Treino"}”). Trocar pelo treino gerado?`)) { btn.disabled = false; return; }
+    const d = await api("/api/alternative/draft", { method: "POST", body: payload });
+    state.session = d; store("gg_session", d); closeModal();
+    if (location.hash !== "#treinar/pronto") location.hash = "#treinar/pronto"; else renderSession();
+  };
+  step1();
+  body.onclick = async (ev) => {
+    const t = ev.target.closest("button"); if (!t) return;
+    try {
+      if (t.dataset.r) { st.reason = t.dataset.r; return step2(); }
+      if (t.id === "alt-back") return step1();
+      if (t.dataset.min) { st.opts.minutes = +t.dataset.min; const i = $("#alt-min"); if (i) i.value = t.dataset.min; return; }
+      if (t.dataset.k) {
+        const k = t.dataset.k, v = t.dataset.v;
+        if (t.dataset.multi) { const cur = st.opts[k] || []; st.opts[k] = cur.includes(v) ? cur.filter((x) => x !== v) : [...cur, v]; }
+        else st.opts[k] = st.opts[k] === v ? null : v;
+        return step2();
+      }
+      if (t.id === "alt-go") {
+        const r = o.reasons.find((x) => x.id === st.reason);
+        if (r.asks === "minutes") { const m = +($("#alt-min") || {}).value; if (!(m >= 10)) return toast("Diga quantos minutos você tem"); st.opts.minutes = m; }
+        if (r.asks === "region" && !st.opts.region) return toast("Toque onde está doendo");
+        if (r.asks === "muscles" && !(st.opts.muscles || []).length) return toast("Toque no que está dolorido");
+        return preview();
+      }
+      if (t.id === "alt-more") { st.seed += 1; return preview(); }
+      if (t.id === "alt-use") return await use(t);
+    } catch (e) { t.disabled = false; toast(e.message, 5000); }
+  };
+}
+
+// --------------------------------------------- sugestões: próximo exercício (treino livre) e extras
+function sugPayload(s) {
+  return s.items.filter((it) => fxStrength(it) && (it.phase || "principal") === "principal")
+    .map((it) => ({ exercise_id: it.exercise_id, sets: Math.max(1, (it.sets || []).filter((x) => x.done).length || (it.sets || []).length) }));
+}
+function addSuggested(s, sug) {
+  const it = { ...sug.item, added: true, fresh: true, suggested: true };
+  if (s.edit_id || s.replace_id || s.pulled) (it.sets || []).forEach((x) => { x.done = true; });
+  s.items.push(it); store("gg_session", s);
+  toast(`${it.name} entrou no treino`);
+}
+async function openSuggest(s, after, extra) {
+  const body = openModal(`<h2>${extra ? "Exercícios extras" : "Próximo exercício"}</h2><p class="muted">Pensando no que combina com o seu treino…</p>`);
+  let seed = 0, added = false;
+  const load = async () => {
+    try {
+      const r = await api("/api/suggest/next", { method: "POST", body: { items: sugPayload(s), n: 3, extra, seed, kit: s.kit || null } });
+      body.innerHTML = `<h2>${extra ? "Exercícios extras" : "Próximo exercício"}</h2>
+        ${r.message ? `<p class="rec ${r.suggestions.length ? "" : "atencao"} small">${esc(r.message)}</p>` : `<p class="small muted">Pelo que você já fez hoje${r.template ? ` (parece um treino ${esc(r.template)})` : ""}, pelo que falta na semana e pela recuperação de cada músculo.</p>`}
+        <div class="sug-list">${r.suggestions.map((x, k) => `<div class="sug-row">${mediaHtml(x.exercise_id, "m")}<div class="grow"><b>${esc(x.name)}</b>
+          <div class="small muted">${x.sets} × ${esc(String(x.reps || (x.duration_s ? x.duration_s + "s" : "")))} · ~${x.minutes} min</div><div class="small">${esc(x.why)}</div></div>
+          <button class="btn sm" data-sugadd="${k}">Adicionar</button></div>`).join("")}</div>
+        <div class="row gap wrap" style="margin-top:10px">${r.suggestions.length ? `<button class="act" id="sug-more">↻ Outras sugestões</button>` : ""}<button class="act" id="sug-close">Fechar</button></div>`;
+      body._sug = r.suggestions;
+    } catch (e) { body.innerHTML = `<p class="rec atencao">${esc(e.message)}</p><button class="act" id="sug-close">Fechar</button>`; }
+  };
+  body.onclick = (ev) => {
+    const t = ev.target.closest("button"); if (!t) return;
+    if (t.id === "sug-close") return closeModal();
+    if (t.id === "sug-more") { seed += 1; return load(); }
+    if (t.dataset.sugadd !== undefined) {
+      addSuggested(s, body._sug[+t.dataset.sugadd]); added = true; t.disabled = true; t.textContent = "✓ Adicionado";
+      // extra: dá para pôr até 2; próximo exercício: um e pronto
+      if (!extra || body.querySelectorAll("[data-sugadd]:disabled").length >= 2) closeModal();
+    }
+  };
+  // ao fechar (por aqui ou pelo ✕), a tela do treino mostra o que entrou
+  closeModal.hook = () => { if (added) after(); };
+  await load();
+}
+// treino livre: logo abaixo dos exercícios, o próximo que faz sentido (busca só quando o treino muda)
+async function loadNextSug(s) {
+  const box = $("#next-sug"); if (!box) return;
+  const sig = JSON.stringify(sugPayload(s)) + "|" + (s._sugSeed || 0);
+  const show = (r) => {
+    const b = $("#next-sug"); if (!b) return;
+    const x = (r.suggestions || [])[0];
+    if (!x) { b.innerHTML = `<span class="small muted">${esc(r.message || "Treino completo por hoje.")}</span>`; return; }
+    b.innerHTML = `<div class="eyebrow">Próximo exercício sugerido</div><div class="sug-row">${mediaHtml(x.exercise_id, "m")}<div class="grow"><b>${esc(x.name)}</b>
+      <div class="small muted">${x.sets} × ${esc(String(x.reps || (x.duration_s ? x.duration_s + "s" : "")))}</div><div class="small">${esc(x.why)}</div></div></div>
+      <div class="row gap wrap" style="margin-top:8px"><button class="btn sm" id="ns-add">Adicionar</button><button class="act" id="ns-other">Outra sugestão</button></div>`;
+    $("#ns-add").onclick = () => { addSuggested(s, x); renderSession(); };
+    $("#ns-other").onclick = () => { s._sugSeed = (s._sugSeed || 0) + 1; loadNextSug(s); };
+  };
+  if (s._sugCache && s._sugCache.sig === sig) return show(s._sugCache.r);
+  try { const r = await api("/api/suggest/next", { method: "POST", body: { items: sugPayload(s), n: 1, seed: s._sugSeed || 0, kit: s.kit || null } }); s._sugCache = { sig, r }; show(r); }
+  catch (e) { const b = $("#next-sug"); if (b) b.remove(); }
 }
 
 // treino livre: começa na lista (para montar) e já sabe o que falta na semana
@@ -1898,12 +2061,14 @@ function renderSession() {
       <details class="small sub" style="margin-top:8px"><summary>Data e hora: ${esc(when)}</summary>
         <div class="field" style="margin:0 0 6px"><label for="s-date">Data e hora do treino</label><input type="datetime-local" id="s-date" value="${esc((s.date || "").slice(0, 16))}"></div></details>
       ${s.deload ? `<p class="small rec">Semana de deload: menos séries, carga −10%, RPE ~6.</p>` : ""}
+      ${s.generated && s.alt ? `<details class="rec small" style="margin-top:10px"><summary><b>✨ Gerado: ${esc(s.alt.label.toLowerCase())}</b></summary><ul class="plain">${(s.alt.why || []).map((w) => `<li>${esc(w)}</li>`).join("")}</ul></details>` : ""}
       ${s.edit_id ? `<div class="rec small" style="margin-top:10px"><b>Você está corrigindo um treino já registrado.</b> Mude repetições e cargas e toque em Salvar correção: o mesmo registro é atualizado (não cria outro).${(s.kept_items || []).length ? ` Ficam como estão: ${esc(s.kept_items.join(", "))}.` : ""}</div>` : partnerDraftHtml(s)}</section>
     ${missingChipsHtml(s)}
     ${compactCard("preparo", "Aquecimento — elevar, ativar, potencializar")}
     ${idxs.filter(([it]) => phaseOf(it) === "principal").map(([it, i]) => sessionItemHtml(it, i)).join("")}
+    ${!s.schedule_id && !s.plan_id && !s.edit_id && !s.with_partner && s.items.some(fxStrength) ? `<div id="next-sug" class="card next-sug"><span class="small muted">Procurando o próximo exercício que combina…</span></div>` : ""}
     ${compactCard("pos", "Pós-treino — alongamento")}
-    <div class="card"><button class="btn sm ghost" id="s-add">+ Adicionar exercício</button>
+    <div class="card"><div class="row gap wrap"><button class="btn sm ghost" id="s-add">+ Adicionar exercício</button><button class="btn sm ghost" id="s-sug">✨ Sugerir exercício</button></div>
       <div class="field" style="margin-top:10px"><label>Como foi o treino?</label><textarea id="s-notes" placeholder="Sensações, dores, energia…">${esc(s.notes || "")}</textarea></div>
       <button class="btn block" id="s-finish">${s.edit_id ? "Salvar correção" : s.replace_id ? "Salvar (substitui o registro anterior)" : "Finalizar e salvar"}</button>
       <button class="act" id="s-cancel" style="margin-top:10px">${s.edit_id ? "Cancelar correção" : "Descartar treino"}</button></div>`;
@@ -2039,6 +2204,8 @@ function bindSession() {
     if (s.edit_id || s.replace_id || s.pulled) { (it.sets || []).forEach((x) => { x.done = true; }); if (it.kind === "cardio") it.done = true; it.fresh = true; }  // treino já feito: o que acrescenta é o que fez
     s.items.push(it); renderSession(); }, { muscle, missing: s.missing });
   $("#s-add").onclick = () => addEx();
+  $("#s-sug").onclick = () => openSuggest(s, () => renderSession(), !!(s.schedule_id || s.plan_id));
+  if ($("#next-sug")) loadNextSug(s);
   $("#s-cancel").onclick = () => { if (confirm(s.edit_id ? "Cancelar a correção? O registro fica como estava." : "Descartar este treino?")) { store("gg_session", null); state.session = null; location.hash = "#hoje"; } };
   $("#s-finish").onclick = finishSession;
   $$("[name=pmerge]").forEach((r) => { r.onchange = () => { s.merge_into = +r.value || null; s.merge_answered = true; store("gg_session", s); }; });
@@ -2644,6 +2811,7 @@ function renderFocus() {
     const sets = s.items.reduce((n, x) => n + (fxStrength(x) ? x.sets.filter((y) => y.done).length : 0), 0);
     body = `<section class="today-card fx-end"><div class="eyebrow">Treino concluído</div><div class="tc-title">${esc(s.day_name || "Treino")} ✓</div>
       <p class="muted">${doneN} de ${order.length} exercícios · ${sets} séries feitas</p>
+      ${s.edit_id ? "" : `<button class="btn ghost block" data-fx="sug" style="margin-bottom:10px">✨ Sugerir 1–2 exercícios extras</button>`}
       <div class="field"><label for="s-notes">Como foi o treino?</label><textarea id="s-notes" placeholder="Sensações, dores, energia…">${esc(s.notes || "")}</textarea></div>
       <button class="btn block" id="s-finish">${s.edit_id ? "Salvar correção" : s.replace_id ? "Salvar (substitui o registro anterior)" : "Finalizar e salvar"}</button>
       <button class="act" data-fx="list" style="margin-top:10px">Revisar na lista</button> <button class="act" id="s-cancel" style="margin-top:10px">${s.edit_id ? "Cancelar correção" : "Descartar treino"}</button></section>`;
@@ -2775,6 +2943,7 @@ function bindFocus() {
       const left = s.restEnd ? Math.ceil((s.restEnd - Date.now()) / 1000) : 0;
       s.view = "lista"; s.restEnd = null; s.restOver = false; s.workEnd = null; s.prepEnd = null; save(); renderSession(); if (left > 0) startTimer(left); return;
     }
+    if (a === "sug") return openSuggest(s, () => { const order2 = fxOrder(s); s.fx = order2.indexOf(s.items.length - 1); save(); renderFocus(); }, true);
     if (a === "add") return pickExercise(null, (ex) => {
       const cur = fxOrder(s)[s.fx];  // onde a pessoa estava (para voltar se ela tirar o exercício que acabou de pôr)
       s.items.push(newSessionItem(ex));
