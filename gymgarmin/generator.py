@@ -29,7 +29,7 @@ import copy
 import math
 from collections import defaultdict
 
-from . import catalog, clock, endurance
+from . import catalog, clock, endurance, life_stage
 from . import focus as focus_mod
 from . import training_rules
 from .limitations import check_exercise, max_zone
@@ -504,6 +504,7 @@ RAMP_DRILLS = {
     "core": ["Dead_Bug", "Cat_Stretch"],
 }
 POTENTIATE = {"inferior": "Box_Jump_Multiple_Response", "superior": "Medicine_Ball_Chest_Pass"}
+KNEE_GUARD_OPTIONS = ["Thigh_Abductor", "Cable_Standing_Hip_Abduction", "Band_Hip_Abduction", "Side_Lying_Hip_Abduction"]
 
 
 def _prep_items(regions: set[str], lims, rotation: int, warm_machine: str, warm_min: int,
@@ -748,6 +749,20 @@ def generate(profile: dict, seed: int = 0, recent: dict | None = None, today=Non
         strength_days = _spread(avail, n_strength)
         cardio_days = [d for d in avail if d not in strength_days]
         split = _choose_split(strength_days, tier_key, goal)
+    life = life_stage.stage(p, tier_key)
+    if life.get("max_strength_days") and n_strength > life["max_strength_days"]:
+        extra_days = [d for d in strength_days][life["max_strength_days"]:]
+        n_strength = life["max_strength_days"]
+        if not end_on:
+            strength_days = _spread(avail, n_strength)
+            cardio_days = [d for d in avail if d not in strength_days]
+            split = _choose_split(strength_days, tier_key, goal)
+        else:
+            strength_days = strength_days[:n_strength]
+            split = split[:n_strength]
+        rationale.append(f"Com {life['age']} anos, até {n_strength} dias de força por semana rendem o mesmo com recuperação melhor"
+                         + (f"; {len(extra_days)} dia(s) viram cardio leve ou mobilidade." if extra_days and not end_on else "."))
+    rationale.extend(life["notes"])
     months = p.get("training_months")
     rationale.append(f"Tempo de prática {('%.0f meses' % months) if months is not None else '(nível do perfil)'} → "
                      f"nível {tier['label']}: {tier['sets']['main']} séries nos principais, reps "
@@ -763,7 +778,8 @@ def generate(profile: dict, seed: int = 0, recent: dict | None = None, today=Non
                          "os outros dias viram cardio/recuperação ativa.")
 
     gym = gym_type(p)
-    picker = _Picker(tier, lims, equipment, seed, gym)
+    picker = _Picker({**tier, "equipment_pref": TIERS["iniciante"]["equipment_pref"]} if life.get("machines_first") else tier,
+                     lims, equipment, seed, gym)
     picker.strength_focus = goal_key == "forca" and tier_key != "iniciante"
     if gym == "premium" and not equipment:
         rationale.append("Academia premium: cada movimento começa pelas máquinas articuladas e de came (pêndulo, V-squat, "
@@ -777,7 +793,7 @@ def generate(profile: dict, seed: int = 0, recent: dict | None = None, today=Non
 
     days: list[dict] = []
     variant_count: dict[str, int] = defaultdict(int)
-    warm_min = 3 if budget <= 45 else 5  # RAMP: o "elevar" leva 3–5 min; o resto é específico do dia
+    warm_min = (3 if budget <= 45 else 5) + int(life.get("warm_extra") or 0)  # RAMP: o "elevar" leva 3–5 min (+ idade)
     potentiate = tier_key in ("avancado", "elite") and goal_key in ("forca", "hibrido", "condicionamento") and budget >= 60
     for di, (wd, key) in enumerate(zip(strength_days, split)):
         title, slots = DAY_TEMPLATES[key]
@@ -811,9 +827,21 @@ def generate(profile: dict, seed: int = 0, recent: dict | None = None, today=Non
                 heavy = _reps_bounds(first.get("reps"))[0] <= 6
                 if heavy and tier_key in ("avancado", "elite"):
                     first["notes"] = ((first.get("notes") or "") + " · top set: 1 série pesada (RPE 8) e as demais ~10% mais leves").strip(" ·")
+        if life.get("knee_guard") and key in LOWER_DAYS and not any(
+                i.get("pattern") == "glute" and "abductors" in (catalog.get(i["exercise_id"]).get("primaryMuscles") or []) for i in main_items):
+            # mulheres: glúteo médio em todo dia de perna (protege o joelho do valgo / LCA)
+            ok = KNEE_GUARD_OPTIONS and next((e for e in KNEE_GUARD_OPTIONS if e not in used and _ok(e, lims, equipment) == "ok"), None)
+            if ok:
+                used.add(ok)
+                main_items.append({"exercise_id": ok, "sets": tier["sets"]["acc"], "reps": reps["acc"], "role": "acc", "pattern": "glute",
+                                   "phase": "principal", "rpe_target": tier["rpe"], "rir": RIR[tier_key]["acc"],
+                                   "rest_s": training_rules.rest_for("acc", tier_key, goal["rest"], p.get("rest_pref")),
+                                   "notes": "glúteo médio: protege o joelho"})
         accs = [i for i in main_items if i["role"] == "acc" and not catalog.get(i["exercise_id"]).get("timed")]
-        if accs and tier_key != "iniciante" and goal_key in ("hipertrofia", "emagrecimento", "hibrido"):
+        if accs and tier_key != "iniciante" and goal_key in ("hipertrofia", "emagrecimento", "hibrido") and not life.get("no_intensifiers"):
             accs[-1]["notes"] = ((accs[-1].get("notes") or "") + " · última série: drop set (tire ~25% e continue até perto da falha)").strip(" ·")
+        for it in main_items:
+            life_stage.apply_item(it, life, (catalog.get(it["exercise_id"]) or {}).get("mechanic") == "compound")
         _pair_supersets(main_items)
         regions = set()
         for it in main_items:
@@ -821,6 +849,13 @@ def generate(profile: dict, seed: int = 0, recent: dict | None = None, today=Non
             for m in ex["primaryMuscles"]:
                 regions.add("core" if MUSCLES.get(m, {}).get("region") == "core" else MUSCLES.get(m, {}).get("region", "superior"))
         prep = _prep_items(regions, lims, di, _cardio_machine(lims, cardio_prefs, di), warm_min, potentiate, equipment)
+        if life.get("balance") and catalog.get(life_stage.BALANCE_DRILL):
+            prep.insert(1, {"exercise_id": life_stage.BALANCE_DRILL, "sets": 2, "duration_s": 30, "rest_s": 10, "phase": "preparo",
+                            "ramp": "ativar", "notes": "cada perna; perto de um apoio (previne quedas)"})
+        if life.get("bone_jump") and "inferior" in regions and catalog.get(life_stage.BONE_JUMP) and \
+                not any(x.get("ramp") == "potencializar" for x in prep):
+            prep.append({"exercise_id": life_stage.BONE_JUMP, "sets": 2, "reps": "5", "rest_s": 45, "phase": "preparo",
+                         "ramp": "potencializar", "notes": "saltos baixos, aterrissando macio: o impacto fortalece os ossos"})
         days.append({"name": f"{WEEKDAYS[wd]} – {title}", "weekday": wd, "kind": "forca", "template": key,
                      "items": prep + main_items})
 
@@ -1023,6 +1058,10 @@ def generate(profile: dict, seed: int = 0, recent: dict | None = None, today=Non
     if lims:
         rationale.append("Limitações aplicadas: exercícios 'evitar' nunca entram; 'cuidado' só quando não há alternativa"
                          + (f"; cardio limitado à zona {mz}." if mz < 5 else "."))
+    # idade/sexo por último: o ajuste de volume da semana não pode passar dos tetos (séries, RPE, repetições)
+    for d in days:
+        for it in d["items"]:
+            life_stage.apply_item(it, life, (catalog.get(it.get("exercise_id")) or {}).get("mechanic") == "compound", rest=False)
 
     return {
         "name": f"Auto – {goal['label']} ({tier['label']})",

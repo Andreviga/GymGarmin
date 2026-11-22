@@ -379,7 +379,7 @@ def _load() -> tuple[list[dict], dict[str, dict]]:
             "instructions": m["instructions"],
             "images": [IMAGE_BASE + i for i in like.get("images", [])] if like else [],
             "image_like": NAMES_PT.get(like["id"], like["name"]) if like else None,
-            "garmin": m["garmin"], "timed": False, "popular": True,
+            "garmin": m["garmin"], "timed": bool(m.get("timed", False)), "popular": True,
             "top_machine": m.get("top_machine", True), "evidence": m.get("evidence", ""), "sources": m.get("sources", []),
             "availability_br": m.get("availability_br"), "lengthened": m.get("lengthened", False), "picto": m.get("picto"),
             "aliases": m.get("aliases") or [],  # nomes que as pessoas usam ("leg press 90", "pressão de pernas")

@@ -24,7 +24,7 @@ import copy
 import re
 from collections import defaultdict
 
-from . import catalog, training_rules
+from . import catalog, life_stage, training_rules
 from . import generator as G
 from .limitations import LIMITATIONS, check_exercise
 from .muscles import MUSCLES, PRIMARY_WEIGHT, SECONDARY_WEIGHT
@@ -259,6 +259,7 @@ class Ctx:
             self.reps = {k: (v if G._reps_bounds(v)[0] >= 8 else "8-12") for k, v in self.reps.items()}
         self.equipment = set(p.get("equipment") or []) or None
         self.gym = G.gym_type(p)
+        self.life = life_stage.stage(p, self.tier_key)
         self.budget = float(budget or p.get("session_minutes") or 60)
         self.sessions = sessions or []
         self.recovery = recovery or {}
@@ -369,6 +370,8 @@ def _new_item(old: dict | None, eid: str, ctx: Ctx, role: str | None = None, pat
     else:
         it.pop("duration_s", None)
         it["reps"] = it.get("reps") or ctx.reps[it["role"]]
+    if not old:   # item novo: segue a idade e o sexo (o que veio do plano já seguia)
+        life_stage.apply_item(it, ctx.life, ex.get("mechanic") == "compound")
     return it
 
 

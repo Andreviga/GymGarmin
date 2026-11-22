@@ -182,5 +182,36 @@
    "confidence": "media"
   },
   "picto": "calf"
+ },
+ {
+  "id": "Single_Leg_Balance",
+  "name": "Equilíbrio em um pé só",
+  "name_en": "Single-Leg Balance",
+  "equipment": "body only",
+  "category": "strength",
+  "force": "static",
+  "mechanic": "isolation",
+  "level": "beginner",
+  "primaryMuscles": [
+   "calves"
+  ],
+  "secondaryMuscles": [
+   "glutes",
+   "abdominals"
+  ],
+  "timed": true,
+  "instructions": [
+   "Perto de uma parede ou apoio, fique num pé só, joelho levemente dobrado.",
+   "Olhe para um ponto fixo e mantenha o quadril nivelado.",
+   "Fácil demais: feche os olhos, vire a cabeça devagar ou fique sobre uma almofada.",
+   "Troque de lado. Equilíbrio treinado reduz o risco de quedas."
+  ],
+  "garmin": {
+   "category": "TOTAL_BODY",
+   "exercise": "STANDING_T_ROTATION_BALANCE",
+   "garmin_name": "Standing T-rotation Balance",
+   "confidence": "media"
+  },
+  "picto": null
  }
 ]

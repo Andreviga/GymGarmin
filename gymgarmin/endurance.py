@@ -156,6 +156,7 @@ def _config(profile: dict) -> dict:
     for s, c in (end.get("sports") or {}).items():
         if s in sp.SPORTS and c and c.get("enabled"):
             out[s] = {**c, "sessions": int(c.get("sessions") or VOLUME[s]["sessions"])}
+    age = _age((profile or {}).get("age"))
     ev = end.get("event") or {}
     if ev.get("type") in EVENTS and _d(ev.get("date")):
         e = EVENTS[ev["type"]]
@@ -164,7 +165,28 @@ def _config(profile: dict) -> dict:
             dist = sum(d for ls, d in e["legs"] if ls == s)
             out[s] = {**base, "enabled": True, "sessions": max(int(base.get("sessions") or 0), n),
                       "goal": {"type": "evento", "event": ev["type"], "distance": dist, "date": ev["date"]}}
+    for c in out.values():
+        c["_age"] = age
     return out
+
+
+def _age(v) -> int | None:
+    try:
+        a = int(v)
+    except (TypeError, ValueError):
+        return None
+    return a if 8 <= a <= 110 else None
+
+
+def progression(c: dict) -> tuple[float, int]:
+    """(subida semanal, semana leve a cada N semanas). Atletas de 50+ recuperam mais devagar entre blocos: +6%/semana e
+    semana leve a cada 3ª; 65+ e adolescentes: +5% (ossos e tendões se adaptam mais devagar que o fôlego)."""
+    a = (c or {}).get("_age")
+    if a is not None and (a >= 65 or a < 16):
+        return 1.05, 3
+    if a is not None and a >= 50:
+        return 1.06, 3
+    return 1.08, 4
 
 
 def active(profile: dict) -> bool:
@@ -207,9 +229,9 @@ def weekly_cap(sport: str, n_sessions: int) -> float:
     return mx if n_sessions <= 1 else mx * (0.55 + 0.45 * (n_sessions - 1)) * 0.9
 
 
-def _trend(start: float, peak: float, n: int) -> float:
-    build_weeks = max(0, n) - max(0, n) // 4  # semanas leves não sobem
-    return min(peak, start * (1.08 ** build_weeks)) if peak >= start else peak
+def _trend(start: float, peak: float, n: int, rate: float = 1.08, every: int = 4) -> float:
+    build_weeks = max(0, n) - max(0, n) // every  # semanas leves não sobem
+    return min(peak, start * (rate ** build_weeks)) if peak >= start else peak
 
 
 def done_ceiling(done: dict | None, sport: str, week_idx: int, planned_avg3: float | None = None) -> float | None:
@@ -263,11 +285,12 @@ def _week_volume(sport: str, c: dict, level: str, week_idx: int, ws: date, recen
     g = c.get("goal") or {}
     race = _d(g.get("date")) if g.get("type") in ("prova", "evento") else None
     n = max(0, week_idx)
+    rate, every = progression(c)
     if race:
         weeks_to = (race - ws).days // 7
         taper = max(1, _taper(sport, c))
         # polimento/prova/recuperação partem do volume realmente atingido antes do polimento
-        top = _trend(start, peak, n + weeks_to - taper - 1)
+        top = _trend(start, peak, n + weeks_to - taper - 1, rate, every)
         if weeks_to < 0:
             rec = -weeks_to
             if rec <= 2:
@@ -278,9 +301,9 @@ def _week_volume(sport: str, c: dict, level: str, week_idx: int, ws: date, recen
         if weeks_to <= taper:
             frac = {1: 0.55, 2: 0.7, 3: 0.8}.get(weeks_to, 0.8) if taper > 1 else 0.6
             return {"volume": top * frac, "phase": "polimento", "weeks_to_race": weeks_to}
-    # progressão: +8%/semana a partir do atual, semana leve a cada 4ª, teto no pico
-    trend = _trend(start, peak, n)
-    deload = n % 4 == 3
+    # progressão: +8%/semana a partir do atual, semana leve a cada 4ª, teto no pico (50+: +6% e leve a cada 3ª)
+    trend = _trend(start, peak, n, rate, every)
+    deload = n % every == every - 1
     vol = trend * (0.75 if deload else 1.0)
     if race:
         weeks_to = (race - ws).days // 7
@@ -370,6 +393,17 @@ def goal_warning(sport: str, c: dict) -> str | None:
 def _run(kind, km, c, anchors, env, level, week_idx, phase):
     S = "corrida"
     note = None
+    rw = run_walk(c, level, week_idx)
+    if rw and kind in ("leve", "longo", "regenerativo"):
+        run_min, walk_min = rw
+        total_min = km * 1000 / sp.speed_mps(S, 2, anchors, env) / 60 * 1.15   # caminhando, o mesmo tempo cobre menos chão
+        n = max(3, min(20, round(total_min / (run_min + walk_min))))
+        return f"Corre-caminha {n} × ({run_min:g} min correndo + {walk_min:g} min caminhando)", [
+            _rest(5 * 60, kind="warmup", zone=1, sport=S, anchors=anchors, env=env, note="5 min caminhando rápido"),
+            _repeat(n, [_steady(S, "interval", 2, anchors, env, dur_s=run_min * 60, note="leve: dá para conversar"),
+                        _rest(walk_min * 60, sport=S, anchors=anchors, env=env, note="caminhando")])], \
+            ("Método corre-caminha: o fôlego melhora rápido, mas ossos e tendões levam semanas — alternar com caminhada "
+             "deixa treinar mais com menos lesão. O tempo de corrida aumenta a cada semana.")
     if kind == "longo":
         steps = [_steady(S, "steady", 2, anchors, env, dist_m=km * 1000)]
         gp = _goal_pace(S, c)
@@ -397,6 +431,16 @@ def _run(kind, km, c, anchors, env, level, week_idx, phase):
                     note="10 min leve + educativos (skipping, anfersen, 4 acelerações de 20 s)"),
             _repeat(n, [_steady(S, "interval", 5, anchors, env, dur_s=4 * 60), _steady(S, "recovery", 1, anchors, env, dur_s=3 * 60)]),
             _steady(S, "cooldown", 1, anchors, env, dur_s=8 * 60)], "4 min forte (90–95% da FC máx: falar só palavras soltas) e 3 min trotando"
+    if kind == "subidas":
+        # subida forte de 60 s: força específica e economia de corrida com menos impacto que o tiro no plano
+        n = 6 if level == "iniciante" else 8 if level == "intermediario" else 10
+        return f"Subidas {n} × 60 s", [
+            _steady(S, "warmup", 2, anchors, env, dist_m=warm * 1000, note="leve + educativos (skipping, anfersen)"),
+            _repeat(n, [{**_steady(S, "interval", 5, anchors, env, dur_s=60), "target": {"type": "open", "label": "forte na subida (8 de 10)"},
+                         "note": "ladeira de 4–8% (ou esteira a 6%): passos curtos, tronco levemente à frente"},
+                        _rest(90, sport=S, anchors=anchors, env=env, note="desce trotando ou caminhando")]),
+            _steady(S, "cooldown", 1, anchors, env, dist_m=cool * 1000)], \
+            "Subidas: força nas pernas e nos tendões com menos impacto que tiro no plano (fase de base)"
     if kind == "intervalado":
         rep = 800 if level == "iniciante" else 1000
         n = max(3, min(8, round(work * 1000 / rep / 1.6)))  # ~60% do miolo é tiro
@@ -445,6 +489,20 @@ def _run(kind, km, c, anchors, env, level, week_idx, phase):
              "note": "registre o tempo: o app recalcula seus ritmos"},
             _steady(S, "cooldown", 1, anchors, env, dist_m=1500)], "Teste de 5 km (recalibra o VDOT)"
     raise ValueError(kind)
+
+
+RUN_WALK = [(1, 2), (1.5, 2), (2, 2), (3, 2), (4, 1.5), (5, 1.5), (7, 1.5), (9, 1), (12, 1), (15, 1)]
+
+
+def run_walk(c: dict, level: str, week_idx: int) -> tuple[float, float] | None:
+    """Iniciante com pouco volume (ou 65+ começando): corre-caminha nas primeiras semanas, subindo o tempo de corrida.
+    Some quando a pessoa já corre 10 km por semana ou depois das 10 semanas."""
+    start = float(c.get("_start") or 0)
+    age = c.get("_age") or 0
+    if level != "iniciante" or start >= 10 or c.get("no_run_walk"):
+        return None
+    k = week_idx if age < 65 else week_idx // 2   # 65+: cada etapa dura 2 semanas
+    return RUN_WALK[k] if k < len(RUN_WALK) else None
 
 
 def _bike(kind, hours, c, anchors, env, level, week_idx, phase):
@@ -568,7 +626,7 @@ def build_session(sport: str, kind: str, volume: float, c: dict, anchors: dict, 
         flat += [x for _ in range(st["n"]) for x in st["steps"]] if st["kind"] == "repeat" else [st]
     dur = sum(s.get("dur_s") or 0 for s in flat)
     dist = sum(s.get("dist_m") or 0 for s in flat)
-    hard = kind in ("intervalado", "noruegues", "ritmo", "ritmo_prova", "sweet_spot", "limiar", "vo2", "css", "velocidade",
+    hard = kind in ("intervalado", "noruegues", "subidas", "ritmo", "ritmo_prova", "sweet_spot", "limiar", "vo2", "css", "velocidade",
                     "intervalos_1000", "intervalos_500", "teste", "prova")
     zone = max((s.get("zone") or 1) for s in flat) if hard else (2 if kind != "regenerativo" else 1)
     end = {"sport": sport, "env": env, "type": kind, "title": title, "steps": steps, "hard": hard, "zone": zone,
@@ -597,7 +655,8 @@ def _week_roles(sport: str, c: dict, level: str, week_idx: int, phase: str, n: i
     n_quality = 0
     if rot and phase not in ("recuperacao",):
         n_quality = 1 if (n >= 3 or (n >= 2 and sport in ("natacao", "ciclismo", "remo"))) else 0
-        if n >= 5 and level in ("avancado", "elite") and phase not in ("polimento", "semana_leve", "prova"):
+        if n >= 5 and level in ("avancado", "elite") and phase not in ("polimento", "semana_leve", "prova") \
+                and not ((c.get("_age") or 0) >= 60 or (c.get("_age") or 99) < 16):
             n_quality = 2
         if sport == "corrida" and level == "iniciante" and week_idx < 4:
             n_quality = 0  # iniciante: primeiro constrói base (educativos na rodagem)
@@ -608,6 +667,8 @@ def _week_roles(sport: str, c: dict, level: str, week_idx: int, phase: str, n: i
             kind = "ritmo_prova" if _goal_pace(sport, c) else kind
         if sport == "ciclismo" and level == "iniciante":
             kind = "sweet_spot"
+        if sport == "corrida" and phase == "base" and kind == "intervalado":
+            kind = "subidas"   # base: força específica na subida, com menos impacto que o tiro no plano
         q.append(kind)
     if test_due and rot and phase in ("base", "construcao", "manutencao", "semana_leve"):
         if q:
@@ -723,6 +784,7 @@ def week_plan(profile: dict, ws: date, start: date, tier_key: str = "intermediar
     out = {}
     test_slot_used = False
     for sport, c in cfg.items():
+        c = {**c, "_start": _current(sport, c, level, recent)}
         n_cfg = int(c["sessions"])
         t_cap = session_max(sport, anchors, c.get("env")) * (1 if n_cfg <= 1 else (0.55 + 0.45 * (n_cfg - 1)) * 0.9)
         wv = week_volume(sport, c, level, week_idx, ws, recent, cap=t_cap, done=done)
@@ -734,13 +796,16 @@ def week_plan(profile: dict, ws: date, start: date, tier_key: str = "intermediar
             missing = not anchors.get(ANCHOR_KEY[sport])
             stale = last is not None and (ws - last).days >= TEST_EVERY_WEEKS * 7
             # teste só fora de semana de prova/polimento e no máximo um por semana
-            test_due = (missing and week_idx in (0, 1)) or stale
+            test_due = ((missing and week_idx in (0, 1)) or stale) and not (sport == "corrida" and run_walk(c, level, week_idx))
             if test_due:
                 test_slot_used = True
         mn = min_session(sport, anchors, c.get("env"))
         n_week = n if full_slots else min(n, max(1, int(wv["volume"] // (mn * 1.1)) or 1))
         roles = _week_roles(sport, c, level, week_idx, wv["phase"], n_week, test_due)
         sessions = _compose(sport, roles, wv["volume"], c, anchors, level, week_idx, wv["phase"])
+        longest = float(((done or {}).get(sport) or {}).get("longest30") or 0)
+        if sport in SPIKE_SPORTS and longest >= mn:
+            sessions = _cap_spikes(sport, sessions, longest, mn, c, anchors, level, week_idx, wv["phase"])
         built = sum(_vol(x) for x in sessions)
         if built and built < wv["volume"] * 0.85:
             # poucas sessões para o volume (o longo tem teto pela distância da prova): a semana mostra o que cabe
@@ -768,6 +833,34 @@ def week_plan(profile: dict, ws: date, start: date, tier_key: str = "intermediar
                       "sessions": sessions}
     _cap_hard(out, level, anchors, max_hard)
     return {"week_idx": week_idx, "sports": out, "bricks": _bricks(profile, out, week_idx)}
+
+
+SPIKE_SPORTS = {"corrida", "caminhada", "trilha"}
+SPIKE_MAX = 1.10
+
+
+def _cap_spikes(sport, sessions, longest, mn, c, anchors, level, week_idx, phase):
+    """Nenhuma sessão mais de 10% maior que a mais longa dos últimos 30 dias: em 5.200 corredores, passar disso num
+    treino só aumentou o risco de lesão (+64% com 10–30%, mais acima disso), mesmo com o volume semanal sob controle
+    (Frandsen et al., BJSM 2025). A prova é a exceção."""
+    unit = VOLUME[sport]["unit"]
+    cap = longest * SPIKE_MAX
+    out = []
+    for se in sessions:
+        e = se["endurance"]
+        size = (e.get("dist_m") or 0) / 1000 if unit == "km" else e["dur_s"] / 3600
+        if e["type"] != "prova" and size > cap + (0.25 if unit == "km" else 0.05):
+            new = build_session(sport, e["type"], _round_vol(sport, max(mn, cap)), c, anchors, level, week_idx, phase)
+            ref = f"{longest:.1f} km".replace(".0 km", " km") if unit == "km" else f"{round(longest * 60)} min"
+            msg = (f"Até 10% acima do seu treino mais longo dos últimos 30 dias ({ref}): pular mais que isso num treino só "
+                   "aumenta o risco de lesão.")
+            new["endurance"]["note"] = (new["endurance"].get("note") + " · " if new["endurance"].get("note") else "") + msg
+            new["endurance"]["spike_capped"] = True
+            if e.get("role"):
+                new["endurance"]["role"] = e["role"]
+            se = new
+        out.append(se)
+    return out
 
 
 def _cap_hard(out: dict, level: str, anchors: dict, max_hard: int | None = None) -> None:
@@ -1041,11 +1134,37 @@ def done_volumes(sessions: list[dict], profile: dict, ws: date) -> dict:
     weeks = [recent_volumes(sessions, profile, today=ws - timedelta(days=1 + 7 * k), weeks=1, fixed_span=True) for k in range(3)]
     before = recent_volumes(sessions, profile, today=ws - timedelta(days=22), weeks=3, fixed_span=True)
     ever = recent_volumes(sessions, profile, today=ws - timedelta(days=1), weeks=8)
+    longest = longest_sessions(sessions, profile, ws)
     out = {}
     for sport in set(avg3) | set(before) | set(ever):
         out[sport] = {"avg3": avg3.get(sport, 0.0), "max3": max(w.get(sport, 0.0) for w in weeks),
                       "weeks": [w.get(sport, 0.0) for w in weeks],
-                      "before": before.get(sport, 0.0), "tracked": sport in ever}
+                      "before": before.get(sport, 0.0), "tracked": sport in ever, "longest30": longest.get(sport, 0.0)}
+    return out
+
+
+def longest_sessions(sessions: list[dict], profile: dict, ws: date, days: int = 30) -> dict:
+    """Maior sessão de cada modalidade nos últimos `days` dias antes de `ws` (km, m ou h, como o volume)."""
+    from . import load
+
+    anchors = sp.anchors_of(profile)
+    lo = ws - timedelta(days=days)
+    out: dict[str, float] = {}
+    for s in sessions:
+        try:
+            d = datetime.fromisoformat(str(s.get("date"))[:19]).date()
+        except ValueError:
+            continue
+        if not (lo <= d < ws):
+            continue
+        st = load.session_stress(s, anchors)
+        for sport, km in st["km"].items():
+            if sport in VOLUME and VOLUME[sport]["unit"] in ("km", "m"):
+                v = km if VOLUME[sport]["unit"] == "km" else km * 1000
+                out[sport] = max(out.get(sport, 0.0), v)
+        for sport, mins in st["minutes"].items():
+            if sport in VOLUME and VOLUME[sport]["unit"] == "h":
+                out[sport] = max(out.get(sport, 0.0), mins / 60)
     return out
 
 
