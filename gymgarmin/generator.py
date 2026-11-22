@@ -312,12 +312,18 @@ def _ok(ex_id: str, lims: list[dict], equipment: set[str] | None) -> str | None:
 class _Picker:
     """Escolhe exercícios por padrão respeitando limitações, equipamento, nível e variedade."""
 
-    def __init__(self, tier: dict, lims: list[dict], equipment: set[str] | None, seed: int, gym: str = "completa"):
+    def __init__(self, tier: dict, lims: list[dict], equipment: set[str] | None, seed: int, gym: str = "completa",
+                 profile: dict | None = None):
         self.tier, self.lims, self.equipment, self.seed = tier, lims, equipment, seed
         self.gym = gym if gym in GYM_TYPES else "completa"
+        # academia da pessoa: aparelho que ela disse que não tem nunca entra; o que confirmou entra mesmo se for raro
+        from . import gyms
+        self.profile = profile or {}
+        self.gym_ok = gyms.checker(profile) if profile is not None else None
+        self.gym_has = set((profile or {}).get("gym_has") or [])
         self.used_week: dict[str, list[str]] = defaultdict(list)
         self.strength_focus = False
-        self.avoid: set[str] = set()                 # exercícios que a pessoa não quer ou não deve fazer
+        self.avoid: set[str] = set((profile or {}).get("gym_missing") or [])  # não quer, não deve ou a academia não tem
         self.prefer: dict[str, list[str]] = {}       # por padrão: estes primeiro (mobilidade, lesão antiga)
         self.demote: dict[str, set[str]] = {}        # por padrão: estes por último
 
@@ -327,7 +333,13 @@ class _Picker:
         if self.gym == "premium":
             pool += [e for e in PREMIUM_EXTRA.get(pattern, []) if e not in pool]
         elif self.gym == "basica":
-            pool = [e for e in pool if e not in MEDIUM_MACHINES] or pool   # pêndulo, articulados: costumam não ter
+            pool = [e for e in pool if e not in MEDIUM_MACHINES or e in self.gym_has] or pool   # pêndulo, articulados: costumam não ter
+        pool += [e for e in PREMIUM_EXTRA.get(pattern, []) if e in self.gym_has and e not in pool]
+        gym_cut = False
+        if self.gym_ok:
+            kept = [e for e in pool if self.gym_ok(e)]
+            gym_cut = len(kept) < len(pool)
+            pool = kept
         if self.strength_focus and pattern == "hinge":
             pool = ["Barbell_Deadlift"] + [e for e in pool if e != "Barbell_Deadlift"]
         for eid in pool:
@@ -336,6 +348,8 @@ class _Picker:
             st = _ok(eid, self.lims, self.equipment)
             if st:
                 out.append((eid, st))
+        if not out and (gym_cut or any(e in self.avoid for e in PATTERNS[pattern])) and self.gym_ok:
+            out = self._gym_fallback(pattern)
         pref = self.tier["equipment_pref"]
         if pref:
             rank = {e: i for i, e in enumerate(pref)}
@@ -345,6 +359,22 @@ class _Picker:
             out.sort(key=lambda c: c[0] not in LENGTHENED)
         out.sort(key=lambda c: c[1] != "ok")
         return self._personal_order(out, pattern)
+
+    def _gym_fallback(self, pattern: str) -> list[tuple[str, str]]:
+        """A academia não tem nenhum aparelho deste movimento (ou a pessoa marcou que não tem): o mais parecido de um
+        movimento vizinho que trabalha o mesmo músculo (ex.: sem cadeira extensora → afundo/búlgaro)."""
+        from . import gyms
+        mus = set(PATTERN_MUSCLES.get(pattern, []))
+        wide = [e for p2, ids in PATTERNS.items() if p2 != pattern and set(PATTERN_MUSCLES.get(p2, [])) & mus for e in ids]
+        for seed in PATTERNS[pattern]:
+            got = []
+            for e in gyms.substitutes(seed, self.profile, wide, lims=self.lims, exclude=self.avoid):
+                st = _ok(e, self.lims, self.equipment)
+                if st and e not in self.avoid:
+                    got.append((e, st))
+            if got:
+                return got[:3]
+        return []
 
     def _personal_order(self, cands: list[tuple[str, str]], pattern: str) -> list[tuple[str, str]]:
         """Perfil detalhado por último (manda mais que academia/nível): preferidos na frente, rebaixados no fim."""
@@ -392,7 +422,7 @@ def rotate_accessories(items: list[dict], cycle: int, profile: dict, tier_key: s
     tier = TIERS.get(tier_key or "intermediario") or TIERS["intermediario"]
     lims = profile.get("limitations") or []
     equipment = set(profile.get("equipment") or []) or None
-    picker = _Picker(tier, lims, equipment, 0, gym_type(profile))
+    picker = _Picker(tier, lims, equipment, 0, gym_type(profile), profile)
     out = copy.deepcopy(items)
     used = {it.get("exercise_id") for it in out}
     for it in out:
@@ -821,14 +851,22 @@ def generate(profile: dict, seed: int = 0, recent: dict | None = None, today=Non
 
     gym = gym_type(p)
     picker = _Picker({**tier, "equipment_pref": TIERS["iniciante"]["equipment_pref"]} if life.get("machines_first") else tier,
-                     lims, equipment, seed, gym)
+                     lims, equipment, seed, gym, p)
     picker.strength_focus = goal_key == "forca" and tier_key != "iniciante"
-    picker.avoid, picker.prefer, picker.demote = set(pers["avoid"]), pers["prefer"], pers["demote"]
+    picker.avoid, picker.prefer, picker.demote = picker.avoid | set(pers["avoid"]), pers["prefer"], pers["demote"]
     if gym == "premium" and not equipment:
         rationale.append("Academia premium: cada movimento começa pelas máquinas articuladas e de came (pêndulo, V-squat, "
                          "remada DY, extensora reclinada, flexora sentada, tríceps acima da cabeça), que seguem a curva de força, "
                          "protegem as articulações e carregam o músculo alongado"
                          + ("; o principal de cada dia continua na barra, porque o seu objetivo é força." if picker.strength_focus else "."))
+    from . import gyms
+    gk, gy = gyms.kit_of(p), gyms.gym_of(p)
+    if gy and not equipment:
+        rationale.append(f"Sua academia: {gy['name']} ({gk['label'].lower()}). Entram os aparelhos que ela provavelmente tem"
+                         + (f"; {len(p.get('gym_missing') or [])} que você marcou como “não tem” ficam de fora" if p.get("gym_missing") else "")
+                         + ". Se faltar algum no dia, toque em “Trocar” → “Não tem na minha academia”.")
+    elif p.get("gym_missing") and not equipment:
+        rationale.append(f"{len(p['gym_missing'])} aparelho(s) que você marcou como “não tem na minha academia” ficam de fora.")
     reps = goal["reps"] or tier["reps"]
     rest_mult = goal["rest"] * training_rules.REST_PREF.get(p.get("rest_pref") or "padrao", 1.0)
     if tier_key == "iniciante" and goal["reps"]:

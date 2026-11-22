@@ -24,7 +24,7 @@ import copy
 import re
 from collections import defaultdict
 
-from . import catalog, life_stage, personal, training_rules
+from . import catalog, gyms, life_stage, personal, training_rules
 from . import generator as G
 from .limitations import LIMITATIONS, check_exercise
 from .muscles import MUSCLES, PRIMARY_WEIGHT, SECONDARY_WEIGHT
@@ -265,6 +265,8 @@ class Ctx:
             self.reps = {k: (v if G._reps_bounds(v)[0] >= 8 else "8-12") for k, v in self.reps.items()}
         self.equipment = set(p.get("equipment") or []) or None
         self.gym = G.gym_type(p)
+        self.gym_ok = gyms.checker(p)                      # aparelhos que a academia tem (e o que a pessoa disse)
+        self.gym_has = set(p.get("gym_has") or [])
         self.life = life_stage.stage(p, self.tier_key)
         self.budget = float(budget or p.get("session_minutes") or 60)
         self.sessions = sessions or []
@@ -304,9 +306,13 @@ def _status(eid: str, lims: list[dict]) -> str | None:
 
 def _allowed_rare(eid: str, ctx: Ctx) -> bool:
     ex = catalog.get(eid) or {}
+    if eid in ctx.my_ids or eid in ctx.gym_has:
+        return True
+    if not ctx.gym_ok(eid):
+        return False
     if ctx.gym == "premium" and ex.get("rotation") is not False:
         return True
-    return not (ex.get("rotation") is False or ex.get("availability_br") == "rara") or eid in ctx.my_ids
+    return not (ex.get("rotation") is False or ex.get("availability_br") == "rara")
 
 
 def candidates(pattern: str, ctx: Ctx, *, lims: list[dict] | None = None, avoid: set[str] | None = None,
@@ -319,7 +325,7 @@ def candidates(pattern: str, ctx: Ctx, *, lims: list[dict] | None = None, avoid:
         pool += [e for e in G.PREMIUM_EXTRA.get(pattern, []) if e not in pool]
     elif ctx.gym == "basica":
         pool = [e for e in pool if e not in G.MEDIUM_MACHINES] or pool
-    pool += [m for m in ctx.my_ids if pattern_of(m) == pattern and m not in pool]
+    pool += [m for m in ctx.my_ids | ctx.gym_has if pattern_of(m) == pattern and m not in pool]
     out = []
     for eid in pool:
         if eid in avoid or eid in ctx.pers["avoid"] or not _allowed_rare(eid, ctx):
@@ -606,7 +612,7 @@ def _sore_from(ctx: Ctx, opts: dict) -> set[str]:
 def build_template(key: str, ctx: Ctx, *, avoid_muscles: set[str] | None = None, avoid_ids: set[str] | None = None,
                    variant: int = 0) -> list[dict]:
     """Os exercícios principais de um molde do gerador (Superior A, Pernas, Full body…), pelo nível da pessoa."""
-    picker = G._Picker(ctx.tier, ctx.lims, ctx.equipment, ctx.seed, ctx.gym)
+    picker = G._Picker(ctx.tier, ctx.lims, ctx.equipment, ctx.seed, ctx.gym, ctx.profile)
     used = set(avoid_ids or set())
     out = []
     for pattern, role in G.DAY_TEMPLATES[key][1]:

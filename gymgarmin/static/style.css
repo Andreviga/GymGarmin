@@ -1006,3 +1006,13 @@ body.timer-on { padding-bottom: calc(72px + 70px + env(safe-area-inset-bottom));
 /* limitações: "não tenho" é uma resposta (não fica como "falta") */
 .chip.lim-none { display: inline-flex; align-items: center; gap: 8px; margin: 4px 0 10px; cursor: pointer; }
 .chip.lim-none input { width: auto; margin: 0; }
+
+/* academia: cartão no perfil e lista para escolher */
+.gym-card { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; font: inherit; color: var(--ink); cursor: pointer;
+  background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; margin: 4px 0 2px; }
+.gym-card .grow, .gym-row .grow { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.gym-ico { font-size: 24px; }
+.gym-row { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; font: inherit; color: var(--ink); cursor: pointer;
+  background: transparent; border: 0; padding: 10px 2px; }
+.gym-row.on b { color: var(--brand); }
+.sw-row.best { outline: 2px solid var(--brand); border-radius: 12px; }

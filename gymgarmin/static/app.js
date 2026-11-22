@@ -2793,7 +2793,10 @@ function openMyMachine(st, onSaved) {
 
 // trocar o exercício no meio do treino por um que faz o mesmo movimento
 async function openSwap(it, onPick) {
-  const body = openModal(`<h2>Trocar ${esc(it.name)}</h2><p class="small muted">Aparelho ocupado ou sua academia não tem? Estes fazem o mesmo trabalho:</p><div id="sw-list" class="sk"><span class="sk-line"></span><span class="sk-line"></span></div>`);
+  const body = openModal(`<h2>Trocar ${esc(it.name)}</h2>
+    <button class="btn block" id="sw-missing">🚫 Não tem na minha academia</button>
+    <p class="small muted" style="margin:4px 2px 14px">Troca pelo mais parecido que ela tem, em todo o treino, e não usa mais este aparelho.</p>
+    <p class="small muted"><b>Só ocupado agora?</b> Escolha um destes para hoje:</p><div id="sw-list" class="sk"><span class="sk-line"></span><span class="sk-line"></span></div>`);
   const s = state.session;
   let alts = [];
   try { alts = await api(`/api/exercises/${encodeURIComponent(it.exercise_id)}/alternatives`); } catch (e) { $("#sw-list", body).innerHTML = `<p class="pill bad">${esc(e.message)}</p>`; return; }
@@ -2805,7 +2808,32 @@ async function openSwap(it, onPick) {
   body.onclick = async (e) => {
     const b = e.target.closest("[data-sw]");
     if (b) { const also = !!($("#sw-plan", body) || {}).checked; closeModal(); return onPick(b.dataset.sw, also); }
+    if (e.target.id === "sw-missing") return openMissing(it, onPick);
     if (e.target.id === "sw-photo") openMyMachine({ exercise_id: it.exercise_id, exercise_name: it.name }, (mm) => { it.my_machine = mm; store("gg_session", state.session); renderSession(); });
+  };
+}
+
+// "não tem na minha academia": escolhe o substituto (o mais parecido vem marcado) e troca em todo o treino
+async function openMissing(it, onPick) {
+  const s = state.session;
+  const body = openModal(`<h2>${esc(it.name)}: não tem na sua academia</h2><p class="small muted">Escolha o que fazer no lugar. A troca vale para hoje, para a planilha e para os próximos treinos.</p><div id="ms-list" class="sk"><span class="sk-line"></span><span class="sk-line"></span></div>`);
+  let r;
+  const excl = s ? s.items.map((x) => x.exercise_id).filter((x) => x !== it.exercise_id) : [];
+  try { r = await api("/api/gym/missing", { method: "POST", body: { exercise_id: it.exercise_id, apply: false, exclude: excl } }); }
+  catch (e) { $("#ms-list", body).innerHTML = `<p class="pill bad">${esc(e.message)}</p>`; return; }
+  const box = $("#ms-list", body); box.className = "";
+  box.innerHTML = r.options.length ? `<ul class="list sw-list">${r.options.map((x, k) => `<li><button class="sw-row ${k ? "" : "best"}" data-ms="${esc(x.id)}">${mediaHtml(x.id, "s")}
+      <span class="grow"><b>${esc(x.name)}</b><span class="small muted">${k ? "" : `<span class="ok-txt">mais parecido</span> · `}${x.gym === "tem" ? "você confirmou que tem" : "provável na sua academia"}</span></span></button></li>`).join("")}</ul>`
+    : `<p class="muted">Não achei um parecido que a sua academia tenha. Use “Trocar” e escolha outro exercício.</p>`;
+  box.onclick = async (e) => {
+    const b = e.target.closest("[data-ms]"); if (!b) return;
+    b.disabled = true;
+    let res;
+    try { res = await api("/api/gym/missing", { method: "POST", body: { exercise_id: it.exercise_id, to: b.dataset.ms, exclude: excl } }); }
+    catch (err) { b.disabled = false; return toast(err.message, 5000); }
+    closeModal();
+    if (s) await onPick(res.to, false);
+    toast(`${it.name} saiu dos seus treinos. No lugar: ${res.name}${res.changed ? ` (${res.changed} ${res.changed === 1 ? "lugar" : "lugares"} na planilha)` : ""}.`, 6000);
   };
 }
 
@@ -2923,15 +2951,58 @@ function focusCard(fp) {
     ${(f.skills || []).length ? `<p class="small">Aptidões no treino (marcadas com “foco”): ${esc(f.skills.map((s) => FOCUS_SKILL_TXT[s]).join("; "))}.</p>` : ""}</div>`;
 }
 
+// ---- academia: escolher na lista (São Paulo) ou pelo tipo; decide quais aparelhos entram no treino
+const GYM_TYPE_TXT = { premium: "Premium / de elite", completa: "Completa (rede grande)", basica: "Básica / de bairro" };
+function gymCardHtml(p) {
+  const g = p.gym || null;
+  return `<span class="gym-ico" aria-hidden="true">🏟️</span><span class="grow"><b>${esc(g ? g.name : GYM_TYPE_TXT[p.gym_type || "completa"])}</b>
+    <span class="small muted">${g ? "toque para trocar" : "escolha a sua: Ironberg, Bodytech, Les Cinq…"}</span></span><span class="chev" aria-hidden="true">›</span>`;
+}
+async function openGymPicker(after) {
+  const body = openModal(`<h2>Onde você treina?</h2><div class="sk"><span class="sk-line"></span><span class="sk-line"></span></div>`);
+  let d; try { d = await api("/api/gyms"); } catch (e) { body.innerHTML = `<p class="pill bad">${esc(e.message)}</p>`; return; }
+  const cur = (d.current || {}).id;
+  const real = d.gyms.filter((g) => !g.id.startsWith("outra_")), generic = d.gyms.filter((g) => g.id.startsWith("outra_"));
+  const row = (g) => `<li><button class="gym-row ${g.id === cur ? "on" : ""}" data-gym="${esc(g.id)}"><span class="grow"><b>${esc(g.name)}</b>
+      <span class="small muted">${esc(g.kit_label)}${g.where ? ` · ${esc(g.where)}` : ""}</span>${g.brands ? `<span class="small muted">Aparelhos: ${esc(g.brands)}</span>` : ""}</span>${g.id === cur ? `<span class="ok-txt">✓</span>` : ""}</button></li>`;
+  const draw = (q) => {
+    const f = (g) => !q || (g.name + " " + (g.where || "")).toLowerCase().includes(q.toLowerCase());
+    $("#gy-list", body).innerHTML = `<h3>São Paulo</h3><ul class="list">${real.filter(f).map(row).join("") || `<li class="small muted">Nenhuma com esse nome: escolha o tipo abaixo.</li>`}</ul>
+      <h3 style="margin-top:12px">Outra academia</h3><ul class="list">${generic.map(row).join("")}</ul>`;
+  };
+  body.innerHTML = `<h2>Onde você treina?</h2>
+    <p class="small muted">O treino usa os aparelhos que a sua academia provavelmente tem. Se faltar algum no dia, toque em “Trocar” → “Não tem na minha academia” e o app aprende.</p>
+    <input id="gy-q" placeholder="Buscar academia ou bairro" autocomplete="off" style="margin-bottom:8px">
+    <div id="gy-list"></div>
+    <p class="small muted" style="margin-top:12px">${esc(d.note)} Pesquisa de ${esc(d.updated)}.</p>`;
+  draw("");
+  $("#gy-q", body).oninput = (e) => draw(e.target.value.trim());
+  body.onclick = async (e) => {
+    const b = e.target.closest("[data-gym]"); if (!b) return;
+    b.disabled = true;
+    let prof; try { prof = await api("/api/gym", { method: "PUT", body: { id: b.dataset.gym } }); } catch (err) { b.disabled = false; return toast(err.message, 5000); }
+    state.profile = prof; if (after) after(prof);
+    const g = d.gyms.find((x) => x.id === b.dataset.gym); const k = d.kits[g.kit];
+    body.innerHTML = `<h2>${esc(g.name)} ✓</h2><p><b>${esc(k.label)}.</b> ${esc(k.desc)}</p>
+      <p class="small muted">Para o treino passar a usar os aparelhos dela, gere de novo — você vê a prévia antes de trocar.</p>
+      <button class="btn block" id="gy-regen">🔄 Gerar meu treino para esta academia</button><button class="act" id="gy-close" style="margin-top:8px">Fechar</button>`;
+    body.onclick = (ev) => { if (ev.target.id === "gy-regen") { closeModal(); openGenerator(); } if (ev.target.id === "gy-close") closeModal(); };
+  };
+}
+
 async function loadMyGym() {
   const box = $("#mygym-box"); if (!box) return;
-  let list = [];
-  try { list = await api("/api/my-gym/machines"); } catch (e) { box.innerHTML = `<p class="pill bad">${esc(e.message)}</p>`; return; }
-  box.innerHTML = `<p class="small muted">Fotografe os aparelhos da sua academia e anote a regulagem (banco, encosto, pino). No treino o app mostra a foto e a regulagem, e na troca de aparelho os seus aparecem primeiro.</p>
+  let list = [], gi = { missing: [] };
+  try { [list, gi] = await Promise.all([api("/api/my-gym/machines"), api("/api/gyms")]); } catch (e) { box.innerHTML = `<p class="pill bad">${esc(e.message)}</p>`; return; }
+  box.innerHTML = `${gi.missing.length ? `<h3>Não tem na sua academia</h3><p class="small muted">Não entram nos seus treinos. Toque para desfazer (se a academia comprou o aparelho).</p>
+      <div class="chips" style="margin-bottom:12px">${gi.missing.map((m) => `<button type="button" class="chip pc" data-gmu="${esc(m.id)}">${esc(m.name)} ✕</button>`).join("")}</div>` : ""}
+    <p class="small muted">Fotografe os aparelhos da sua academia e anote a regulagem (banco, encosto, pino). No treino o app mostra a foto e a regulagem, e na troca de aparelho os seus aparecem primeiro.</p>
     ${list.length ? `<ul class="list mg-list">${list.map((m) => `<li><button class="mg-row" data-mgid="${esc(m.id)}">${m.photo_url ? `<img src="${esc(m.photo_url)}" alt="">` : `<span class="mm-ph">📷</span>`}
       <span class="grow"><b>${esc(m.name)}</b><span class="small muted">${esc(m.exercise_name || m.exercise_id)}${m.settings ? ` · ${esc(m.settings)}` : ""}</span></span><span class="chev">›</span></button></li>`).join("")}</ul>` : ""}
     <button class="btn ghost block" id="mg-new">📷 Fotografar um aparelho</button>`;
-  box.onclick = (e) => {
+  box.onclick = async (e) => {
+    const u = e.target.closest("[data-gmu]");
+    if (u) { await api("/api/gym/missing", { method: "POST", body: { exercise_id: u.dataset.gmu, undo: true } }); toast("Pode voltar a entrar no treino quando você gerar de novo"); return loadMyGym(); }
     const r = e.target.closest("[data-mgid]");
     if (r) { const m = list.find((x) => x.id === r.dataset.mgid); return openMyMachine({ ...m }, loadMyGym); }
     if (e.target.id === "mg-new") pickExercise(null, (ex) => openMyMachine({ exercise_id: ex.id, exercise_name: ex.name }, loadMyGym));
@@ -4168,7 +4239,7 @@ async function viewPerfil(openSec) {
       ${num("hr_max", `FC máx. medida <span class="muted">(calculada: ${p.hr_max_calc ?? "—"})</span>`, 'inputmode="numeric" placeholder="se souber"')}
     </div>
     <p class="small muted">Idade e peso calculam suas zonas de frequência cardíaca e as cargas iniciais. Com o Garmin conectado, eles vêm do relógio.</p>`, miss.some((m) => ["age", "weight_kg", "sex", "name"].includes(m[0])))}
-  ${sect("treino", "🏋️", "Treino e rotina", [GOAL_TXT[p.goal], nDays ? `${nDays} dias/semana` : "", p.session_minutes ? `${p.session_minutes} min` : ""].filter(Boolean).join(" · ") || "objetivo, dias, tempo, academia",
+  ${sect("treino", "🏋️", "Treino e rotina", [GOAL_TXT[p.goal], nDays ? `${nDays} dias/semana` : "", p.session_minutes ? `${p.session_minutes} min` : "", (p.gym || {}).name || ""].filter(Boolean).join(" · ") || "objetivo, dias, tempo, academia",
     `<div class="grid2">
       <div class="field"><label>Objetivo</label><select data-p="goal">${[["hipertrofia", "Hipertrofia"], ["forca", "Força"], ["emagrecimento", "Emagrecimento"], ["condicionamento", "Condicionamento"], ["saude", "Saúde geral"], ["hibrido", "Híbrido (força + resistência)"]].map(([v, t]) => `<option value="${v}" ${p.goal === v ? "selected" : ""}>${t}</option>`).join("")}</select></div>
       <div class="field"><label>Há quanto tempo treina</label><select data-p="training_months"><option value="">—</option>${MONTH_OPTS.map(([v, t]) => `<option value="${v}" ${+p.training_months === v ? "selected" : ""}>${t}</option>`).join("")}</select></div>
@@ -4176,8 +4247,9 @@ async function viewPerfil(openSec) {
     </div>
     <label>Dias que pode treinar</label>
     <div class="chips">${["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"].map((w, i) => `<label class="chip"><input type="checkbox" data-wd="${i}" ${(p.available_days || []).includes(i) ? "checked" : ""}> ${w}</label>`).join("")}</div>
-    <div class="field" style="margin-top:12px"><label for="gym-type">Tipo de academia</label><select id="gym-type" data-p="gym_type">${[["completa", "Completa (rede grande: máquinas, polias, barras)"], ["premium", "Premium / de elite (máquinas articuladas modernas)"], ["basica", "Básica / de bairro / do prédio"]].map(([v, t]) => `<option value="${v}" ${(p.gym_type || "completa") === v ? "selected" : ""}>${t}</option>`).join("")}</select>
-      <p class="small muted" style="margin:4px 0 0">Premium: o treino começa pelas máquinas que seguem a curva de força e protegem as articulações (pêndulo, V-squat, remada DY, extensora reclinada). Ao mudar, gere o treino de novo.</p></div>
+    <label style="margin-top:12px">Onde você treina</label>
+    <input type="hidden" id="gym-type" data-p="gym_type" value="${esc(p.gym_type || "completa")}">
+    <button type="button" class="gym-card" id="gym-pick">${gymCardHtml(p)}</button>
     <label style="margin-top:12px">O que tem na sua academia</label>
     <div class="chips">${[["barbell", "Barra"], ["dumbbell", "Halteres"], ["machine", "Máquinas"], ["cable", "Polia/cabo"], ["kettlebells", "Kettlebell"], ["bands", "Elástico"], ["e-z curl bar", "Barra W"]].map(([k, t]) => `<label class="chip"><input type="checkbox" data-eq="${k}" ${!(p.equipment || []).length || p.equipment.includes(k) ? "checked" : ""}> ${t}</label>`).join("")}</div>
     <label style="margin-top:12px">Cardio que você gosta de usar</label>
@@ -4240,6 +4312,7 @@ async function viewPerfil(openSec) {
       <label class="btn sm ghost" style="margin:0">Restaurar backup<input type="file" id="restore" accept=".json,application/json" hidden></label></div>` : ""}`)}
   <div class="savebar"><button class="btn block" id="save-profile">Salvar perfil</button></div>`;
   if (openSec) { const el = $(`#sec-${openSec}`); if (el) { el.open = true; setTimeout(() => el.scrollIntoView({ block: "start" }), 50); } }
+  const gp = $("#gym-pick"); if (gp) gp.onclick = () => openGymPicker((prof) => { $("#gym-type").value = prof.gym_type || "completa"; gp.innerHTML = gymCardHtml(prof); });
   const ns = $("[data-open-step]"); if (ns) ns.onclick = () => { const el = $(`#sec-${ns.dataset.openStep}`); if (el) { el.open = true; el.scrollIntoView({ block: "start", behavior: "smooth" }); } };
   // "Salvar" só aparece com uma seção de dados aberta ou algo alterado
   let dirty = false;

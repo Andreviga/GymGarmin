@@ -18,7 +18,7 @@ from datetime import date, timedelta
 
 from . import adaptive, alternative, auth, coach, focus, gallery, ingest, my_gym, partners, training_rules
 from . import watch_review as wrv
-from . import personal, weather
+from . import gyms, personal, weather
 from . import (analysis, calibration, catalog, clock, db, dedupe, health, endurance, garmin_export, garmin_sync, generator, history, limitations,
                load, plans_io, progression, readiness, schedule, sports, steps, templates, watch_labels)
 from .muscles import EQUIPMENT_PT, HR_ZONES, MUSCLES, hr_max, zone_bpm
@@ -991,13 +991,16 @@ def photo_get(pid: str):
 
 @app.get("/api/exercises/{exercise_id}/alternatives")
 def exercise_alternatives(exercise_id: str):
-    lims, ovr = _profile().get("limitations") or [], db.garmin_overrides()
+    prof = _profile()
+    lims, ovr = prof.get("limitations") or [], db.garmin_overrides()
+    # do mais parecido para o menos, só o que a academia da pessoa tem (ou provavelmente tem)
+    ids = _subs_for(exercise_id, prof)[:14] or my_gym.alternatives(exercise_id)
     out = []
-    for eid in my_gym.alternatives(exercise_id):
+    for eid in ids:
         ex = catalog.get(eid)
         v = _with_status(ex, lims, ovr)
         out.append({"id": eid, "name": v["name"], "equipment_pt": v.get("equipment_pt"), "limitation": v.get("limitation"),
-                    "kind": ex["kind"], "timed": ex.get("timed"), "my_machine": my_gym.for_exercise(eid)})
+                    "kind": ex["kind"], "timed": ex.get("timed"), "my_machine": my_gym.for_exercise(eid), "gym": gyms.status(prof, eid)})
     out.sort(key=lambda x: ((x["limitation"] or {}).get("status") == "evitar", not x["my_machine"]))
     return out
 
@@ -1018,41 +1021,141 @@ def session_item(body: dict = Body(...)):
     return items[0]
 
 
+def _set_timed(it: dict, dst: str) -> None:
+    if catalog.get(dst).get("timed") and not it.get("duration_s"):
+        it.pop("reps", None)
+        it["duration_s"] = 40
+
+
+def _swap_everywhere(plan_id: int | None, src: str, choices: list[str]) -> dict:
+    """Troca src na planilha e nos próximos treinos da agenda. Em cada dia usa a primeira opção que ainda não está
+    naquele dia (não repete exercício). Lembra a troca para quando o treino for gerado de novo."""
+    choices = [c for c in choices if catalog.get(c) and c != src]
+    if not choices:
+        raise HTTPException(400, "Exercício desconhecido")
+
+    def pick(items: list[dict]) -> str:
+        used = {i.get("exercise_id") for i in items}
+        return next((c for c in choices if c not in used), choices[0])
+
+    n = 0
+    if plan_id:
+        p = db.get_plan(plan_id)
+        if p:
+            for d in p.get("days", []):
+                dst = pick(d.get("items", []))
+                for it in d.get("items", []):
+                    if it.get("exercise_id") == src:
+                        it["exercise_id"] = dst
+                        _set_timed(it, dst)
+                        n += 1
+            db.update_plan(plan_id, p)
+    prefs = json.loads(db.kv_get("swap_prefs") or "{}")  # lembra a troca: ao regerar o treino ela continua valendo
+    prefs = {k: v for k, v in prefs.items() if k != choices[0] and v != src}
+    prefs[src] = choices[0]
+    db.kv_set("swap_prefs", json.dumps(prefs))
+    today = clock.today()
+    for e in db.list_schedule(today.isoformat(), (today + timedelta(days=21)).isoformat()):
+        if e.get("status") != "planejado":
+            continue
+        dst = pick(e.get("items", []))
+        hit = False
+        for it in e.get("items", []):
+            if it.get("exercise_id") == src:
+                it["exercise_id"] = dst
+                _set_timed(it, dst)
+                hit = True
+        if hit:
+            if e.get("garmin_workout_id"):
+                e["garmin_outdated"] = True
+            db.save_entry(e)
+    return {"changed": n, "to": choices[0]}
+
+
 @app.post("/api/plans/{plan_id}/swap")
 def plan_swap(plan_id: int, body: dict = Body(...)):
     """Troca o exercício em toda a planilha e nos próximos treinos da agenda (a academia não tem / prefere outro)."""
     src, dst = body.get("from"), body.get("to")
     if not catalog.get(dst):
         raise HTTPException(400, "Exercício desconhecido")
-    p = _plan_or_404(plan_id)
-    n = 0
-    for d in p.get("days", []):
-        for it in d.get("items", []):
-            if it.get("exercise_id") == src:
-                it["exercise_id"] = dst
-                if catalog.get(dst).get("timed") and not it.get("duration_s"):
-                    it.pop("reps", None)
-                    it["duration_s"] = 40
-                n += 1
-    db.update_plan(plan_id, p)
-    prefs = json.loads(db.kv_get("swap_prefs") or "{}")  # lembra a troca: ao regerar o treino ela continua valendo
-    prefs = {k: v for k, v in prefs.items() if k != dst and v != src}
-    prefs[src] = dst
-    db.kv_set("swap_prefs", json.dumps(prefs))
-    today = clock.today()
-    for e in db.list_schedule(today.isoformat(), (today + timedelta(days=21)).isoformat()):
-        if e.get("status") != "planejado":
-            continue
-        hit = False
-        for it in e.get("items", []):
-            if it.get("exercise_id") == src:
-                it["exercise_id"] = dst
-                hit = True
-        if hit:
-            if e.get("garmin_workout_id"):
-                e["garmin_outdated"] = True
-            db.save_entry(e)
-    return {"changed": n}
+    _plan_or_404(plan_id)
+    return {"changed": _swap_everywhere(plan_id, src, [dst])["changed"]}
+
+
+# ------------------------------------------------------------- academia ----
+
+@app.get("/api/gyms")
+def gyms_list():
+    prof = _profile()
+    d = gyms.data()
+    cur = gyms.gym_of(prof)
+    return {"gyms": gyms.all_gyms(), "kits": d["kits"], "note": d["note"], "updated": d["updated"],
+            "current": cur, "kit": gyms.kit_of(prof),
+            "missing": [{"id": e, "name": (catalog.get(e) or {}).get("name") or e} for e in prof.get("gym_missing") or []],
+            "has": [{"id": e, "name": (catalog.get(e) or {}).get("name") or e} for e in prof.get("gym_has") or []]}
+
+
+@app.put("/api/gym")
+def gym_set(body: dict = Body(...)):
+    """Escolhe a academia: guarda qual é e o tipo (que decide os aparelhos prováveis)."""
+    g = next((x for x in gyms.all_gyms() if x["id"] == body.get("id")), None)
+    if not g:
+        raise HTTPException(400, "Academia desconhecida")
+    kit = gyms.data()["kits"][g["kit"]]
+    unit = str(body.get("unit") or "").strip()[:60] or None
+    return db.save_profile({"gym": {"id": g["id"], "name": g["name"], "unit": unit}, "gym_type": kit["gym_type"], "equipment": []})
+
+
+def _subs_for(eid: str, prof: dict, exclude: set[str] | None = None) -> list[str]:
+    pool = my_gym.alternatives(eid, limit=40)
+    pat = alternative.pattern_of(eid)
+    if pat:
+        pool += list(generator.PATTERNS.get(pat, [])) + list(generator.PREMIUM_EXTRA.get(pat, []))
+    mine = {m.get("exercise_id") for m in my_gym.list_mine()}
+    lims = generator.with_personal_lims(prof.get("limitations") or [], personal.derive(prof))
+    return gyms.substitutes(eid, prof, pool, my_ids=mine, lims=lims, exclude=exclude)
+
+
+@app.post("/api/gym/missing")
+def gym_missing(body: dict = Body(...)):
+    """'Não tem na minha academia': lembra, troca pelo mais parecido que a academia tem em todo o treino e devolve
+    as outras opções (se a pessoa preferir outra). undo=true desfaz (volta a poder entrar no treino)."""
+    eid = body.get("exercise_id")
+    if not catalog.get(eid):
+        raise HTTPException(404, "Exercício desconhecido")
+    prof = _profile()
+    missing = [e for e in prof.get("gym_missing") or [] if e != eid]
+    has = [e for e in prof.get("gym_has") or [] if e != eid]
+    if body.get("undo"):
+        db.save_profile({"gym_missing": missing, "gym_has": has})
+        return {"ok": True}
+    upd = {"gym_missing": missing + [eid], "gym_has": has}
+    apply = body.get("apply", True)
+    prof = db.save_profile(upd) if apply else {**prof, **upd}   # só consultar as opções não marca nada
+    subs = _subs_for(eid, prof, set(body.get("exclude") or []))
+    to = body.get("to")
+    if to and catalog.get(to):
+        subs = [to] + [e for e in subs if e != to]
+    if not subs:
+        return {"to": None, "options": [], "changed": 0}
+    out = {"changed": 0, "to": subs[0]}
+    if apply:
+        out = _swap_everywhere(prof.get("schedule_plan_id"), eid, subs[:6])
+    return {**out, "name": catalog.get(out["to"])["name"],
+            "options": [{"id": e, "name": catalog.get(e)["name"], "gym": gyms.status(prof, e)} for e in subs[:8]]}
+
+
+@app.post("/api/gym/has")
+def gym_has(body: dict = Body(...)):
+    """'Tem na minha academia': aparelho raro que a pessoa confirmou passa a poder entrar no treino."""
+    eid = body.get("exercise_id")
+    if not catalog.get(eid):
+        raise HTTPException(404, "Exercício desconhecido")
+    prof = _profile()
+    has = [e for e in prof.get("gym_has") or [] if e != eid] + ([] if body.get("undo") else [eid])
+    missing = [e for e in prof.get("gym_missing") or [] if e != eid]
+    db.save_profile({"gym_has": has, "gym_missing": missing})
+    return {"ok": True}
 
 
 @app.post("/api/feedback")
