@@ -1096,3 +1096,6 @@ body.timer-on { padding-bottom: calc(72px + 70px + env(safe-area-inset-bottom));
 .wrow > .small { flex: 1 1 auto; min-width: 0; }
 .wrow > span:last-child { display: flex; flex: none; gap: 2px; }
 @media (max-width: 380px) { .wrow .wbtn { width: 38px; min-width: 38px; padding: 0; font-size: 20px; } }
+
+/* cartões de atalho do perfil: título em cima, explicação embaixo */
+.link-card .grow { display: flex; flex-direction: column; gap: 2px; min-width: 0; }

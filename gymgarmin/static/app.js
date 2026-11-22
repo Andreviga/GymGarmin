@@ -4629,12 +4629,9 @@ async function viewPerfil(openSec) {
     <div class="grow"><b class="prof-name">${esc(firstName && firstName !== "Eu" ? firstName : "Seu perfil")}</b>
       <span class="small muted">${[GOAL_TXT[p.goal], nDays ? `${nDays} dias` : "", p.session_minutes ? `${p.session_minutes} min` : ""].filter(Boolean).join(" · ") || "Complete para o app montar seu treino"}</span>
       <div class="meter" style="margin-top:8px"><span style="width:${Math.round(100 * filled / PROFILE_REQ.length)}%"></span></div>
-      <span class="small ${miss.length ? "muted" : "ok-txt"}">${miss.length ? `Falta: ${miss.map((m) => m[1]).join(", ")}` : "Perfil completo ✔"}</span></div>
+      <span class="small ${miss.length ? "muted" : "ok-txt"}">${miss.length ? `Falta: ${miss.map((m) => m[1]).join(", ")}` : nextStep ? "Dados básicos ✔ · siga os passos abaixo para personalizar" : "Perfil completo ✔"}</span></div>
   </section>
   ${installCardHtml("perfil")}
-  ${state.me && state.me.user && state.me.user.is_admin ? `<button class="link-card sect dev-link" id="fam-open" type="button"><span class="sect-ico" aria-hidden="true">👨‍👩‍👧</span><span class="grow"><b>Chamar a família</b><span class="small muted">mensagem pronta no WhatsApp: cada um cria a conta sozinho</span></span><span class="chev" aria-hidden="true">›</span></button>` : ""}
-  ${state.me && state.me.logged_in ? `<button class="link-card sect dev-link" data-feedback type="button"><span class="sect-ico" aria-hidden="true">💬</span><span class="grow"><b>Mandar sugestão ou problema</b><span class="small muted">o que achou, o que faltou, o que deu errado</span></span><span class="chev" aria-hidden="true">›</span></button>` : ""}
-  ${state.me && state.me.user && state.me.user.is_admin ? `<a class="link-card sect dev-link" href="#dev"><span class="sect-ico" aria-hidden="true">🛠️</span><span class="grow"><b>Área do desenvolvedor</b><span class="small muted" id="dev-count">fotos de aparelhos para aprovar</span></span><span class="chev" aria-hidden="true">›</span></a>` : ""}
   ${nextStep ? `<button class="next-step" type="button" data-open-step="${nextStep[0]}"><span class="sect-n">${nextStep[1][0]}</span>
     <span class="grow"><span class="small">Próximo passo</span><b>${({ dados: "Seus dados", treino: "Treino e rotina", limites: "Limitações e lesões", pers: "Personalização detalhada", relogios: "Relógio" })[nextStep[0]]}</b></span><span class="chev">›</span></button>`
     : `<p class="small ok-txt" style="margin:0 2px 10px">✓ O essencial está preenchido. As seções opcionais deixam o treino ainda mais seu.</p>`}
@@ -4721,6 +4718,9 @@ async function viewPerfil(openSec) {
     <p class="small muted">Perfil, planilhas, treinos registrados e agenda em um arquivo .json.</p>
     <div class="row gap wrap"><a class="btn sm ghost" href="/api/backup">Baixar backup</a>
       <label class="btn sm ghost" style="margin:0">Restaurar backup<input type="file" id="restore" accept=".json,application/json" hidden></label></div>` : ""}`)}
+  ${state.me && state.me.user && state.me.user.is_admin ? `<button class="link-card sect dev-link" id="fam-open" type="button"><span class="sect-ico" aria-hidden="true">👨‍👩‍👧</span><span class="grow"><b>Chamar a família</b><span class="small muted">mensagem pronta no WhatsApp: cada um cria a conta sozinho</span></span><span class="chev" aria-hidden="true">›</span></button>` : ""}
+  ${state.me && state.me.logged_in ? `<button class="link-card sect dev-link" data-feedback type="button"><span class="sect-ico" aria-hidden="true">💬</span><span class="grow"><b>Mandar sugestão ou problema</b><span class="small muted">o que achou, o que faltou, o que deu errado</span></span><span class="chev" aria-hidden="true">›</span></button>` : ""}
+  ${state.me && state.me.user && state.me.user.is_admin ? `<a class="link-card sect dev-link" href="#dev"><span class="sect-ico" aria-hidden="true">🛠️</span><span class="grow"><b>Área do desenvolvedor</b><span class="small muted" id="dev-count">fotos de aparelhos para aprovar</span></span><span class="chev" aria-hidden="true">›</span></a>` : ""}
   <div class="savebar"><button class="btn block" id="save-profile">Salvar perfil</button></div>`;
   if (openSec) { const el = $(`#sec-${openSec}`); if (el) { el.open = true; setTimeout(() => el.scrollIntoView({ block: "start" }), 50); } }
   const gp = $("#gym-pick"); if (gp) gp.onclick = () => openGymPicker((prof) => { $("#gym-type").value = prof.gym_type || "completa"; gp.innerHTML = gymCardHtml(prof); });
