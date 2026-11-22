@@ -267,10 +267,19 @@ class _PGConn:
         return _PGCursor(cur, returning)
 
     def executescript(self, script: str) -> None:
+        """Cria as tabelas uma a uma. Duas instâncias ligando juntas podem criar a mesma tabela ao mesmo tempo
+        (CREATE ... IF NOT EXISTS não é atômico no Postgres): quem perde a corrida ignora e segue."""
         script = script.replace("INTEGER PRIMARY KEY,", "SERIAL PRIMARY KEY,")
         for stmt in script.split(";"):
-            if stmt.strip():
+            if not stmt.strip():
+                continue
+            try:
                 self.raw.cursor().execute(stmt)
+                self.raw.commit()
+            except Exception as e:  # noqa: BLE001
+                self.raw.rollback()
+                if not any(code in str(e) for code in ("23505", "42P07", "already exists")):
+                    raise
 
     def commit(self):
         self.raw.commit()
