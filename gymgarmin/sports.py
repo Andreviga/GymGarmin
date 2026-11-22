@@ -242,6 +242,13 @@ def anchors_of(profile: dict) -> dict:
     """Âncoras salvas no perfil (com FC máx. estimada pela idade se faltar)."""
     end = (profile or {}).get("endurance") or {}
     a = dict(end.get("anchors") or {})
+    from . import personal
+    if personal.rpe_mode(profile or {}):
+        # remédio que baixa a FC: zonas por FC enganam — alvo por esforço percebido (ritmo/potência continuam valendo)
+        a.pop("lthr", None)
+        a.pop("hrmax", None)
+        a["rpe_mode"] = True
+        return a
     if not a.get("hrmax"):
         age = (profile or {}).get("age")
         a["hrmax"] = (profile or {}).get("hr_max") or (round(208 - 0.7 * age) if age else None)
@@ -274,6 +281,9 @@ def target_for(sport: str, zone: int, anchors: dict) -> dict:
         fast, slow = row_splits(val)[zone]
         return {"type": "split", "fast_s_500": round(fast), "slow_s_500": round(slow),
                 "label": f"{fmt_pace(fast, '/500m')}–{fmt_pace(slow, '/500m')}"}
+    if anchors.get("rpe_mode"):
+        from .personal import RPE_LABEL
+        return {"type": "rpe", "zone": min(zone, 6), "label": RPE_LABEL.get(zone, f"Z{zone}")}
     hz = hr_zones(anchors.get("lthr"), anchors.get("hrmax"))
     if hz:
         lo, hi = hz[min(zone, 5)]

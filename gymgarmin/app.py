@@ -18,6 +18,7 @@ from datetime import date, timedelta
 
 from . import alternative, auth, coach, focus, gallery, ingest, my_gym, partners, training_rules
 from . import watch_review as wrv
+from . import personal
 from . import (analysis, calibration, catalog, clock, db, dedupe, health, endurance, garmin_export, garmin_sync, generator, history, limitations,
                load, plans_io, progression, readiness, schedule, sports, steps, templates, watch_labels)
 from .muscles import EQUIPMENT_PT, HR_ZONES, MUSCLES, hr_max, zone_bpm
@@ -711,12 +712,14 @@ def _with_status(ex: dict, lims: list[dict], overrides: dict | None = None) -> d
 @app.get("/api/meta")
 def meta():
     p = _profile()
-    fc = hr_max(p.get("age"), p.get("hr_max"))
+    fc = None if personal.rpe_mode(p) else hr_max(p.get("age"), p.get("hr_max"))   # betabloqueador: zonas por esforço
     return {
         "muscles": [{"key": k, **{kk: vv for kk, vv in v.items() if kk != "mav"}, "mav": list(v["mav"])}
                     for k, v in MUSCLES.items()],
         "limitations": limitations.catalog(),
-        "zones": [{"zone": z, **v, "bpm": zone_bpm(z, fc)} for z, v in HR_ZONES.items()],
+        "zones": [{"zone": z, **v, "bpm": zone_bpm(z, fc), **({"rpe": personal.RPE_LABEL.get(z)} if fc is None and personal.rpe_mode(p) else {})}
+                  for z, v in HR_ZONES.items()],
+        "personal_questions": personal.QUESTIONS,
         "hr_max": fc,
         "equipment": [{"key": k, "pt": v} for k, v in EQUIPMENT_PT.items() if k],
         "templates": templates.list_templates(),
@@ -1641,7 +1644,7 @@ def session_prefill(plan_id: int, idx: int):
     plan = _plan_or_404(plan_id)
     day = _day(plan, idx)
     return {"plan_id": plan_id, "day_name": day.get("name"), "date": clock.now().isoformat(timespec="minutes"),
-            "items": _prefill_items(day.get("items", []))}
+            "items": _prefill_items(day.get("items", [])), "alerts": _alerts()}
 
 
 # ----------------------------------------------------- evolução de cargas ----
@@ -2609,6 +2612,8 @@ def _alt_opts(body: dict) -> dict:
         out["muscles"] = [str(x) for x in o["muscles"] if str(x) in alternative.MUSCLE_GROUPS]
     if isinstance(o.get("kit"), list):
         out["kit"] = [str(x) for x in o["kit"] if str(x) in {k["id"] for k in alternative.KITS}]
+    if o.get("sick") in ("pescoco", "febre"):
+        out["sick"] = o["sick"]
     return out
 
 
@@ -2708,7 +2713,7 @@ def alternative_draft(body: dict = Body(...)):
     prop, _ = _alt_proposal(body)
     return {"date": clock.now().strftime("%Y-%m-%dT%H:%M"), "day_name": prop["day_name"].replace(" (alternativo)", " (gerado)"),
             "items": _prefill_items(prop["items"]), "alt": {k: prop[k] for k in ("reason", "label", "why", "base", "changes", "warnings")},
-            "view": "lista", "generated": True, "kit": _alt_opts(body).get("kit") if body.get("reason") == "fora" else None}
+            "view": "lista", "generated": True, "alerts": _alerts(), "kit": _alt_opts(body).get("kit") if body.get("reason") == "fora" else None}
 
 
 @app.post("/api/suggest/next")
@@ -2828,7 +2833,19 @@ def get_schedule(date_: str | None = Query(None, alias="date")):
         "pending": pending,  # treinos livres esperando a resposta "foi o treino X?"
         "legacy": schedule.legacy_compensation(entries, today) if current else None,  # reforço da regra antiga
         "time_warnings": _time_warnings(views, budget),
+        "comeback": _comeback(today) if current and plan else None,
     }
+
+
+def _comeback(today: date) -> dict | None:
+    """Parou de treinar (7+ dias sem nada, mas já treinava): volta com o mínimo, sem culpa. Mais da metade de quem começa
+    numa academia desiste em 3 meses (Sperandei 2016); o que mais segura é voltar logo depois da falta (Milkman 2021)."""
+    recent = db.list_sessions(since=(today - timedelta(days=60)).isoformat(), limit=200)
+    dates = sorted({str(s.get("date"))[:10] for s in recent if str(s.get("source")) != "passos"})
+    if len(dates) < 3:
+        return None
+    gap = (today - date.fromisoformat(dates[-1])).days
+    return {"days": gap} if gap >= 7 else None
 
 
 def _time_warnings(views: list[dict], budget: float) -> list[str]:
@@ -2902,13 +2919,22 @@ def schedule_rebuild():
     return {"ok": True}
 
 
+def _alerts() -> list[str]:
+    """O que o perfil detalhado pede para lembrar no treino (sinais para parar, glicose, asma…)."""
+    d = personal.derive(_profile())
+    out = list(d["session_notes"])
+    if d["stop_signs"] or d["clearance"]:
+        out.insert(0, personal.stop_signs_text())
+    return out
+
+
 @app.get("/api/schedule/{entry_id}/prefill")
 def schedule_prefill(entry_id: int):
     e = _entry_or_404(entry_id)
     deload = bool((e.get("cycle") or {}).get("deload"))
     return {"schedule_id": e["id"], "plan_id": e.get("plan_id"), "day_name": e.get("day_name"),
             "date": e["date"] + clock.now().strftime("T%H:%M"), "deload": deload,
-            "items": _prefill_items(e.get("items", []), deload)}
+            "items": _prefill_items(e.get("items", []), deload), "alerts": _alerts()}
 
 
 def _entry_day(e: dict) -> dict:

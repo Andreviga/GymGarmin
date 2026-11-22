@@ -42,7 +42,7 @@ def test_every_reason_respects_limits_and_time():
     prof = {**PROF, "limitations": [{"key": "joelho", "severity": "evitar"}]}
     for d in G.generate(prof)["days"]:
         for r in A.REASON_IDS:
-            opts = {"region": "ombro"} if r == "dor" else {"muscles": ["peito"]} if r == "dolorido" else \
+            opts = {"sick": "pescoco"} if r == "doente" else {"region": "ombro"} if r == "dor" else {"muscles": ["peito"]} if r == "dolorido" else \
                 {"kit": ["halteres", "elastico"]} if r == "fora" else {"minutes": 30} if r == "tempo" else {}
             ctx = A.Ctx(prof, balance=[{"key": "hamstrings", "missing": 6}])
             o = A.propose(d["items"], r, ctx, opts, d["name"])

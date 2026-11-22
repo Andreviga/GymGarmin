@@ -247,6 +247,9 @@ async function viewHoje(weekDate) {
   ${weekDate ? "" : firstStepsHtml(true) + statsHtml(rd, g, adjusted, plannedToday.length > 0) + (sch.pending || []).map(questionHtml).join("") + watchInboxHtml(wib) + stepsAskHtml(stp, sch.today) + partnerCardsHtml(prt) + legacyHtml(sch) + focusChip(prof) + garminSyncCard(sch, gst) + installCardHtml("hoje")}${athleteHtml}
   ${missed.length ? `<div class="rec alerta"><b>Treino perdido:</b> ${missed.map((e) => `${e.weekday} ${ddmm(e.date)} – ${esc(e.day_name)}`).join(", ")}.
      <div class="row gap wrap" style="margin-top:6px">${missed.map((e) => `<button class="btn sm" data-skip="${e.id}">Ajustar a semana (${e.weekday})</button>`).join("")}</div></div>` : ""}
+  ${!weekDate && sch.comeback ? `<section class="card wbox"><div class="eyebrow">Que bom te ver</div><b>${sch.comeback.days} dias sem treinar — tudo bem, acontece.</b>
+    <p class="small" style="margin:6px 0 10px">Para voltar sem sofrer: um treino curto de 25 min hoje. Uma série por exercício com esforço já mantém força e músculo, e voltar logo é o que mais segura o hábito.</p>
+    <button class="btn sm" data-comeback="1">Voltar com 25 min</button></section>` : ""}
   <section class="week">
     <div class="week-head"><button class="icon-btn sm" data-week="${addDays(sch.week_start, -7)}" aria-label="Semana anterior">‹</button>
       <div class="grow"><b>${weekDate ? esc(sch.plan.name) : `Semana de ${ddmm(sch.week_start)}`}</b>
@@ -497,6 +500,7 @@ function bindAgenda(sch) {
       if (d.wok) { t.disabled = true; await api(`/api/watch/inbox/${d.wok}/ok`, { method: "POST" }); toast("Ok, fica como o relógio mandou"); return again(); }
       if (d.alt) return openAlternative(+d.alt, again);
       if (d.gen) return openAlternative(null, again);
+      if (d.comeback) { const e = sch.entries.find((x) => x.date === sch.today && x.status === "planejado" && x.kind === "forca"); return openAlternative(e ? e.id : null, again, { reason: "tempo", opts: { minutes: 25 } }); }
       if (d.altundo) { t.disabled = true; const e = await api(`/api/alternative/undo/${d.altundo}`, { method: "POST" }); toast(`Treino original de volta${e.garmin_outdated ? ". Reenvie ao relógio para atualizar" : ""}`, 4000); return again(); }
       if (d.altwhy) { const e = sch.entries.find((x) => String(x.id) === d.altwhy); if (e && e.alt) openModal(altResultHtml(e.alt, null) + `<button class="btn block" onclick="closeModal()">Ok</button>`); return; }
       if (t.id === "rd-open") return openReadiness(sch._rd);
@@ -1883,6 +1887,61 @@ async function viewTreinar(planId, idx) {
   renderSession();
 }
 
+// ---------------------------------------------------------------- personalização detalhada (saúde, fase, corpo, corrida, rotina)
+function persSummary(p) {
+  const a = p.personal || {};
+  const n = Object.entries(a).filter(([k, v]) => !k.startsWith("_") && (Array.isArray(v) ? v.length : v !== null && v !== "" && v !== undefined)).length;
+  return n ? `${n} ${n === 1 ? "resposta" : "respostas"} · ajusta o treino com base em pesquisas` : "saúde, remédios, corpo, corrida e rotina (opcional)";
+}
+function persForm(p) {
+  const box = $("#pers-box"); if (!box) return;
+  const Q = (state.meta && state.meta.personal_questions) || [];
+  const a = JSON.parse(JSON.stringify(p.personal || {}));
+  const ctx = () => ({ sex: [p.sex || null], running: [!!((((p.endurance || {}).sports || {}).corrida) || {}).enabled] });
+  const shown = (cond) => !cond || Object.entries(cond).every(([k, vals]) => {
+    if (vals === "any") return Array.isArray(a[k]) && a[k].length > 0;
+    const c = ctx(); const v = k in c ? c[k][0] : (a[k] ?? null);
+    return vals.includes(v);
+  });
+  const exName = (id) => (a._names || {})[id] || id.replace(/_/g, " ");
+  const field = (q) => {
+    if (!shown(q.show_if)) return "";
+    const v = a[q.id];
+    if (q.type === "multi") return `<div class="pq"><label>${esc(q.label)}</label><div class="chips">${q.options.map(([k, t]) => `<button type="button" class="chip pc ${(v || []).includes(k) ? "on" : ""}" data-pm="${q.id}" data-pv="${k}" aria-pressed="${(v || []).includes(k)}">${esc(t)}</button>`).join("")}</div></div>`;
+    if (q.type === "single") return `<div class="pq"><label>${esc(q.label)}</label><div class="chips">${q.options.map(([k, t]) => `<button type="button" class="chip pc ${v === k ? "on" : ""}" data-ps="${q.id}" data-pv="${k}" aria-pressed="${v === k}">${esc(t)}</button>`).join("")}</div></div>`;
+    if (q.type === "number") return `<div class="pq field"><label>${esc(q.label)}</label><input type="number" inputmode="numeric" data-pn="${q.id}" value="${esc(v ?? "")}" min="${q.min ?? 0}" max="${q.max ?? 999}"></div>`;
+    if (q.type === "exercises") return `<div class="pq"><label>${esc(q.label)}</label><div class="chips">${(v || []).map((id) => `<button type="button" class="chip pc on" data-pxdel="${esc(id)}">${esc(exName(id))} ✕</button>`).join("")}<button type="button" class="chip" data-pxadd="${q.id}">+ exercício</button></div></div>`;
+    return "";
+  };
+  const render = () => {
+    box.innerHTML = `<p class="small muted">Tudo opcional. Cada resposta muda o treino com base em diretrizes e estudos (ACSM, NSCA, ADA, COI, BJSM…), e o “Por que este treino” mostra o que mudou. Não substitui médico ou fisioterapeuta.</p>
+      ${Q.filter((s) => shown(s.show_if)).map((s) => `<h3 style="margin-top:14px">${esc(s.section)}</h3>${s.intro ? `<p class="small muted">${esc(s.intro)}</p>` : ""}${s.items.map(field).join("")}`).join("")}
+      <button class="btn block" id="pers-save" type="button" style="margin-top:14px">Salvar personalização</button>
+      <button class="btn ghost block" id="pers-regen" type="button" style="margin-top:8px">🔄 Gerar meu treino com estas respostas</button>`;
+  };
+  render();
+  box.onclick = async (e) => {
+    const t = e.target.closest("button"); if (!t) return;
+    const d = t.dataset;
+    if (d.pm) { const cur = new Set(a[d.pm] || []); if (cur.has(d.pv)) cur.delete(d.pv); else cur.add(d.pv); a[d.pm] = [...cur]; return render(); }
+    if (d.ps) { a[d.ps] = a[d.ps] === d.pv ? null : d.pv; return render(); }
+    if (d.pxdel) { a.dislikes = (a.dislikes || []).filter((x) => x !== d.pxdel); return render(); }
+    if (d.pxadd) return pickExercise(null, (ex) => { a.dislikes = [...new Set([...(a.dislikes || []), ex.id])]; a._names = { ...(a._names || {}), [ex.id]: ex.name }; closeModal(); render(); });
+    if (t.id === "pers-save" || t.id === "pers-regen") {
+      $$("[data-pn]", box).forEach((i) => { a[i.dataset.pn] = i.value === "" ? null : +i.value; });
+      t.disabled = true;
+      try {
+        state.profile = await api("/api/profile", { method: "PUT", body: { personal: a } });
+        p.personal = state.profile.personal;
+        const sum = $("#sec-pers summary .small.muted"); if (sum) sum.textContent = persSummary(state.profile);
+        if (t.id === "pers-regen") return openGenerator();
+        toast("Personalização salva. Toque em “Gerar meu treino com estas respostas” para aplicar.", 5000);
+      } catch (err) { toast(err.message, 5000); } finally { t.disabled = false; }
+    }
+  };
+  box.oninput = (e) => { const i = e.target; if (i.dataset.pn) a[i.dataset.pn] = i.value === "" ? null : +i.value; };
+}
+
 // ---------------------------------------------------------------- treino do relógio: conferir exercício por exercício
 function watchInboxHtml(w) {
   const list = (w && w.items) || []; if (!list.length) return "";
@@ -1939,7 +1998,7 @@ function altResultHtml(p, entryId) {
     ${(p.changes || []).length ? `<details class="small sub"><summary>O que mudou · ${p.changes.length}</summary><ul class="plain alt-ch">${p.changes.map((c) => `<li>${ch(c)}</li>`).join("")}</ul></details>` : ""}
     ${p.base ? `<details class="small sub"><summary>Por que funciona</summary><p>${esc(p.base)}</p></details>` : ""}`;
 }
-async function openAlternative(entryId, again) {
+async function openAlternative(entryId, again, preset) {
   let o; try { o = await api("/api/alternative/options"); } catch (e) { return toast(e.message, 5000); }
   const st = { reason: null, opts: {}, seed: 0 };
   const body = openModal("");
@@ -1963,6 +2022,7 @@ async function openAlternative(entryId, again) {
       ${r.asks === "region" ? `<p class="small muted">Onde está doendo?</p>${chips(o.regions, "region", false)}<p class="small muted" style="margin-top:8px">Dor forte, que piora, com inchaço ou formigamento: não treine a região e procure avaliação.</p>` : ""}
       ${r.asks === "muscles" ? `<p class="small muted">O que ainda está dolorido?${(o.sore_groups || []).length ? " (já marquei o que você treinou há pouco)" : ""}</p>${chips(o.muscle_groups, "muscles", true)}` : ""}
       ${r.asks === "kit" ? `<p class="small muted">O que você tem aí? (nada marcado = só o peso do corpo)</p>${chips(o.kits.filter((k) => k.id !== "corpo"), "kit", true)}` : ""}
+      ${r.asks === "sick" ? `<p class="small muted">Como você está?</p>${chips([{ id: "pescoco", label: "Só nariz/garganta, sem febre" }, { id: "febre", label: "Febre, dor no corpo, peito ou estômago" }], "sick", false)}` : ""}
       <button class="btn block" id="alt-go" style="margin-top:14px">Ver a opção</button><button class="act" id="alt-back" style="margin-top:8px">‹ Outro motivo</button>`;
   };
   const preview = async () => {
@@ -1991,7 +2051,7 @@ async function openAlternative(entryId, again) {
     state.session = d; store("gg_session", d); closeModal();
     if (location.hash !== "#treinar/pronto") location.hash = "#treinar/pronto"; else renderSession();
   };
-  step1();
+  if (preset) { st.reason = preset.reason; st.opts = { ...(preset.opts || {}) }; preview(); } else step1();
   body.onclick = async (ev) => {
     const t = ev.target.closest("button"); if (!t) return;
     try {
@@ -2009,6 +2069,7 @@ async function openAlternative(entryId, again) {
         if (r.asks === "minutes") { const m = +($("#alt-min") || {}).value; if (!(m >= 10)) return toast("Diga quantos minutos você tem"); st.opts.minutes = m; }
         if (r.asks === "region" && !st.opts.region) return toast("Toque onde está doendo");
         if (r.asks === "muscles" && !(st.opts.muscles || []).length) return toast("Toque no que está dolorido");
+        if (r.asks === "sick" && !st.opts.sick) return toast("Toque em como você está");
         return preview();
       }
       if (t.id === "alt-more") { st.seed += 1; return preview(); }
@@ -2108,6 +2169,7 @@ function renderSession() {
         <div class="field" style="margin:0 0 6px"><label for="s-date">Data e hora do treino</label><input type="datetime-local" id="s-date" value="${esc((s.date || "").slice(0, 16))}"></div></details>
       ${s.deload ? `<p class="small rec">Semana de deload: menos séries, carga −10%, RPE ~6.</p>` : ""}
       ${s.watch_review ? watchHeadHtml(s) : ""}
+      ${(s.alerts || []).length ? `<details class="rec atencao small" style="margin-top:10px"><summary><b>⚠️ Para o seu perfil</b></summary><ul class="plain">${s.alerts.map((x) => `<li>${esc(x)}</li>`).join("")}</ul></details>` : ""}
       ${s.generated && s.alt ? `<details class="rec small" style="margin-top:10px"><summary><b>✨ Gerado: ${esc(s.alt.label.toLowerCase())}</b></summary><ul class="plain">${(s.alt.why || []).map((w) => `<li>${esc(w)}</li>`).join("")}</ul></details>` : ""}
       ${s.edit_id && !s.watch_review ? `<div class="rec small" style="margin-top:10px"><b>Você está corrigindo um treino já registrado.</b> Mude repetições e cargas e toque em Salvar correção: o mesmo registro é atualizado (não cria outro).${(s.kept_items || []).length ? ` Ficam como estão: ${esc(s.kept_items.join(", "))}.` : ""}</div>` : partnerDraftHtml(s)}</section>
     ${missingChipsHtml(s)}
@@ -3899,6 +3961,7 @@ async function viewPerfil(openSec) {
       <select data-sev="${l.id}" style="width:auto"><option value="evitar" ${(ul[l.id] || {}).severity !== "cuidado" ? "selected" : ""}>significativa</option><option value="cuidado" ${(ul[l.id] || {}).severity === "cuidado" ? "selected" : ""}>leve</option></select></label>
       <div class="small muted">${esc(l.note)}</div></li>`).join("")}</ul>
     <div class="field"><label>Outros exercícios a evitar (separe por vírgula)</label><input id="custom-avoid" value="${esc(custom.custom_avoid || "")}" placeholder="ex.: leg press, burpee, levantamento terra"></div>`)}
+  ${sect("pers", "🧬", "Personalização detalhada", persSummary(p), `<div id="pers-box"></div>`)}
   ${sect("esportes", "🏃", "Esportes e provas", Object.entries((p.endurance || {}).sports || {}).filter(([, c]) => c.enabled).map(([k]) => SPORT_WORD[k] || k).join(", ") || "corrida, bike, natação…",
     `<p class="small">Corrida, ciclismo, natação, remo, caminhada e trilha: meta de volume ou prova com tempo alvo, zonas por ritmo, potência ou FC.</p>
     <a class="btn ghost block" href="#esportes">Configurar esportes e provas</a>`)}
@@ -3938,7 +4001,8 @@ async function viewPerfil(openSec) {
   let dirty = false;
   const updSave = () => { const bar = $(".savebar"); if (bar) bar.hidden = !(dirty || ["dados", "treino", "limites"].some((id) => ($(`#sec-${id}`) || {}).open)); };
   $$(".sect").forEach((d) => d.addEventListener("toggle", updSave));
-  const own = (e) => e.target.closest && e.target.closest("#focus-box, #mygym-box");  // têm botão próprio de salvar
+  const own = (e) => e.target.closest && e.target.closest("#focus-box, #mygym-box, #pers-box");  // têm botão próprio de salvar
+  persForm(p);
   view.addEventListener("input", (e) => { if (own(e)) return; dirty = true; updSave(); });
   view.addEventListener("change", (e) => { if (own(e)) return; dirty = true; updSave(); });
   updSave();

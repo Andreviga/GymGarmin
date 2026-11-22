@@ -31,7 +31,7 @@ MINUTES = [35, 60, 90]
 LIMS = [[], [{"key": "joelho", "severity": "evitar"}], [{"key": "ombro", "severity": "cuidado"}],
         [{"key": "lombar", "severity": "evitar"}, {"key": "punho", "severity": "cuidado"}]]
 GYMS = ["basica", "completa", "premium"]
-OPTS = {"tempo": [{"minutes": 25}, {"minutes": 40}], "dor": [{"region": r} for r in ("ombro", "joelho", "lombar", "cotovelo")],
+OPTS = {"doente": [{"sick": "pescoco"}], "tempo": [{"minutes": 25}, {"minutes": 40}], "dor": [{"region": r} for r in ("ombro", "joelho", "lombar", "cotovelo")],
         "dolorido": [{"muscles": ["pernas"]}, {"muscles": ["peito", "ombros"]}, {"muscles": ["costas", "bracos"]}],
         "fora": [{"kit": []}, {"kit": ["halteres"]}, {"kit": ["elastico", "barra"]}]}
 

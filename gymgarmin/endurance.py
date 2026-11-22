@@ -165,8 +165,13 @@ def _config(profile: dict) -> dict:
             dist = sum(d for ls, d in e["legs"] if ls == s)
             out[s] = {**base, "enabled": True, "sessions": max(int(base.get("sessions") or 0), n),
                       "goal": {"type": "evento", "event": ev["type"], "distance": dist, "date": ev["date"]}}
+    from . import personal
+    pers = personal.derive(profile or {})
+    keep = {k: pers[k] for k in ("end_rate", "spike", "force_run_walk", "no_hills_speed", "pyramidal", "hold_progress",
+                                 "no_running", "zone_cap", "run_notes", "low_impact_cardio")}
     for c in out.values():
         c["_age"] = age
+        c["_pers"] = keep
     return out
 
 
@@ -182,11 +187,17 @@ def progression(c: dict) -> tuple[float, int]:
     """(subida semanal, semana leve a cada N semanas). Atletas de 50+ recuperam mais devagar entre blocos: +6%/semana e
     semana leve a cada 3ª; 65+ e adolescentes: +5% (ossos e tendões se adaptam mais devagar que o fôlego)."""
     a = (c or {}).get("_age")
+    pers = (c or {}).get("_pers") or {}
+    rate, every = 1.08, 4
     if a is not None and (a >= 65 or a < 16):
-        return 1.05, 3
-    if a is not None and a >= 50:
-        return 1.06, 3
-    return 1.08, 4
+        rate, every = 1.05, 3
+    elif a is not None and a >= 50:
+        rate, every = 1.06, 3
+    if pers.get("end_rate"):
+        rate = min(rate, pers["end_rate"])   # lesão de corrida no último ano, IMC alto, fumante
+    if pers.get("hold_progress"):
+        rate = 1.0                           # sinal de pouca energia disponível (RED-S): o volume não sobe
+    return rate, every
 
 
 def active(profile: dict) -> bool:
@@ -505,7 +516,10 @@ def run_walk(c: dict, level: str, week_idx: int) -> tuple[float, float] | None:
     Some quando a pessoa já corre 10 km por semana ou depois das 10 semanas."""
     start = float(c.get("_start") or 0)
     age = c.get("_age") or 0
-    if level != "iniciante" or start >= 10 or c.get("no_run_walk"):
+    forced = bool((c.get("_pers") or {}).get("force_run_walk"))
+    if not forced and (level != "iniciante" or start >= 10 or c.get("no_run_walk")):
+        return None
+    if forced and start >= 25:
         return None
     k = week_idx if age < 65 else week_idx // 2   # 65+: cada etapa dura 2 semanas
     return RUN_WALK[k] if k < len(RUN_WALK) else None
@@ -635,6 +649,10 @@ def build_session(sport: str, kind: str, volume: float, c: dict, anchors: dict, 
     hard = kind in ("intervalado", "noruegues", "subidas", "ritmo", "ritmo_prova", "sweet_spot", "limiar", "vo2", "css", "velocidade",
                     "intervalos_1000", "intervalos_500", "teste", "prova")
     zone = max((s.get("zone") or 1) for s in flat) if hard else (2 if kind != "regenerativo" else 1)
+    if kind == "longo" and sport in ("corrida", "ciclismo", "trilha", "caminhada") and dur > 75 * 60:
+        fuel = ("Leve carboidrato: 30–60 g por hora (gel, banana, bebida esportiva)" if dur <= 150 * 60 else
+                "Leve carboidrato: 60–90 g por hora; treine o estômago nos longões, subindo 10–15 g/h por semana")
+        note = (note + " · " if note else "") + fuel + "; beba pela sede, mais no calor."
     end = {"sport": sport, "env": env, "type": kind, "title": title, "steps": steps, "hard": hard, "zone": zone,
            "dur_s": int(dur), "dist_m": int(dist) if dist else None, "note": note, "phase": phase}
     if sport == "natacao":
@@ -675,8 +693,18 @@ def _week_roles(sport: str, c: dict, level: str, week_idx: int, phase: str, n: i
             kind = "sweet_spot"
         if sport == "corrida" and phase == "base" and kind == "intervalado":
             kind = "subidas"   # base: força específica na subida, com menos impacto que o tiro no plano
+        pers = c.get("_pers") or {}
+        if pers.get("pyramidal") and kind in ("noruegues", "vo2"):
+            kind = "ritmo" if sport == "corrida" else "limiar"   # 50+/recreativo: mais limiar, menos VO2 (Rosenblat 2025)
+        if sport == "corrida" and pers.get("no_hills_speed") and kind in ("subidas", "intervalado", "noruegues"):
+            kind = "ritmo"
         q.append(kind)
-    if test_due and rot and phase in ("base", "construcao", "manutencao", "semana_leve"):
+    pers = c.get("_pers") or {}
+    if pers.get("zone_cap"):
+        q = []   # aguardando avaliação médica: nada forte
+    if sport == "corrida" and pers.get("no_hills_speed"):
+        test_due = False
+    if test_due and rot and phase in ("base", "construcao", "manutencao", "semana_leve") and not pers.get("zone_cap"):
         if q:
             q[0] = "teste"
         else:
@@ -811,7 +839,17 @@ def week_plan(profile: dict, ws: date, start: date, tier_key: str = "intermediar
         sessions = _compose(sport, roles, wv["volume"], c, anchors, level, week_idx, wv["phase"])
         longest = float(((done or {}).get(sport) or {}).get("longest30") or 0)
         if sport in SPIKE_SPORTS and longest >= mn:
-            sessions = _cap_spikes(sport, sessions, longest, mn, c, anchors, level, week_idx, wv["phase"])
+            sessions = _cap_spikes(sport, sessions, longest, mn, c, anchors, level, week_idx, wv["phase"],
+                                   (c.get("_pers") or {}).get("spike") or SPIKE_MAX)
+        pers = c.get("_pers") or {}
+        if sport == "corrida" and pers.get("no_running"):
+            # dor forte ao correr / pós-parto recente: a corrida vira bike leve com o mesmo tempo
+            bike_c = {"env": "indoor"}
+            sessions = [_as_bike(s, bike_c, anchors, level, week_idx, wv["phase"]) for s in sessions]
+        elif sport == "corrida" and pers.get("run_notes") and sessions:
+            first = next((s for s in sessions if s["endurance"]["type"] in ("leve", "longo", "regenerativo")), sessions[0])
+            extra = " · ".join(pers["run_notes"][:3])
+            first["endurance"]["note"] = (first["endurance"].get("note") + " · " if first["endurance"].get("note") else "") + extra
         built = sum(_vol(x) for x in sessions)
         if built and built < wv["volume"] * 0.85:
             # poucas sessões para o volume (o longo tem teto pela distância da prova): a semana mostra o que cabe
@@ -845,12 +883,22 @@ SPIKE_SPORTS = {"corrida", "caminhada", "trilha"}
 SPIKE_MAX = 1.10
 
 
-def _cap_spikes(sport, sessions, longest, mn, c, anchors, level, week_idx, phase):
+def _as_bike(s, c, anchors, level, week_idx, phase):
+    hours = max(0.5, round((s.get("duration_min") or 40) / 60 * 12) / 12)
+    b = build_session("ciclismo", "leve", hours, c, anchors, level, week_idx, phase)
+    b["endurance"]["title"] = "Bike leve (no lugar da corrida)"
+    b["endurance"]["note"] = "A corrida está suspensa pelo que você marcou no perfil (dor forte ou fase pós-parto). Mesmo tempo, sem impacto."
+    b["endurance"]["role"] = s["endurance"].get("role") or "leve"
+    return b
+
+
+def _cap_spikes(sport, sessions, longest, mn, c, anchors, level, week_idx, phase, factor=None):
     """Nenhuma sessão mais de 10% maior que a mais longa dos últimos 30 dias: em 5.200 corredores, passar disso num
     treino só aumentou o risco de lesão (+64% com 10–30%, mais acima disso), mesmo com o volume semanal sob controle
     (Frandsen et al., BJSM 2025). A prova é a exceção."""
     unit = VOLUME[sport]["unit"]
-    cap = longest * SPIKE_MAX
+    factor = factor or SPIKE_MAX
+    cap = longest * factor
     out = []
     for se in sessions:
         e = se["endurance"]
@@ -858,8 +906,8 @@ def _cap_spikes(sport, sessions, longest, mn, c, anchors, level, week_idx, phase
         if e["type"] != "prova" and size > cap + (0.25 if unit == "km" else 0.05):
             new = build_session(sport, e["type"], _round_vol(sport, max(mn, cap)), c, anchors, level, week_idx, phase)
             ref = f"{longest:.1f} km".replace(".0 km", " km") if unit == "km" else f"{round(longest * 60)} min"
-            msg = (f"Até 10% acima do seu treino mais longo dos últimos 30 dias ({ref}): pular mais que isso num treino só "
-                   "aumenta o risco de lesão.")
+            msg = (f"Até {round((factor - 1) * 100)}% acima do seu treino mais longo dos últimos 30 dias ({ref}): pular mais "
+                   "que isso num treino só aumenta o risco de lesão.")
             new["endurance"]["note"] = (new["endurance"].get("note") + " · " if new["endurance"].get("note") else "") + msg
             new["endurance"]["spike_capped"] = True
             if e.get("role"):

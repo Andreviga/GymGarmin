@@ -24,7 +24,7 @@ import copy
 import re
 from collections import defaultdict
 
-from . import catalog, life_stage, training_rules
+from . import catalog, life_stage, personal, training_rules
 from . import generator as G
 from .limitations import LIMITATIONS, check_exercise
 from .muscles import MUSCLES, PRIMARY_WEIGHT, SECONDARY_WEIGHT
@@ -59,6 +59,11 @@ REASONS = [
      "hint": "Só com o que você tem: peso do corpo, halteres, elástico, barra fixa.",
      "base": "Cargas leves dão ganho de massa parecido com cargas altas quando a série vai até perto da falha "
              "(Schoenfeld et al., 2017); flexão de braço perto da falha rende como supino (Kikuchi e Nakazato, 2017)."},
+    {"id": "doente", "icon": "🤧", "label": "Estou doente ou me recuperando", "asks": "sick",
+     "hint": "Resfriado sem febre: treino bem mais leve. Febre ou dor no corpo: descanso.",
+     "base": "Regra do pescoço: sintomas só acima do pescoço (nariz, garganta) e sem febre permitem treino leve, a 50–70% do "
+             "volume; febre, dor no corpo ou sintomas no peito/estômago pedem descanso até 24–48 h sem febre. Depois de gripe "
+             "ou COVID, volte aos poucos em 1–2 semanas (Elliott et al., BJSM 2020)."},
     {"id": "falta", "icon": "📊", "label": "Treinar o que está faltando na semana",
      "hint": "Monta o treino com os músculos que mais ficaram para trás.",
      "base": "O que importa para cada músculo é o volume da semana (Schoenfeld et al., 2017; Pelland et al., 2024): "
@@ -248,7 +253,8 @@ class Ctx:
                  history_ids: set[str] | None = None, seed: int = 0):
         p = profile or {}
         self.profile = p
-        self.lims = p.get("limitations") or []
+        self.pers = personal.derive(p)
+        self.lims = G.with_personal_lims(p.get("limitations") or [], self.pers)
         months = p.get("training_months")
         self.tier_key = G.tier_for(months if months is not None else {"iniciante": 3, "intermediario": 12, "avancado": 36}.get(p.get("level"), 12))
         self.tier = G.TIERS[self.tier_key]
@@ -316,7 +322,7 @@ def candidates(pattern: str, ctx: Ctx, *, lims: list[dict] | None = None, avoid:
     pool += [m for m in ctx.my_ids if pattern_of(m) == pattern and m not in pool]
     out = []
     for eid in pool:
-        if eid in avoid or not _allowed_rare(eid, ctx):
+        if eid in avoid or eid in ctx.pers["avoid"] or not _allowed_rare(eid, ctx):
             continue
         ex = catalog.get(eid)
         if not ex:
@@ -789,7 +795,33 @@ def _r_falta(main, ctx, opts, today_load: dict | None = None):
     return out, changes, why, {"day_name": "Treino do que falta"}
 
 
-HANDLERS = {"ocupado": _r_ocupado, "tempo": _r_tempo, "cansado": _r_cansado, "dor": _r_dor, "dolorido": _r_dolorido,
+def _r_doente(main, ctx, opts):
+    if opts.get("sick") != "pescoco":
+        raise ValueError("Com febre, dor no corpo ou sintomas no peito ou no estômago, hoje é descanso: treinar agora atrasa a "
+                         "recuperação e pode ser perigoso para o coração. Volte 24–48 h depois de a febre passar, começando leve.")
+    out, changes, why, extra = _r_cansado(main, ctx, opts)
+    for it in out:
+        if not is_strength(it):
+            continue
+        s = int(it["sets"])
+        new = max(1, round(s * 0.6)) if it.get("role") != "main" else max(2, round(s * 0.6))
+        if new < s:
+            it["sets"] = new
+        it["rpe_target"] = min(float(it.get("rpe_target") or 6), 6)
+        it["rir"] = "3–4 (bem longe da falha)"
+    while _sets_total(out) > 0.6 * max(1, _sets_total(main)):
+        accs = [i for i in out if is_strength(i) and i.get("role") == "acc"]
+        if not accs or len([i for i in out if is_strength(i)]) <= 3:
+            break
+        last = accs[-1]
+        out.remove(last)
+        changes.append({"type": "sai", "from": last["exercise_id"], "to": None, "why": "menos volume enquanto se recupera"})
+    why = ["Resfriado sem febre (só acima do pescoço): cerca de 60% do volume, esforço até 6 de 10, nada de tiros.",
+           "Se piorar durante o treino, pare. Febre, dor no corpo ou falta de ar: descanso e, se persistir, procure atendimento."]
+    return out, changes, why, None
+
+
+HANDLERS = {"doente": _r_doente, "ocupado": _r_ocupado, "tempo": _r_tempo, "cansado": _r_cansado, "dor": _r_dor, "dolorido": _r_dolorido,
             "variar": _r_variar, "fora": _r_fora, "falta": _r_falta}
 
 

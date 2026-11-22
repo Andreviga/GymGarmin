@@ -29,7 +29,7 @@ import copy
 import math
 from collections import defaultdict
 
-from . import catalog, clock, endurance, life_stage
+from . import catalog, clock, endurance, life_stage, personal
 from . import focus as focus_mod
 from . import training_rules
 from .limitations import check_exercise, max_zone
@@ -317,6 +317,9 @@ class _Picker:
         self.gym = gym if gym in GYM_TYPES else "completa"
         self.used_week: dict[str, list[str]] = defaultdict(list)
         self.strength_focus = False
+        self.avoid: set[str] = set()                 # exercícios que a pessoa não quer ou não deve fazer
+        self.prefer: dict[str, list[str]] = {}       # por padrão: estes primeiro (mobilidade, lesão antiga)
+        self.demote: dict[str, set[str]] = {}        # por padrão: estes por último
 
     def candidates(self, pattern: str) -> list[tuple[str, str]]:
         out = []
@@ -328,6 +331,8 @@ class _Picker:
         if self.strength_focus and pattern == "hinge":
             pool = ["Barbell_Deadlift"] + [e for e in pool if e != "Barbell_Deadlift"]
         for eid in pool:
+            if eid in self.avoid:
+                continue
             st = _ok(eid, self.lims, self.equipment)
             if st:
                 out.append((eid, st))
@@ -339,7 +344,16 @@ class _Picker:
         if pattern in LENGTHENED_PATTERNS:
             out.sort(key=lambda c: c[0] not in LENGTHENED)
         out.sort(key=lambda c: c[1] != "ok")
-        return out
+        return self._personal_order(out, pattern)
+
+    def _personal_order(self, cands: list[tuple[str, str]], pattern: str) -> list[tuple[str, str]]:
+        """Perfil detalhado por último (manda mais que academia/nível): preferidos na frente, rebaixados no fim."""
+        pref = self.prefer.get(pattern) or []
+        dem = self.demote.get(pattern) or set()
+        if not (pref or dem):
+            return cands
+        prank = {e: i for i, e in enumerate(pref)}
+        return sorted(cands, key=lambda c: (c[1] != "ok", c[0] in dem, prank.get(c[0], len(prank))))
 
     def _premium_order(self, cands: list[tuple[str, str]], pattern: str, role: str) -> list[tuple[str, str]]:
         """Academia premium: primeiro as máquinas modernas do padrão (com apoio, curva de força, músculo alongado).
@@ -351,7 +365,7 @@ class _Picker:
         return sorted(cands, key=lambda c: (c[1] != "ok", rank.get(c[0], len(pref))))
 
     def pick(self, pattern: str, role: str, used_day: set[str], variant: int) -> tuple[str, str] | None:
-        cands = self._premium_order([c for c in self.candidates(pattern) if c[0] not in used_day], pattern, role)
+        cands = self._personal_order(self._premium_order([c for c in self.candidates(pattern) if c[0] not in used_day], pattern, role), pattern)
         if not cands:
             return None
         fresh = [c for c in cands if c[0] not in self.used_week[pattern]]
@@ -641,6 +655,22 @@ def _leg_penalty(days: list[int], split: list[str], hard_leg_days: set[int]) -> 
     return n
 
 
+def with_personal_lims(lims: list[dict], pers: dict) -> list[dict]:
+    """Limitações do perfil + as que o perfil detalhado dispara (lesão antiga, osso frágil, sem impacto)."""
+    out = list(lims)
+    keys = {x.get("key") for x in out}
+    extra = list(pers.get("extra_lims") or [])
+    if pers.get("no_core_flexion"):
+        extra.append({"key": "osso", "severity": "evitar"})
+    if pers.get("no_jumps"):
+        extra.append({"key": "baixo_impacto", "severity": "evitar"})
+    for x in extra:
+        if x["key"] not in keys:
+            out.append(x)
+            keys.add(x["key"])
+    return out
+
+
 def _choose_split_endurance(days: list[int], tier_key: str, goal: dict, hard_leg_days: set[int]) -> list[str]:
     import itertools
 
@@ -659,7 +689,8 @@ def _choose_split_endurance(days: list[int], tier_key: str, goal: dict, hard_leg
 
 def generate(profile: dict, seed: int = 0, recent: dict | None = None, today=None) -> dict:
     p = profile or {}
-    lims = p.get("limitations") or []
+    pers = personal.derive(p)
+    lims = with_personal_lims(p.get("limitations") or [], pers)
     tier_key = tier_for(p.get("training_months") if p.get("training_months") is not None else
                         {"iniciante": 3, "intermediario": 12, "avancado": 36}.get(p.get("level"), 12))
     tier = TIERS[tier_key]
@@ -750,6 +781,16 @@ def generate(profile: dict, seed: int = 0, recent: dict | None = None, today=Non
         cardio_days = [d for d in avail if d not in strength_days]
         split = _choose_split(strength_days, tier_key, goal)
     life = life_stage.stage(p, tier_key)
+    if pers.get("rpe_cap"):
+        life["rpe_cap"] = min(life.get("rpe_cap") or 10, pers["rpe_cap"])
+    life["warm_extra"] = max(int(life.get("warm_extra") or 0), int(pers.get("warm_extra") or 0))
+    life["machines_first"] = bool(life.get("machines_first") or pers.get("machines_first"))
+    if pers.get("no_jumps"):
+        life["bone_jump"] = False
+    elif pers.get("bone_impact") and not (set(x.get("key") for x in lims) & life_stage.NO_JUMP_LIMS):
+        life["bone_jump"] = True
+    if pers.get("clearance"):
+        life["no_intensifiers"] = True
     if life.get("max_strength_days") and n_strength > life["max_strength_days"]:
         extra_days = [d for d in strength_days][life["max_strength_days"]:]
         n_strength = life["max_strength_days"]
@@ -763,6 +804,7 @@ def generate(profile: dict, seed: int = 0, recent: dict | None = None, today=Non
         rationale.append(f"Com {life['age']} anos, até {n_strength} dias de força por semana rendem o mesmo com recuperação melhor"
                          + (f"; {len(extra_days)} dia(s) viram cardio leve ou mobilidade." if extra_days and not end_on else "."))
     rationale.extend(life["notes"])
+    rationale.extend(pers["notes"])
     months = p.get("training_months")
     rationale.append(f"Tempo de prática {('%.0f meses' % months) if months is not None else '(nível do perfil)'} → "
                      f"nível {tier['label']}: {tier['sets']['main']} séries nos principais, reps "
@@ -781,6 +823,7 @@ def generate(profile: dict, seed: int = 0, recent: dict | None = None, today=Non
     picker = _Picker({**tier, "equipment_pref": TIERS["iniciante"]["equipment_pref"]} if life.get("machines_first") else tier,
                      lims, equipment, seed, gym)
     picker.strength_focus = goal_key == "forca" and tier_key != "iniciante"
+    picker.avoid, picker.prefer, picker.demote = set(pers["avoid"]), pers["prefer"], pers["demote"]
     if gym == "premium" and not equipment:
         rationale.append("Academia premium: cada movimento começa pelas máquinas articuladas e de came (pêndulo, V-squat, "
                          "remada DY, extensora reclinada, flexora sentada, tríceps acima da cabeça), que seguem a curva de força, "
@@ -794,7 +837,8 @@ def generate(profile: dict, seed: int = 0, recent: dict | None = None, today=Non
     days: list[dict] = []
     variant_count: dict[str, int] = defaultdict(int)
     warm_min = (3 if budget <= 45 else 5) + int(life.get("warm_extra") or 0)  # RAMP: o "elevar" leva 3–5 min (+ idade)
-    potentiate = tier_key in ("avancado", "elite") and goal_key in ("forca", "hibrido", "condicionamento") and budget >= 60
+    potentiate = tier_key in ("avancado", "elite") and goal_key in ("forca", "hibrido", "condicionamento") and budget >= 60 \
+        and not pers.get("no_jumps")
     for di, (wd, key) in enumerate(zip(strength_days, split)):
         title, slots = DAY_TEMPLATES[key]
         variant = variant_count[key]
@@ -830,7 +874,7 @@ def generate(profile: dict, seed: int = 0, recent: dict | None = None, today=Non
         if life.get("knee_guard") and key in LOWER_DAYS and not any(
                 i.get("pattern") == "glute" and "abductors" in (catalog.get(i["exercise_id"]).get("primaryMuscles") or []) for i in main_items):
             # mulheres: glúteo médio em todo dia de perna (protege o joelho do valgo / LCA)
-            ok = KNEE_GUARD_OPTIONS and next((e for e in KNEE_GUARD_OPTIONS if e not in used and _ok(e, lims, equipment) == "ok"), None)
+            ok = KNEE_GUARD_OPTIONS and next((e for e in KNEE_GUARD_OPTIONS if e not in used and e not in picker.avoid and _ok(e, lims, equipment) == "ok"), None)
             if ok:
                 used.add(ok)
                 main_items.append({"exercise_id": ok, "sets": tier["sets"]["acc"], "reps": reps["acc"], "role": "acc", "pattern": "glute",
@@ -842,6 +886,7 @@ def generate(profile: dict, seed: int = 0, recent: dict | None = None, today=Non
             accs[-1]["notes"] = ((accs[-1].get("notes") or "") + " · última série: drop set (tire ~25% e continue até perto da falha)").strip(" ·")
         for it in main_items:
             life_stage.apply_item(it, life, (catalog.get(it["exercise_id"]) or {}).get("mechanic") == "compound")
+            personal.apply_item(it, pers)
         _pair_supersets(main_items)
         regions = set()
         for it in main_items:
@@ -1062,6 +1107,7 @@ def generate(profile: dict, seed: int = 0, recent: dict | None = None, today=Non
     for d in days:
         for it in d["items"]:
             life_stage.apply_item(it, life, (catalog.get(it.get("exercise_id")) or {}).get("mechanic") == "compound", rest=False)
+            personal.apply_item(it, pers)
 
     return {
         "name": f"Auto – {goal['label']} ({tier['label']})",

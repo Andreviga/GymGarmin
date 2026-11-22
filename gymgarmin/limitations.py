@@ -20,6 +20,22 @@ import re
 from .catalog import strip_accents
 
 LIMITATIONS: dict[str, dict] = {
+    "osso": {
+        "label": "Ossos frágeis (osteopenia/osteoporose, corticoide contínuo)",
+        "avoid": [r"crunch", r"sit.?up", r"russian twist", r"toe touch", r"jack.?knife", r"v.?up", r"oblique",
+                  r"cross.?body crunch", r"abdominal (supra|na polia|máquina)", r"ab coaster", r"rotary torso", r"good morning"],
+        "caution": [r"deadlift", r"bent over", r"leg raise", r"knee raise"],
+        "alternatives": ["Plank", "Dead_Bug", "Pallof_Press", "Hyperextensions_Back_Extensions"],
+        "note": "Força com carga alta é o que fortalece o osso; o que sai é flexão de coluna com carga (abdominal supra, rotação).",
+    },
+    "baixo_impacto": {
+        "label": "Sem impacto (saltos e corrida)",
+        "avoid": [r"jump", r"hop", r"bound", r"burpee", r"skater", r"tuck", r"plyo", r"jumping jack", r"mountain climber"],
+        "avoid_categories": ["plyometrics"],
+        "cardio_avoid_impact": ["alto"],
+        "alternatives": ["cardio_bike_vertical", "cardio_eliptico", "cardio_esteira_caminhada"],
+        "note": "Cardio de baixo impacto (bike, elíptico, caminhada inclinada, água) rende o mesmo para o coração.",
+    },
     "joelho": {
         "label": "Joelho (dor patelar, condromalácia, menisco, LCA)",
         "avoid": [r"jump", r"hop", r"bound", r"pistol", r"sissy", r"depth", r"lunge sprint", r"tuck jump", r"skater"],

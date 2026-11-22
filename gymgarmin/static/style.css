@@ -934,3 +934,8 @@ body:has(.wz) { padding-bottom: 0; }
 .card.need-pick { border: 1px solid var(--warn); }
 .wpick, .wguess { margin-top: 8px; }
 button.mini { border: 1px solid var(--line); background: var(--card); color: var(--ink); border-radius: 8px; padding: 0 6px; min-height: 26px; font-size: 13px; }
+
+/* personalização detalhada */
+.pq { margin: 10px 0; }
+.pq > label { display: block; font-weight: 600; margin-bottom: 6px; color: var(--ink); }
+.chip.pc.on { border-color: var(--brand); background: var(--brand); color: var(--brand-ink); }
