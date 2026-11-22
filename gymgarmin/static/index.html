@@ -37,14 +37,13 @@
       <div id="modal-body"></div>
     </div>
   </div>
-  <div id="timer" class="timer" hidden>
-    <div class="timer-label">Descanso</div>
-    <div id="timer-value" class="timer-value">0:00</div>
-    <div class="row gap">
-      <button class="btn ghost" data-timer="-15">−15s</button>
-      <button class="btn ghost" data-timer="+15">+15s</button>
-      <button class="btn" data-timer="stop">Pular</button>
-    </div>
+  <div id="timer" class="timer" hidden role="timer">
+    <span class="timer-label">Descanso</span>
+    <span id="timer-value" class="timer-value">0:00</span>
+    <button class="tb" data-timer="-15" aria-label="Menos 15 segundos">−15</button>
+    <button class="tb" data-timer="+15" aria-label="Mais 15 segundos">+15</button>
+    <button class="tb tb-skip" data-timer="stop">Pular</button>
+    <span class="timer-track"><span id="timer-bar"></span></span>
   </div>
   <div id="toast" class="toast" hidden></div>
   <script src="/static/app.js?v=hl6"></script>

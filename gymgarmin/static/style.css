@@ -947,3 +947,43 @@ button.mini { border: 1px solid var(--line); background: var(--card); color: var
 .chip.eff span { font-size: 12px; opacity: .8; }
 .wx-moderado, .wx-alto { border-left-color: var(--warn); }
 .wx-perigo { border-left-color: var(--bad); }
+
+/* cronômetro de descanso compacto: não cobre os exercícios e some sozinho no fim */
+.timer { display: flex !important; align-items: center; gap: 6px; flex-wrap: nowrap; padding: 6px 8px 10px 14px; border-radius: 999px;
+  left: 12px; right: 12px; bottom: calc(72px + env(safe-area-inset-bottom)); box-shadow: 0 10px 28px -10px rgba(0,0,0,.5); overflow: hidden; }
+.timer[hidden] { display: none !important; }
+.timer .timer-label { font-size: 12px; opacity: .8; }
+.timer .timer-value { font-size: 24px; font-weight: 800; margin-right: auto; }
+.timer .tb { appearance: none; border: 1px solid color-mix(in srgb, var(--bg) 45%, transparent); background: transparent; color: var(--bg);
+  border-radius: 999px; min-width: 44px; min-height: 36px; font: inherit; font-weight: 700; font-size: 14px; cursor: pointer; }
+.timer .tb-skip { background: var(--bg); color: var(--ink); border-color: var(--bg); padding: 0 12px; }
+.timer .timer-track { position: absolute; left: 14px; right: 14px; bottom: 4px; height: 3px; border-radius: 2px; background: color-mix(in srgb, var(--bg) 25%, transparent); }
+.timer #timer-bar { display: block; height: 100%; width: 0; border-radius: 2px; background: var(--bg); transition: width .25s linear; }
+body.timer-on { padding-bottom: calc(72px + 70px + env(safe-area-inset-bottom)); }
+/* modo um exercício por vez: barra de descanso fina presa no topo */
+.fx-restbar { position: sticky; top: 0; z-index: 6; background: var(--ink); color: var(--bg); border-radius: 16px; padding: 8px 10px 8px 14px;
+  margin: 0 0 10px; box-shadow: 0 10px 24px -14px rgba(0,0,0,.6); }
+.fx-restbar .rb-row { display: flex; align-items: center; gap: 6px; }
+.fx-restbar .rb-lbl { font-size: 12px; opacity: .8; }
+.fx-restbar .rb-clock { font-size: 30px; font-weight: 850; letter-spacing: -1px; font-variant-numeric: tabular-nums; margin-right: auto; }
+.fx-restbar .rb-b { appearance: none; border: 1px solid color-mix(in srgb, var(--bg) 45%, transparent); background: transparent; color: var(--bg);
+  border-radius: 999px; min-width: 44px; min-height: 38px; font: inherit; font-weight: 700; cursor: pointer; }
+.fx-restbar .rb-skip { background: var(--bg); color: var(--ink); border-color: var(--bg); padding: 0 12px; }
+.fx-restbar .fx-bar { margin-top: 6px; height: 4px; }
+.fx-just-wrap { background: var(--card); border-radius: 14px; padding: 8px 12px; margin-bottom: 10px; box-shadow: var(--shadow); }
+.fx-just-wrap summary { font-size: 14px; font-weight: 600; cursor: pointer; }
+.fx-just-wrap .fx-just { margin-top: 8px; }
+
+/* perfil em etapas */
+.sect-n { flex: none; width: 30px; height: 30px; border-radius: 50%; display: inline-grid; place-items: center; font-weight: 800; font-size: 14px;
+  background: var(--brand-soft); color: var(--brand); }
+.sect-n.ok { background: var(--ok); color: var(--ok-ink); }
+.sect-st { flex: none; font-size: 12px; font-weight: 700; border-radius: 999px; padding: 2px 8px; margin-right: 4px; }
+.sect-st.ok { background: var(--ok-bg, var(--brand-soft)); color: var(--ok); }
+.sect-st.todo { background: var(--warn-bg); color: var(--warn); }
+.sect-st.opt { color: var(--ink-2); border: 1px solid var(--line); }
+.next-step { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; font: inherit; color: var(--ink); cursor: pointer;
+  background: var(--card); border: 2px solid var(--brand); border-radius: var(--radius); padding: 12px 14px; margin: 0 0 12px; box-shadow: var(--shadow); }
+.next-step .grow { display: flex; flex-direction: column; }
+.next-step .small { color: var(--brand); font-weight: 700; }
+.hoje-group:empty { display: none; }

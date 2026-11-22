@@ -244,10 +244,9 @@ async function viewHoje(weekDate) {
   sch._sel = sel;
   const adjusted = plannedToday.some((e) => e.readiness_backup);
   view.innerHTML = `${weekDate ? pageHead(`Semana de ${ddmm(sch.week_start)}`) : pageHead("Hoje", true, sch.today)}
-  ${weekDate ? "" : firstStepsHtml(true) + statsHtml(rd, g, adjusted, plannedToday.length > 0) + (sch.pending || []).map(questionHtml).join("") + watchInboxHtml(wib) + stepsAskHtml(stp, sch.today) + partnerCardsHtml(prt) + legacyHtml(sch) + focusChip(prof) + garminSyncCard(sch, gst) + installCardHtml("hoje")}${athleteHtml}
+  ${weekDate ? "" : statsHtml(rd, g, adjusted, plannedToday.length > 0)}
   ${missed.length ? `<div class="rec alerta"><b>Treino perdido:</b> ${missed.map((e) => `${e.weekday} ${ddmm(e.date)} – ${esc(e.day_name)}`).join(", ")}.
      <div class="row gap wrap" style="margin-top:6px">${missed.map((e) => `<button class="btn sm" data-skip="${e.id}">Ajustar a semana (${e.weekday})</button>`).join("")}</div></div>` : ""}
-  ${weekDate ? "" : `<div id="hx"></div>`}
   ${!weekDate && sch.comeback ? `<section class="card wbox"><div class="eyebrow">Que bom te ver</div><b>${sch.comeback.days} dias sem treinar — tudo bem, acontece.</b>
     <p class="small" style="margin:6px 0 10px">Para voltar sem sofrer: um treino curto de 25 min hoje. Uma série por exercício com esforço já mantém força e músculo, e voltar logo é o que mais segura o hábito.</p>
     <button class="btn sm" data-comeback="1">Voltar com 25 min</button></section>` : ""}
@@ -259,6 +258,14 @@ async function viewHoje(weekDate) {
     <div class="wstrip" role="tablist">${weekStrip(sch, sel)}</div>
   </section>
   <div id="day-panel">${dayPanel(sch, sel)}</div>
+  ${weekDate ? "" : (() => {
+    // depois do treino do dia: o que precisa de resposta, o check-in e o resto (configuração e parceiro) por último
+    const todo = `<div id="hx"></div>` + (sch.pending || []).map(questionHtml).join("") + watchInboxHtml(wib) + stepsAskHtml(stp, sch.today);
+    const rest = partnerCardsHtml(prt) + legacyHtml(sch) + focusChip(prof) + garminSyncCard(sch, gst);
+    const setup = firstStepsHtml(true) + installCardHtml("hoje");
+    return `<div class="hoje-group">${todo}</div>${athleteHtml}
+      ${rest.trim() ? `<div class="hoje-group">${rest}</div>` : ""}${setup.trim() ? `<h2 class="sec-title">Configurar</h2>${setup}` : ""}`;
+  })()}
   ${(sch.time_warnings || []).length ? `<details class="rec atencao small"><summary><b>⏱ ${sch.time_warnings.length} ${sch.time_warnings.length > 1 ? "dias passam" : "dia passa"} do seu tempo de treino</b></summary><ul class="plain">${sch.time_warnings.map((w) => `<li>${esc(w)}</li>`).join("")}</ul></details>` : ""}
   ${cyc && cyc.deload ? `<p class="small rec">Semana de deload: menos séries, carga −10% e RPE ~6 para o corpo assimilar o ciclo.</p>` : ""}
   <section class="card goals"><div class="row between"><h2>Metas da semana</h2><a class="small" href="#analise">Progresso ›</a></div><div class="stack">
@@ -2911,7 +2918,7 @@ function wakeOff() { try { WL && WL.release(); } catch (_) { /* já liberado */ 
 function fxLeave() { clearInterval(fxInt); fxInt = null; wakeOff(); document.body.classList.remove("focus-on"); }
 document.addEventListener("visibilitychange", () => { if (!document.hidden && document.body.classList.contains("focus-on")) { wakeOn(); fxTick(); } });
 
-// nada avança sozinho: o fim do descanso ou do tempo só avisa (som + vibração); trocar é sempre no seu toque
+// o descanso termina sozinho (som + vibração) e a barra some; o tempo de um exercício só avisa — marcar a série é no seu toque
 function fxTick() {
   const s = state.session; if (!s || !document.body.classList.contains("focus-on")) return;
   const el = $("#fx-clock"), bar = $("#fx-bar span"), now = Date.now();
@@ -2919,16 +2926,17 @@ function fxTick() {
   const beeps = (left) => { if (left !== fxLast && left > 0 && left <= 3) beep(660, 0.12, 0.22); fxLast = left; };
   if (s.restEnd) {
     const over = now - s.restEnd;
-    if (over < 0) { const left = Math.ceil(-over / 1000); show(left, s.restTotal); return beeps(left); }
-    if (!s.restOver) {
-      s.restOver = true; store("gg_session", s); if (over < 8000) alarm();
-      const sec = $(".fx-rest"); if (!sec) return renderFocus();
-      sec.classList.add("over"); const lbl = $("#fx-rest-lbl"); if (lbl) lbl.textContent = "Descanso terminado";
-      $$(".fx-rest [data-when=rest]").forEach((x) => { x.hidden = true; }); $$(".fx-rest [data-when=over]").forEach((x) => { x.hidden = false; });
-      const go = $(".fx-rest .fx-skip"); if (go && s.items[fxOrder(s)[s.fx]]) go.textContent = "▶ Começar";
+    const rc = $("#fx-rclock"), rb = $("#fx-rbar span");
+    if (over < 0) {
+      const left = Math.ceil(-over / 1000);
+      if (rc) rc.textContent = mmss(left);
+      if (rb && s.restTotal) rb.style.width = `${Math.min(100, 100 * (1 - left / s.restTotal))}%`;
+      return beeps(left);
     }
-    if (el) el.textContent = "+" + mmss(Math.floor(over / 1000));
-    return;
+    // acabou: avisa (som + vibração, se acabou agora) e some sozinho; a tela já está na próxima série
+    s.restEnd = null; s.restOver = false; s.lastSet = null; fxLast = null; store("gg_session", s);
+    if (over < 8000) { alarm(); toast("Descanso terminado — bora para a próxima!"); }
+    return renderFocus();
   }
   if (s.prepEnd) {
     const left = Math.ceil((s.prepEnd - now) / 1000);
@@ -2955,7 +2963,7 @@ function fxSetDone() {
   else { rest = (it.plan || {}).rest_s ?? 90; if (it.sets.every((y) => y.done)) s.fx = fxNextPos(s, order, s.fx); }
   if (rest > 0) { s.restTotal = rest; s.restEnd = Date.now() + rest * 1000; s.restOver = false; fxLast = null; }
   store("gg_session", s); renderFocus();
-  if (s.restEnd) window.scrollTo(0, 0);
+  window.scrollTo(0, 0);
 }
 
 function fxNextHtml(s, order) {
@@ -2984,21 +2992,7 @@ function renderFocus() {
     <button class="fx-nav" data-fx="next" ${pos >= order.length ? "disabled" : ""} aria-label="Próximo exercício">›</button></div>`;
   const tools = `<div class="fx-tools"><button class="act" data-fx="list">☰ Ver lista</button><button class="act" data-fx="add">+ Exercício</button></div>`;
   let body;
-  if (s.restEnd) {
-    const left = Math.max(0, Math.ceil((s.restEnd - Date.now()) / 1000));
-    const just = fxJustHtml(s);
-    const clock = `<div class="fx-clock" id="fx-clock">${s.restOver ? "+" + mmss(Math.floor((Date.now() - s.restEnd) / 1000)) : mmss(left)}</div>`;
-    const go = `<button class="btn ${just ? "" : "block"} fx-skip" data-fx="r-skip">${!it ? "Terminei" : s.restOver ? "▶ Começar" : "Estou pronto"}</button>`;
-    // com a série recém-feita editável em cima, o cronômetro e o botão ficam juntos numa barra fixa embaixo (sempre visíveis)
-    body = `<section class="fx-rest ${s.restOver ? "over" : ""} ${just ? "has-just" : ""}">${just}
-      <div class="eyebrow" id="fx-rest-lbl" aria-live="polite">${s.restOver ? "Descanso terminado" : "Descanso"}</div>
-      ${just ? "" : clock}
-      <div class="fx-bar" id="fx-bar" data-when="rest" ${s.restOver ? "hidden" : ""}><span style="width:${Math.round(100 * (1 - left / (s.restTotal || 1)))}%"></span></div>
-      <div id="fx-next-box">${fxNextHtml(s, order)}</div>
-      <div class="fx-rest-btns" data-when="rest" ${s.restOver ? "hidden" : ""}><button class="btn ghost" data-fx="r-15">−15 s</button><button class="btn ghost" data-fx="r+15">+15 s</button></div>
-      ${just ? `<div class="fx-dock">${clock}${go}</div>` : go}
-      <p class="small" data-when="over" ${s.restOver ? "" : "hidden"} style="margin:10px 0 0;opacity:.8">Sem pressa: só muda quando você tocar.</p></section>`;
-  } else if (!it) {
+  if (!it) {
     const sets = s.items.reduce((n, x) => n + (fxStrength(x) ? x.sets.filter((y) => y.done).length : 0), 0);
     body = `<section class="today-card fx-end"><div class="eyebrow">Treino concluído</div><div class="tc-title">${esc(s.day_name || "Treino")} ✓</div>
       <p class="muted">${doneN} de ${order.length} exercícios · ${sets} séries feitas</p>
@@ -3072,7 +3066,19 @@ function renderFocus() {
         <div class="fx-setmini"><button class="act" data-fx="skip">Pular</button><button class="act drop-ex" data-fx="drop">🗑 Tirar do treino</button></div></section>`;
     }
   }
-  view.innerHTML = top + body + (s.restEnd && it ? "" : tools);  // no descanso depois da última série dá para pôr mais um exercício
+  // descanso: uma barra fina presa no topo; embaixo continua o exercício (dá para navegar, ver a lista e ajustar a série feita)
+  let rest = "";
+  if (s.restEnd) {
+    const left = Math.max(0, Math.ceil((s.restEnd - Date.now()) / 1000));
+    const just = fxJustHtml(s);
+    rest = `<div class="fx-restbar" id="fx-restbar" role="timer" aria-live="off">
+        <div class="rb-row"><span class="rb-lbl">Descanso</span><b class="rb-clock" id="fx-rclock">${mmss(left)}</b>
+          <button class="rb-b" data-fx="r-15" aria-label="Menos 15 segundos">−15</button><button class="rb-b" data-fx="r+15" aria-label="Mais 15 segundos">+15</button>
+          <button class="rb-b rb-skip" data-fx="r-skip">Pular</button></div>
+        <div class="fx-bar" id="fx-rbar"><span style="width:${Math.round(100 * (1 - left / (s.restTotal || 1)))}%"></span></div></div>
+      ${just ? `<details class="fx-just-wrap"><summary>✏️ Ajustar a série que você acabou de fazer</summary>${just}</details>` : ""}`;
+  }
+  view.innerHTML = top + rest + body + tools;
   bindFocus();
 }
 
@@ -3123,8 +3129,8 @@ function bindFocus() {
     if (a === "skipwarm") { (it.warmup || []).forEach((w) => { if (!w.done) w.skip = true; }); s.fsel = null; save(); return renderFocus(); }
     if (a === "done") { it.done = true; s.workEnd = null; s.prepEnd = null; s.timeUp = false; s.fx = fxNextPos(s, order, s.fx); save(); return renderFocus(); }
     if (a === "skip") { s.workEnd = null; s.prepEnd = null; s.timeUp = false; s.fsel = null; s.fx = Math.min(order.length, s.fx + 1); save(); return renderFocus(); }
-    if (a === "prev" || a === "next") { s.lastSet = null; s.restEnd = null; s.restOver = false; s.workEnd = null; s.prepEnd = null; s.timeUp = false; s.fsel = null; s.fx = Math.max(0, Math.min(order.length, s.fx + (a === "next" ? 1 : -1))); save(); return renderFocus(); }
-    if (a === "r-15" || a === "r+15") { s.restEnd = Math.max(Date.now(), s.restEnd + (a === "r+15" ? 15000 : -15000)); s.restTotal = Math.max(s.restTotal, Math.ceil((s.restEnd - Date.now()) / 1000)); save(); return fxTick(); }
+    if (a === "prev" || a === "next") { s.workEnd = null; s.prepEnd = null; s.timeUp = false; s.fsel = null; s.fx = Math.max(0, Math.min(order.length, s.fx + (a === "next" ? 1 : -1))); save(); return renderFocus(); }
+    if (a === "r-15" || a === "r+15") { if (!s.restEnd) return; s.restEnd = Math.max(Date.now() + 1000, s.restEnd + (a === "r+15" ? 15000 : -15000)); s.restTotal = Math.max(s.restTotal, Math.ceil((s.restEnd - Date.now()) / 1000)); save(); return fxTick(); }
     if (a === "r-skip") { s.restEnd = null; s.restOver = false; s.lastSet = null; save(); return renderFocus(); }
     if (a === "work") { s.workTotal = +t.dataset.sec; s.prepEnd = Date.now() + 5000; s.workEnd = null; s.timeUp = false; s.workKind = t.dataset.kind; fxLast = null; save(); return renderFocus(); }
     if (a === "work-stop") { s.workEnd = null; s.prepEnd = null; save(); return renderFocus(); }
@@ -3148,9 +3154,9 @@ function bindFocus() {
 }
 
 /* ---- timer de descanso ---- */
-let timerEnd = 0, timerInt;
+let timerEnd = 0, timerInt, timerTotal = 0;
 function startTimer(sec, from) {
-  timerEnd = Date.now() + sec * 1000; $("#timer").hidden = false; document.body.classList.add("timer-on"); tick();
+  timerEnd = Date.now() + sec * 1000; timerTotal = sec; $("#timer").hidden = false; document.body.classList.add("timer-on"); tick();
   clearInterval(timerInt); timerInt = setInterval(tick, 250);
   // deixa a próxima série (ou o próximo exercício) visível acima do cronômetro
   requestAnimationFrame(() => {
@@ -3165,12 +3171,13 @@ function stopTimer() { clearInterval(timerInt); $("#timer").hidden = true; docum
 function tick() {
   const left = Math.max(0, Math.round((timerEnd - Date.now()) / 1000));
   $("#timer-value").textContent = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")}`;
-  if (left <= 0) { stopTimer(); try { navigator.vibrate && navigator.vibrate([200, 100, 200]); } catch (_) { /* sem vibração */ } toast("Descanso terminado — próxima série!"); }
+  const bar = $("#timer-bar"); if (bar && timerTotal) bar.style.width = `${Math.min(100, 100 * (1 - left / timerTotal))}%`;
+  if (left <= 0) { stopTimer(); alarm(); toast("Descanso terminado — próxima série!"); }
 }
 $("#timer").addEventListener("click", (e) => {
   const a = e.target.dataset.timer; if (!a) return;
   if (a === "stop") return stopTimer();
-  timerEnd += (+a) * 1000; tick();
+  timerEnd = Math.max(Date.now() + 1000, timerEnd + (+a) * 1000); timerTotal = Math.max(timerTotal, Math.ceil((timerEnd - Date.now()) / 1000)); tick();
 });
 
 /* ------------------------------------------------------------- ANÁLISE -- */
@@ -3954,9 +3961,26 @@ async function viewPerfil(openSec) {
   const miss = profileMissing(p);
   const filled = PROFILE_REQ.length - miss.length;
   const firstName = String(p.name || "").trim();
-  const sect = (id, icon, title, sub, body, open = false) => `<details class="sect" id="sec-${id}" ${open || openSec === id ? "open" : ""}>
-    <summary><span class="sect-ico" aria-hidden="true">${icon}</span><span class="grow"><b>${title}</b><span class="small muted">${sub}</span></span><span class="chev" aria-hidden="true">›</span></summary>
+  // ordem de preencher: 1–3 essenciais, 4–5 recomendados, 6–8 opcionais; cada seção mostra se já está feita
+  const pa = p.personal || {};
+  const STEP = {
+    dados: [1, ["name", "age", "weight_kg", "sex"].every((k) => !miss.some((m) => m[0] === k)), "essencial"],
+    treino: [2, ["goal", "training_months", "available_days"].every((k) => !miss.some((m) => m[0] === k)), "essencial"],
+    limites: [3, !!store("gg_lim_seen") || (p.limitations || []).length > 0, "essencial"],
+    pers: [4, Object.keys(pa).some((k) => !k.startsWith("_") && pa[k] != null && !(Array.isArray(pa[k]) && !pa[k].length)), "recomendado"],
+    relogios: [5, !!g.connected || !!store("gg_watch_skip") || (p.devices || []).length > 0, "recomendado"],
+    esportes: [6, Object.values(((p.endurance || {}).sports) || {}).some((c) => c && c.enabled), "opcional"],
+    foco: [7, !!p.focus, "opcional"],
+    academia: [8, false, "opcional"],
+  };
+  const nextStep = Object.entries(STEP).find(([, v]) => !v[1] && v[2] !== "opcional");
+  const sect = (id, icon, title, sub, body, open = false) => {
+    const st = STEP[id];
+    const badge = st ? (st[1] ? `<span class="sect-st ok" aria-label="feito">✓</span>` : `<span class="sect-st ${st[2] === "opcional" ? "opt" : "todo"}">${st[2] === "opcional" ? "opcional" : "falta"}</span>`) : "";
+    return `<details class="sect" id="sec-${id}" ${open || openSec === id ? "open" : ""}>
+    <summary>${st ? `<span class="sect-n ${st[1] ? "ok" : ""}" aria-hidden="true">${st[0]}</span>` : `<span class="sect-ico" aria-hidden="true">${icon}</span>`}<span class="grow"><b>${title}</b><span class="small muted">${sub}</span></span>${badge}<span class="chev" aria-hidden="true">›</span></summary>
     <div class="sect-body">${body}</div></details>`;
+  };
   const GOAL_TXT = { hipertrofia: "Hipertrofia", forca: "Força", emagrecimento: "Emagrecimento", condicionamento: "Condicionamento", saude: "Saúde geral", hibrido: "Híbrido" };
   const nDays = (p.available_days || []).length;
   const lims = (p.limitations || []).filter((l) => l.key !== "personalizado");
@@ -3972,6 +3996,10 @@ async function viewPerfil(openSec) {
   ${state.me && state.me.user && state.me.user.is_admin ? `<button class="link-card sect dev-link" id="fam-open" type="button"><span class="sect-ico" aria-hidden="true">👨‍👩‍👧</span><span class="grow"><b>Chamar a família</b><span class="small muted">mensagem pronta no WhatsApp: cada um cria a conta sozinho</span></span><span class="chev" aria-hidden="true">›</span></button>` : ""}
   ${state.me && state.me.logged_in ? `<button class="link-card sect dev-link" data-feedback type="button"><span class="sect-ico" aria-hidden="true">💬</span><span class="grow"><b>Mandar sugestão ou problema</b><span class="small muted">o que achou, o que faltou, o que deu errado</span></span><span class="chev" aria-hidden="true">›</span></button>` : ""}
   ${state.me && state.me.user && state.me.user.is_admin ? `<a class="link-card sect dev-link" href="#dev"><span class="sect-ico" aria-hidden="true">🛠️</span><span class="grow"><b>Área do desenvolvedor</b><span class="small muted" id="dev-count">fotos de aparelhos para aprovar</span></span><span class="chev" aria-hidden="true">›</span></a>` : ""}
+  ${nextStep ? `<button class="next-step" type="button" data-open-step="${nextStep[0]}"><span class="sect-n">${nextStep[1][0]}</span>
+    <span class="grow"><span class="small">Próximo passo</span><b>${({ dados: "Seus dados", treino: "Treino e rotina", limites: "Limitações e lesões", pers: "Personalização detalhada", relogios: "Relógio" })[nextStep[0]]}</b></span><span class="chev">›</span></button>`
+    : `<p class="small ok-txt" style="margin:0 2px 10px">✓ O essencial está preenchido. As seções opcionais deixam o treino ainda mais seu.</p>`}
+  <h2 class="sec-title">Preencha nesta ordem</h2>
   ${sect("dados", "👤", "Seus dados", [p.age ? `${p.age} anos` : "", p.weight_kg ? `${p.weight_kg} kg` : "", p.height_cm ? `${p.height_cm} cm` : ""].filter(Boolean).join(" · ") || "nome, idade, peso, altura, FC",
     `<div class="grid2">
       <div class="field"><label>Nome</label><input data-p="name" value="${esc(p.name && p.name !== "Eu" ? p.name : "")}" placeholder="Como quer ser chamado" autocomplete="given-name"></div>
@@ -4010,7 +4038,6 @@ async function viewPerfil(openSec) {
       <p class="small muted">“Ajuste de volume” multiplica as séries por músculo: reduza se não estiver recuperando, aumente se estagnou recuperando bem.</p></details>
     <button class="btn ghost block" id="prof-regen" type="button" style="margin-top:12px">🔄 Gerar meu treino de novo</button>
     <p class="small muted">Mudou algo aqui? Salve e gere de novo: você vê a prévia antes de trocar. Histórico, cargas, aparelhos fotografados e as trocas “usar sempre” continuam.</p>`, miss.some((m) => ["training_months", "available_days", "goal"].includes(m[0])))}
-  ${sect("foco", "🎯", "Foco: músculo ou aptidão", p.focus ? esc(p.focus.label || "foco ativo") : "melhorar algo específico (opcional)", `<div id="focus-box"><div class="sk"><span class="sk-line"></span></div></div>`)}
   ${sect("limites", "🩹", "Limitações e lesões", lims.length ? lims.map((l) => (state.meta.limitations.find((x) => x.id === l.key) || {}).label || l.key).join(", ") : "nenhuma marcada",
     `<p class="small muted">O app marca exercícios como <span class="pill warn">cuidado</span> ou <span class="pill bad">evitar</span>, troca os que não servem e limita a zona do cardio. Não substitui orientação de um profissional.</p>
     <ul class="list">${state.meta.limitations.map((l) => `<li><label class="row gap" style="color:var(--ink);font-size:15px;margin:0"><input type="checkbox" data-lim="${l.id}" ${ul[l.id] ? "checked" : ""}> <span class="grow">${esc(l.label)}</span>
@@ -4018,10 +4045,6 @@ async function viewPerfil(openSec) {
       <div class="small muted">${esc(l.note)}</div></li>`).join("")}</ul>
     <div class="field"><label>Outros exercícios a evitar (separe por vírgula)</label><input id="custom-avoid" value="${esc(custom.custom_avoid || "")}" placeholder="ex.: leg press, burpee, levantamento terra"></div>`)}
   ${sect("pers", "🧬", "Personalização detalhada", persSummary(p), `<div id="pers-box"></div>`)}
-  ${sect("esportes", "🏃", "Esportes e provas", Object.entries((p.endurance || {}).sports || {}).filter(([, c]) => c.enabled).map(([k]) => SPORT_WORD[k] || k).join(", ") || "corrida, bike, natação…",
-    `<p class="small">Corrida, ciclismo, natação, remo, caminhada e trilha: meta de volume ou prova com tempo alvo, zonas por ritmo, potência ou FC.</p>
-    <a class="btn ghost block" href="#esportes">Configurar esportes e provas</a>`)}
-  ${sect("academia", "🏟️", "Minha academia", "fotos e regulagem dos aparelhos que você usa", `<div id="mygym-box"><div class="sk"><span class="sk-line"></span></div></div>`)}
   ${sect("relogios", "⌚", "Relógios", g.connected ? `Garmin conectado${g.display_name ? "" : ""}` : g.needs_reconnect ? "Garmin: reconectar" : "Garmin, Apple Watch, Amazfit, Xiaomi, Samsung…",
     `<h3>Garmin</h3>
     ${!g.library_installed ? `<p class="pill bad">Biblioteca garminconnect não instalada no servidor: <code>pip install "garminconnect>=0.3.20"</code></p>` : ""}
@@ -4044,6 +4067,12 @@ async function viewPerfil(openSec) {
   
     ${devHtml}
     ${g.connected ? "" : `<button class="act" id="watch-skip" style="margin-top:10px">Não uso relógio por enquanto</button>`}`, g.needs_reconnect || openSec === "relogios")}
+  ${sect("esportes", "🏃", "Esportes e provas", Object.entries((p.endurance || {}).sports || {}).filter(([, c]) => c.enabled).map(([k]) => SPORT_WORD[k] || k).join(", ") || "corrida, bike, natação…",
+    `<p class="small">Corrida, ciclismo, natação, remo, caminhada e trilha: meta de volume ou prova com tempo alvo, zonas por ritmo, potência ou FC.</p>
+    <a class="btn ghost block" href="#esportes">Configurar esportes e provas</a>`)}
+  ${sect("foco", "🎯", "Foco: músculo ou aptidão", p.focus ? esc(p.focus.label || "foco ativo") : "melhorar algo específico (opcional)", `<div id="focus-box"><div class="sk"><span class="sk-line"></span></div></div>`)}
+  ${sect("academia", "🏟️", "Minha academia", "fotos e regulagem dos aparelhos que você usa", `<div id="mygym-box"><div class="sk"><span class="sk-line"></span></div></div>`)}
+  <h2 class="sec-title">Pessoas e conta</h2>
   ${partnerHtml ? sect("parceiro", "🤝", "Treinar com alguém", "parceiro de treino e placar da semana", partnerHtml) : ""}
   ${coachHtml ? sect("coach", "🧑‍🏫", "Coach", "quem acompanha seus treinos", coachHtml) : ""}
   ${sect("conta", "🔒", "Conta e segurança", state.me && state.me.logged_in ? esc(state.me.user.email) : "criar login", `${acctHtml}
@@ -4053,6 +4082,7 @@ async function viewPerfil(openSec) {
       <label class="btn sm ghost" style="margin:0">Restaurar backup<input type="file" id="restore" accept=".json,application/json" hidden></label></div>` : ""}`)}
   <div class="savebar"><button class="btn block" id="save-profile">Salvar perfil</button></div>`;
   if (openSec) { const el = $(`#sec-${openSec}`); if (el) { el.open = true; setTimeout(() => el.scrollIntoView({ block: "start" }), 50); } }
+  const ns = $("[data-open-step]"); if (ns) ns.onclick = () => { const el = $(`#sec-${ns.dataset.openStep}`); if (el) { el.open = true; el.scrollIntoView({ block: "start", behavior: "smooth" }); } };
   // "Salvar" só aparece com uma seção de dados aberta ou algo alterado
   let dirty = false;
   const updSave = () => { const bar = $(".savebar"); if (bar) bar.hidden = !(dirty || ["dados", "treino", "limites"].some((id) => ($(`#sec-${id}`) || {}).open)); };
@@ -4080,6 +4110,14 @@ async function viewPerfil(openSec) {
     state.meta = await api("/api/meta");
     store("gg_lim_seen", 1);
     toast("Perfil salvo ✔");
+    // segue a ordem: fecha o que salvou e abre o próximo passo que falta
+    const req = ["dados", "treino", "limites", "pers", "relogios"];
+    const m2 = profileMissing(state.profile);
+    const done2 = { dados: ["name", "age", "weight_kg", "sex"].every((k) => !m2.some((x) => x[0] === k)), treino: ["goal", "training_months", "available_days"].every((k) => !m2.some((x) => x[0] === k)), limites: true };
+    const nx = req.find((id) => id in done2 ? !done2[id] : !($(`#sec-${id} .sect-st.ok`)));
+    $$(".sect[open]").forEach((d) => { if (["dados", "treino", "limites"].includes(d.id.slice(4))) d.open = false; });
+    ["dados", "treino", "limites"].forEach((id) => { if (done2[id]) { const sm = $(`#sec-${id} summary`); if (sm && !sm.querySelector(".sect-st.ok")) { const b0 = sm.querySelector(".sect-st"); if (b0) { b0.className = "sect-st ok"; b0.textContent = "✓"; } const n0 = sm.querySelector(".sect-n"); if (n0) n0.classList.add("ok"); } } });
+    if (nx) { const el = $(`#sec-${nx}`); if (el) { el.open = true; setTimeout(() => el.scrollIntoView({ block: "start", behavior: "smooth" }), 80); } }
     const head = $(".prof-head"); if (head) { const m = profileMissing(state.profile); head.querySelector(".meter span").style.width = `${Math.round(100 * (PROFILE_REQ.length - m.length) / PROFILE_REQ.length)}%`; }
   };
   if ($("#restore")) $("#restore").onchange = async (e) => {
