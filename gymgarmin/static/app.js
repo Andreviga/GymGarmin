@@ -424,6 +424,10 @@ function dayPanel(sch, date) {
     ${es.filter((e) => e.alt && e.status === "planejado").map((e) => `<div class="rec small alt-on"><b>🔀 Outra opção: ${esc(e.alt.label.toLowerCase())}</b>
       <div>${esc((e.alt.why || [])[0] || "")}</div>
       <div class="row gap wrap" style="margin-top:6px"><button class="btn sm ghost" data-altwhy="${e.id}">Por quê?</button><button class="btn sm ghost" data-altundo="${e.id}">Voltar ao original</button></div></div>`).join("")}
+    ${es.filter((e) => e.status === "planejado" && e.kind === "forca" && date >= sch.today).map((e) => e.gym_day
+      ? `<div class="rec small gym-day"><b>📍 ${esc(e.gym_day.name)} neste dia</b>${(e.gym_changes || []).length ? `<div>Trocado: ${esc(e.gym_changes.join(" · "))}</div>` : `<div>Nada precisou mudar.</div>`}
+        <div class="row gap wrap" style="margin-top:6px"><button class="btn sm ghost" data-dgym="${e.id}">Outra academia</button><button class="btn sm ghost" data-dgymundo="${e.id}">Voltar à de sempre</button></div></div>`
+      : `<button class="gym-line" data-dgym="${e.id}">📍 ${esc(((state.profile || {}).gym || {}).name || "Minha academia")} <span class="muted">· vai treinar em outro lugar?</span></button>`).join("")}
     ${planned.length ? `<a class="btn block go" href="#treinar/agenda/${first.id}">${date === sch.today ? "Começar treino" : date < sch.today ? "Registrar treino" : "Treinar agora"}</a>` : ""}
     ${es.some((e) => e.status === "perdido") ? `<button class="btn block" data-skip="${es.find((e) => e.status === "perdido").id}">Ajustar a semana</button>` : ""}
     <ul class="exlist">${main.map((it) => {
@@ -521,6 +525,8 @@ function bindAgenda(sch) {
       if (d.wrev) { t.disabled = true; return openWatchCheck(+d.wrev).finally(() => { t.disabled = false; }); }
       if (d.wok) { t.disabled = true; await api(`/api/watch/inbox/${d.wok}/ok`, { method: "POST" }); toast("Ok, fica como o relógio mandou"); return again(); }
       if (d.alt) return openAlternative(+d.alt, again);
+      if (d.dgym) return openGymPicker(null, { entry: +d.dgym, done: again });
+      if (d.dgymundo) { t.disabled = true; await api(`/api/schedule/${d.dgymundo}/gym`, { method: "POST", body: { id: null } }); toast("Treino da sua academia de sempre de volta"); return again(); }
       if (d.gen) return openAlternative(null, again);
       if (d.gsync) {
         t.disabled = true; t.textContent = "Buscando no Garmin…";
@@ -2970,10 +2976,10 @@ function gymCardHtml(p) {
     <span class="small muted">${g && g.id === "casa" ? `${(p.home_kit || []).length ? (p.home_kit || []).map((k) => (HOME_KITS.find((x) => x[0] === k) || [, k])[1].replace(/^\S+\s/, "").toLowerCase()).join(", ") : "só o peso do corpo"} · toque para trocar`
       : g ? "toque para trocar" : "escolha a sua: Ironberg, Bodytech, Les Cinq… ou em casa"}</span></span><span class="chev" aria-hidden="true">›</span>`;
 }
-async function openGymPicker(after) {
-  const body = openModal(`<h2>Onde você treina?</h2><div class="sk"><span class="sk-line"></span><span class="sk-line"></span></div>`);
+async function openGymPicker(after, day) {
+  const body = openModal(`<h2>${day ? "Onde vai treinar neste dia?" : "Onde você treina?"}</h2><div class="sk"><span class="sk-line"></span><span class="sk-line"></span></div>`);
   let d; try { d = await api("/api/gyms"); } catch (e) { body.innerHTML = `<p class="pill bad">${esc(e.message)}</p>`; return; }
-  const cur = (d.current || {}).id;
+  const cur = day ? null : (d.current || {}).id;
   const real = d.gyms.filter((g) => !g.id.startsWith("outra_") && g.id !== "casa"), generic = d.gyms.filter((g) => g.id.startsWith("outra_"));
   const home = d.gyms.find((g) => g.id === "casa");
   const row = (g) => `<li><button class="gym-row ${g.id === cur ? "on" : ""}" data-gym="${esc(g.id)}"><span class="grow"><b>${esc(g.name)}</b>
@@ -2985,8 +2991,8 @@ async function openGymPicker(after) {
       <h3>São Paulo</h3><ul class="list">${real.filter(f).map(row).join("") || `<li class="small muted">Nenhuma com esse nome: escolha o tipo abaixo.</li>`}</ul>
       <h3 style="margin-top:12px">Outra academia</h3><ul class="list">${generic.map(row).join("")}</ul>`;
   };
-  body.innerHTML = `<h2>Onde você treina?</h2>
-    <p class="small muted">O treino usa os aparelhos que a sua academia provavelmente tem. Se faltar algum no dia, toque em “Trocar” → “Não tem na minha academia” e o app aprende.</p>
+  body.innerHTML = `<h2>${day ? "Onde vai treinar neste dia?" : "Onde você treina?"}</h2>
+    <p class="small muted">${day ? "Só este treino muda: o que essa academia provavelmente não tem vira o mais parecido que ela tem (e, se ela for mais equipada, entra o aparelho moderno do movimento). A carga do exercício novo vem estimada pela sua força." : "O treino usa os aparelhos que a sua academia provavelmente tem. Se faltar algum no dia, toque em “Trocar” → “Não tem na minha academia” e o app aprende."}</p>
     <input id="gy-q" placeholder="Buscar academia ou bairro" autocomplete="off" style="margin-bottom:8px">
     <div id="gy-list"></div>
     <p class="small muted" style="margin-top:12px">${esc(d.note)} Pesquisa de ${esc(d.updated)}.</p>`;
@@ -2994,6 +3000,16 @@ async function openGymPicker(after) {
   $("#gy-q", body).oninput = (e) => draw(e.target.value.trim());
   body.onclick = async (e) => {
     const b = e.target.closest("[data-gym]"); if (!b) return;
+    if (day) {
+      const go = async (kit) => {
+        let en; try { en = await api(`/api/schedule/${day.entry}/gym`, { method: "POST", body: { id: b.dataset.gym, home_kit: kit } }); } catch (err) { return toast(err.message, 5000); }
+        closeModal(); const n = (en.gym_changes || []).length;
+        toast(n ? `Treino adaptado para ${en.gym_day.name}: ${n} ${n === 1 ? "troca" : "trocas"}${en.garmin_outdated ? ". Reenvie ao relógio" : ""}` : `${en.gym_day.name}: nada precisou mudar`, 6000);
+        day.done && day.done();
+      };
+      if (b.dataset.gym === "casa") return openHomeKit(null, go);
+      b.disabled = true; return go(null);
+    }
     if (b.dataset.gym === "casa") return openHomeKit(after);
     b.disabled = true;
     let prof; try { prof = await api("/api/gym", { method: "PUT", body: { id: b.dataset.gym } }); } catch (err) { b.disabled = false; return toast(err.message, 5000); }
@@ -3009,7 +3025,7 @@ async function openGymPicker(after) {
 // treino em casa: o que a pessoa tem decide cada exercício
 const HOME_KITS = [["halteres", "🏋️ Halteres"], ["elastico", "➰ Elásticos"], ["kettlebell", "🔔 Kettlebell"], ["barra", "🪜 Barra fixa"],
   ["banco", "🪑 Banco ou cadeira firme"], ["corda", "🪢 Corda de pular"]];
-function openHomeKit(after) {
+function openHomeKit(after, pick) {
   const cur = new Set((state.profile && state.profile.gym && state.profile.gym.id === "casa" && state.profile.home_kit) || ["halteres", "elastico"]);
   const body = openModal("");
   const draw = () => {
@@ -3017,13 +3033,14 @@ function openHomeKit(after) {
       <div class="chips">${HOME_KITS.map(([k, t]) => `<button type="button" class="chip pc big ${cur.has(k) ? "on" : ""}" data-hk="${k}" aria-pressed="${cur.has(k)}">${t}</button>`).join("")}</div>
       <p class="small muted" style="margin-top:10px">${cur.size ? "" : "Nada marcado: treino só com o peso do corpo (agachamento, flexão, remada sob a mesa, ponte, prancha)."}
         Com carga leve, as séries vão até 1–2 repetições do limite: o estímulo para ganhar músculo fica parecido com o da academia.</p>
-      <button class="btn block" id="hk-save" style="margin-top:12px">Salvar: treino em casa</button>`;
+      <button class="btn block" id="hk-save" style="margin-top:12px">${pick ? "Adaptar o treino deste dia" : "Salvar: treino em casa"}</button>`;
   };
   draw();
   body.onclick = async (e) => {
     const c = e.target.closest("[data-hk]");
     if (c) { const k = c.dataset.hk; if (cur.has(k)) cur.delete(k); else cur.add(k); return draw(); }
     if (e.target.id !== "hk-save") return;
+    if (pick) return pick([...cur]);
     e.target.disabled = true;
     let prof; try { prof = await api("/api/gym", { method: "PUT", body: { id: "casa", home_kit: [...cur] } }); } catch (err) { e.target.disabled = false; return toast(err.message, 5000); }
     state.profile = prof; if (after) after(prof);

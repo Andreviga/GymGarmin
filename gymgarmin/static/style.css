@@ -1051,3 +1051,8 @@ body.timer-on { padding-bottom: calc(72px + 70px + env(safe-area-inset-bottom));
 .ws-breath span { font-weight: 800; color: var(--ink); transform: scale(1); }
 .ws-player.rest .ws-clock { color: var(--brand); }
 .ws-end { text-align: center; }
+
+/* academia do dia */
+.gym-line { display: block; width: 100%; text-align: left; font: inherit; font-size: 14px; color: var(--ink); background: transparent;
+  border: 1px dashed var(--line); border-radius: 12px; padding: 8px 12px; margin: 0 0 10px; cursor: pointer; }
+.gym-day { margin-bottom: 10px; }

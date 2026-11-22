@@ -227,3 +227,65 @@ def substitutes(eid: str, p: dict, pool: list[str], *, my_ids: set[str] | None =
     has = set((p or {}).get("gym_has") or [])
     cands.sort(key=lambda x: (x[1] != "ok", -(similarity(eid, x[0]) + (2 if x[0] in my_ids or x[0] in has else 0))))
     return [c for c, _ in cands]
+
+
+def day_profile(p: dict, gym_id: str, home_kit: list[str] | None = None) -> dict:
+    """Perfil "de hoje": mesma pessoa, outra academia (os 'não tem/tem' são da academia de sempre: não valem lá)."""
+    g = next((x for x in all_gyms() if x["id"] == gym_id), None)
+    if not g:
+        raise KeyError(gym_id)
+    kit = data()["kits"][g["kit"]]
+    out = {**(p or {}), "gym": {"id": g["id"], "name": g["name"] if g["id"] != "casa" else "Em casa"}, "gym_type": kit["gym_type"],
+           "gym_missing": [], "gym_has": [], "equipment": []}
+    if g["id"] == "casa":
+        out["home_kit"] = list(home_kit or [])
+    return out
+
+
+def adapt_day(items: list[dict], p: dict, day_p: dict, pool_for) -> tuple[list[dict], list[str]]:
+    """Troca no treino do dia o que a academia de hoje (provavelmente) não tem pelo mais parecido que ela tem; numa
+    academia mais equipada que a de sempre, oferece o aparelho moderno do movimento. Devolve (itens, mudanças)."""
+    import copy
+    from . import generator as G
+    from .alternative import pattern_of
+    from .limitations import check_exercise
+
+    items = copy.deepcopy(items)
+    changes: list[str] = []
+    if G.home_kit(day_p) is not None:
+        d = {"kind": "forca", "items": items, "weekday": 0, "budget": float(p.get("session_minutes") or 60)}
+        before = [i.get("exercise_id") for i in items if (i.get("phase") or "principal") == "principal"]
+        G._to_home([d], day_p, G.home_kit(day_p), [])
+        after = [i.get("exercise_id") for i in d["items"] if (i.get("phase") or "principal") == "principal"]
+        for a, b in zip(before, after):
+            if a != b:
+                changes.append(f"{(catalog.get(a) or {}).get('name', a)} → {(catalog.get(b) or {}).get('name', b)}")
+        return d["items"], changes
+    ok = checker(day_p)
+    lims = (p or {}).get("limitations") or []
+    upgrade = kit_of(day_p)["level"] > kit_of(p)["level"] and kit_of(day_p)["gym_type"] == "premium"
+    used = {i.get("exercise_id") for i in items}
+    for it in items:
+        eid = it.get("exercise_id")
+        ex = catalog.get(eid) or {}
+        if (it.get("phase") or "principal") != "principal" or ex.get("kind") == "cardio" or it.get("endurance"):
+            continue
+        new = None
+        if not ok(eid):
+            subs = substitutes(eid, day_p, pool_for(eid), lims=lims, exclude=used)
+            new = subs[0] if subs else None
+        elif upgrade and it.get("role") != "main":
+            pat = pattern_of(eid, it)
+            best = [e for e in (G.PREMIUM_PREF.get(pat) or [])[:2] if ok(e) and e not in used and catalog.get(e)
+                    and check_exercise(catalog.get(e), lims)["status"] == "ok"]
+            if best and eid not in (G.PREMIUM_PREF.get(pat) or [])[:3]:
+                new = best[0]
+        if new and new != eid:
+            it["gym_from"] = eid
+            it["exercise_id"] = new
+            if catalog.get(new).get("timed") and not it.get("duration_s"):
+                it.pop("reps", None)
+                it["duration_s"] = 40
+            used.add(new)
+            changes.append(f"{ex.get('name', eid)} → {catalog.get(new)['name']}")
+    return items, changes

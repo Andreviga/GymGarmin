@@ -107,3 +107,32 @@ def test_api_escolher_academia_e_nao_tem(client):
     assert not client.get("/api/profile").json()["gym_missing"]
     client.post("/api/gym/has", json={"exercise_id": "Belt_Squat"})
     assert client.get("/api/profile").json()["gym_has"] == ["Belt_Squat"]
+
+
+def test_api_academia_do_dia(client):
+    client.put("/api/profile", json={**BASE, "available_days": [0, 1, 2, 3, 4, 5, 6]})
+    client.put("/api/gym", json={"id": "ironberg"})
+    client.post("/api/generator/apply", json={})
+    sch = client.get("/api/schedule").json()
+    e = next(x for x in sch["entries"] if x["kind"] == "forca" and x["status"] == "planejado")
+    orig = [i["exercise_id"] for i in e["items"]]
+    # boutique: nada raro fica
+    r = client.post(f"/api/schedule/{e['id']}/gym", json={"id": "les_cinq"}).json()
+    rare = {m for m, x in gyms.machines().items() if x.get("availability_br") == "rara"}
+    assert r["gym_day"]["name"] == "Les Cinq Gym" and not ({i["exercise_id"] for i in r["items"]} & rare)
+    # em casa só com elástico: sem máquina/barra
+    r = client.post(f"/api/schedule/{e['id']}/gym", json={"id": "casa", "home_kit": ["elastico"]}).json()
+    eqs = {catalog.get(i["exercise_id"]).get("equipment") for i in r["items"] if (i.get("phase") or "principal") == "principal"}
+    assert not eqs & {"machine", "cable", "barbell"} and r["gym_changes"]
+    pre = client.get(f"/api/schedule/{e['id']}/prefill").json()
+    assert [i["exercise_id"] for i in pre["items"]] == [i["exercise_id"] for i in r["items"]]
+    # desfazer volta ao original
+    back = client.post(f"/api/schedule/{e['id']}/gym", json={"id": None}).json()
+    assert [i["exercise_id"] for i in back["items"]] == orig and "gym_day" not in back
+    assert client.post(f"/api/schedule/{e['id']}/gym", json={"id": "xyz"}).status_code == 400
+    # de academia básica para uma de musculação: oferece o aparelho moderno nos secundários
+    client.put("/api/gym", json={"id": "outra_basica"})
+    client.post("/api/generator/apply", json={})
+    e2 = next(x for x in client.get("/api/schedule").json()["entries"] if x["kind"] == "forca" and x["status"] == "planejado")
+    up = client.post(f"/api/schedule/{e2['id']}/gym", json={"id": "ironberg"}).json()
+    assert all(i.get("role") != "main" for i in up["items"] if i.get("gym_from"))

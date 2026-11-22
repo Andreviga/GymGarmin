@@ -1145,11 +1145,16 @@ def gym_set(body: dict = Body(...)):
     return db.save_profile(upd)
 
 
-def _subs_for(eid: str, prof: dict, exclude: set[str] | None = None) -> list[str]:
+def _subs_pool(eid: str) -> list[str]:
     pool = my_gym.alternatives(eid, limit=40)
     pat = alternative.pattern_of(eid)
     if pat:
         pool += list(generator.PATTERNS.get(pat, [])) + list(generator.PREMIUM_EXTRA.get(pat, []))
+    return pool
+
+
+def _subs_for(eid: str, prof: dict, exclude: set[str] | None = None) -> list[str]:
+    pool = _subs_pool(eid)
     mine = {m.get("exercise_id") for m in my_gym.list_mine()}
     lims = generator.with_personal_lims(prof.get("limitations") or [], personal.derive(prof))
     return gyms.substitutes(eid, prof, pool, my_ids=mine, lims=lims, exclude=exclude)
@@ -3206,6 +3211,38 @@ def _entry_day(e: dict) -> dict:
     d = date.fromisoformat(e["date"])
     return {"name": f"{e.get('day_name')} {d.day:02d}/{d.month:02d}", "items": e.get("items", []),
             "notes": "; ".join(e.get("changes") or []) or None}
+
+
+@app.post("/api/schedule/{entry_id}/gym")
+def schedule_gym(entry_id: int, body: dict = Body(...)):
+    """Academia deste dia (viagem, outra unidade, casa): adapta o treino ao que ela tem. id vazio = volta ao de sempre."""
+    e = _entry_or_404(entry_id)
+    if e.get("status") != "planejado":
+        raise HTTPException(400, "Só dá para mudar a academia de um treino que ainda não foi feito")
+    if not body.get("id"):
+        if e.get("gym_orig_items") is not None:
+            e["items"] = e.pop("gym_orig_items")
+        e.pop("gym_day", None)
+        e.pop("gym_changes", None)
+        if e.get("garmin_workout_id"):
+            e["garmin_outdated"] = True
+        db.save_entry(e)
+        return e
+    prof = _profile()
+    try:
+        day_p = gyms.day_profile(prof, body["id"], body.get("home_kit"))
+    except KeyError:
+        raise HTTPException(400, "Academia desconhecida")
+    base = e["gym_orig_items"] if e.get("gym_orig_items") is not None else e.get("items", [])
+    items, changes = gyms.adapt_day(base, prof, day_p, lambda eid: _subs_pool(eid))
+    e["gym_orig_items"] = base
+    e["items"] = items
+    e["gym_day"] = {"id": day_p["gym"]["id"], "name": day_p["gym"]["name"]}
+    e["gym_changes"] = changes
+    if e.get("garmin_workout_id"):
+        e["garmin_outdated"] = True
+    db.save_entry(e)
+    return e
 
 
 @app.get("/api/schedule/{entry_id}/fit")
