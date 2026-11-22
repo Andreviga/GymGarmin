@@ -157,3 +157,14 @@ def test_api_alerts_meta_and_comeback(client):
                                            "items": [{"exercise_id": "Barbell_Squat", "sets": [{"reps": 8, "load_kg": 60}]}]})
     assert client.get("/api/schedule").json()["comeback"]["days"] >= 7
     assert client.post("/api/alternative/preview", json={"entry_id": e["id"], "reason": "doente", "opts": {"sick": "febre"}}).status_code == 400
+
+
+def test_nenhuma_e_resposta_mas_nao_muda_o_treino():
+    """“Não tenho nenhuma destas” conta como respondido, mas não dispara regra nenhuma."""
+    vazio = personal.derive(dict(BASE))
+    nenhum = personal.derive({**BASE, "personal": {"conditions": ["nenhum"], "meds": ["nenhum"], "past_injury": ["nenhum"]}})
+    assert personal.answers({"personal": {"conditions": ["nenhum"]}})["conditions"] == []
+    assert nenhum["avoid"] == vazio["avoid"] and nenhum["notes"] == vazio["notes"] and not nenhum["rpe_mode"]
+    q = {it["id"]: it for s in personal.QUESTIONS for it in s["items"]}
+    for k in ("conditions", "meds", "past_injury"):
+        assert q[k].get("none"), k

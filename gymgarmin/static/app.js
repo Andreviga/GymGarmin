@@ -324,7 +324,7 @@ function firstStepsHtml(hasPlan) {
   const items = [
     ["Seus dados", "nome, idade, peso e sexo", !["name", "age", "weight_kg", "sex"].some((k) => miss.includes(k)), "#perfil/dados"],
     ["Rotina de treino", "objetivo, dias e tempo por treino", !["goal", "training_months", "available_days"].some((k) => miss.includes(k)), "#perfil/treino"],
-    ["Limitações e lesões", "opcional: deixa o treino mais seguro", !!store("gg_lim_seen") || (p.limitations || []).length > 0, "#perfil/limites"],
+    ["Limitações e lesões", "opcional: deixa o treino mais seguro", !!p.limitations_none || !!store("gg_lim_seen") || (p.limitations || []).length > 0, "#perfil/limites"],
     ["Conectar relógio", "opcional: Garmin, Apple ou Android", !!g.connected || !!store("gg_watch_skip"), "#perfil/relogios"],
     ["Gerar seu treino", "o app monta a semana inteira", !!hasPlan, null],
   ];
@@ -1965,63 +1965,163 @@ async function hojeExtras(sch) {
   };
 }
 
-// ---------------------------------------------------------------- personalização detalhada (saúde, fase, corpo, corrida, rotina)
+// ---------------------------------------------------------------- personalização detalhada: lista e passo a passo
+// perguntas que valem para a pessoa (sexo, corrida e respostas anteriores mudam o que aparece)
+function persCtx(p) { return { sex: p.sex || null, running: !!((((p.endurance || {}).sports || {}).corrida) || {}).enabled }; }
+function persShown(cond, a, c) {
+  return !cond || Object.entries(cond).every(([k, vals]) => {
+    if (vals === "any") return Array.isArray(a[k]) && a[k].some((x) => x !== "nenhum");
+    const v = k in c ? c[k] : (a[k] ?? null);
+    return vals.includes(v);
+  });
+}
+function persQuestions(p, a) {
+  const c = persCtx(p); const out = [];
+  for (const s of (state.meta && state.meta.personal_questions) || []) {
+    if (!persShown(s.show_if, a, c)) continue;
+    for (const q of s.items) if (persShown(q.show_if, a, c)) out.push({ ...q, section: s.section, intro: s.intro });
+  }
+  return out;
+}
+// respondida: escolheu algo (ou "nenhuma"); "não gosto de exercícios" e cidade são extras (não contam como falta)
+const persOptional = (q) => q.type === "exercises" || q.type === "text";
+const persAnswered = (q, a) => (Array.isArray(a[q.id]) ? a[q.id].length > 0 : a[q.id] !== null && a[q.id] !== undefined && a[q.id] !== "");
+function persProgress(p, a) {
+  const qs = persQuestions(p, a || p.personal || {}).filter((q) => !persOptional(q));
+  const done = qs.filter((q) => persAnswered(q, a || p.personal || {})).length;
+  return { done, total: qs.length, complete: qs.length > 0 && done === qs.length };
+}
 function persSummary(p) {
-  const a = p.personal || {};
-  const n = Object.entries(a).filter(([k, v]) => !k.startsWith("_") && (Array.isArray(v) ? v.length : v !== null && v !== "" && v !== undefined)).length;
-  return n ? `${n} ${n === 1 ? "resposta" : "respostas"} · ajusta o treino com base em pesquisas` : "saúde, remédios, corpo, corrida e rotina (opcional)";
+  const pr = persProgress(p);
+  return pr.done ? `${pr.done} de ${pr.total} respondidas${pr.complete ? " · ajustando seu treino" : ""}` : "saúde, remédios, corpo, corrida e rotina";
+}
+function persBadge(p) {
+  const pr = persProgress(p);
+  return pr.complete ? `<span class="sect-st sst-ok" aria-label="feito">✓</span>` : `<span class="sect-st sst-todo">${pr.done ? `${pr.done}/${pr.total}` : "falta"}</span>`;
+}
+// marca/desmarca numa pergunta de várias respostas: "nenhuma" é exclusivo
+function persToggle(a, id, v) {
+  const cur = new Set((a[id] || []).filter((x) => x !== "nenhum"));
+  if (v === "nenhum") { a[id] = (a[id] || []).includes("nenhum") ? [] : ["nenhum"]; return; }
+  if (cur.has(v)) cur.delete(v); else cur.add(v);
+  a[id] = [...cur];
+}
+function persFieldHtml(q, a, big) {
+  const v = a[q.id];
+  const chip = (attr, k, t, on) => `<button type="button" class="chip pc ${on ? "on" : ""} ${big ? "big" : ""}" ${attr}="${q.id}" data-pv="${esc(k)}" aria-pressed="${on}">${esc(t)}</button>`;
+  if (q.type === "multi") return `<div class="chips">${q.none ? chip("data-pm", "nenhum", "✕ " + q.none, (v || []).includes("nenhum")) : ""}
+    ${q.options.map(([k, t]) => chip("data-pm", k, t, (v || []).includes(k))).join("")}</div>`;
+  if (q.type === "single") return `<div class="chips">${q.options.map(([k, t]) => chip("data-ps", k, t, v === k)).join("")}</div>`;
+  if (q.type === "number") return `<input type="number" inputmode="numeric" data-pn="${q.id}" value="${esc(v ?? "")}" min="${q.min ?? 0}" max="${q.max ?? 999}" placeholder="semanas">`;
+  if (q.type === "text") return `<input data-ptx="${q.id}" value="${esc(v ?? "")}" placeholder="${esc(q.placeholder || "")}" maxlength="60">`;
+  if (q.type === "exercises") return `<div class="chips">${(v || []).map((id) => `<button type="button" class="chip pc on" data-pxdel="${esc(id)}">${esc(((a._names || {})[id]) || id.replace(/_/g, " "))} ✕</button>`).join("")}<button type="button" class="chip" data-pxadd="${q.id}">+ exercício</button></div>`;
+  return "";
+}
+async function persSave(p, a) {
+  state.profile = await api("/api/profile", { method: "PUT", body: { personal: a } });
+  p.personal = state.profile.personal;
+  const sm = $("#sec-pers summary"); if (sm) {
+    const sub = sm.querySelector(".small.muted"); if (sub) sub.textContent = persSummary(state.profile);
+    const old = sm.querySelector(".sect-st"); if (old) old.outerHTML = persBadge(state.profile);
+    const n = sm.querySelector(".sect-n"); if (n) n.classList.toggle("ok", persProgress(state.profile).complete);
+  }
 }
 function persForm(p) {
   const box = $("#pers-box"); if (!box) return;
-  const Q = (state.meta && state.meta.personal_questions) || [];
   const a = JSON.parse(JSON.stringify(p.personal || {}));
-  const ctx = () => ({ sex: [p.sex || null], running: [!!((((p.endurance || {}).sports || {}).corrida) || {}).enabled] });
-  const shown = (cond) => !cond || Object.entries(cond).every(([k, vals]) => {
-    if (vals === "any") return Array.isArray(a[k]) && a[k].length > 0;
-    const c = ctx(); const v = k in c ? c[k][0] : (a[k] ?? null);
-    return vals.includes(v);
-  });
-  const exName = (id) => (a._names || {})[id] || id.replace(/_/g, " ");
-  const field = (q) => {
-    if (!shown(q.show_if)) return "";
-    const v = a[q.id];
-    if (q.type === "multi") return `<div class="pq"><label>${esc(q.label)}</label><div class="chips">${q.options.map(([k, t]) => `<button type="button" class="chip pc ${(v || []).includes(k) ? "on" : ""}" data-pm="${q.id}" data-pv="${k}" aria-pressed="${(v || []).includes(k)}">${esc(t)}</button>`).join("")}</div></div>`;
-    if (q.type === "single") return `<div class="pq"><label>${esc(q.label)}</label><div class="chips">${q.options.map(([k, t]) => `<button type="button" class="chip pc ${v === k ? "on" : ""}" data-ps="${q.id}" data-pv="${k}" aria-pressed="${v === k}">${esc(t)}</button>`).join("")}</div></div>`;
-    if (q.type === "number") return `<div class="pq field"><label>${esc(q.label)}</label><input type="number" inputmode="numeric" data-pn="${q.id}" value="${esc(v ?? "")}" min="${q.min ?? 0}" max="${q.max ?? 999}"></div>`;
-    if (q.type === "text") return `<div class="pq field"><label>${esc(q.label)}</label><input data-ptx="${q.id}" value="${esc(v ?? "")}" placeholder="${esc(q.placeholder || "")}" maxlength="60"></div>`;
-    if (q.type === "exercises") return `<div class="pq"><label>${esc(q.label)}</label><div class="chips">${(v || []).map((id) => `<button type="button" class="chip pc on" data-pxdel="${esc(id)}">${esc(exName(id))} ✕</button>`).join("")}<button type="button" class="chip" data-pxadd="${q.id}">+ exercício</button></div></div>`;
-    return "";
-  };
   const render = () => {
-    box.innerHTML = `<p class="small muted">Tudo opcional. Cada resposta muda o treino com base em diretrizes e estudos (ACSM, NSCA, ADA, COI, BJSM…), e o “Por que este treino” mostra o que mudou. Não substitui médico ou fisioterapeuta.</p>
-      ${Q.filter((s) => shown(s.show_if)).map((s) => `<h3 style="margin-top:14px">${esc(s.section)}</h3>${s.intro ? `<p class="small muted">${esc(s.intro)}</p>` : ""}${s.items.map(field).join("")}`).join("")}
-      <button class="btn block" id="pers-save" type="button" style="margin-top:14px">Salvar personalização</button>
+    const pr = persProgress(p, a);
+    const qs = persQuestions(p, a);
+    let sec = "";
+    box.innerHTML = `<div class="pers-top"><div class="grow"><b>${pr.done} de ${pr.total} respondidas</b>
+        <div class="meter" style="margin-top:6px"><span style="width:${pr.total ? Math.round(100 * pr.done / pr.total) : 0}%"></span></div></div></div>
+      <button class="btn block" id="pers-wiz" type="button" style="margin:12px 0 4px">${pr.done ? (pr.complete ? "▶ Revisar passo a passo" : "▶ Continuar passo a passo") : "▶ Responder passo a passo (2 min)"}</button>
+      <p class="small muted">Uma pergunta por vez, com “nenhuma” quando não se aplica. Muda o treino com base em diretrizes (ACSM, NSCA, ADA, COI, BJSM…). Não substitui médico ou fisioterapeuta.</p>
+      <details class="adv"><summary class="small">Ver e editar todas as respostas</summary>
+      ${qs.map((q) => { const h = q.section !== sec ? `<h3 style="margin-top:14px">${esc(q.section)}</h3>` : ""; sec = q.section;
+        return `${h}<div class="pq ${!persOptional(q) && !persAnswered(q, a) ? "pq-open" : ""}"><label>${esc(q.label)}</label>${persFieldHtml(q, a, false)}</div>`; }).join("")}
+      <button class="btn block" id="pers-save" type="button" style="margin-top:14px">Salvar respostas</button></details>
       <button class="btn ghost block" id="pers-regen" type="button" style="margin-top:8px">🔄 Gerar meu treino com estas respostas</button>`;
   };
   render();
+  const readInputs = () => {
+    $$("[data-pn]", box).forEach((i) => { a[i.dataset.pn] = i.value === "" ? null : +i.value; });
+    $$("[data-ptx]", box).forEach((i) => { a[i.dataset.ptx] = i.value.trim() || null; });
+  };
   box.onclick = async (e) => {
     const t = e.target.closest("button"); if (!t) return;
     const d = t.dataset;
-    if (d.pm) { const cur = new Set(a[d.pm] || []); if (cur.has(d.pv)) cur.delete(d.pv); else cur.add(d.pv); a[d.pm] = [...cur]; return render(); }
+    if (t.id === "pers-wiz") { readInputs(); return persWizard(p, a, () => { persForm(p); }); }
+    if (d.pm) { persToggle(a, d.pm, d.pv); return render(); }
     if (d.ps) { a[d.ps] = a[d.ps] === d.pv ? null : d.pv; return render(); }
     if (d.pxdel) { a.dislikes = (a.dislikes || []).filter((x) => x !== d.pxdel); return render(); }
     if (d.pxadd) return pickExercise(null, (ex) => { a.dislikes = [...new Set([...(a.dislikes || []), ex.id])]; a._names = { ...(a._names || {}), [ex.id]: ex.name }; closeModal(); render(); });
     if (t.id === "pers-save" || t.id === "pers-regen") {
-      $$("[data-pn]", box).forEach((i) => { a[i.dataset.pn] = i.value === "" ? null : +i.value; });
-      $$("[data-ptx]", box).forEach((i) => { a[i.dataset.ptx] = i.value.trim() || null; });
-      t.disabled = true;
+      readInputs(); t.disabled = true;
       try {
-        state.profile = await api("/api/profile", { method: "PUT", body: { personal: a } });
-        p.personal = state.profile.personal;
-        const sum = $("#sec-pers summary .small.muted"); if (sum) sum.textContent = persSummary(state.profile);
+        await persSave(p, a);
         if (t.id === "pers-regen") return openGenerator();
-        toast("Personalização salva. Toque em “Gerar meu treino com estas respostas” para aplicar.", 5000);
+        toast("Respostas salvas. Toque em “Gerar meu treino com estas respostas” para aplicar.", 5000); render();
       } catch (err) { toast(err.message, 5000); } finally { t.disabled = false; }
     }
   };
   box.oninput = (e) => { const i = e.target; if (i.dataset.pn) a[i.dataset.pn] = i.value === "" ? null : +i.value; if (i.dataset.ptx) a[i.dataset.ptx] = i.value.trim() || null; };
 }
-
+// passo a passo: uma pergunta por tela; começa na primeira sem resposta
+function persWizard(p, a, done, startId) {
+  const body = openModal("");
+  const list = () => persQuestions(p, a);
+  let curId = startId || (list().find((q) => !persOptional(q) && !persAnswered(q, a)) || list()[0] || {}).id;
+  // fechou no meio (✕ ou tocou fora): salva o que já respondeu
+  closeModal.hook = () => { persSave(p, a).then(done).catch(() => {}); };
+  const idx = () => list().findIndex((q) => q.id === curId);
+  const go = (dir) => { const L = list(); const i = idx(); const n = L[i + dir]; if (n) { curId = n.id; draw(); } else if (dir > 0) finish(); };
+  const finish = async () => {
+    closeModal.hook = null;
+    body.innerHTML = `<h2>Salvando…</h2>`;
+    try { await persSave(p, a); } catch (err) { toast(err.message, 5000); }
+    const pr = persProgress(p, a);
+    body.innerHTML = `<h2>${pr.complete ? "Pronto! ✓" : `${pr.done} de ${pr.total} respondidas`}</h2>
+      <p>${pr.complete ? "Suas respostas estão salvas." : "Salvei o que você respondeu; dá para completar depois."} Para o treino passar a usar, gere de novo — você vê a prévia antes de trocar.</p>
+      <button class="btn block" id="pw-regen">🔄 Gerar meu treino com estas respostas</button>
+      <button class="act" id="pw-close" style="margin-top:8px">Fechar</button>`;
+  };
+  const draw = () => {
+    const L = list(); const i = idx(); const q = L[i]; if (!q) return finish();
+    const need = !persOptional(q);
+    body.innerHTML = `<div class="pw-head"><span class="small muted">${esc(q.section)} · ${i + 1} de ${L.length}</span>
+        <div class="meter" style="margin-top:6px"><span style="width:${Math.round(100 * i / L.length)}%"></span></div></div>
+      ${q.intro && (i === 0 || L[i - 1].section !== q.section) ? `<p class="small muted" style="margin-top:12px">${esc(q.intro)}</p>` : ""}
+      <h2 class="pw-q">${esc(q.label)}</h2>
+      ${q.type === "multi" ? `<p class="small muted" style="margin:-4px 0 10px">Pode marcar mais de uma.</p>` : ""}
+      <div class="pw-body">${persFieldHtml(q, a, true)}</div>
+      <div class="pw-nav"><button class="btn ghost" id="pw-back" ${i === 0 ? "disabled" : ""}>‹ Voltar</button>
+        ${q.type === "single" ? `<button class="act" id="pw-skip">${need ? "Pular" : "Próxima ›"}</button>`
+          : `<button class="btn" id="pw-next">${persAnswered(q, a) || !need ? "Próxima ›" : "Pular ›"}</button>`}</div>`;
+    const inp = body.querySelector("input"); if (inp) setTimeout(() => inp.focus(), 50);
+  };
+  body.onclick = (e) => {
+    const t = e.target.closest("button"); if (!t) return;
+    const d = t.dataset;
+    if (t.id === "pw-close") { closeModal(); return done(); }
+    if (t.id === "pw-regen") { closeModal(); done(); return openGenerator(); }
+    if (t.id === "pw-back") return go(-1);
+    if (t.id === "pw-skip" || t.id === "pw-next") {
+      $$("[data-pn]", body).forEach((x) => { a[x.dataset.pn] = x.value === "" ? null : +x.value; });
+      $$("[data-ptx]", body).forEach((x) => { a[x.dataset.ptx] = x.value.trim() || null; });
+      return go(1);
+    }
+    if (d.ps) { a[d.ps] = d.pv; draw(); return setTimeout(() => go(1), 220); }   // uma resposta só: avança sozinho
+    if (d.pm) { persToggle(a, d.pm, d.pv); return draw(); }
+    if (d.pxdel) { a.dislikes = (a.dislikes || []).filter((x) => x !== d.pxdel); return draw(); }
+    if (d.pxadd) {
+      // o seletor usa a mesma janela: depois de escolher, o passo a passo volta na mesma pergunta
+      closeModal.hook = null;
+      return pickExercise(null, (ex) => { a.dislikes = [...new Set([...(a.dislikes || []), ex.id])]; a._names = { ...(a._names || {}), [ex.id]: ex.name }; persWizard(p, a, done, curId); });
+    }
+  };
+  draw();
+}
 // ---------------------------------------------------------------- treino do relógio: conferir exercício por exercício
 function watchInboxHtml(w) {
   const list = (w && w.items) || []; if (!list.length) return "";
@@ -4023,8 +4123,8 @@ async function viewPerfil(openSec) {
   const STEP = {
     dados: [1, ["name", "age", "weight_kg", "sex"].every((k) => !miss.some((m) => m[0] === k)), "essencial"],
     treino: [2, ["goal", "training_months", "available_days"].every((k) => !miss.some((m) => m[0] === k)), "essencial"],
-    limites: [3, !!store("gg_lim_seen") || (p.limitations || []).length > 0, "essencial"],
-    pers: [4, Object.keys(pa).some((k) => !k.startsWith("_") && pa[k] != null && !(Array.isArray(pa[k]) && !pa[k].length)), "recomendado"],
+    limites: [3, !!p.limitations_none || !!store("gg_lim_seen") || (p.limitations || []).length > 0, "essencial"],
+    pers: [4, persProgress(p).complete, "recomendado"],
     relogios: [5, !!g.connected || !!store("gg_watch_skip") || (p.devices || []).length > 0, "recomendado"],
     esportes: [6, Object.values(((p.endurance || {}).sports) || {}).some((c) => c && c.enabled), "opcional"],
     foco: [7, !!p.focus, "opcional"],
@@ -4033,7 +4133,7 @@ async function viewPerfil(openSec) {
   const nextStep = Object.entries(STEP).find(([, v]) => !v[1] && v[2] !== "opcional");
   const sect = (id, icon, title, sub, body, open = false) => {
     const st = STEP[id];
-    const badge = st ? (st[1] ? `<span class="sect-st sst-ok" aria-label="feito">✓</span>` : `<span class="sect-st ${st[2] === "opcional" ? "sst-opt" : "sst-todo"}">${st[2] === "opcional" ? "opcional" : "falta"}</span>`) : "";
+    const badge = id === "pers" ? persBadge(p) : st ? (st[1] ? `<span class="sect-st sst-ok" aria-label="feito">✓</span>` : `<span class="sect-st ${st[2] === "opcional" ? "sst-opt" : "sst-todo"}">${st[2] === "opcional" ? "opcional" : "falta"}</span>`) : "";
     return `<details class="sect" id="sec-${id}" ${open || openSec === id ? "open" : ""}>
     <summary>${st ? `<span class="sect-n ${st[1] ? "ok" : ""}" aria-hidden="true">${st[0]}</span>` : `<span class="sect-ico" aria-hidden="true">${icon}</span>`}<span class="grow"><b>${title}</b><span class="small muted">${sub}</span></span>${badge}<span class="chev" aria-hidden="true">›</span></summary>
     <div class="sect-body">${body}</div></details>`;
@@ -4095,8 +4195,9 @@ async function viewPerfil(openSec) {
       <p class="small muted">“Ajuste de volume” multiplica as séries por músculo: reduza se não estiver recuperando, aumente se estagnou recuperando bem.</p></details>
     <button class="btn ghost block" id="prof-regen" type="button" style="margin-top:12px">🔄 Gerar meu treino de novo</button>
     <p class="small muted">Mudou algo aqui? Salve e gere de novo: você vê a prévia antes de trocar. Histórico, cargas, aparelhos fotografados e as trocas “usar sempre” continuam.</p>`, miss.some((m) => ["training_months", "available_days", "goal"].includes(m[0])))}
-  ${sect("limites", "🩹", "Limitações e lesões", lims.length ? lims.map((l) => (state.meta.limitations.find((x) => x.id === l.key) || {}).label || l.key).join(", ") : "nenhuma marcada",
+  ${sect("limites", "🩹", "Limitações e lesões", lims.length ? lims.map((l) => (state.meta.limitations.find((x) => x.id === l.key) || {}).label || l.key).join(", ") : p.limitations_none ? "não tenho nenhuma" : "marque as suas ou “não tenho”",
     `<p class="small muted">O app marca exercícios como <span class="pill warn">cuidado</span> ou <span class="pill bad">evitar</span>, troca os que não servem e limita a zona do cardio. Não substitui orientação de um profissional.</p>
+    <label class="chip pc lim-none ${p.limitations_none && !lims.length ? "on" : ""}"><input type="checkbox" id="lim-none" ${p.limitations_none && !lims.length ? "checked" : ""}> ✕ Não tenho limitação nem lesão</label>
     <ul class="list">${state.meta.limitations.map((l) => `<li><label class="row gap" style="color:var(--ink);font-size:15px;margin:0"><input type="checkbox" data-lim="${l.id}" ${ul[l.id] ? "checked" : ""}> <span class="grow">${esc(l.label)}</span>
       <select data-sev="${l.id}" style="width:auto"><option value="evitar" ${(ul[l.id] || {}).severity !== "cuidado" ? "selected" : ""}>significativa</option><option value="cuidado" ${(ul[l.id] || {}).severity === "cuidado" ? "selected" : ""}>leve</option></select></label>
       <div class="small muted">${esc(l.note)}</div></li>`).join("")}</ul>
@@ -4149,6 +4250,14 @@ async function viewPerfil(openSec) {
   view.addEventListener("input", (e) => { if (own(e)) return; dirty = true; updSave(); });
   view.addEventListener("change", (e) => { if (own(e)) return; dirty = true; updSave(); });
   updSave();
+  // "não tenho limitação" e marcar uma limitação se excluem
+  const ln = $("#lim-none");
+  if (ln) {
+    const lnOn = (on) => { ln.checked = on; ln.closest("label").classList.toggle("on", on); };
+    ln.onchange = () => { lnOn(ln.checked); if (ln.checked) { $$("[data-lim]").forEach((c) => { c.checked = false; }); $("#custom-avoid").value = ""; } };
+    $$("[data-lim]").forEach((c) => c.addEventListener("change", () => { if (c.checked) lnOn(false); }));
+    $("#custom-avoid").addEventListener("input", (e) => { if (e.target.value.trim()) lnOn(false); });
+  }
   api("/api/generator/options").then((o) => {
     const el = $("#cm-list"); if (!el) return;
     el.innerHTML = o.cardio_machines.map((m) => `<label class="chip"><input type="checkbox" data-cm="${m.id}" ${(p.cardio_machines || []).includes(m.id) ? "checked" : ""}> ${esc(m.name)}</label>`).join("");
@@ -4163,6 +4272,7 @@ async function viewPerfil(openSec) {
     body.limitations = $$("[data-lim]").filter((c) => c.checked).map((c) => ({ key: c.dataset.lim, severity: $(`[data-sev="${c.dataset.lim}"]`).value }));
     const ca = $("#custom-avoid").value.trim();
     if (ca) body.limitations.push({ key: "personalizado", label: "Restrição pessoal", severity: "evitar", custom_avoid: ca });
+    body.limitations_none = !body.limitations.length && !!($("#lim-none") || {}).checked;
     state.profile = await api("/api/profile", { method: "PUT", body });
     state.meta = await api("/api/meta");
     store("gg_lim_seen", 1);

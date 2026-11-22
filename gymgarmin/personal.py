@@ -30,13 +30,13 @@ from . import catalog
 QUESTIONS = [
     {"section": "Saúde", "intro": "Respostas ficam só no seu perfil e ajustam o treino. Na dúvida, marque o que algum médico já disse.",
      "items": [
-        {"id": "conditions", "type": "multi", "label": "Algum médico já disse que você tem:", "options": [
+        {"id": "conditions", "type": "multi", "label": "Algum médico já disse que você tem:", "none": "Não tenho nenhuma destas", "options": [
             ["pre_diabetes", "Pré-diabetes"], ["diabetes", "Diabetes (sem insulina)"], ["diabetes_insulina", "Diabetes com insulina ou glibenclamida/gliclazida"],
             ["osteopenia", "Osteopenia"], ["osteoporose", "Osteoporose"], ["fratura_vertebra", "Já fraturei vértebra ou várias fraturas leves"],
             ["artrose", "Artrose no joelho ou quadril"], ["artrite", "Artrite reumatoide / outra artrite"],
             ["asma", "Asma ou chiado no esforço"], ["renal", "Doença renal"], ["cancer", "Câncer (tratando ou terminou há < 2 anos)"],
             ["hipermobilidade", "Articulações muito flexíveis (já 'saíram do lugar')"]]},
-        {"id": "meds", "type": "multi", "label": "Usa algum destes remédios?", "options": [
+        {"id": "meds", "type": "multi", "label": "Usa algum destes remédios?", "none": "Não uso nenhum destes", "options": [
             ["fc", "Betabloqueador ou outro para coração/pressão que baixa a FC (atenolol, propranolol, carvedilol, metoprolol, bisoprolol, verapamil, diltiazem)"],
             ["glp1", "Injeção para emagrecer (Ozempic, Wegovy, Mounjaro)"], ["anticoagulante", "Anticoagulante (varfarina, rivaroxabana, apixabana)"],
             ["corticoide", "Corticoide todo dia"], ["diuretico", "Diurético ou dapagliflozina/empagliflozina"]]},
@@ -64,14 +64,14 @@ QUESTIONS = [
         {"id": "overhead", "type": "single", "label": "Encostado na parede, leva os braços esticados até encostar acima da cabeça sem arquear a lombar?",
          "options": [["sim", "Sim"], ["nao", "Não"], ["doi", "Dói"], ["nao_sei", "Não testei"]]},
         {"id": "past_injury", "type": "multi", "label": "Lesão séria nos últimos 2 anos (cirurgia, ruptura, luxação, hérnia), já liberada e sem dor:",
-         "options": [["ombro", "Ombro"], ["joelho", "Joelho"], ["lombar", "Coluna lombar"], ["quadril", "Quadril"],
+         "none": "Nenhuma lesão séria", "options": [["ombro", "Ombro"], ["joelho", "Joelho"], ["lombar", "Coluna lombar"], ["quadril", "Quadril"],
                      ["tornozelo", "Tornozelo"], ["cotovelo", "Cotovelo"], ["punho", "Punho"]]},
         {"id": "dislikes", "type": "exercises", "label": "Exercícios que você não gosta ou não quer fazer (o app troca por outro do mesmo movimento):"},
         {"id": "variety", "type": "single", "label": "Prefere:", "options": [
             ["meio", "Meio-termo"], ["rotina", "Rotina fixa (mesmos exercícios)"], ["variar", "Variar sempre"]]},
     ]},
     {"section": "Corrida", "show_if": {"running": [True]}, "items": [
-        {"id": "run_injuries", "type": "multi", "label": "Teve alguma destas lesões nos últimos 12 meses?", "options": [
+        {"id": "run_injuries", "type": "multi", "label": "Teve alguma destas lesões nos últimos 12 meses?", "none": "Nenhuma", "options": [
             ["aquiles", "Tendão de Aquiles"], ["fascite", "Fascite plantar / dor no calcanhar"], ["canelite", "Canelite"],
             ["fratura_estresse", "Fratura por estresse"], ["joelho_frente", "Dor na frente do joelho"], ["banda_it", "Dor na lateral do joelho (banda iliotibial)"]]},
         {"id": "run_pain", "type": "single", "label": "Ainda sente dor ao correr?", "show_if": {"run_injuries": "any"}, "options": [
@@ -107,9 +107,14 @@ RPE_LABEL = {1: "esforço 1–2 de 10 (bem leve)", 2: "esforço 3–4 de 10 (con
              4: "esforço 7 de 10 (poucas palavras)", 5: "esforço 8–9 de 10 (forte)", 6: "esforço 9–10 de 10 (máximo)"}
 
 
+NONE = "nenhum"   # "não tenho nenhuma destas" nas perguntas de várias respostas (respondido, mas nada muda)
+
+
 def answers(p: dict) -> dict:
     a = (p or {}).get("personal")
-    return a if isinstance(a, dict) else {}
+    if not isinstance(a, dict):
+        return {}
+    return {k: ([x for x in v if x != NONE] if isinstance(v, list) else v) for k, v in a.items()}
 
 
 def bmi(p: dict) -> float | None:
