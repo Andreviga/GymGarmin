@@ -18,7 +18,7 @@ from datetime import date, timedelta
 
 from . import adaptive, alternative, auth, coach, focus, gallery, ingest, my_gym, partners, training_rules
 from . import watch_review as wrv
-from . import gyms, loads, personal, weather
+from . import gyms, loads, personal, weather, wellness
 from . import (analysis, calibration, catalog, clock, db, dedupe, health, endurance, garmin_export, garmin_sync, generator, history, limitations,
                load, plans_io, progression, readiness, schedule, sports, steps, templates, watch_labels)
 from .muscles import EQUIPMENT_PT, HR_ZONES, MUSCLES, hr_max, zone_bpm
@@ -1080,6 +1080,40 @@ def plan_swap(plan_id: int, body: dict = Body(...)):
         raise HTTPException(400, "Exercício desconhecido")
     _plan_or_404(plan_id)
     return {"changed": _swap_everywhere(plan_id, src, [dst])["changed"]}
+
+
+# ------------------------------------------------------------- bem-estar ----
+
+@app.get("/api/wellness")
+def wellness_list(light: int = 0):
+    """Yoga, Pilates, mobilidade, alongamento e respiração: biblioteca + o que faz sentido hoje."""
+    prof = _profile()
+    today = clock.today()
+    entries = db.list_schedule(today.isoformat(), today.isoformat())
+    runs = [e for e in entries if e.get("kind") == "resistencia" and e.get("sport") == "corrida"]
+    run_done = any(e.get("status") == "feito" for e in runs) or any(
+        (catalog.get(it.get("exercise_id")) or {}).get("sport") == "corrida" or str(it.get("exercise_id", "")).startswith("corrida_")
+        for x in db.list_sessions(limit=10, since=today.isoformat()) for it in x.get("items") or [])
+    run_planned = any(e.get("status") == "planejado" for e in runs)
+    rest_day = not any(e.get("status") in ("planejado", "feito") and e.get("kind") in ("forca", "resistencia", "cardio") for e in entries)
+    low = False
+    try:
+        rv = None if light else _readiness_view(today)   # na tela Hoje: rápido, sem recalcular a prontidão
+        low = bool(rv and rv.get("action") in ("descanso", "trocar"))
+    except Exception:  # noqa: BLE001
+        pass
+    d = wellness.data()
+    return {"cats": d["cats"], "goals": d["goals"], "sessions": wellness.summaries(prof),
+            "suggestions": wellness.suggest(prof, hour=clock.now().hour, run_planned=run_planned, run_done=run_done,
+                                            rest_day=rest_day, low_readiness=low)}
+
+
+@app.get("/api/wellness/{sid}")
+def wellness_session(sid: str):
+    s = wellness.session(sid, _profile())
+    if not s:
+        raise HTTPException(404, "Sessão não encontrada")
+    return s
 
 
 # ------------------------------------------------------------- academia ----

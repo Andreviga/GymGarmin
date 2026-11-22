@@ -1903,6 +1903,7 @@ async function viewTreinar(planId, idx) {
       ${plans.map((p) => `<h2 class="sec-title">${esc(p.name)}</h2><div class="picks">${p.days.map((d, i) => row(`#treinar/${p.id}/${i}`, d.name, `${(d.items || []).length || ""} ${(d.items || []).length ? "exercícios" : "da planilha"}`)).join("")}</div>`).join("")
         || (agenda.length ? "" : `<p class="muted">Sem planilhas ativas.</p>`)}
       <button class="btn block" id="gen-now" style="margin-top:14px">✨ Gerar um treino agora</button>
+      <a class="btn ghost block" href="#bemestar" style="margin-top:8px">🧘 Yoga, Pilates, alongamento e respiração</a>
       <button class="btn ghost block" id="free" style="margin-top:8px">Treino livre</button>`;
     $("#gen-now").onclick = () => openAlternative(null, () => viewTreinar());
     const r = $("#resume"); if (r) r.onclick = () => { state.session = draft; renderSession(); };
@@ -1937,7 +1938,8 @@ async function hojeExtras(sch) {
   const box = $("#hx"); if (!box) return;
   const outdoor = sch.entries.some((e) => e.date === sch.today && e.status === "planejado" && (e.items || []).some((it) => it.endurance
     && ["corrida", "ciclismo", "caminhada", "trilha"].includes(it.endurance.sport) && !["esteira", "indoor", "rolo", "piscina"].includes(it.endurance.env)));
-  const [ad, wx] = await Promise.all([api("/api/adaptive").catch(() => null), outdoor ? api("/api/weather/today").catch(() => null) : Promise.resolve(null)]);
+  const [ad, wx, wsd] = await Promise.all([api("/api/adaptive").catch(() => null), outdoor ? api("/api/weather/today").catch(() => null) : Promise.resolve(null),
+    api("/api/wellness?light=1").catch(() => null)]);
   let html = "";
   const w = wx && wx.advice;
   if (w && w.show) {
@@ -1951,6 +1953,9 @@ async function hojeExtras(sch) {
       <ul class="plain small" style="margin:6px 0 8px">${(p.why || []).map((x) => `<li>${esc(x)}</li>`).join("")}</ul>
       <div class="row gap wrap"><button class="btn sm" data-adapply="${esc(p.kind)}">${esc(p.action)}</button><button class="act" data-addismiss="${esc(p.kind)}">Agora não</button></div></section>`;
   }
+  const sg = ((wsd && wsd.suggestions) || []).filter((x) => x.id !== "mobilidade_articular" || !html);
+  if (sg.length) html += `<section class="card wbox"><div class="eyebrow">🧘 Bem-estar para hoje</div><div class="ws-list">${sg.slice(0, 2).map((x) => wsCard(x, x.why)).join("")}</div>
+    <a class="act" href="#bemestar">Ver yoga, Pilates, alongamento e respiração ›</a></section>`;
   box.innerHTML = html;
   box.onclick = async (e) => {
     const t = e.target.closest("button"); if (!t) return;
@@ -3026,6 +3031,149 @@ function openHomeKit(after) {
       <button class="btn block" id="gy-regen">🔄 Gerar meu treino de casa</button><button class="act" id="gy-close" style="margin-top:8px">Fechar</button>`;
     body.onclick = (ev) => { if (ev.target.id === "gy-regen") { closeModal(); openGenerator(); } if (ev.target.id === "gy-close") closeModal(); };
   };
+}
+
+
+// ---------------------------------------------------------------- bem-estar: yoga, Pilates, mobilidade, alongamento, respiração
+let WS = null, wsInt = null;
+function wsLeave() { clearInterval(wsInt); wsInt = null; WS = null; wakeOff(); document.body.classList.remove("focus-on"); }
+const wsCard = (x, why) => `<a class="ws-card" href="#bemestar/${esc(x.id)}"><span class="ws-ico" aria-hidden="true">${x.icon}</span>
+  <span class="grow"><b>${esc(x.title)}</b><span class="small muted">${why ? esc(why) : `${x.minutes} min · ${esc((x.goal || []).map((g) => (WSD.goals || {})[g] || g).filter((t) => !["Antes", "Depois"].includes(t)).slice(0, 2).join(" · "))}`}</span></span>
+  <span class="ws-min">${x.minutes}′</span></a>`;
+let WSD = {};
+async function viewBemEstar(id, mode) {
+  if (id) return mode === "play" ? wsPlay(id) : wsDetail(id);
+  const d = WSD = await api("/api/wellness");
+  const goal = store("gg_ws_goal") || "";
+  const list = d.sessions.filter((x) => !goal || (x.goal || []).includes(goal));
+  const cats = Object.keys(d.cats).filter((c) => list.some((x) => x.cat === c));
+  view.innerHTML = `${d.suggestions.length ? `<h2 class="sec-title">Para hoje</h2><div class="ws-list">${d.suggestions.map((x) => wsCard(x, x.why)).join("")}</div>` : ""}
+    <h2 class="sec-title">O que você quer?</h2>
+    <div class="chips ws-goals"><button class="chip pc ${goal ? "" : "on"}" data-wg="">Tudo</button>${["estresse", "sono", "corrida", "amplitude", "articulacoes", "lombar", "joelho", "ombro", "core", "postura", "equilibrio"]
+      .map((g) => `<button class="chip pc ${goal === g ? "on" : ""}" data-wg="${g}">${esc(d.goals[g])}</button>`).join("")}</div>
+    ${cats.map((c) => `<h2 class="sec-title">${esc(d.cats[c])}</h2><div class="ws-list">${list.filter((x) => x.cat === c).map((x) => wsCard(x)).join("")}</div>`).join("")}
+    <p class="small muted" style="margin-top:14px">Sessões montadas a partir de revisões e diretrizes (fontes em cada uma). Não substituem médico ou fisioterapeuta.
+      Para treino de força em casa: Perfil → Treino e rotina → Onde você treina → 🏠 Em casa.</p>`;
+  view.onclick = (e) => { const g = e.target.closest("[data-wg]"); if (g) { store("gg_ws_goal", g.dataset.wg); viewBemEstar(); } };
+}
+function wsStepTxt(st) {
+  const side = st.s ? " cada lado" : "";
+  if (st.sets) return `${st.sets} × ${st.t} s${side}`;
+  if (st.r) return `${st.r}${st.s && !/cada|lado|\+/.test(st.r) ? side : ""}`;
+  return st.t >= 60 ? `${mmss(st.t)} min${side}` : `${st.t} s${side}`;
+}
+async function wsDetail(id) {
+  const x = await api(`/api/wellness/${encodeURIComponent(id)}`);
+  view.innerHTML = `<section class="card ws-head"><div class="ws-ico big" aria-hidden="true">${x.icon}</div><h2 style="margin:6px 0 2px">${esc(x.title)}</h2>
+      <div class="small muted">${x.minutes} min · ${x.steps.length} passos</div>
+      <p style="margin:10px 0 6px">${esc(x.why)}</p>
+      ${x.personal_note ? `<p class="small rec">${esc(x.personal_note)}</p>` : ""}
+      <p class="small muted" style="margin:6px 0 0">⚠️ ${esc(x.cautions)}</p>
+      <a class="btn block" href="#bemestar/${esc(x.id)}/play" style="margin-top:12px">▶ Começar</a></section>
+    <h2 class="sec-title">Passo a passo</h2>
+    <ol class="ws-steps">${x.steps.map((st) => `<li>${mediaHtml(st.ex || "x", "s", "yoga")}<span class="grow"><b>${esc(st.n)}</b><span class="small muted">${esc(wsStepTxt(st))}${st.breath ? " · respiração guiada" : ""}</span>
+      <span class="small">${esc(st.how)}</span></span></li>`).join("")}</ol>
+    <details class="adv"><summary class="small">De onde vem (fontes)</summary><ul class="plain small">${(x.sources || []).map((f) => `<li><a href="${esc(f.u)}" target="_blank" rel="noopener">${esc(f.t)}</a></li>`).join("")}</ul></details>
+    <a class="act" href="#bemestar" style="display:block;margin-top:10px">‹ Todas as sessões</a>`;
+}
+// o guia: cada passo vira 1+ "unidades" (lado direito/esquerdo, séries e descansos); tempo avança sozinho, repetições no toque
+function wsUnits(x) {
+  const out = [];
+  x.steps.forEach((st, k) => {
+    const sides = st.s ? ["Lado direito", "Lado esquerdo"] : [null];
+    sides.forEach((sd) => {
+      if (st.sets) {
+        for (let j = 0; j < st.sets; j++) {
+          out.push({ k, st, label: [sd, `Série ${j + 1} de ${st.sets}`].filter(Boolean).join(" · "), t: st.t, kind: "time" });
+          if (j < st.sets - 1) out.push({ k, st, label: "Descanso", t: st.rest || 45, kind: "rest" });
+        }
+      } else out.push({ k, st, label: sd, t: st.t, kind: st.tap ? "tap" : "time", breath: st.breath });
+    });
+  });
+  return out;
+}
+async function wsPlay(id) {
+  const x = await api(`/api/wellness/${encodeURIComponent(id)}`);
+  WS = { x, u: wsUnits(x), i: 0, end: null, paused: false, left: null, started: Date.now(), done: false };
+  document.body.classList.add("focus-on"); wakeOn(); audioUnlock();
+  wsGo(0);
+  clearInterval(wsInt); wsInt = setInterval(wsTick, 200);
+  view.onclick = (e) => {
+    const b = e.target.closest("[data-ws]"); if (!b || !WS) return;
+    audioUnlock();
+    const a = b.dataset.ws;
+    if (a === "next" || a === "done") return wsGo(WS.i + 1);
+    if (a === "prev") return wsGo(Math.max(0, WS.i - 1));
+    if (a === "pause") { if (WS.paused) { WS.end = Date.now() + WS.left * 1000; WS.paused = false; } else { WS.left = Math.max(0, (WS.end - Date.now()) / 1000); WS.paused = true; } return wsRender(); }
+    if (a === "log") return wsLog(b);
+    if (a === "exit") { location.hash = `#bemestar/${x.id}`; }
+  };
+}
+function wsGo(i) {
+  if (!WS) return;
+  if (i >= WS.u.length) { WS.done = true; WS.end = null; alarm(); return wsRender(); }
+  WS.i = i; const u = WS.u[i];
+  WS.end = u.kind === "tap" ? null : Date.now() + u.t * 1000; WS.paused = false; WS.t0 = Date.now();
+  wsRender();
+}
+function wsBreath(u) {
+  const [a, h1, b, h2] = u.breath; const cyc = a + h1 + b + h2;
+  const e = ((Date.now() - WS.t0) / 1000) % cyc;
+  if (e < a) return ["Puxe o ar", 0.55 + 0.45 * (e / a)];
+  if (e < a + h1) return [h1 > 1.5 ? "Segure" : "Mais um pouco", 1];
+  if (e < a + h1 + b) return ["Solte devagar", 1 - 0.45 * ((e - a - h1) / b)];
+  return ["Segure", 0.55];
+}
+function wsRender() {
+  const W = WS; if (!W) return;
+  const x = W.x;
+  if (W.done) {
+    const min = Math.max(1, Math.round((Date.now() - W.started) / 60000));
+    W.min = min;
+    view.innerHTML = `<section class="card ws-end"><div class="ws-ico big">✓</div><h2>${esc(x.title)}</h2><p>Pronto! ${min} min.</p>
+      <button class="btn block" data-ws="log">Registrar no meu histórico</button><button class="act" data-ws="exit" style="margin-top:8px">Fechar</button></section>`;
+    return;
+  }
+  const u = W.u[W.i]; const st = u.st; const nx = W.u[W.i + 1];
+  const left = u.kind === "tap" ? null : W.paused ? W.left : Math.max(0, (W.end - Date.now()) / 1000);
+  view.innerHTML = `<section class="ws-player ${u.kind === "rest" ? "rest" : ""}">
+    <div class="ws-top"><button class="act" data-ws="exit" aria-label="Sair">✕</button><span class="small muted grow">${esc(x.title)} · ${W.i + 1} de ${W.u.length}</span></div>
+    <div class="meter"><span style="width:${Math.round(100 * W.i / W.u.length)}%"></span></div>
+    ${u.kind === "rest" ? `<div class="ws-ico big" aria-hidden="true">😮‍💨</div><h2 class="ws-name">Descanso</h2>`
+      : `<div class="ws-media">${u.breath ? `<div class="ws-breath" id="ws-breath"><span id="ws-bt"></span></div>` : mediaHtml(st.ex || "x", "m", "yoga")}</div>
+        <h2 class="ws-name">${esc(st.n)}</h2>${u.label ? `<div class="ws-side">${esc(u.label)}</div>` : ""}`}
+    <div class="ws-clock" id="ws-clock">${u.kind === "tap" ? esc(st.r || "") : mmss(Math.ceil(left))}</div>
+    ${u.kind === "rest" ? "" : `<p class="ws-how">${esc(st.how)}</p>`}
+    <div class="ws-nav"><button class="btn ghost" data-ws="prev" ${W.i ? "" : "disabled"}>‹</button>
+      ${u.kind === "tap" ? `<button class="btn" data-ws="done">✓ Feito</button>` : `<button class="btn ghost" data-ws="pause">${W.paused ? "▶ Continuar" : "⏸ Pausar"}</button>`}
+      <button class="btn ghost" data-ws="next">›</button></div>
+    ${nx ? `<p class="small muted ws-next">A seguir: ${esc(nx.kind === "rest" ? "descanso" : nx.st.n)}${nx.label && nx.kind !== "rest" ? ` (${esc(nx.label)})` : ""}</p>` : `<p class="small muted ws-next">Último passo</p>`}
+  </section>`;
+  wsTick();
+}
+function wsTick() {
+  const W = WS; if (!W || W.done) return;
+  if (location.hash.split("/")[0] !== "#bemestar") return wsLeave();
+  const u = W.u[W.i];
+  if (u.breath && !W.paused) {
+    const [txt, sc] = wsBreath(u); const el = $("#ws-breath"); const bt = $("#ws-bt");
+    if (el) el.style.transform = `scale(${sc.toFixed(3)})`; if (bt) bt.textContent = txt;
+  }
+  if (u.kind === "tap" || W.paused || !W.end) return;
+  const left = (W.end - Date.now()) / 1000;
+  const c = $("#ws-clock"); if (c) c.textContent = mmss(Math.max(0, Math.ceil(left)));
+  if (left <= 3 && left > 0 && Math.ceil(left) !== W.beeped) { W.beeped = Math.ceil(left); if (!u.breath) beep(660, 0.08, 0.15); }
+  if (left <= 0) { beep(988, 0.2); wsGo(W.i + 1); }
+}
+async function wsLog(b) {
+  const W = WS; if (!W) return;
+  b.disabled = true;
+  try {
+    await api("/api/sessions", { method: "POST", body: { date: localISO(), client_id: `ws-${W.x.id}-${W.started}`, day_name: W.x.title,
+      notes: `Bem-estar: ${W.x.title}`, items: [{ exercise_id: "atividade_mobilidade", name: W.x.title, kind: "cardio", duration_min: W.min, zone: 1, done: true }] } });
+    toast("Registrado ✔ (conta como atividade leve)");
+    location.hash = "#bemestar";
+  } catch (err) { b.disabled = false; toast(err.message, 5000); }
 }
 
 async function loadMyGym() {
@@ -4544,8 +4692,9 @@ async function doRoute(ctl) {
   closeModal.hook = null;                 // ...e quem abriu a janela não é avisado: a tela dele já não é a que está na frente
   if (!$("#modal").hidden) closeModal();  // trocar de tela fecha a janela aberta (não fica por cima da tela nova)
   if (name !== "treinar") fxLeave();
+  if (name !== "bemestar" || b !== "play") { clearInterval(wsInt); wsInt = null; WS = null; }
   $$(".tabbar a").forEach((el) => el.classList.toggle("active", el.dataset.tab === ({ plano: "planilhas", exercicios: "planilhas", aparelhos: "planilhas", evolucao: "analise", saude: "analise", esportes: "perfil", coach: "perfil", dev: "perfil", bemvindo: "hoje" }[name] || name)));
-  const TITLES = { planilhas: "Planos", exercicios: "Planos", aparelhos: "Planos", plano: "Planilha", treinar: "Treinar", analise: "Progresso", evolucao: "Evolução", saude: "Saúde e sono", perfil: "Perfil", esportes: "Esportes", coach: "Coach", dev: "Desenvolvedor" };
+  const TITLES = { planilhas: "Planos", exercicios: "Planos", aparelhos: "Planos", plano: "Planilha", treinar: "Treinar", bemestar: "Bem-estar", analise: "Progresso", evolucao: "Evolução", saude: "Saúde e sono", perfil: "Perfil", esportes: "Esportes", coach: "Coach", dev: "Desenvolvedor" };
   const pt = $("#page-title"); pt.textContent = TITLES[name] || ""; pt.hidden = !TITLES[name] || (name === "treinar" && a);
   const sn = $("#subnav"); sn.hidden = !["planilhas", "exercicios", "aparelhos"].includes(name);
   $$("#subnav a").forEach((x) => x.classList.toggle("on", x.dataset.sub === name));
@@ -4568,7 +4717,7 @@ async function doRoute(ctl) {
         document.querySelector(".topbar").insertAdjacentHTML("afterend", `<div id="eph" class="rec atencao small" style="margin:8px 16px 0">Versão de teste online: os dados podem ser apagados pelo servidor. Use <a href="#perfil">Perfil → Backup</a> para salvar e restaurar.</div>`);
       }
     }
-    const routes = { hoje: () => viewHoje(a), planilhas: viewPlanilhas, plano: () => viewPlano(a), treinar: () => viewTreinar(a, b), analise: viewAnalise, evolucao: () => viewEvolucao(decodeURIComponent(a || "")), esportes: viewEsportes, saude: viewSaude, exercicios: viewExercicios, aparelhos: () => viewAparelhos(a), perfil: () => viewPerfil(a), coach: viewCoach, dev: viewDev, bemvindo: viewBemVindo };
+    const routes = { hoje: () => viewHoje(a), planilhas: viewPlanilhas, plano: () => viewPlano(a), treinar: () => viewTreinar(a, b), bemestar: () => viewBemEstar(a, b), analise: viewAnalise, evolucao: () => viewEvolucao(decodeURIComponent(a || "")), esportes: viewEsportes, saude: viewSaude, exercicios: viewExercicios, aparelhos: () => viewAparelhos(a), perfil: () => viewPerfil(a), coach: viewCoach, dev: viewDev, bemvindo: viewBemVindo };
     const render = async () => {
       await (routes[name] || viewHoje)();
       if (!view.onclick) view.onclick = (e) => { const id = e.target.dataset && e.target.dataset.ex; if (id) showExercise(id); };

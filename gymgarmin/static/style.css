@@ -1020,3 +1020,34 @@ body.timer-on { padding-bottom: calc(72px + 70px + env(safe-area-inset-bottom));
 /* exercícios de dois lados: peso total, metade de cada lado */
 .fx-side { text-align: center; margin: -2px 0 8px; color: var(--ink-2); }
 .side-hint { margin: 8px 0 0; }
+
+/* bem-estar */
+.ws-list { display: flex; flex-direction: column; gap: 8px; }
+.ws-card { display: flex; align-items: center; gap: 12px; background: var(--card); border-radius: var(--radius); padding: 12px 14px;
+  box-shadow: var(--shadow); color: var(--ink); text-decoration: none; }
+.wbox .ws-card { box-shadow: none; border: 1px solid var(--line); }
+.ws-card .grow { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.ws-ico { font-size: 26px; flex: none; }
+.ws-ico.big { font-size: 44px; text-align: center; }
+.ws-min { font-weight: 800; color: var(--brand); flex: none; }
+.ws-goals { margin-bottom: 4px; }
+.ws-head { text-align: left; }
+.ws-steps { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 10px; }
+.ws-steps li { display: flex; gap: 10px; align-items: flex-start; background: var(--card); border-radius: 14px; padding: 10px; }
+.ws-steps .grow { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.ws-player { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 8px; padding: 4px 0 24px; }
+.ws-player .meter { width: 100%; }
+.ws-top { display: flex; align-items: center; gap: 8px; width: 100%; }
+.ws-media .demo.l, .ws-media .demo { margin: 6px auto; }
+.ws-name { margin: 4px 0 0; font-size: 26px; }
+.ws-side { font-weight: 700; color: var(--brand); }
+.ws-clock { font-size: 64px; font-weight: 850; letter-spacing: -2px; font-variant-numeric: tabular-nums; line-height: 1.05; }
+.ws-how { max-width: 520px; margin: 0; color: var(--ink-2); }
+.ws-nav { display: flex; gap: 10px; width: 100%; justify-content: center; margin-top: 6px; }
+.ws-nav .btn { flex: 1; max-width: 200px; min-height: 52px; }
+.ws-nav .btn.ghost:first-child, .ws-nav .btn.ghost:last-child { flex: 0 0 64px; }
+.ws-breath { width: 180px; height: 180px; border-radius: 50%; background: radial-gradient(circle, var(--brand-soft) 0%, var(--brand) 140%);
+  display: grid; place-items: center; transform: scale(.6); transition: transform .2s linear; margin: 10px auto; }
+.ws-breath span { font-weight: 800; color: var(--ink); transform: scale(1); }
+.ws-player.rest .ws-clock { color: var(--brand); }
+.ws-end { text-align: center; }

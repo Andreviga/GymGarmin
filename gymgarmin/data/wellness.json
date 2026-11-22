@@ -1,0 +1,1470 @@
+{
+ "updated": "2026-11",
+ "cats": {
+  "yoga": "Yoga",
+  "pilates": "Pilates",
+  "alongamento": "Alongamento",
+  "mobilidade": "Mobilidade",
+  "articulacoes": "Proteção das articulações",
+  "respiracao": "Respiração"
+ },
+ "goals": {
+  "estresse": "Menos estresse",
+  "sono": "Dormir melhor",
+  "corrida": "Corrida",
+  "amplitude": "Amplitude / flexibilidade",
+  "articulacoes": "Articulações",
+  "joelho": "Joelho",
+  "lombar": "Lombar",
+  "ombro": "Ombro",
+  "core": "Core",
+  "postura": "Trabalho sentado",
+  "equilibrio": "Equilíbrio",
+  "pescoco": "Pescoço",
+  "foco": "Foco",
+  "pre": "Antes",
+  "pos": "Depois"
+ },
+ "sessions": [
+  {
+   "id": "yoga_estresse",
+   "title": "Yoga para baixar o estresse",
+   "cat": "yoga",
+   "icon": "🧘",
+   "goal": [
+    "estresse"
+   ],
+   "when": [
+    "descanso",
+    "noite",
+    "qualquer"
+   ],
+   "level": "todos",
+   "why": "Yoga suave com respiração lenta (~6 por minuto, soltando o ar mais devagar do que puxa) reduz o estresse percebido e ativa o lado 'freio' do sistema nervoso. Melhor 2–3× por semana.",
+   "cautions": "Sem dor: vá até sentir alongar, nunca doer. Glaucoma ou pressão alta sem controle: evite ficar de cabeça para baixo.",
+   "sources": [
+    {
+     "t": "Schleinzer et al., 2024 — yoga reduz o estresse percebido",
+     "u": "https://pubmed.ncbi.nlm.nih.gov/39553891/"
+    },
+    {
+     "t": "Laborde et al., 2022 — respiração lenta aumenta a variabilidade da FC",
+     "u": "https://doi.org/10.1016/j.neubiorev.2022.104711"
+    },
+    {
+     "t": "Cramer et al., 2015 — segurança da yoga",
+     "u": "https://pubmed.ncbi.nlm.nih.gov/26116216/"
+    }
+   ],
+   "steps": [
+    {
+     "n": "Respiração lenta sentado",
+     "t": 180,
+     "how": "Sente confortável. Puxe o ar pelo nariz em 4 s e solte em 6 s. Ombros soltos.",
+     "breath": [
+      4,
+      0,
+      6,
+      0
+     ]
+    },
+    {
+     "n": "Gato-vaca",
+     "t": 60,
+     "how": "De quatro apoios: ao puxar o ar, peito para frente e olhar para cima; ao soltar, arredonde as costas. Bem devagar.",
+     "ex": "Cat_Stretch",
+     "r": "6–8 ciclos",
+     "tap": true
+    },
+    {
+     "n": "Postura da criança",
+     "t": 90,
+     "how": "Joelhos afastados, quadril nos calcanhares, braços à frente. Respire nas costas.",
+     "ex": "Childs_Pose"
+    },
+    {
+     "n": "Avanço baixo",
+     "t": 45,
+     "how": "Um joelho no chão, o outro pé à frente. Quadril desce e vai para frente; sinta a frente da coxa de trás.",
+     "s": true,
+     "ex": "Kneeling_Hip_Flexor"
+    },
+    {
+     "n": "Flexão à frente em pé",
+     "t": 50,
+     "how": "Joelhos dobrados, deixe o tronco pendurar. Cabeça e pescoço soltos.",
+     "avoid": [
+      "osteoporose",
+      "fratura_vertebra"
+     ],
+     "alt": {
+      "n": "Alongamento de posterior deitado",
+      "t": 50,
+      "how": "Deitado, puxe uma perna esticada com uma toalha no pé. Costas no chão.",
+      "s": true,
+      "ex": "Hamstring_Stretch"
+     }
+    },
+    {
+     "n": "Ponte apoiada",
+     "t": 90,
+     "how": "Deitado, pés no chão, suba o quadril e apoie um travesseiro ou bloco embaixo do sacro. Solte o peso.",
+     "ex": "Butt_Lift_Bridge"
+    },
+    {
+     "n": "Torção deitada",
+     "t": 45,
+     "how": "Deitado, joelhos dobrados caem para um lado, braços abertos, olhar para o outro.",
+     "s": true,
+     "ex": "Lying_Crossover"
+    },
+    {
+     "n": "Pernas na parede",
+     "t": 240,
+     "how": "Deitado com o quadril perto da parede e as pernas apoiadas nela. Respiração lenta.",
+     "breath": [
+      4,
+      0,
+      6,
+      0
+     ]
+    },
+    {
+     "n": "Relaxamento final",
+     "t": 300,
+     "how": "Deitado de barriga para cima. Passe a atenção pelo corpo dos pés à cabeça, soltando cada parte."
+    }
+   ],
+   "minutes": 20
+  },
+  {
+   "id": "yoga_sono",
+   "title": "Yoga e respiração para dormir",
+   "cat": "yoga",
+   "icon": "🌙",
+   "goal": [
+    "sono",
+    "estresse"
+   ],
+   "when": [
+    "noite"
+   ],
+   "level": "todos",
+   "why": "Sequência curta e calma para a noite, terminando com expiração longa (puxa 4 s, solta 7 s). Yoga melhora um pouco a qualidade do sono, e a respiração lenta acalma o corpo antes de deitar.",
+   "cautions": "Faça na cama ou no tapete, com luz baixa. Tontura: volte a respirar normal.",
+   "sources": [
+    {
+     "t": "Wang et al., 2020 — yoga e qualidade do sono",
+     "u": "https://doi.org/10.1186/s12888-020-02566-4"
+    },
+    {
+     "t": "Zaccaro et al., 2018 — respiração lenta e relaxamento",
+     "u": "https://pubmed.ncbi.nlm.nih.gov/30245619/"
+    },
+    {
+     "t": "Laborde et al., 2022 — respiração lenta aumenta a variabilidade da FC",
+     "u": "https://doi.org/10.1016/j.neubiorev.2022.104711"
+    }
+   ],
+   "steps": [
+    {
+     "n": "Gato-vaca bem lento",
+     "t": 60,
+     "how": "De quatro apoios, mova a coluna no ritmo da respiração.",
+     "ex": "Cat_Stretch"
+    },
+    {
+     "n": "Postura da criança",
+     "t": 90,
+     "how": "Testa apoiada, braços ao lado do corpo. Solte os ombros.",
+     "ex": "Childs_Pose"
+    },
+    {
+     "n": "Torção deitada",
+     "t": 45,
+     "how": "Joelhos caem para um lado, olhar para o outro.",
+     "s": true,
+     "ex": "Lying_Crossover"
+    },
+    {
+     "n": "Glúteo em '4' deitado",
+     "t": 45,
+     "how": "Tornozelo sobre o joelho oposto, puxe a coxa de baixo em direção ao peito.",
+     "s": true,
+     "ex": "Lying_Glute"
+    },
+    {
+     "n": "Pernas na parede",
+     "t": 180,
+     "how": "Pernas apoiadas na parede, braços soltos.",
+     "breath": [
+      4,
+      0,
+      7,
+      0
+     ]
+    },
+    {
+     "n": "Expiração longa",
+     "t": 300,
+     "how": "Deitado: puxe o ar em 4 s pelo nariz e solte em 7 s. Se dormir no meio, ótimo.",
+     "breath": [
+      4,
+      0,
+      7,
+      0
+     ]
+    }
+   ],
+   "minutes": 14
+  },
+  {
+   "id": "aquecimento_corrida",
+   "title": "Aquecimento antes de correr",
+   "cat": "mobilidade",
+   "icon": "🏃",
+   "goal": [
+    "corrida",
+    "pre"
+   ],
+   "when": [
+    "antes_corrida"
+   ],
+   "level": "todos",
+   "why": "Aquecer (subir a temperatura, ativar glúteo e panturrilha, mobilizar e acelerar) melhora o desempenho. Alongamento parado de 60 s ou mais antes de correr tira força: aqui é tudo dinâmico.",
+   "cautions": "Machucado: faça as acelerações bem leves ou pule.",
+   "sources": [
+    {
+     "t": "Fradkin et al., 2010 — aquecimento melhora o desempenho",
+     "u": "https://pubmed.ncbi.nlm.nih.gov/19996770/"
+    },
+    {
+     "t": "Behm et al., 2016 — alongamento estático, dinâmico e PNF antes do esforço",
+     "u": "https://pubmed.ncbi.nlm.nih.gov/26642915/"
+    },
+    {
+     "t": "Kay & Blazevich, 2012 — estático ≥60 s antes reduz força/potência",
+     "u": "https://pubmed.ncbi.nlm.nih.gov/21659901/"
+    }
+   ],
+   "steps": [
+    {
+     "n": "Trote leve ou caminhada rápida",
+     "t": 240,
+     "how": "Bem fácil, dá para conversar."
+    },
+    {
+     "n": "Ponte de glúteo",
+     "t": 40,
+     "how": "Suba o quadril apertando o glúteo, 2 s em cima.",
+     "ex": "Butt_Lift_Bridge",
+     "r": "10",
+     "tap": true
+    },
+    {
+     "n": "Caminhada lateral com elástico",
+     "t": 40,
+     "how": "Elástico acima dos joelhos, passos laterais curtos sem deixar o joelho entrar.",
+     "ex": "Monster_Walk",
+     "r": "10 para cada lado",
+     "tap": true
+    },
+    {
+     "n": "Elevação de panturrilha",
+     "t": 40,
+     "how": "Suba na ponta dos pés e desça devagar.",
+     "ex": "Standing_Calf_Raises",
+     "r": "15",
+     "tap": true
+    },
+    {
+     "n": "Balanço de perna",
+     "t": 30,
+     "how": "Apoiado numa parede, balance a perna para frente e para trás, depois para os lados.",
+     "s": true,
+     "r": "10 + 10",
+     "tap": true
+    },
+    {
+     "n": "Avanço com rotação",
+     "t": 45,
+     "how": "Passo à frente, desça e gire o tronco para o lado da perna da frente.",
+     "ex": "Bodyweight_Walking_Lunge",
+     "r": "6 de cada lado",
+     "tap": true
+    },
+    {
+     "n": "Abertura de quadril",
+     "t": 30,
+     "how": "Em pé, leve o joelho para cima e abra para o lado, desenhando um círculo.",
+     "s": true,
+     "ex": "Standing_Hip_Circles",
+     "r": "6",
+     "tap": true
+    },
+    {
+     "n": "Lagarta",
+     "t": 40,
+     "how": "Em pé, desça as mãos até o chão, caminhe com as mãos até a prancha e volte.",
+     "ex": "Inchworm",
+     "r": "4",
+     "tap": true
+    },
+    {
+     "n": "Skipping A",
+     "t": 30,
+     "how": "Joelho alto alternando, pisando na ponta do pé, braços acompanham.",
+     "r": "2 × 15 m",
+     "tap": true
+    },
+    {
+     "n": "Anfersen (calcanhar no glúteo)",
+     "t": 30,
+     "how": "Corrida curta levando o calcanhar ao glúteo.",
+     "r": "2 × 15 m",
+     "tap": true
+    },
+    {
+     "n": "Acelerações progressivas",
+     "t": 60,
+     "how": "2–3 tiros de 60–80 m subindo até 70–85% do máximo, voltando andando.",
+     "r": "2–3",
+     "tap": true
+    }
+   ],
+   "minutes": 16
+  },
+  {
+   "id": "pos_corrida",
+   "title": "Depois de correr: soltar e alongar",
+   "cat": "alongamento",
+   "icon": "🦵",
+   "goal": [
+    "corrida",
+    "pos",
+    "amplitude"
+   ],
+   "when": [
+    "depois_corrida"
+   ],
+   "level": "todos",
+   "why": "Desaquecer e alongar não acelera a recuperação nem previne lesão. Mas depois da corrida é um bom momento para somar tempo de alongamento, que melhora a amplitude com o tempo, e para o corpo desacelerar.",
+   "cautions": "Alongue até sentir tensão, nunca dor.",
+   "sources": [
+    {
+     "t": "Van Hooren & Peake, 2018 — o que o desaquecimento faz (e não faz)",
+     "u": "https://doi.org/10.1007/s40279-018-0916-2"
+    },
+    {
+     "t": "Afonso et al., 2021 — alongar depois do treino não acelera a recuperação",
+     "u": "https://doi.org/10.3389/fphys.2021.677581"
+    },
+    {
+     "t": "Warneke et al., 2025 — consenso Delphi sobre alongamento",
+     "u": "https://pubmed.ncbi.nlm.nih.gov/40513717/"
+    },
+    {
+     "t": "Thomas et al., 2018 — dose de alongamento (≥5 min por músculo/semana)",
+     "u": "https://pubmed.ncbi.nlm.nih.gov/29506306/"
+    }
+   ],
+   "steps": [
+    {
+     "n": "Caminhada leve",
+     "t": 180,
+     "how": "Deixe a respiração voltar ao normal."
+    },
+    {
+     "n": "Panturrilha (perna esticada)",
+     "t": 40,
+     "how": "Mãos na parede, perna de trás esticada, calcanhar no chão.",
+     "s": true,
+     "ex": "Calf_Stretch_Hands_Against_Wall"
+    },
+    {
+     "n": "Panturrilha (joelho dobrado)",
+     "t": 40,
+     "how": "Mesma posição, dobre o joelho de trás: alonga o sóleo.",
+     "s": true,
+     "ex": "Standing_Soleus_And_Achilles_Stretch"
+    },
+    {
+     "n": "Flexor do quadril",
+     "t": 45,
+     "how": "Um joelho no chão, aperte o glúteo dessa perna e leve o quadril para frente.",
+     "s": true,
+     "ex": "Kneeling_Hip_Flexor"
+    },
+    {
+     "n": "Posterior de coxa deitado",
+     "t": 45,
+     "how": "Deitado, puxe a perna esticada com uma toalha.",
+     "s": true,
+     "ex": "Hamstring_Stretch"
+    },
+    {
+     "n": "Quadríceps",
+     "t": 40,
+     "how": "Em pé (apoie numa parede) ou deitado de lado, segure o pé atrás.",
+     "s": true,
+     "ex": "Quad_Stretch"
+    },
+    {
+     "n": "Glúteo em '4'",
+     "t": 45,
+     "how": "Deitado, tornozelo sobre o joelho oposto, puxe a coxa.",
+     "s": true,
+     "ex": "Lying_Glute"
+    },
+    {
+     "n": "Respiração lenta",
+     "t": 90,
+     "how": "Puxe 4 s, solte 6 s.",
+     "breath": [
+      4,
+      0,
+      6,
+      0
+     ]
+    }
+   ],
+   "minutes": 13
+  },
+  {
+   "id": "yoga_corredores",
+   "title": "Yoga para corredores",
+   "cat": "yoga",
+   "icon": "🧘",
+   "goal": [
+    "corrida",
+    "amplitude"
+   ],
+   "when": [
+    "descanso",
+    "leve",
+    "depois_corrida"
+   ],
+   "level": "intermediario",
+   "why": "Quadril, posterior e panturrilha com posturas mantidas de 45–90 s. Bom em dia de descanso ou de treino leve (não logo antes de um treino forte: posturas longas tiram força na hora).",
+   "cautions": "Joelho dói no pombo: faça o '4' deitado.",
+   "sources": [
+    {
+     "t": "Thomas et al., 2018 — dose de alongamento (≥5 min por músculo/semana)",
+     "u": "https://pubmed.ncbi.nlm.nih.gov/29506306/"
+    },
+    {
+     "t": "Behm et al., 2016 — alongamento estático, dinâmico e PNF antes do esforço",
+     "u": "https://pubmed.ncbi.nlm.nih.gov/26642915/"
+    },
+    {
+     "t": "Warneke et al., 2025 — consenso Delphi sobre alongamento",
+     "u": "https://pubmed.ncbi.nlm.nih.gov/40513717/"
+    }
+   ],
+   "steps": [
+    {
+     "n": "Saudação ao sol suave",
+     "t": 120,
+     "how": "3 voltas devagar: braços para cima, dobra à frente, prancha, cachorro olhando para baixo, volta.",
+     "r": "3",
+     "tap": true
+    },
+    {
+     "n": "Avanço baixo",
+     "t": 50,
+     "how": "Joelho de trás no chão, quadril para frente e para baixo.",
+     "s": true,
+     "ex": "Kneeling_Hip_Flexor"
+    },
+    {
+     "n": "Lagarto",
+     "t": 50,
+     "how": "Do avanço, as duas mãos por dentro do pé da frente, quadril baixo.",
+     "s": true,
+     "ex": "Worlds_Greatest_Stretch"
+    },
+    {
+     "n": "Meia espacate",
+     "t": 50,
+     "how": "Do avanço, leve o quadril para trás e estique a perna da frente, ponta do pé para cima.",
+     "s": true,
+     "ex": "Hamstring_Stretch"
+    },
+    {
+     "n": "Pombo (ou '4' deitado)",
+     "t": 75,
+     "how": "Canela da frente atravessada, perna de trás esticada. Joelho incomoda: faça deitado.",
+     "s": true,
+     "ex": "Lying_Glute"
+    },
+    {
+     "n": "Cachorro olhando para baixo",
+     "t": 60,
+     "how": "Quadril alto, pedalando: um calcanhar desce, depois o outro.",
+     "ex": "Calf_Stretch_Hands_Against_Wall"
+    },
+    {
+     "n": "Agachamento profundo (guirlanda)",
+     "t": 50,
+     "how": "Pés afastados, desça o quadril, cotovelos abrem os joelhos.",
+     "ex": "Bodyweight_Squat"
+    },
+    {
+     "n": "Torção deitada",
+     "t": 45,
+     "how": "Joelhos para um lado, olhar para o outro.",
+     "s": true,
+     "ex": "Lying_Crossover"
+    },
+    {
+     "n": "Pernas na parede",
+     "t": 180,
+     "how": "Respiração lenta.",
+     "breath": [
+      4,
+      0,
+      6,
+      0
+     ]
+    }
+   ],
+   "minutes": 16
+  },
+  {
+   "id": "amplitude",
+   "title": "Mais amplitude (alongar + força em amplitude)",
+   "cat": "alongamento",
+   "icon": "🤸",
+   "goal": [
+    "amplitude"
+   ],
+   "when": [
+    "descanso",
+    "qualquer"
+   ],
+   "level": "todos",
+   "why": "O que mais pesa é o tempo total por semana: ~5 min por músculo por semana, em sessões curtas e frequentes (5× por semana é o ideal). Força com amplitude total ganha amplitude tanto quanto alongar — por isso o fim é com exercícios profundos.",
+   "cautions": "Até a tensão, não até a dor. Articulação muito flexível ou cirurgia recente: sem balançar no fim do movimento.",
+   "sources": [
+    {
+     "t": "Thomas et al., 2018 — dose de alongamento (≥5 min por músculo/semana)",
+     "u": "https://pubmed.ncbi.nlm.nih.gov/29506306/"
+    },
+    {
+     "t": "Afonso et al., 2021 — força em amplitude total melhora a amplitude tanto quanto alongar",
+     "u": "https://pubmed.ncbi.nlm.nih.gov/33917036/"
+    },
+    {
+     "t": "Warneke et al., 2025 — consenso Delphi sobre alongamento",
+     "u": "https://pubmed.ncbi.nlm.nih.gov/40513717/"
+    },
+    {
+     "t": "Behm et al., 2016 — alongamento estático, dinâmico e PNF antes do esforço",
+     "u": "https://pubmed.ncbi.nlm.nih.gov/26642915/"
+    }
+   ],
+   "steps": [
+    {
+     "n": "Aquecer: polichinelo leve ou marcha",
+     "t": 120,
+     "how": "Só para esquentar."
+    },
+    {
+     "n": "Posterior de coxa",
+     "t": 45,
+     "how": "Deitado com toalha no pé, perna esticada.",
+     "s": true,
+     "ex": "Hamstring_Stretch"
+    },
+    {
+     "n": "Flexor do quadril",
+     "t": 45,
+     "how": "Joelho no chão, glúteo apertado, quadril à frente.",
+     "s": true,
+     "ex": "Kneeling_Hip_Flexor"
+    },
+    {
+     "n": "Panturrilha",
+     "t": 45,
+     "how": "Mãos na parede, calcanhar no chão.",
+     "s": true,
+     "ex": "Calf_Stretch_Hands_Against_Wall"
+    },
+    {
+     "n": "Adutores (borboleta)",
+     "t": 60,
+     "how": "Sentado, solas dos pés juntas, joelhos caem para os lados.",
+     "ex": "Groin_and_Back_Stretch"
+    },
+    {
+     "n": "Glúteo em '4'",
+     "t": 45,
+     "how": "Deitado, tornozelo sobre o joelho oposto.",
+     "s": true,
+     "ex": "Lying_Glute"
+    },
+    {
+     "n": "Peitoral na porta",
+     "t": 45,
+     "how": "Antebraço no batente da porta, gire o corpo para o outro lado.",
+     "s": true,
+     "ex": "Chest_And_Front_Of_Shoulder_Stretch"
+    },
+    {
+     "n": "PNF no posterior",
+     "t": 60,
+     "how": "Com a toalha: empurre a perna contra ela por 5 s (força leve), solte e puxe mais por 25 s. 2×.",
+     "s": true,
+     "ex": "Hamstring_Stretch"
+    },
+    {
+     "n": "Agachamento cossaco",
+     "t": 60,
+     "how": "Pés bem afastados, desça para um lado com a outra perna esticada.",
+     "ex": "Bodyweight_Squat",
+     "r": "8 alternando",
+     "tap": true
+    },
+    {
+     "n": "Terra romeno lento",
+     "t": 60,
+     "how": "Com halteres ou elástico: desça com as costas retas até sentir o posterior, 3 s descendo.",
+     "ex": "Stiff-Legged_Dumbbell_Deadlift",
+     "r": "10",
+     "avoid": [
+      "osteoporose",
+      "fratura_vertebra"
+     ],
+     "alt": {
+      "n": "Ponte com uma perna",
+      "t": 60,
+      "how": "Calcanhar longe do quadril, 2 s em cima.",
+      "ex": "Single_Leg_Glute_Bridge",
+      "r": "10 de cada"
+     },
+     "tap": true
+    },
+    {
+     "n": "Agachamento profundo parado",
+     "t": 60,
+     "how": "Desça o máximo que der com o calcanhar no chão; segure numa porta se precisar.",
+     "ex": "Bodyweight_Squat"
+    }
+   ],
+   "minutes": 16
+  },
+  {
+   "id": "mobilidade_articular",
+   "title": "Mobilidade das articulações (6 min)",
+   "cat": "mobilidade",
+   "icon": "🔄",
+   "goal": [
+    "articulacoes"
+   ],
+   "when": [
+    "manha",
+    "qualquer",
+    "antes_treino"
+   ],
+   "level": "todos",
+   "why": "Círculos lentos e no maior tamanho que der em cada articulação, sem dor. É prática de treinadores (não há estudo que meça): serve como 'despertar' rápido do corpo e antes do treino.",
+   "cautions": "Movimento lento e controlado; dor = diminua o círculo.",
+   "sources": [
+    {
+     "t": "Behm et al., 2016 — alongamento estático, dinâmico e PNF antes do esforço",
+     "u": "https://pubmed.ncbi.nlm.nih.gov/26642915/"
+    }
+   ],
+   "steps": [
+    {
+     "n": "Pescoço",
+     "t": 40,
+     "how": "Desenhe meio círculo com o queixo de um ombro ao outro, devagar.",
+     "ex": "Side_Neck_Stretch",
+     "r": "3 para cada lado",
+     "tap": true
+    },
+    {
+     "n": "Ombros",
+     "t": 45,
+     "how": "Braço esticado, desenhe o maior círculo possível sem girar o tronco.",
+     "s": true,
+     "ex": "Arm_Circles",
+     "r": "3 + 3",
+     "tap": true
+    },
+    {
+     "n": "Coluna (gato-vaca)",
+     "t": 45,
+     "how": "De quatro apoios, uma vértebra de cada vez.",
+     "ex": "Cat_Stretch"
+    },
+    {
+     "n": "Quadril",
+     "t": 45,
+     "how": "De quatro apoios ou em pé, joelho desenha um círculo grande.",
+     "s": true,
+     "ex": "Standing_Hip_Circles",
+     "r": "3 + 3",
+     "tap": true
+    },
+    {
+     "n": "Joelhos",
+     "t": 30,
+     "how": "Em pé, mãos nos joelhos, círculos pequenos.",
+     "r": "5 + 5",
+     "tap": true
+    },
+    {
+     "n": "Tornozelos",
+     "t": 40,
+     "how": "Sentado ou em pé, desenhe o maior círculo com o pé.",
+     "s": true,
+     "ex": "Ankle_Circles",
+     "r": "5 + 5",
+     "tap": true
+    }
+   ],
+   "minutes": 6
+  },
+  {
+   "id": "joelho",
+   "title": "Joelho protegido",
+   "cat": "articulacoes",
+   "icon": "🦿",
+   "goal": [
+    "articulacoes",
+    "joelho"
+   ],
+   "when": [
+    "qualquer"
+   ],
+   "level": "todos",
+   "why": "Exercício é o tratamento mais estudado para o joelho (inclusive artrose): reduz dor e melhora função. Base: quadríceps e glúteo fortes, 2–3× por semana, mais caminhadas.",
+   "cautions": "Dor até 3–5 de 10 no exercício é aceitável se passar em 24 h. Joelho quente e inchado: pare e procure avaliação.",
+   "sources": [
+    {
+     "t": "Cochrane, Lawford et al., 2024 — exercício para artrose de joelho",
+     "u": "https://pubmed.ncbi.nlm.nih.gov/39625083/"
+    },
+    {
+     "t": "Clifford et al., 2020 — isometria para tendões",
+     "u": "https://pubmed.ncbi.nlm.nih.gov/32818059/"
+    }
+   ],
+   "steps": [
+    {
+     "n": "Sentar e levantar da cadeira",
+     "t": 60,
+     "how": "Cadeira firme, levante sem usar as mãos e sente devagar (3 s).",
+     "ex": "Bodyweight_Squat",
+     "r": "3 × 8–12",
+     "tap": true
+    },
+    {
+     "n": "Elevação da perna esticada",
+     "t": 50,
+     "how": "Deitado, uma perna dobrada; suba a outra esticada até a altura do joelho dobrado.",
+     "s": true,
+     "r": "3 × 10",
+     "tap": true
+    },
+    {
+     "n": "Extensão final do joelho com elástico",
+     "t": 50,
+     "how": "Elástico atrás do joelho preso num pé de mesa: estique o joelho até o fim e segure 2 s.",
+     "s": true,
+     "r": "3 × 12",
+     "tap": true
+    },
+    {
+     "n": "Ponte de glúteo",
+     "t": 50,
+     "how": "Suba o quadril, 2 s em cima.",
+     "ex": "Butt_Lift_Bridge",
+     "r": "3 × 12",
+     "tap": true
+    },
+    {
+     "n": "Abdução deitado de lado",
+     "t": 50,
+     "how": "Deitado de lado, suba a perna de cima um pouco para trás.",
+     "s": true,
+     "ex": "IT_Band_and_Glute_Stretch",
+     "r": "3 × 12",
+     "tap": true
+    },
+    {
+     "n": "Subida no degrau baixo",
+     "t": 60,
+     "how": "Suba num degrau com uma perna, desça devagar.",
+     "s": true,
+     "ex": "Step-up_with_Knee_Raise",
+     "r": "3 × 8",
+     "tap": true
+    },
+    {
+     "n": "Agachamento isométrico na parede",
+     "t": 40,
+     "how": "Costas na parede, joelhos a ~60–90°, segure. Alivia a dor do tendão patelar na hora.",
+     "sets": 3,
+     "rest": 45
+    }
+   ],
+   "minutes": 33
+  },
+  {
+   "id": "lombar",
+   "title": "Lombar forte (McGill + mobilidade)",
+   "cat": "articulacoes",
+   "icon": "🪨",
+   "goal": [
+    "articulacoes",
+    "lombar"
+   ],
+   "when": [
+    "manha",
+    "qualquer"
+   ],
+   "level": "todos",
+   "why": "Exercício reduz a dor lombar crônica; nenhum tipo é claramente melhor que outro — o melhor é o que você faz. Os 'três grandes' do McGill treinam o tronco a segurar a coluna parada, com 10 s por repetição.",
+   "cautions": "Dor que desce pela perna, formigamento, febre ou alteração para urinar: procure avaliação antes.",
+   "sources": [
+    {
+     "t": "Cochrane, Hayden et al., 2021 — exercício para dor lombar crônica",
+     "u": "https://pubmed.ncbi.nlm.nih.gov/34580864/"
+    },
+    {
+     "t": "OMS, 2023 — diretriz para dor lombar",
+     "u": "https://www.who.int/publications/i/item/9789240081789"
+    },
+    {
+     "t": "Fernández-Rodríguez et al., 2022 — Pilates e força para dor lombar crônica",
+     "u": "https://pubmed.ncbi.nlm.nih.gov/35722759/"
+    }
+   ],
+   "steps": [
+    {
+     "n": "Gato-vaca",
+     "t": 45,
+     "how": "Mova só até onde é confortável.",
+     "ex": "Cat_Stretch",
+     "r": "8",
+     "tap": true
+    },
+    {
+     "n": "Abdominal modificado de McGill",
+     "t": 90,
+     "how": "Deitado, uma perna dobrada, mãos sob a lombar. Tire só cabeça e ombros do chão, segure 10 s.",
+     "r": "6-4-2 (10 s cada)",
+     "tap": true
+    },
+    {
+     "n": "Prancha lateral",
+     "t": 60,
+     "how": "Do joelho (fácil) ou do pé. Corpo reto, segure 10 s.",
+     "s": true,
+     "ex": "Side_Bridge",
+     "r": "6-4-2 (10 s cada)",
+     "tap": true
+    },
+    {
+     "n": "Perdigueiro (bird-dog)",
+     "t": 90,
+     "how": "De quatro apoios, estique braço e perna opostos sem girar o quadril, segure 10 s.",
+     "ex": "Dead_Bug",
+     "r": "6-4-2 de cada lado",
+     "tap": true
+    },
+    {
+     "n": "Dobradiça de quadril",
+     "t": 45,
+     "how": "Bastão nas costas (cabeça, meio das costas e sacro encostados): dobre no quadril sem perder os 3 pontos.",
+     "r": "10",
+     "tap": true
+    },
+    {
+     "n": "Ponte de glúteo",
+     "t": 45,
+     "how": "Quadril sobe pelo glúteo, não pela lombar.",
+     "ex": "Butt_Lift_Bridge",
+     "r": "12",
+     "tap": true
+    }
+   ],
+   "minutes": 7
+  },
+  {
+   "id": "ombro",
+   "title": "Ombro saudável (manguito)",
+   "cat": "articulacoes",
+   "icon": "💪",
+   "goal": [
+    "articulacoes",
+    "ombro"
+   ],
+   "when": [
+    "qualquer",
+    "antes_treino"
+   ],
+   "level": "todos",
+   "why": "Fortalecer com carga que progride é o que tem algum efeito no ombro; exercício sem carga não mostrou benefício. Rotação externa, remada e escápula, 2–3× por semana.",
+   "cautions": "Dor forte ou fraqueza súbita no braço: procure avaliação.",
+   "sources": [
+    {
+     "t": "Naunton et al., 2020 — exercício resistido para o ombro",
+     "u": "https://pubmed.ncbi.nlm.nih.gov/32571081/"
+    }
+   ],
+   "steps": [
+    {
+     "n": "Rotação externa deitado de lado",
+     "t": 60,
+     "how": "Cotovelo colado no corpo com uma toalha embaixo, gire o antebraço para cima com um halter leve.",
+     "s": true,
+     "ex": "External_Rotation_with_Band",
+     "r": "3 × 12–15",
+     "tap": true
+    },
+    {
+     "n": "Rotação externa com elástico",
+     "t": 50,
+     "how": "Em pé, cotovelo junto ao corpo, abra o antebraço para fora.",
+     "s": true,
+     "ex": "External_Rotation_with_Band",
+     "r": "3 × 12–15",
+     "tap": true
+    },
+    {
+     "n": "Remada com elástico",
+     "t": 50,
+     "how": "Puxe o elástico até a costela, aperte as escápulas.",
+     "r": "3 × 12",
+     "tap": true
+    },
+    {
+     "n": "Y e T deitado de bruços",
+     "t": 50,
+     "how": "Deitado de bruços, suba os braços em Y e depois em T, polegares para cima.",
+     "ex": "Superman",
+     "r": "2 × 10",
+     "tap": true
+    },
+    {
+     "n": "Deslizamento na parede",
+     "t": 45,
+     "how": "Antebraços na parede, deslize para cima sem tirar as costas da posição.",
+     "r": "2 × 10",
+     "tap": true
+    },
+    {
+     "n": "Abertura com elástico",
+     "t": 40,
+     "how": "Braços esticados à frente, abra o elástico até o peito.",
+     "ex": "Band_Pull_Apart",
+     "r": "2 × 15",
+     "tap": true
+    }
+   ],
+   "minutes": 23
+  },
+  {
+   "id": "tendao_iso",
+   "title": "Isometria para tendões (joelho e aquiles)",
+   "cat": "articulacoes",
+   "icon": "🦶",
+   "goal": [
+    "articulacoes",
+    "corrida",
+    "joelho"
+   ],
+   "when": [
+    "qualquer",
+    "antes_corrida"
+   ],
+   "level": "todos",
+   "why": "Segurar a força parada por 30–45 s alivia a dor do tendão na hora e é uma boa porta de entrada; no longo prazo, o que trata o tendão é carga que progride (isometria não é melhor que o exercício normal).",
+   "cautions": "Esforço forte mas sem passar de 3–4 de dor em 10.",
+   "sources": [
+    {
+     "t": "Clifford et al., 2020 — isometria para tendões",
+     "u": "https://pubmed.ncbi.nlm.nih.gov/32818059/"
+    }
+   ],
+   "steps": [
+    {
+     "n": "Agachamento na parede",
+     "t": 45,
+     "how": "Joelhos a ~70°, segure forte; no descanso, ande um pouco.",
+     "sets": 4,
+     "rest": 60
+    },
+    {
+     "n": "Panturrilha em uma perna, parada",
+     "t": 40,
+     "how": "Na ponta de um pé só (apoie a mão na parede), segure no meio da subida.",
+     "s": true,
+     "ex": "Single_Leg_Calf_Raise_Step",
+     "sets": 4,
+     "rest": 30
+    },
+    {
+     "n": "Agachamento espanhol (elástico)",
+     "t": 45,
+     "how": "Elástico grosso atrás dos joelhos preso num ponto firme; sente para trás com a canela vertical e segure.",
+     "sets": 4,
+     "rest": 60
+    }
+   ],
+   "minutes": 19
+  },
+  {
+   "id": "pilates_iniciante",
+   "title": "Pilates de solo — iniciante",
+   "cat": "pilates",
+   "icon": "🌀",
+   "goal": [
+    "core",
+    "lombar",
+    "postura"
+   ],
+   "when": [
+    "qualquer"
+   ],
+   "level": "iniciante",
+   "why": "Pilates está entre os exercícios com mais efeito para dor lombar crônica (1–2× por semana já ajuda) e melhora equilíbrio e força em idosos. Controle, respiração e coluna neutra.",
+   "cautions": "Osteoporose: os passos de rolar e dobrar a coluna são trocados automaticamente. Gestante ou diástase: cabeça no chão e versões mais leves.",
+   "sources": [
+    {
+     "t": "Fernández-Rodríguez et al., 2022 — Pilates e força para dor lombar crônica",
+     "u": "https://pubmed.ncbi.nlm.nih.gov/35722759/"
+    },
+    {
+     "t": "Meta-análise — Pilates de solo em idosos (equilíbrio e força)",
+     "u": "https://pubmed.ncbi.nlm.nih.gov/29283899/"
+    },
+    {
+     "t": "OMS, 2023 — diretriz para dor lombar",
+     "u": "https://www.who.int/publications/i/item/9789240081789"
+    }
+   ],
+   "steps": [
+    {
+     "n": "Respiração e coluna neutra",
+     "t": 90,
+     "how": "Deitado, joelhos dobrados. Puxe o ar expandindo as costelas para os lados; ao soltar, umbigo para dentro."
+    },
+    {
+     "n": "Ponte articulada",
+     "t": 60,
+     "how": "Suba a coluna do chão vértebra por vértebra e desça do mesmo jeito.",
+     "ex": "Butt_Lift_Bridge",
+     "r": "8",
+     "tap": true
+    },
+    {
+     "n": "Cem (The Hundred)",
+     "t": 60,
+     "how": "Pernas em mesa (joelhos a 90°), cabeça no chão se o pescoço cansar; braços batem para cima e para baixo: 5 batidas puxando o ar, 5 soltando.",
+     "r": "50–100 batidas",
+     "tap": true
+    },
+    {
+     "n": "Meio rolamento para trás",
+     "t": 60,
+     "how": "Sentado, joelhos dobrados: role para trás até a metade e volte.",
+     "r": "5–6",
+     "avoid": [
+      "osteoporose",
+      "fratura_vertebra"
+     ],
+     "alt": {
+      "n": "Perdigueiro",
+      "t": 60,
+      "how": "De quatro apoios, braço e perna opostos.",
+      "ex": "Dead_Bug",
+      "r": "8 de cada"
+     },
+     "tap": true
+    },
+    {
+     "n": "Círculos com uma perna",
+     "t": 60,
+     "how": "Deitado, uma perna para cima: círculos pequenos sem mexer o quadril.",
+     "s": true,
+     "r": "5 para cada sentido",
+     "tap": true
+    },
+    {
+     "n": "Alongamento de uma perna",
+     "t": 60,
+     "how": "Cabeça e ombros levemente fora do chão, troque as pernas puxando um joelho de cada vez.",
+     "r": "8 de cada lado",
+     "avoid": [
+      "osteoporose",
+      "fratura_vertebra"
+     ],
+     "alt": {
+      "n": "Marcha deitado",
+      "t": 60,
+      "how": "Cabeça no chão, abdômen firme, tire um pé de cada vez do chão.",
+      "r": "10 de cada"
+     },
+     "tap": true
+    },
+    {
+     "n": "Série lateral de pernas",
+     "t": 60,
+     "how": "Deitado de lado: chute à frente e atrás, levantar e baixar, círculos pequenos.",
+     "s": true,
+     "ex": "IT_Band_and_Glute_Stretch",
+     "r": "8–10 de cada",
+     "tap": true
+    },
+    {
+     "n": "Natação",
+     "t": 30,
+     "how": "De bruços, braço e perna opostos sobem e trocam rápido, pescoço longo.",
+     "ex": "Superman"
+    },
+    {
+     "n": "Cisne preparatório",
+     "t": 45,
+     "how": "De bruços, mãos ao lado do peito, suba só o peito olhando para o chão.",
+     "r": "5",
+     "tap": true
+    },
+    {
+     "n": "Postura da criança",
+     "t": 45,
+     "how": "Descanse.",
+     "ex": "Childs_Pose"
+    }
+   ],
+   "minutes": 12
+  },
+  {
+   "id": "yoga_equilibrio",
+   "title": "Yoga com cadeira: equilíbrio e mobilidade",
+   "cat": "yoga",
+   "icon": "🪑",
+   "goal": [
+    "equilibrio",
+    "articulacoes"
+   ],
+   "when": [
+    "qualquer"
+   ],
+   "level": "todos",
+   "why": "Yoga melhora equilíbrio e mobilidade, principalmente com mais idade. Tudo com uma cadeira ou parede para apoiar.",
+   "cautions": "Sempre com apoio por perto. Levante do chão devagar (tontura quando a pressão cai).",
+   "sources": [
+    {
+     "t": "Youkhana et al., 2016 — yoga, equilíbrio e mobilidade em idosos",
+     "u": "https://pubmed.ncbi.nlm.nih.gov/26707903/"
+    }
+   ],
+   "steps": [
+    {
+     "n": "Montanha com troca de peso",
+     "t": 60,
+     "how": "Em pé, passe o peso de um pé para o outro, depois para frente e para trás."
+    },
+    {
+     "n": "Árvore com apoio",
+     "t": 30,
+     "how": "Mão na cadeira, um pé apoiado na canela ou no tornozelo da outra perna.",
+     "s": true,
+     "ex": "Single_Leg_Balance"
+    },
+    {
+     "n": "Guerreiro II com cadeira",
+     "t": 30,
+     "how": "Pernas afastadas, joelho da frente dobrado sobre o pé, braços abertos.",
+     "s": true
+    },
+    {
+     "n": "Cadeira (meio agachamento)",
+     "t": 45,
+     "how": "Sente para trás como se fosse sentar, segure 10–20 s.",
+     "ex": "Bodyweight_Squat",
+     "r": "3",
+     "tap": true
+    },
+    {
+     "n": "Marcha calcanhar-ponta",
+     "t": 45,
+     "how": "Ande numa linha, calcanhar encostando na ponta do outro pé, perto de uma parede.",
+     "r": "2 × 10 passos",
+     "tap": true
+    },
+    {
+     "n": "Gato-vaca sentado",
+     "t": 45,
+     "how": "Mãos nos joelhos, arredonde e estenda a coluna.",
+     "ex": "Cat_Stretch",
+     "r": "8",
+     "tap": true
+    },
+    {
+     "n": "Torção sentado",
+     "t": 30,
+     "how": "Gire o tronco segurando o encosto da cadeira.",
+     "s": true,
+     "ex": "Chair_Lower_Back_Stretch"
+    },
+    {
+     "n": "Flexão à frente sentado",
+     "t": 45,
+     "how": "Tronco desce entre as pernas, cabeça solta.",
+     "ex": "Chair_Lower_Back_Stretch",
+     "avoid": [
+      "osteoporose",
+      "fratura_vertebra"
+     ],
+     "alt": {
+      "n": "Respiração lenta sentado",
+      "t": 45,
+      "how": "Puxe 4 s, solte 6 s.",
+      "breath": [
+       4,
+       0,
+       6,
+       0
+      ]
+     }
+    },
+    {
+     "n": "Relaxamento",
+     "t": 180,
+     "how": "Sentado ou deitado, respiração lenta.",
+     "breath": [
+      4,
+      0,
+      6,
+      0
+     ]
+    }
+   ],
+   "minutes": 11
+  },
+  {
+   "id": "pausa_escritorio",
+   "title": "Pausa ativa para quem trabalha sentado",
+   "cat": "mobilidade",
+   "icon": "💻",
+   "goal": [
+    "postura",
+    "pescoco"
+   ],
+   "when": [
+    "trabalho",
+    "qualquer"
+   ],
+   "level": "todos",
+   "why": "Pausas curtas dão mais disposição e menos cansaço. Para dor no pescoço, o que funciona é fortalecer (as abertura e rotação com elástico daqui), 2–3× por semana. A cada 60–90 min sentado.",
+   "cautions": "Dor ou formigamento descendo pelo braço: procure avaliação.",
+   "sources": [
+    {
+     "t": "Albulescu et al., 2022 — micropausas no trabalho",
+     "u": "https://pubmed.ncbi.nlm.nih.gov/36044424/"
+    },
+    {
+     "t": "Revisão 2024 — exercício para dor no pescoço em trabalho de escritório",
+     "u": "https://pubmed.ncbi.nlm.nih.gov/38219373/"
+    },
+    {
+     "t": "Warneke et al., 2025 — consenso Delphi sobre alongamento",
+     "u": "https://pubmed.ncbi.nlm.nih.gov/40513717/"
+    }
+   ],
+   "steps": [
+    {
+     "n": "Retração do queixo",
+     "t": 40,
+     "how": "Leve o queixo para trás (papada), segure 3 s.",
+     "r": "10",
+     "tap": true
+    },
+    {
+     "n": "Alongamento lateral do pescoço",
+     "t": 25,
+     "how": "Orelha em direção ao ombro, ombro do outro lado desce.",
+     "s": true,
+     "ex": "Side_Neck_Stretch"
+    },
+    {
+     "n": "Rotação de ombros",
+     "t": 20,
+     "how": "Círculos para trás.",
+     "ex": "Shoulder_Circles",
+     "r": "10",
+     "tap": true
+    },
+    {
+     "n": "Abertura com elástico (ou aperte as escápulas)",
+     "t": 40,
+     "how": "Braços à frente, abra até o peito.",
+     "ex": "Band_Pull_Apart",
+     "r": "2 × 15",
+     "tap": true
+    },
+    {
+     "n": "Rotação externa com elástico",
+     "t": 40,
+     "how": "Cotovelo colado, abra o antebraço.",
+     "ex": "External_Rotation_with_Band",
+     "r": "12",
+     "tap": true
+    },
+    {
+     "n": "Extensão torácica na cadeira",
+     "t": 30,
+     "how": "Mãos atrás da cabeça, incline o peito para trás sobre o encosto.",
+     "ex": "Chair_Upper_Body_Stretch",
+     "r": "8",
+     "tap": true
+    },
+    {
+     "n": "Rotação torácica sentado",
+     "t": 30,
+     "how": "Braços cruzados no peito, gire o tronco.",
+     "s": true,
+     "r": "6",
+     "tap": true
+    },
+    {
+     "n": "Flexor do quadril em pé",
+     "t": 30,
+     "how": "Um pé atrás, aperte o glúteo e leve o quadril à frente.",
+     "s": true,
+     "ex": "Kneeling_Hip_Flexor"
+    },
+    {
+     "n": "Sentar e levantar",
+     "t": 40,
+     "how": "Da cadeira, sem as mãos.",
+     "ex": "Bodyweight_Squat",
+     "r": "10",
+     "tap": true
+    }
+   ],
+   "minutes": 8
+  },
+  {
+   "id": "resp_suspiro",
+   "title": "Suspiro cíclico (5 min)",
+   "cat": "respiracao",
+   "icon": "🌬️",
+   "goal": [
+    "estresse"
+   ],
+   "when": [
+    "qualquer",
+    "noite",
+    "trabalho"
+   ],
+   "level": "todos",
+   "why": "Puxe o ar pelo nariz, complete com mais um pouco e solte bem devagar pela boca. Num estudo comparando técnicas (5 min por dia, 1 mês), foi a que mais melhorou o humor e baixou a frequência respiratória.",
+   "cautions": "Tontura ou formigamento: volte a respirar normal.",
+   "sources": [
+    {
+     "t": "Balban et al., 2023 — suspiro cíclico x respiração quadrada x meditação",
+     "u": "https://doi.org/10.1016/j.xcrm.2022.100895"
+    }
+   ],
+   "steps": [
+    {
+     "n": "Suspiro cíclico",
+     "t": 300,
+     "how": "Puxa pelo nariz (2 s), completa com mais um pouco (1 s), solta longo pela boca (6 s).",
+     "breath": [
+      2,
+      1,
+      6,
+      0
+     ]
+    }
+   ],
+   "minutes": 5
+  },
+  {
+   "id": "resp_ressonante",
+   "title": "Respiração ressonante (10 min)",
+   "cat": "respiracao",
+   "icon": "🫁",
+   "goal": [
+    "estresse",
+    "sono"
+   ],
+   "when": [
+    "qualquer",
+    "noite"
+   ],
+   "level": "todos",
+   "why": "Cerca de 6 respirações por minuto (puxa 4–5 s, solta 5–6 s) é o ritmo em que a frequência cardíaca mais oscila junto com a respiração; aumenta a variabilidade da FC. 5–20 min, 1–2× por dia.",
+   "cautions": "Confortável, sem forçar. Nunca dirigindo ou na água.",
+   "sources": [
+    {
+     "t": "Lehrer & Gevirtz, 2014 — respiração ressonante (~6/min)",
+     "u": "https://doi.org/10.3389/fpsyg.2014.00756"
+    },
+    {
+     "t": "Laborde et al., 2022 — respiração lenta aumenta a variabilidade da FC",
+     "u": "https://doi.org/10.1016/j.neubiorev.2022.104711"
+    }
+   ],
+   "steps": [
+    {
+     "n": "Respiração ressonante",
+     "t": 600,
+     "how": "Pelo nariz, barriga e costelas expandem: puxa 4 s, solta 6 s.",
+     "breath": [
+      4,
+      0,
+      6,
+      0
+     ]
+    }
+   ],
+   "minutes": 10
+  },
+  {
+   "id": "resp_quadrada",
+   "title": "Respiração quadrada (5 min)",
+   "cat": "respiracao",
+   "icon": "⬜",
+   "goal": [
+    "estresse",
+    "foco"
+   ],
+   "when": [
+    "qualquer",
+    "trabalho"
+   ],
+   "level": "todos",
+   "why": "Puxa 4, segura 4, solta 4, segura 4. Ajuda a acalmar e focar (no estudo comparativo, menos que o suspiro cíclico).",
+   "cautions": "Gestante, epilepsia, doença cardíaca ou pânico: prefira o suspiro cíclico (sem prender o ar).",
+   "sources": [
+    {
+     "t": "Balban et al., 2023 — suspiro cíclico x respiração quadrada x meditação",
+     "u": "https://doi.org/10.1016/j.xcrm.2022.100895"
+    }
+   ],
+   "steps": [
+    {
+     "n": "Respiração quadrada",
+     "t": 300,
+     "how": "Puxa 4 s, segura 4 s, solta 4 s, segura 4 s.",
+     "breath": [
+      4,
+      4,
+      4,
+      4
+     ]
+    }
+   ],
+   "minutes": 5
+  }
+ ]
+}
