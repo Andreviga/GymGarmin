@@ -44,6 +44,19 @@ MUSCLE_FIXES = {
 
 # Nomes em português dos exercícios mais comuns de academia no Brasil
 NAMES_PT = {
+    # telas novas (famosos, bem-estar, casa, trocas): sem nome em inglês para quem usa
+    "Air_Bike": "Abdominal bicicleta", "Barbell_Shoulder_Press": "Desenvolvimento com barra", "Bent-Arm_Barbell_Pullover": "Pullover com barra (braço dobrado)",
+    "Butt_Lift_Bridge": "Ponte de glúteo", "Cable_One_Arm_Tricep_Extension": "Tríceps unilateral na polia", "Chair_Lower_Back_Stretch": "Alongamento de lombar na cadeira",
+    "Chair_Upper_Body_Stretch": "Alongamento de peito e costas na cadeira", "Dumbbell_Incline_Row": "Remada com halteres no banco inclinado",
+    "Dumbbell_Lying_Rear_Lateral_Raise": "Crucifixo invertido deitado com halteres", "Glute_Ham_Raise": "Flexão nórdica no banco (glute-ham)",
+    "Groin_and_Back_Stretch": "Alongamento de adutores (borboleta)", "Incline_Cable_Flye": "Crucifixo inclinado na polia", "Kneeling_Hip_Flexor": "Alongamento do flexor do quadril (ajoelhado)",
+    "Leverage_Shoulder_Press": "Desenvolvimento articulado", "Lying_Crossover": "Torção deitada", "Lying_Dumbbell_Tricep_Extension": "Tríceps testa com halteres",
+    "Monster_Walk": "Caminhada lateral com elástico (monster walk)", "Palms-Down_Wrist_Curl_Over_A_Bench": "Rosca de punho invertida no banco",
+    "Rope_Straight-Arm_Pulldown": "Pulldown de braço estendido com corda", "Seated_Bent-Over_Rear_Delt_Raise": "Crucifixo invertido sentado (deltoide posterior)",
+    "Smith_Machine_Incline_Bench_Press": "Supino inclinado no Smith", "Standing_Biceps_Cable_Curl": "Rosca na polia em pé",
+    "Standing_Soleus_And_Achilles_Stretch": "Alongamento de panturrilha (sóleo e tendão de Aquiles)", "Step-up_with_Knee_Raise": "Subida no banco com elevação do joelho",
+    "Straight-Arm_Dumbbell_Pullover": "Pullover com halter (braço estendido)", "Triceps_Pushdown_-_V-Bar_Attachment": "Tríceps pulley (barra V)",
+    "Weighted_Pull_Ups": "Barra fixa com peso", "Wide-Grip_Barbell_Bench_Press": "Supino reto com pegada aberta",
     # treino em casa / hotel (opção "fora da academia")
     "Back_Flyes_-_With_Bands": "Crucifixo invertido com elástico",
     "Band_Assisted_Pull-Up": "Barra fixa com elástico (assistida)",

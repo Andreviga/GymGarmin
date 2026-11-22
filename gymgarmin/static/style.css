@@ -1091,3 +1091,8 @@ body.timer-on { padding-bottom: calc(72px + 70px + env(safe-area-inset-bottom));
 .fam-faces { font-size: 20px; letter-spacing: -4px; flex: none; }
 .hero-start .tc-title { font-size: 26px; }
 .text-link { display: block; text-align: center; margin-top: 4px; padding: 10px 0; min-height: 40px; color: var(--brand); text-decoration: underline; text-underline-offset: 3px; }
+/* check-in: os 5 rostos sempre numa linha, mesmo em tela estreita (rótulo encolhe, rostos não quebram) */
+.wrow { flex-wrap: nowrap; align-items: center; }
+.wrow > .small { flex: 1 1 auto; min-width: 0; }
+.wrow > span:last-child { display: flex; flex: none; gap: 2px; }
+@media (max-width: 380px) { .wrow .wbtn { width: 38px; min-width: 38px; padding: 0; font-size: 20px; } }
