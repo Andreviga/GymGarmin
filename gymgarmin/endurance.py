@@ -396,8 +396,14 @@ def _run(kind, km, c, anchors, env, level, week_idx, phase):
     rw = run_walk(c, level, week_idx)
     if rw and kind in ("leve", "longo", "regenerativo"):
         run_min, walk_min = rw
-        total_min = km * 1000 / sp.speed_mps(S, 2, anchors, env) / 60 * 1.15   # caminhando, o mesmo tempo cobre menos chão
-        n = max(3, min(20, round(total_min / (run_min + walk_min))))
+        # o número de blocos sai da distância da sessão: correndo (zona 2) + caminhando (zona 1) + 5 min caminhando no começo
+        v2, v1 = sp.speed_mps(S, 2, anchors, env), sp.speed_mps(S, 1, anchors, env)
+        warm_m = 5 * 60 * v1
+        work_m = max(0.0, km * 1000 - warm_m)
+        n = max(2, min(20, round(work_m / (run_min * 60 * v2 + walk_min * 60 * v1))))
+        if n * (run_min * 60 * v2 + walk_min * 60 * v1) > work_m * 1.2:
+            # sessão curta para o bloco da semana: blocos menores, no mesmo esquema (não passa da distância do dia)
+            run_min = max(1.0, math.floor((work_m / n - walk_min * 60 * v1) / (60 * v2)))
         return f"Corre-caminha {n} × ({run_min:g} min correndo + {walk_min:g} min caminhando)", [
             _rest(5 * 60, kind="warmup", zone=1, sport=S, anchors=anchors, env=env, note="5 min caminhando rápido"),
             _repeat(n, [_steady(S, "interval", 2, anchors, env, dur_s=run_min * 60, note="leve: dá para conversar"),
