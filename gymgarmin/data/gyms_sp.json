@@ -2,43 +2,185 @@
   "updated": "2026-11",
   "note": "Nenhuma academia publica a lista de aparelhos de cada unidade. As marcas abaixo vêm de matérias e páginas oficiais; o resto é o perfil provável do tipo de academia. O app aprende com o 'não tem aqui' / 'tem aqui' de cada pessoa.",
   "kits": {
-    "musculacao": {"label": "Musculação de alto nível", "level": 3, "gym_type": "premium",
-      "desc": "Muita variedade de máquinas articuladas e de anilha (vários leg press, hack, pêndulo, máquinas de glúteo). Quase tudo do catálogo costuma existir."},
-    "boutique": {"label": "Boutique de luxo", "level": 2, "gym_type": "premium",
+    "musculacao": {
+      "label": "Musculação de alto nível",
+      "level": 3,
+      "gym_type": "premium",
+      "desc": "Muita variedade de máquinas articuladas e de anilha (vários leg press, hack, pêndulo, máquinas de glúteo). Quase tudo do catálogo costuma existir."
+    },
+    "boutique": {
+      "label": "Boutique de luxo",
+      "level": 2,
+      "gym_type": "premium",
       "desc": "Espaço menor e aparelhos de linha (Technogym): máquinas de placa e algumas de anilha. Aparelhos raros de musculação (pêndulo, belt squat, V-squat, banco nórdico) costumam não ter.",
-      "exclude": ["Pendulum_Squat", "Reverse_Hack_Squat", "LeverLegPress_Machine", "LandmineStation"]},
-    "rede_premium": {"label": "Rede premium", "level": 2, "gym_type": "premium",
-      "desc": "Unidades grandes com máquinas de placa, polias, peso livre e algumas articuladas de anilha. Os aparelhos mais raros variam por unidade."},
-    "completa": {"label": "Rede grande / completa", "level": 2, "gym_type": "completa",
-      "desc": "Máquinas, polias, barras e halteres. Articuladas modernas e raras: pouco comuns."},
-    "basica": {"label": "Básica / de bairro / do prédio", "level": 1, "gym_type": "basica",
-      "desc": "O essencial: halteres, barras, algumas máquinas e polia."}
+      "exclude": [
+        "Pendulum_Squat",
+        "Reverse_Hack_Squat",
+        "LeverLegPress_Machine",
+        "LandmineStation"
+      ]
+    },
+    "rede_premium": {
+      "label": "Rede premium",
+      "level": 2,
+      "gym_type": "premium",
+      "desc": "Unidades grandes com máquinas de placa, polias, peso livre e algumas articuladas de anilha. Os aparelhos mais raros variam por unidade."
+    },
+    "completa": {
+      "label": "Rede grande / completa",
+      "level": 2,
+      "gym_type": "completa",
+      "desc": "Máquinas, polias, barras e halteres. Articuladas modernas e raras: pouco comuns."
+    },
+    "basica": {
+      "label": "Básica / de bairro / do prédio",
+      "level": 1,
+      "gym_type": "basica",
+      "desc": "O essencial: halteres, barras, algumas máquinas e polia."
+    }
   },
   "gyms": [
-    {"id": "ironberg", "name": "Ironberg", "kit": "musculacao", "where": "Barra Funda (SP), Alphaville (Barueri), São Caetano",
+    {
+      "id": "ironberg",
+      "name": "Ironberg",
+      "kit": "musculacao",
+      "where": "Barra Funda (SP), Alphaville (Barueri), São Caetano",
       "brands": "Hammer Strength, Cybex e Life Fitness (unidade de Florianópolis); rede com 18 leg press de marcas diferentes e ~20 variações para glúteo",
-      "sources": ["https://lifefitness.com/en-us/success-stories/health-clubs/ironberg", "https://www.metropoles.com/conteudo-especial/ironberg-em-brasilia", "https://wellhub.com/pt-br/search/partners/ironberg-barra-funda-parque-industrial-tomas-edson/"]},
-    {"id": "les_cinq", "name": "Les Cinq Gym", "kit": "boutique", "where": "Jardins", "brands": "Technogym (academia 'full connected')",
-      "sources": ["https://lescinqgym.com.br/", "https://www.gazetasp.com.br/estilo-de-vida/conheca-5-academias-para-treinar-em-sao-paulo/"]},
-    {"id": "six", "name": "SIX Sport Life / SIX Wowness Club", "kit": "boutique", "where": "Jardim Paulistano, Vila Nova Conceição",
-      "brands": "Parceria com a Technogym", "sources": ["https://www.infomoney.com.br/business/six-sport-life-academia-de-luxo-all-inclusive-tem-mensalidade-de-r-35-mil/", "https://consumidormoderno.com.br/six-sport-life-academia-seis-estrelas-brasil/"]},
-    {"id": "reebok_club", "name": "Reebok Sports Club", "kit": "rede_premium", "where": "Vila Olímpia, Shopping Cidade Jardim",
-      "brands": "Mais de 70 dos ~90 aparelhos são Technogym (site do clube)", "sources": ["https://reebokclub.com.br/"]},
-    {"id": "bodytech", "name": "Bodytech", "kit": "rede_premium", "where": "Várias unidades (vitrine: Iguatemi)",
-      "brands": "Marca dos aparelhos não divulgada; varia por unidade", "sources": ["https://www.seudinheiro.com/2026/lifestyle/quanto-custa-treinar-nas-academias-mais-caras-do-brasil-em-2026-e-o-que-elas-oferecem-sama/"]},
-    {"id": "bio_ritmo", "name": "Bio Ritmo", "kit": "rede_premium", "where": "Várias unidades (grupo Smart Fit)",
-      "brands": "Marca não confirmada (as fontes divergem)", "sources": ["https://www.gazetasp.com.br/economia/luxo-e-personal-exclusivo-5-academias-top-para-treinar-em-sao-paulo/"]},
-    {"id": "cia_athletica", "name": "Cia Athletica", "kit": "rede_premium", "where": "Morumbi e outras unidades",
-      "brands": "Marca dos aparelhos não divulgada", "sources": ["https://www.gazetasp.com.br/economia/luxo-e-personal-exclusivo-5-academias-top-para-treinar-em-sao-paulo/"]},
-    {"id": "smart_fit", "name": "Smart Fit", "kit": "completa", "where": "Várias unidades",
-      "brands": "Movement (linha Next Selectorized, desenvolvida com a rede)", "sources": ["https://www.movement.com.br/wp-content/uploads/2025/03/Apresentacao-Next-Selectorized-compactado_1.pdf"]},
-    {"id": "bluefit", "name": "Bluefit", "kit": "completa", "where": "Várias unidades", "brands": "Life Fitness em parte das unidades (ex.: Santana, 2021)", "sources": []}
+      "sources": [
+        "https://lifefitness.com/en-us/success-stories/health-clubs/ironberg",
+        "https://www.metropoles.com/conteudo-especial/ironberg-em-brasilia",
+        "https://wellhub.com/pt-br/search/partners/ironberg-barra-funda-parque-industrial-tomas-edson/"
+      ]
+    },
+    {
+      "id": "nation_ct",
+      "name": "Nation CT",
+      "kit": "musculacao",
+      "where": "Av. Paulista (1ª unidade anunciada; grupo Smart Fit + Renato Cariani)",
+      "brands": "Foco em musculação de alto rendimento; aparelhos todos importados, anunciados como exclusivos no país",
+      "sources": [
+        "https://braziljournal.com/smartfit-quer-os-bodybuilders-nation-tera-mensalidade-de-ate-r-400/",
+        "https://www.seudinheiro.com/2023/empresas/smart-fit-smft3-deve-ter-retorno-bombado-com-a-marca-nation-focada-no-nicho-de-bodybuilding-diz-xp-btg-pactual-eleva-preco-alvo-das-acoes-dfon/"
+      ]
+    },
+    {
+      "id": "ct_rc",
+      "name": "CT RC (Centro de Treinamento Renato Cariani)",
+      "kit": "musculacao",
+      "where": "São Bernardo do Campo (24 h) e outras cidades",
+      "brands": "Rede de musculação de alto nível lançada em 2026; marca dos aparelhos não divulgada",
+      "sources": [
+        "https://www.mktesportivo.com/2026/01/renato-cariani-lanca-rede-propria-de-academias-e-anuncia-primeiras-unidades-da-ctrc/",
+        "https://abcdoabc.com.br/renato-cariani-academia-24h-sao-bernardo/"
+      ]
+    },
+    {
+      "id": "les_cinq",
+      "name": "Les Cinq Gym",
+      "kit": "boutique",
+      "where": "Jardins",
+      "brands": "Technogym (academia 'full connected')",
+      "sources": [
+        "https://lescinqgym.com.br/",
+        "https://www.gazetasp.com.br/estilo-de-vida/conheca-5-academias-para-treinar-em-sao-paulo/"
+      ]
+    },
+    {
+      "id": "six",
+      "name": "SIX Sport Life / SIX Wowness Club",
+      "kit": "boutique",
+      "where": "Jardim Paulistano, Vila Nova Conceição",
+      "brands": "Parceria com a Technogym",
+      "sources": [
+        "https://www.infomoney.com.br/business/six-sport-life-academia-de-luxo-all-inclusive-tem-mensalidade-de-r-35-mil/",
+        "https://consumidormoderno.com.br/six-sport-life-academia-seis-estrelas-brasil/"
+      ]
+    },
+    {
+      "id": "reebok_club",
+      "name": "Reebok Sports Club",
+      "kit": "rede_premium",
+      "where": "Vila Olímpia, Shopping Cidade Jardim",
+      "brands": "Mais de 70 dos ~90 aparelhos são Technogym (site do clube)",
+      "sources": [
+        "https://reebokclub.com.br/"
+      ]
+    },
+    {
+      "id": "bodytech",
+      "name": "Bodytech",
+      "kit": "rede_premium",
+      "where": "Várias unidades (vitrine: Iguatemi)",
+      "brands": "Marca dos aparelhos não divulgada; varia por unidade",
+      "sources": [
+        "https://www.seudinheiro.com/2026/lifestyle/quanto-custa-treinar-nas-academias-mais-caras-do-brasil-em-2026-e-o-que-elas-oferecem-sama/"
+      ]
+    },
+    {
+      "id": "bio_ritmo",
+      "name": "Bio Ritmo",
+      "kit": "rede_premium",
+      "where": "Paulista (Conjunto Nacional), Shopping Ibirapuera e outras (grupo Smart Fit)",
+      "brands": "Marca alta do grupo Smart Fit, com aparelhos 'de maior qualidade e tecnologia'; fabricante não divulgado",
+      "sources": [
+        "https://maquinadoesporte.com.br/mercado/bio-ritmo-cria-experiencias-para-alem-das-catracas-em-busca-de-avanco-no-mercado-premium/",
+        "https://forbes.com.br/forbes-life/2025/12/brandvoice-bio-ritmo-nova-era-do-bem-estar/"
+      ]
+    },
+    {
+      "id": "cia_athletica",
+      "name": "Cia Athletica",
+      "kit": "rede_premium",
+      "where": "Morumbi e outras unidades",
+      "brands": "Marca dos aparelhos não divulgada",
+      "sources": [
+        "https://www.gazetasp.com.br/economia/luxo-e-personal-exclusivo-5-academias-top-para-treinar-em-sao-paulo/"
+      ]
+    },
+    {
+      "id": "smart_fit",
+      "name": "Smart Fit",
+      "kit": "completa",
+      "where": "Várias unidades",
+      "brands": "Movement (linha Next Selectorized, desenvolvida com a rede)",
+      "sources": [
+        "https://www.movement.com.br/wp-content/uploads/2025/03/Apresentacao-Next-Selectorized-compactado_1.pdf"
+      ]
+    },
+    {
+      "id": "bluefit",
+      "name": "Bluefit",
+      "kit": "completa",
+      "where": "Várias unidades",
+      "brands": "Life Fitness em parte das unidades (ex.: Santana, 2021)",
+      "sources": []
+    }
   ],
   "generic": [
-    {"id": "outra_musculacao", "name": "Outra academia de musculação de alto nível", "kit": "musculacao"},
-    {"id": "outra_boutique", "name": "Outra academia de luxo / boutique", "kit": "boutique"},
-    {"id": "outra_premium", "name": "Outra academia premium", "kit": "rede_premium"},
-    {"id": "outra_completa", "name": "Outra academia completa", "kit": "completa"},
-    {"id": "outra_basica", "name": "Academia básica / de bairro / do prédio", "kit": "basica"}
+    {
+      "id": "outra_musculacao",
+      "name": "Outra academia de musculação de alto nível",
+      "kit": "musculacao"
+    },
+    {
+      "id": "outra_boutique",
+      "name": "Outra academia de luxo / boutique",
+      "kit": "boutique"
+    },
+    {
+      "id": "outra_premium",
+      "name": "Outra academia premium",
+      "kit": "rede_premium"
+    },
+    {
+      "id": "outra_completa",
+      "name": "Outra academia completa",
+      "kit": "completa"
+    },
+    {
+      "id": "outra_basica",
+      "name": "Academia básica / de bairro / do prédio",
+      "kit": "basica"
+    }
   ]
 }
