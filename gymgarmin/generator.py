@@ -114,18 +114,67 @@ PATTERNS = {
     "core": ["Cable_Crunch", "Plank", "Dead_Bug", "Pallof_Press", "Hanging_Leg_Raise", "Ab_Crunch_Machine", "Reverse_Crunch", "Side_Bridge"],
 }
 
-# aparelhos pesquisados (data/machines.json): entram no rodízio de cada padrão; os raros ficam só para escolha manual
+# aparelhos pesquisados (data/machines.json): entram no rodízio de cada padrão; os raros (pêndulo de anilha, V-squat,
+# remada DY, flexora ajoelhada…) só entram em academia premium, onde eles existem
+PREMIUM_EXTRA: dict[str, list[str]] = {}
+MEDIUM_MACHINES: set[str] = set()
+
+
 def _add_researched_machines() -> None:
     import json
     from pathlib import Path
     for m in json.loads((Path(__file__).resolve().parent / "data" / "machines.json").read_text()):
-        if m.get("availability_br") == "rara" or m["pattern"] not in PATTERNS or m.get("rotation") is False:
+        if m["pattern"] not in PATTERNS or m.get("rotation") is False:
             continue  # "rotation": false = aparelho/variação que só entra por escolha da pessoa
+        if m.get("availability_br") == "rara":
+            PREMIUM_EXTRA.setdefault(m["pattern"], []).append(m["id"])
+            continue
+        if m.get("availability_br") == "média":
+            MEDIUM_MACHINES.add(m["id"])
         if m["id"] not in PATTERNS[m["pattern"]]:
             PATTERNS[m["pattern"]].append(m["id"])
 
 
 _add_researched_machines()
+
+# ------------------------------------------------------- tipo de academia ---
+# Academia premium / de elite (Hammer Strength, Panatta, Gym80, Technogym, Prime, Nautilus…): as máquinas articuladas
+# e de came seguem a curva de força do músculo, estabilizam o corpo e deixam levar a série até perto da falha com
+# menos estresse nas articulações e menos fadiga geral. Hipertrofia e força em máquina e em peso livre são parecidas
+# quando o esforço é igual (Haugen et al., 2023); treinar o músculo alongado rende mais (flexora sentada > deitada,
+# Maeo et al., 2021; tríceps acima da cabeça > pulley, Maeo et al., 2023; extensora reclinada, Pedrosa et al., 2022;
+# parciais alongadas, Wolf et al., 2023). Por isso, na premium, cada padrão começa pela versão com apoio e carga no
+# músculo alongado. Para quem tem objetivo de força, o exercício principal continua sendo a barra (é o que se testa).
+GYM_TYPES = {"basica": "Academia básica / de bairro", "completa": "Academia completa (rede grande)",
+             "premium": "Academia premium / de elite"}
+PREMIUM_PREF = {
+    "squat": ["Pendulum_Squat", "VSquat_Machine", "Hack_Squat", "Belt_Squat", "LeverSquat_Machine", "Reverse_Hack_Squat", "Leg_Press"],
+    "hinge": ["Romanian_Deadlift", "BackExtensionMachine", "Hyperextensions_Back_Extensions", "Pull_Through"],
+    "single_leg": ["Single-Leg_Leg_Press", "Split_Squat_with_Dumbbells", "Dumbbell_Rear_Lunge"],
+    "leg_curl": ["Seated_Leg_Curl", "KneelingLegCurl_Machine", "Lying_Leg_Curls", "NordicBench"],
+    "leg_ext": ["ReclinedLegExtension_Machine", "Leg_Extensions", "SissySquatBench"],
+    "glute": ["Hip_Thrust_Machine", "StandingHipThrust_Machine", "Glute_Kickback_Machine", "Barbell_Hip_Thrust", "Thigh_Abductor"],
+    "calf": ["Hack_Machine_Calf_Raise", "Standing_Calf_Raises", "Seated_Calf_Raise", "Calf_Press_On_The_Leg_Press_Machine"],
+    "adductor": ["Thigh_Adductor", "Cable_Hip_Adduction"],
+    "h_push": ["Leverage_Chest_Press", "Machine_Bench_Press", "Dumbbell_Bench_Press", "Barbell_Bench_Press_-_Medium_Grip"],
+    "incline_push": ["Leverage_Incline_Chest_Press", "Incline_Dumbbell_Press", "LandmineStation"],
+    "chest_fly": ["InclineFlyMachine", "Butterfly", "Low_Cable_Crossover", "Cable_Crossover"],
+    "v_push": ["Machine_Shoulder_Military_Press", "VikingPress_Machine", "Seated_Dumbbell_Press", "Dumbbell_Shoulder_Press"],
+    "lateral": ["Machine_Lateral_Raise", "Cable_Y_Raise", "Cable_Seated_Lateral_Raise", "Side_Lateral_Raise"],
+    "rear_delt": ["Reverse_Machine_Flyes", "Cable_Rear_Delt_Fly", "Face_Pull"],
+    "v_pull": ["Machine_Lat_Pulldown", "Machine_Pullover", "Wide-Grip_Lat_Pulldown", "Close-Grip_Front_Lat_Pulldown", "Pullups"],
+    "h_pull": ["DyRow_Machine", "SealRowBench", "Leverage_Low_Row", "Leverage_Iso_Row", "Leverage_High_Row", "Seated_Cable_Rows"],
+    "traps": ["Dumbbell_Shrug", "Barbell_Shrug"],
+    "biceps": ["Bayesian_Cable_Curl", "Machine_Preacher_Curls", "Incline_Dumbbell_Curl", "Preacher_Curl", "Cable_Hammer_Curls_-_Rope_Attachment"],
+    "triceps": ["OverheadTricepsMachine", "Cable_Rope_Overhead_Triceps_Extension", "Cable_Cross-Body_Triceps_Extension", "Machine_Triceps_Extension", "Triceps_Pushdown_-_Rope_Attachment"],
+    "core": ["Ab_Crunch_Machine", "AbCoaster_Machine", "Cable_Crunch", "Pallof_Press", "RotaryTorso_Machine", "Dead_Bug"],
+}
+
+
+def gym_type(p: dict) -> str:
+    g = (p or {}).get("gym_type")
+    return g if g in GYM_TYPES else "completa"
+
 
 DAY_TEMPLATES = {
     "FB_A": ("Full body A", [("squat", "main"), ("h_push", "main"), ("h_pull", "main"), ("hinge", "sec"), ("lateral", "acc"), ("biceps", "acc"), ("core", "acc")]),
@@ -263,14 +312,19 @@ def _ok(ex_id: str, lims: list[dict], equipment: set[str] | None) -> str | None:
 class _Picker:
     """Escolhe exercícios por padrão respeitando limitações, equipamento, nível e variedade."""
 
-    def __init__(self, tier: dict, lims: list[dict], equipment: set[str] | None, seed: int):
+    def __init__(self, tier: dict, lims: list[dict], equipment: set[str] | None, seed: int, gym: str = "completa"):
         self.tier, self.lims, self.equipment, self.seed = tier, lims, equipment, seed
+        self.gym = gym if gym in GYM_TYPES else "completa"
         self.used_week: dict[str, list[str]] = defaultdict(list)
         self.strength_focus = False
 
     def candidates(self, pattern: str) -> list[tuple[str, str]]:
         out = []
-        pool = PATTERNS[pattern]
+        pool = list(PATTERNS[pattern])
+        if self.gym == "premium":
+            pool += [e for e in PREMIUM_EXTRA.get(pattern, []) if e not in pool]
+        elif self.gym == "basica":
+            pool = [e for e in pool if e not in MEDIUM_MACHINES] or pool   # pêndulo, articulados: costumam não ter
         if self.strength_focus and pattern == "hinge":
             pool = ["Barbell_Deadlift"] + [e for e in pool if e != "Barbell_Deadlift"]
         for eid in pool:
@@ -287,12 +341,25 @@ class _Picker:
         out.sort(key=lambda c: c[1] != "ok")
         return out
 
+    def _premium_order(self, cands: list[tuple[str, str]], pattern: str, role: str) -> list[tuple[str, str]]:
+        """Academia premium: primeiro as máquinas modernas do padrão (com apoio, curva de força, músculo alongado).
+        Exceção: objetivo força, exercício principal → a barra continua na frente."""
+        if self.gym != "premium" or (self.strength_focus and role == "main"):
+            return cands
+        pref = PREMIUM_PREF.get(pattern) or []
+        rank = {e: i for i, e in enumerate(pref)}
+        return sorted(cands, key=lambda c: (c[1] != "ok", rank.get(c[0], len(pref))))
+
     def pick(self, pattern: str, role: str, used_day: set[str], variant: int) -> tuple[str, str] | None:
-        cands = [c for c in self.candidates(pattern) if c[0] not in used_day]
+        cands = self._premium_order([c for c in self.candidates(pattern) if c[0] not in used_day], pattern, role)
         if not cands:
             return None
         fresh = [c for c in cands if c[0] not in self.used_week[pattern]]
         pool = fresh or cands
+        if self.gym == "premium" and not (self.strength_focus and role == "main") and pattern in PREMIUM_PREF:
+            # varia só entre as duas melhores opções modernas do movimento; no terra romeno e na flexora, a melhor sempre
+            # (alongamento do posterior sob carga: nenhuma máquina substitui o RDL, e a flexora sentada rende mais)
+            pool = cands[:1] if pattern in ("hinge", "leg_curl") else pool[:2]
         if role == "main":
             idx = (self.seed) % min(2, len(pool))
         else:
@@ -311,7 +378,7 @@ def rotate_accessories(items: list[dict], cycle: int, profile: dict, tier_key: s
     tier = TIERS.get(tier_key or "intermediario") or TIERS["intermediario"]
     lims = profile.get("limitations") or []
     equipment = set(profile.get("equipment") or []) or None
-    picker = _Picker(tier, lims, equipment, 0)
+    picker = _Picker(tier, lims, equipment, 0, gym_type(profile))
     out = copy.deepcopy(items)
     used = {it.get("exercise_id") for it in out}
     for it in out:
@@ -695,8 +762,14 @@ def generate(profile: dict, seed: int = 0, recent: dict | None = None, today=Non
         rationale.append(f"Nível {tier['label']} rende melhor com até {tier['max_strength_days']} dias de força; "
                          "os outros dias viram cardio/recuperação ativa.")
 
-    picker = _Picker(tier, lims, equipment, seed)
+    gym = gym_type(p)
+    picker = _Picker(tier, lims, equipment, seed, gym)
     picker.strength_focus = goal_key == "forca" and tier_key != "iniciante"
+    if gym == "premium" and not equipment:
+        rationale.append("Academia premium: cada movimento começa pelas máquinas articuladas e de came (pêndulo, V-squat, "
+                         "remada DY, extensora reclinada, flexora sentada, tríceps acima da cabeça), que seguem a curva de força, "
+                         "protegem as articulações e carregam o músculo alongado"
+                         + ("; o principal de cada dia continua na barra, porque o seu objetivo é força." if picker.strength_focus else "."))
     reps = goal["reps"] or tier["reps"]
     rest_mult = goal["rest"] * training_rules.REST_PREF.get(p.get("rest_pref") or "padrao", 1.0)
     if tier_key == "iniciante" and goal["reps"]:

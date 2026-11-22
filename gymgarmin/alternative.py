@@ -103,7 +103,7 @@ HOME: dict[str, list[tuple[str, set[str], str | None]]] = {
               ("Glute_Kickback", set(), None)],
     "calf": [("Standing_Dumbbell_Calf_Raise", {"halteres"}, "num degrau, amplitude toda"),
              ("Calf_Raises_-_With_Bands", {"elastico"}, None),
-             ("Standing_Dumbbell_Calf_Raise", set(), "sem halter: num degrau, uma perna por vez, até perto do limite")],
+             ("Single_Leg_Calf_Raise_Step", set(), "num degrau, uma perna por vez, até perto do limite")],
     "adductor": [("Band_Hip_Adductions", {"elastico"}, None)],
     "h_push": [("Dumbbell_Bench_Press", {"halteres", "banco"}, None),
                ("Dumbbell_Floor_Press", {"halteres"}, "deitado no chão, cotovelo encosta e sobe"),
@@ -258,6 +258,7 @@ class Ctx:
         if self.tier_key == "iniciante" and self.goal["reps"]:
             self.reps = {k: (v if G._reps_bounds(v)[0] >= 8 else "8-12") for k, v in self.reps.items()}
         self.equipment = set(p.get("equipment") or []) or None
+        self.gym = G.gym_type(p)
         self.budget = float(budget or p.get("session_minutes") or 60)
         self.sessions = sessions or []
         self.recovery = recovery or {}
@@ -296,6 +297,8 @@ def _status(eid: str, lims: list[dict]) -> str | None:
 
 def _allowed_rare(eid: str, ctx: Ctx) -> bool:
     ex = catalog.get(eid) or {}
+    if ctx.gym == "premium" and ex.get("rotation") is not False:
+        return True
     return not (ex.get("rotation") is False or ex.get("availability_br") == "rara") or eid in ctx.my_ids
 
 
@@ -305,6 +308,10 @@ def candidates(pattern: str, ctx: Ctx, *, lims: list[dict] | None = None, avoid:
     lims = ctx.lims if lims is None else lims
     avoid = avoid or set()
     pool = list(G.PATTERNS.get(pattern, []))
+    if ctx.gym == "premium" and ctx.kit is None:
+        pool += [e for e in G.PREMIUM_EXTRA.get(pattern, []) if e not in pool]
+    elif ctx.gym == "basica":
+        pool = [e for e in pool if e not in G.MEDIUM_MACHINES] or pool
     pool += [m for m in ctx.my_ids if pattern_of(m) == pattern and m not in pool]
     out = []
     for eid in pool:
@@ -324,12 +331,13 @@ def candidates(pattern: str, ctx: Ctx, *, lims: list[dict] | None = None, avoid:
         if st:
             out.append((eid, st))
     base = {e: i for i, (e, _) in enumerate(out)}
+    prem = {e: i for i, e in enumerate(G.PREMIUM_PREF.get(pattern, []))} if ctx.gym == "premium" and ctx.kit is None else {}
 
     def key(c):
         eid, st = c
         ex = catalog.get(eid)
         extra = rank(ex) if rank else 0
-        return (st != "ok", extra, eid not in ctx.my_ids, eid not in ctx.history_ids, base[eid])
+        return (st != "ok", extra, eid not in ctx.my_ids, prem.get(eid, len(prem)), eid not in ctx.history_ids, base[eid])
     out.sort(key=key)
     return out
 
@@ -458,6 +466,10 @@ def _r_ocupado(main, ctx, opts):
 
     out, changes = _swap_all(main, ctx, lambda it, to: f"{(catalog.get(to) or {}).get('equipment_pt') or 'livre'}: não depende de rack nem de máquina",
                              keep=keep, eq_ok=eq_ok, rank=rank)
+    for it in out:
+        if is_strength(it) and (catalog.get(it["exercise_id"]) or {}).get("equipment") in ("barbell", "e-z curl bar"):
+            changes.append({"type": "ajuste", "from": it["exercise_id"], "to": it["exercise_id"],
+                            "why": "fica: não há outra opção que respeite suas limitações; faça quando a barra liberar"})
     # mesma estação seguida: acessórios de polia juntos, de halteres juntos (menos troca de lugar)
     head = [i for i in out if i.get("role") != "acc"]
     acc = sorted([i for i in out if i.get("role") == "acc"], key=lambda i: rank(catalog.get(i["exercise_id"]) or {}))
@@ -509,6 +521,15 @@ def _r_cansado(main, ctx, opts):
         it["rpe_target"] = min(float(it.get("rpe_target") or 8), 7)
         if it.get("notes"):
             it["notes"] = re.sub(r"\s*·?\s*(última série: drop set[^·]*|top set:[^·]*)", "", it["notes"]).strip(" ·") or None
+    before = _sets_total(main)
+    while _sets_total(out) > 0.75 * before:
+        accs = [i for i in out if is_strength(i) and i.get("role") == "acc"]
+        if not accs or len([i for i in out if is_strength(i)]) <= 3:
+            break
+        last = accs[-1]
+        out.remove(last)
+        changes = [c for c in changes if c.get("from") != last["exercise_id"]]
+        changes.append({"type": "sai", "from": last["exercise_id"], "to": None, "why": "menos volume hoje (cansaço)"})
     why = ["Cerca de 1/3 menos séries, parando 2–3 repetições antes da falha: o estímulo continua, a fadiga cai bastante.",
            "Exercícios que carregam a coluna em pé trocados por versões com apoio (máquina, polia, banco)."]
     return out, changes, why, None
@@ -576,13 +597,14 @@ def _sore_from(ctx: Ctx, opts: dict) -> set[str]:
 def build_template(key: str, ctx: Ctx, *, avoid_muscles: set[str] | None = None, avoid_ids: set[str] | None = None,
                    variant: int = 0) -> list[dict]:
     """Os exercícios principais de um molde do gerador (Superior A, Pernas, Full body…), pelo nível da pessoa."""
-    picker = G._Picker(ctx.tier, ctx.lims, ctx.equipment, ctx.seed)
+    picker = G._Picker(ctx.tier, ctx.lims, ctx.equipment, ctx.seed, ctx.gym)
     used = set(avoid_ids or set())
     out = []
     for pattern, role in G.DAY_TEMPLATES[key][1]:
         if avoid_muscles and set(G.PATTERN_MUSCLES.get(pattern, [])) & avoid_muscles:
             continue
-        cands = [c for c in candidates(pattern, ctx, avoid=used)]
+        cands = candidates(pattern, ctx, avoid=used, eq_ok=(lambda ex: not (set(ex.get("primaryMuscles") or []) & avoid_muscles))
+                           if avoid_muscles else None)
         ch = _choose(cands, ctx, variant + len(out)) if cands else picker.pick(pattern, role, used, variant)
         if not ch:
             continue
@@ -646,7 +668,7 @@ def _r_dolorido(main, ctx, opts):
         opts_p.sort(key=lambda p: -sum(miss.get(m, 0) for m in G.PATTERN_MUSCLES.get(p, [])))
         placed = False
         for p in opts_p:
-            ch = _choose(candidates(p, ctx, avoid=used), ctx)
+            ch = _choose(candidates(p, ctx, avoid=used, eq_ok=lambda ex: not (set(ex.get("primaryMuscles") or []) & sore)), ctx)
             if ch:
                 used.add(ch[0])
                 out.append(_new_item(it, ch[0], ctx, pattern=p, role="acc" if p not in COMPOUND_PATTERNS else it.get("role")))
@@ -923,6 +945,8 @@ def next_exercises(session_items: list[dict], ctx: Ctx, n: int = 3, extra: bool 
                 continue
             s -= 6
         if region in ("superior", "inferior") and preg not in (region, "neutro"):
+            if len(items) >= 3:
+                continue
             s -= 12
         if p in COMPOUND_PATTERNS:
             n_comp = sum(1 for x in have_p if x in COMPOUND_PATTERNS)

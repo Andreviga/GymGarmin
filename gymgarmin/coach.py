@@ -120,7 +120,8 @@ def adapt_plan(plan: dict, lims: list[dict], profile: dict) -> tuple[dict, list[
     from .generator import TIERS, _Picker, tier_for
 
     tier = TIERS[tier_for(profile.get("training_months") if profile.get("training_months") is not None else 12)]
-    picker = _Picker(tier, lims, set(profile.get("equipment") or []) or None, 0)
+    from .generator import gym_type
+    picker = _Picker(tier, lims, set(profile.get("equipment") or []) or None, 0, gym_type(profile))
     changes = []
     for day in plan.get("days") or []:
         used = {i.get("exercise_id") for i in day.get("items") or []}

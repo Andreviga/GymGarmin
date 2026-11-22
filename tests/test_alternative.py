@@ -176,3 +176,44 @@ def test_api_draft_and_suggest(client):
     assert 1 <= len(r["suggestions"]) <= 2
     for s in r["suggestions"]:
         assert s["why"] and s["item"]["exercise_id"] == s["exercise_id"] and s["item"]["sets"]
+
+
+# ---------------------------------------------------------------- academia premium / de elite
+def _mains_and_all(prof):
+    pl = G.generate(prof)
+    items = [i for d in pl["days"] for i in d["items"] if (i.get("phase") or "principal") == "principal" and i.get("role")]
+    return pl, items
+
+
+def test_premium_gym_prefers_modern_machines_and_explains():
+    base = {**PROF, "available_days": [0, 1, 3, 4]}
+    pl, items = _mains_and_all({**base, "gym_type": "premium"})
+    _, normal = _mains_and_all({**base, "gym_type": "completa"})
+    rare = {e for v in G.PREMIUM_EXTRA.values() for e in v}
+    ids = {i["exercise_id"] for i in items}
+    assert ids & rare and not ({i["exercise_id"] for i in normal} & rare)   # pêndulo, remada DY… só na premium
+    machine = lambda xs: sum(1 for i in xs if catalog.get(i["exercise_id"])["equipment"] in ("machine", "cable"))  # noqa: E731
+    assert machine(items) > machine(normal)
+    assert any("Academia premium" in r for r in pl["rationale"])
+    # terra romeno e flexora sentada continuam (alongamento do posterior)
+    assert "Romanian_Deadlift" in ids and "Seated_Leg_Curl" in ids
+
+
+def test_premium_strength_goal_keeps_barbell_mains():
+    _, items = _mains_and_all({**PROF, "goal": "forca", "gym_type": "premium", "available_days": [0, 1, 3, 4]})
+    mains = [catalog.get(i["exercise_id"])["equipment"] for i in items if i["role"] == "main"]
+    assert mains.count("barbell") >= 2
+
+
+def test_basic_gym_skips_uncommon_machines():
+    _, items = _mains_and_all({**PROF, "gym_type": "basica", "available_days": [0, 1, 3, 4]})
+    assert not ({i["exercise_id"] for i in items} & G.MEDIUM_MACHINES)
+
+
+def test_premium_respects_limitations_and_alternatives_use_premium():
+    prof = {**PROF, "gym_type": "premium", "limitations": [{"key": "ombro", "severity": "evitar"}]}
+    _, items = _mains_and_all(prof)
+    assert all(check_exercise(catalog.get(i["exercise_id"]), prof["limitations"])["status"] != "evitar" for i in items)
+    d = G.generate(prof)["days"][0]
+    o = A.propose(d["items"], "variar", A.Ctx(prof), {}, d["name"])
+    assert all(check_exercise(catalog.get(i["exercise_id"]), prof["limitations"])["status"] != "evitar" for i in o["items"] if A.is_strength(i))

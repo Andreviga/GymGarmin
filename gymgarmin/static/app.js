@@ -1197,7 +1197,8 @@ const WIZ = { step: 0, d: null };
 const WIZ_GOALS = [["hipertrofia", "💪 Ganhar massa muscular", "ficar mais forte e com mais músculo"], ["emagrecimento", "🔥 Emagrecer", "perder gordura mantendo os músculos"],
   ["saude", "❤️ Saúde e disposição", "se mexer bem, dormir melhor, sem exagero"], ["condicionamento", "🫁 Condicionamento", "fôlego e resistência"],
   ["forca", "🏋️ Força", "levantar mais peso"], ["hibrido", "🏃 Musculação + corrida", "os dois juntos, no mesmo plano"]];
-const WIZ_PLACES = [["academia", "🏟️ Academia completa", "máquinas, polias, barras e halteres", []], ["pequena", "🏠 Academia pequena / do prédio", "halteres, barra e algumas máquinas", ["barbell", "dumbbell", "machine", "cable"]],
+const WIZ_PLACES = [["elite", "🏆 Academia premium / de elite", "máquinas articuladas modernas (Hammer Strength, Panatta, Gym80, Technogym…), pêndulo, V-squat", []],
+  ["academia", "🏟️ Academia completa", "máquinas, polias, barras e halteres", []], ["pequena", "🏠 Academia pequena / do prédio", "halteres, barra e algumas máquinas", ["barbell", "dumbbell", "machine", "cable"]],
   ["casa", "🛋️ Em casa com halteres ou elástico", "", ["dumbbell", "bands", "kettlebells"]], ["corpo", "🤸 Só o peso do corpo", "sem equipamento", ["bands"]]];
 async function viewBemVindo() {
   const [p, meta] = await Promise.all([api("/api/profile"), state.meta ? Promise.resolve(state.meta) : api("/api/meta")]);
@@ -1205,7 +1206,7 @@ async function viewBemVindo() {
   const run = (((p.endurance || {}).sports || {}).corrida || {});
   WIZ.d = { name: p.name && p.name !== "Eu" ? p.name : "", sex: p.sex || "", age: p.age ?? "", weight_kg: p.weight_kg ?? "", height_cm: p.height_cm ?? "",
     goal: p.goal || "", training_months: p.training_months ?? "", available_days: p.available_days || [], session_minutes: p.session_minutes || 60,
-    place: (p.equipment || []).length ? (WIZ_PLACES.find((x) => JSON.stringify(x[3]) === JSON.stringify(p.equipment)) || ["academia"])[0] : "academia",
+    place: (p.equipment || []).length ? (WIZ_PLACES.find((x) => JSON.stringify(x[3]) === JSON.stringify(p.equipment)) || ["academia"])[0] : p.gym_type === "premium" ? "elite" : "academia",
     lims: (p.limitations || []).map((l) => l.key).filter((k) => k !== "personalizado"), none: !(p.limitations || []).length,
     run: run.enabled ? (run.sessions || 2) : 0 };
   WIZ.step = 0; renderWiz();
@@ -1279,7 +1280,7 @@ async function wizFinish() {
   end.sports.corrida = { ...(end.sports.corrida || {}), enabled: +d.run > 0, env: (end.sports.corrida || {}).env || "rua", sessions: +d.run || 2 };
   const prof = { name: d.name.trim(), sex: d.sex, age: +d.age, weight_kg: +d.weight_kg, height_cm: d.height_cm ? +d.height_cm : null,
     goal: d.goal, training_months: +d.training_months, available_days: d.available_days, session_minutes: +d.session_minutes,
-    equipment: (WIZ_PLACES.find((x) => x[0] === d.place) || [, , , []])[3], limitations: d.none ? [] : d.lims.map((k) => ({ key: k, severity: "cuidado" })),
+    equipment: (WIZ_PLACES.find((x) => x[0] === d.place) || [, , , []])[3], gym_type: { elite: "premium", academia: "completa" }[d.place] || "basica", limitations: d.none ? [] : d.lims.map((k) => ({ key: k, severity: "cuidado" })),
     endurance: end, same_session: true };
   if (d.goal === "hibrido" && !(+d.run)) prof.endurance.sports.corrida = { ...prof.endurance.sports.corrida, enabled: true, sessions: 2 };
   await api("/api/profile", { method: "PUT", body: { ...p, ...prof } });
@@ -3872,6 +3873,8 @@ async function viewPerfil(openSec) {
     </div>
     <label>Dias que pode treinar</label>
     <div class="chips">${["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"].map((w, i) => `<label class="chip"><input type="checkbox" data-wd="${i}" ${(p.available_days || []).includes(i) ? "checked" : ""}> ${w}</label>`).join("")}</div>
+    <div class="field" style="margin-top:12px"><label for="gym-type">Tipo de academia</label><select id="gym-type" data-p="gym_type">${[["completa", "Completa (rede grande: máquinas, polias, barras)"], ["premium", "Premium / de elite (máquinas articuladas modernas)"], ["basica", "Básica / de bairro / do prédio"]].map(([v, t]) => `<option value="${v}" ${(p.gym_type || "completa") === v ? "selected" : ""}>${t}</option>`).join("")}</select>
+      <p class="small muted" style="margin:4px 0 0">Premium: o treino começa pelas máquinas que seguem a curva de força e protegem as articulações (pêndulo, V-squat, remada DY, extensora reclinada). Ao mudar, gere o treino de novo.</p></div>
     <label style="margin-top:12px">O que tem na sua academia</label>
     <div class="chips">${[["barbell", "Barra"], ["dumbbell", "Halteres"], ["machine", "Máquinas"], ["cable", "Polia/cabo"], ["kettlebells", "Kettlebell"], ["bands", "Elástico"], ["e-z curl bar", "Barra W"]].map(([k, t]) => `<label class="chip"><input type="checkbox" data-eq="${k}" ${!(p.equipment || []).length || p.equipment.includes(k) ? "checked" : ""}> ${t}</label>`).join("")}</div>
     <label style="margin-top:12px">Cardio que você gosta de usar</label>

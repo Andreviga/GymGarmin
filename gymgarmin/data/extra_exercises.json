@@ -155,5 +155,32 @@
    "confidence": "generica"
   },
   "picto": null
+ },
+ {
+  "id": "Single_Leg_Calf_Raise_Step",
+  "name": "Panturrilha unilateral no degrau (peso do corpo)",
+  "name_en": "Single-Leg Calf Raise on Step",
+  "equipment": "body only",
+  "category": "strength",
+  "force": "push",
+  "mechanic": "isolation",
+  "level": "beginner",
+  "primaryMuscles": [
+   "calves"
+  ],
+  "secondaryMuscles": [],
+  "instructions": [
+   "Ponta de um pé na borda de um degrau, a outra perna dobrada; segure numa parede para o equilíbrio.",
+   "Desça o calcanhar o máximo que der (alongando a panturrilha) e pare 1 s embaixo.",
+   "Suba até a ponta do pé e aperte 1 s em cima.",
+   "Faça até 1–2 repetições do limite; fácil demais: segure uma mochila."
+  ],
+  "garmin": {
+   "category": "CALF_RAISE",
+   "exercise": "SINGLE_LEG_STANDING_CALF_RAISE",
+   "garmin_name": "Single Leg Standing Calf Raise",
+   "confidence": "media"
+  },
+  "picto": "calf"
  }
 ]
