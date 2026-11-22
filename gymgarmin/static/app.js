@@ -1312,7 +1312,8 @@ async function wizFinish() {
   end.sports.corrida = { ...(end.sports.corrida || {}), enabled: +d.run > 0, env: (end.sports.corrida || {}).env || "rua", sessions: +d.run || 2 };
   const prof = { name: d.name.trim(), sex: d.sex, age: +d.age, weight_kg: +d.weight_kg, height_cm: d.height_cm ? +d.height_cm : null,
     goal: d.goal, training_months: +d.training_months, available_days: d.available_days, session_minutes: +d.session_minutes,
-    equipment: (WIZ_PLACES.find((x) => x[0] === d.place) || [, , , []])[3], gym_type: { elite: "premium", academia: "completa" }[d.place] || "basica", limitations: d.none ? [] : d.lims.map((k) => ({ key: k, severity: "cuidado" })),
+    equipment: ["casa", "corpo"].includes(d.place) ? [] : (WIZ_PLACES.find((x) => x[0] === d.place) || [, , , []])[3], gym_type: { elite: "premium", academia: "completa" }[d.place] || "basica",
+    ...(["casa", "corpo"].includes(d.place) ? { gym: { id: "casa", name: "Em casa" }, home_kit: d.place === "casa" ? ["halteres", "elastico"] : [] } : {}), limitations: d.none ? [] : d.lims.map((k) => ({ key: k, severity: "cuidado" })),
     endurance: end, same_session: true };
   if (d.goal === "hibrido" && !(+d.run)) prof.endurance.sports.corrida = { ...prof.endurance.sports.corrida, enabled: true, sessions: 2 };
   await api("/api/profile", { method: "PUT", body: { ...p, ...prof } });
@@ -2458,7 +2459,8 @@ function sessionItemHtml(it, i) {
     : it.watch_guess && !it.confirm_guess && it.exercise_id === it.orig_id ? `<div class="rec small wguess">⌚ O relógio só disse “${esc(it.watch_guess)}”; o app chutou este exercício.
       <div class="row gap wrap" style="margin-top:6px"><button class="btn sm" data-gok="${i}">✓ Está certo</button><button class="btn sm ghost" data-swap="${i}">Trocar</button></div></div>` : "";
   return `<div class="card${it.need_pick ? " need-pick" : ""}">${head}${pickBox}
-    <table class="set-table" style="margin-top:8px"><thead><tr><th>#</th><th>${timed ? "Tempo s" : "Reps"}</th><th>kg</th><th>RPE</th><th></th></tr></thead><tbody>
+    ${it.sides ? `<p class="small muted side-hint">Peso <b>total</b>: some os dois lados (2 halteres de 10 kg = 20). O app entende metade de cada lado.</p>` : ""}
+    <table class="set-table" style="margin-top:8px"><thead><tr><th>#</th><th>${timed ? "Tempo s" : "Reps"}</th><th>${it.sides ? "kg total" : "kg"}</th><th>RPE</th><th></th></tr></thead><tbody>
     ${it.sets.map((x, j) => `<tr class="${x.done ? "done" : ""}"><td>${s0.edit_id ? `<button class="set-n" data-setmenu="${i}:${j}" aria-label="Série ${j + 1}: mover, separar ou apagar">${j + 1}<span aria-hidden="true">⋯</span></button>` : j + 1}</td>
       <td><input class="num" inputmode="numeric" data-s="${timed ? "duration_s" : "reps"}" data-i="${i}" data-j="${j}" value="${esc(timed ? x.duration_s ?? "" : x.reps ?? "")}"></td>
       <td><input class="num" inputmode="decimal" data-s="load_kg" data-i="${i}" data-j="${j}" value="${esc(x.load_kg ?? "")}"${x.partner_load != null ? ` placeholder="sua" aria-label="Sua carga (a do parceiro foi ${esc(x.partner_load)} kg)"` : ""}></td>
@@ -2529,7 +2531,11 @@ function bindSession() {
     if (t.dataset.done) {
       const [i, j] = t.dataset.done.split(":").map(Number); const set = s.items[i].sets[j]; set.done = !set.done; save();
       t.classList.toggle("on", set.done); t.closest("tr").classList.toggle("done", set.done);
-      if (set.done) startTimer((s.items[i].plan || {}).rest_s || 90, t);
+      if (set.done) {
+        startTimer((s.items[i].plan || {}).rest_s || 90, t);
+        const msg = calibrate(s.items[i], j);
+        if (msg) { save(); renderSession(); toast(msg, 7000); }
+      }
     }
     if (t.dataset.cdone) { const it = s.items[+t.dataset.cdone]; it.done = !it.done; t.classList.toggle("on", it.done); save(); }
     if (t.dataset.pdone) { const it = s.items[+t.dataset.pdone]; it.done = !it.done; t.classList.toggle("on", it.done); save(); }
@@ -2956,18 +2962,22 @@ const GYM_TYPE_TXT = { premium: "Premium / de elite", completa: "Completa (rede 
 function gymCardHtml(p) {
   const g = p.gym || null;
   return `<span class="gym-ico" aria-hidden="true">🏟️</span><span class="grow"><b>${esc(g ? g.name : GYM_TYPE_TXT[p.gym_type || "completa"])}</b>
-    <span class="small muted">${g ? "toque para trocar" : "escolha a sua: Ironberg, Bodytech, Les Cinq…"}</span></span><span class="chev" aria-hidden="true">›</span>`;
+    <span class="small muted">${g && g.id === "casa" ? `${(p.home_kit || []).length ? (p.home_kit || []).map((k) => (HOME_KITS.find((x) => x[0] === k) || [, k])[1].replace(/^\S+\s/, "").toLowerCase()).join(", ") : "só o peso do corpo"} · toque para trocar`
+      : g ? "toque para trocar" : "escolha a sua: Ironberg, Bodytech, Les Cinq… ou em casa"}</span></span><span class="chev" aria-hidden="true">›</span>`;
 }
 async function openGymPicker(after) {
   const body = openModal(`<h2>Onde você treina?</h2><div class="sk"><span class="sk-line"></span><span class="sk-line"></span></div>`);
   let d; try { d = await api("/api/gyms"); } catch (e) { body.innerHTML = `<p class="pill bad">${esc(e.message)}</p>`; return; }
   const cur = (d.current || {}).id;
-  const real = d.gyms.filter((g) => !g.id.startsWith("outra_")), generic = d.gyms.filter((g) => g.id.startsWith("outra_"));
+  const real = d.gyms.filter((g) => !g.id.startsWith("outra_") && g.id !== "casa"), generic = d.gyms.filter((g) => g.id.startsWith("outra_"));
+  const home = d.gyms.find((g) => g.id === "casa");
   const row = (g) => `<li><button class="gym-row ${g.id === cur ? "on" : ""}" data-gym="${esc(g.id)}"><span class="grow"><b>${esc(g.name)}</b>
       <span class="small muted">${esc(g.kit_label)}${g.where ? ` · ${esc(g.where)}` : ""}</span>${g.brands ? `<span class="small muted">Aparelhos: ${esc(g.brands)}</span>` : ""}</span>${g.id === cur ? `<span class="ok-txt">✓</span>` : ""}</button></li>`;
   const draw = (q) => {
     const f = (g) => !q || (g.name + " " + (g.where || "")).toLowerCase().includes(q.toLowerCase());
-    $("#gy-list", body).innerHTML = `<h3>São Paulo</h3><ul class="list">${real.filter(f).map(row).join("") || `<li class="small muted">Nenhuma com esse nome: escolha o tipo abaixo.</li>`}</ul>
+    $("#gy-list", body).innerHTML = `${home ? `<ul class="list"><li><button class="gym-row ${cur === "casa" ? "on" : ""}" data-gym="casa"><span class="grow"><b>🏠 Treino em casa</b>
+      <span class="small muted">com halteres, elástico, barra fixa… ou só o peso do corpo</span></span>${cur === "casa" ? `<span class="ok-txt">✓</span>` : ""}</button></li></ul>` : ""}
+      <h3>São Paulo</h3><ul class="list">${real.filter(f).map(row).join("") || `<li class="small muted">Nenhuma com esse nome: escolha o tipo abaixo.</li>`}</ul>
       <h3 style="margin-top:12px">Outra academia</h3><ul class="list">${generic.map(row).join("")}</ul>`;
   };
   body.innerHTML = `<h2>Onde você treina?</h2>
@@ -2979,6 +2989,7 @@ async function openGymPicker(after) {
   $("#gy-q", body).oninput = (e) => draw(e.target.value.trim());
   body.onclick = async (e) => {
     const b = e.target.closest("[data-gym]"); if (!b) return;
+    if (b.dataset.gym === "casa") return openHomeKit(after);
     b.disabled = true;
     let prof; try { prof = await api("/api/gym", { method: "PUT", body: { id: b.dataset.gym } }); } catch (err) { b.disabled = false; return toast(err.message, 5000); }
     state.profile = prof; if (after) after(prof);
@@ -2986,6 +2997,33 @@ async function openGymPicker(after) {
     body.innerHTML = `<h2>${esc(g.name)} ✓</h2><p><b>${esc(k.label)}.</b> ${esc(k.desc)}</p>
       <p class="small muted">Para o treino passar a usar os aparelhos dela, gere de novo — você vê a prévia antes de trocar.</p>
       <button class="btn block" id="gy-regen">🔄 Gerar meu treino para esta academia</button><button class="act" id="gy-close" style="margin-top:8px">Fechar</button>`;
+    body.onclick = (ev) => { if (ev.target.id === "gy-regen") { closeModal(); openGenerator(); } if (ev.target.id === "gy-close") closeModal(); };
+  };
+}
+
+// treino em casa: o que a pessoa tem decide cada exercício
+const HOME_KITS = [["halteres", "🏋️ Halteres"], ["elastico", "➰ Elásticos"], ["kettlebell", "🔔 Kettlebell"], ["barra", "🪜 Barra fixa"],
+  ["banco", "🪑 Banco ou cadeira firme"], ["corda", "🪢 Corda de pular"]];
+function openHomeKit(after) {
+  const cur = new Set((state.profile && state.profile.gym && state.profile.gym.id === "casa" && state.profile.home_kit) || ["halteres", "elastico"]);
+  const body = openModal("");
+  const draw = () => {
+    body.innerHTML = `<h2>🏠 Treino em casa</h2><p class="small muted">O que você tem aí? Cada exercício vira o mais parecido que dá para fazer com isso. Sem nada também dá: só o peso do corpo.</p>
+      <div class="chips">${HOME_KITS.map(([k, t]) => `<button type="button" class="chip pc big ${cur.has(k) ? "on" : ""}" data-hk="${k}" aria-pressed="${cur.has(k)}">${t}</button>`).join("")}</div>
+      <p class="small muted" style="margin-top:10px">${cur.size ? "" : "Nada marcado: treino só com o peso do corpo (agachamento, flexão, remada sob a mesa, ponte, prancha)."}
+        Com carga leve, as séries vão até 1–2 repetições do limite: o estímulo para ganhar músculo fica parecido com o da academia.</p>
+      <button class="btn block" id="hk-save" style="margin-top:12px">Salvar: treino em casa</button>`;
+  };
+  draw();
+  body.onclick = async (e) => {
+    const c = e.target.closest("[data-hk]");
+    if (c) { const k = c.dataset.hk; if (cur.has(k)) cur.delete(k); else cur.add(k); return draw(); }
+    if (e.target.id !== "hk-save") return;
+    e.target.disabled = true;
+    let prof; try { prof = await api("/api/gym", { method: "PUT", body: { id: "casa", home_kit: [...cur] } }); } catch (err) { e.target.disabled = false; return toast(err.message, 5000); }
+    state.profile = prof; if (after) after(prof);
+    body.innerHTML = `<h2>🏠 Em casa ✓</h2><p>Para o treino passar a ser de casa, gere de novo — você vê a prévia antes de trocar.</p>
+      <button class="btn block" id="gy-regen">🔄 Gerar meu treino de casa</button><button class="act" id="gy-close" style="margin-top:8px">Fechar</button>`;
     body.onclick = (ev) => { if (ev.target.id === "gy-regen") { closeModal(); openGenerator(); } if (ev.target.id === "gy-close") closeModal(); };
   };
 }
@@ -3096,6 +3134,44 @@ function fxCur(it, s) {
   return { w: false, k, x: it.sets[k] };
 }
 const WARM_REST = 45, WARM_LAST_REST = 75;
+// exercício de dois lados (halteres, máquina iso-lateral, unilateral): anota o total, metade de cada lado
+function sideTxt(total) {
+  const t = +total;
+  if (!t) return "Peso <b>total</b>: some os dois lados. O app entende metade de cada lado.";
+  const h = Math.round((t / 2) * 100) / 100;
+  return `= <b>2 × ${String(h).replace(".", ",")} kg</b> (um de cada lado) · anote sempre o total`;
+}
+// salto de carga que existe no aparelho (halter: 1 kg por lado até 10, depois 2; barra 2,5; placa 5)
+function loadStep(it, load) {
+  if (it.sides) { const side = (+load || 0) / 2; const eq = (it.load_step || 4) >= 5 ? 2.5 : side <= 10 ? 1 : 2; return eq * 2; }
+  return it.load_step || 2.5;
+}
+// 1ª série de um exercício novo (ou estimado por outro aparelho) é teste: pelo que sobrou de reps, ajusta as próximas
+function calibrate(it, k) {
+  if (!it || it.calibrated || !it.sets) return null;
+  const sug = it.suggestion || {};
+  if (!(sug.estimated || !(it.last && (it.last.sets || []).some((y) => y.load_kg)))) return null;
+  const x = it.sets[k]; if (!x || !x.done) return null;
+  if (it.sets.slice(0, k).some((y) => y.done && y.load_kg)) return null;   // só a primeira série feita
+  const load = +x.load_kg, reps = +x.reps;
+  if (!load || !reps) return null;
+  const nums = String((it.plan || {}).reps || "8-12").match(/\d+/g) || ["10"];
+  const lo = +nums[0], hi = +(nums[1] || nums[0]), mid = (lo + hi) / 2;
+  const rr = String((it.plan || {}).rir || "").match(/\d+(\.\d+)?/g); const rirT = rr ? Math.max(1, rr.reduce((a, b) => a + +b, 0) / rr.length) : 2;
+  let rir = x.rpe ? 10 - +x.rpe : null;
+  if (rir == null) { if (reps >= hi + 3) rir = 1; else if (reps < lo) rir = 0; else return null; }
+  if (Math.abs(rir - rirT) < 2 && reps >= lo && reps <= hi + 2) { it.calibrated = true; return null; }
+  const e1 = load * (1 + (reps + rir) / 30);
+  let nl = e1 / (1 + (mid + rirT) / 30);
+  nl = Math.min(load * 1.3, Math.max(load * 0.7, nl));
+  const st = loadStep(it, nl); nl = Math.max(st, Math.round(nl / st) * st);
+  it.calibrated = true;
+  if (Math.abs(nl - load) < st / 2) return null;
+  for (let j = k + 1; j < it.sets.length; j++) { const y = it.sets[j]; if (!y.done && (y.load_kg == null || +y.load_kg === load)) y.load_kg = nl; }
+  const kg = String(nl).replace(".", ",");
+  return nl > load ? `A 1ª série mostrou que dá para mais: ajustei as próximas para ${kg} kg${it.sides ? " (total)" : ""}.`
+    : `Ficou pesado: ajustei as próximas para ${kg} kg${it.sides ? " (total)" : ""} para fechar ${lo}–${hi} reps com folga certa.`;
+}
 function fxCarry(it, k, f, old, val) {
   if (f !== "load_kg" || !it || !it.sets) return;
   // no treino puxado as séries já vêm marcadas como feitas: a carga digitada desce do mesmo jeito para as que estão vazias/iguais
@@ -3186,6 +3262,7 @@ function fxSetDone() {
   const c = fxCur(it, s); c.x.done = true; s.fsel = null; s.timeUp = false; s.workEnd = null; s.prepEnd = null;
   s.lastSet = { i: order[s.fx], w: c.w, k: c.k };
   if (!c.w) fxCarry(it, c.k, "load_kg", null, c.x.load_kg);
+  if (!c.w) { const msg = calibrate(it, c.k); if (msg) setTimeout(() => toast(msg, 7000), 300); }
   let rest;
   if (c.w) rest = (it.warmup || []).some((y) => !y.done && !y.skip) ? WARM_REST : WARM_LAST_REST;
   else { rest = (it.plan || {}).rest_s ?? 90; if (it.sets.every((y) => y.done)) s.fx = fxNextPos(s, order, s.fx); }
@@ -3263,7 +3340,8 @@ function renderFocus() {
         <div class="fx-sets">${W.map((y, j) => `<button class="fx-dot warm ${y.done ? "done" : ""} ${y.skip && !y.done ? "skip" : ""} ${c.w && j === k ? "cur" : ""}" data-fset="${-(j + 1)}" aria-label="Aquecimento ${j + 1}${y.done ? " feito" : ""}">${y.done ? "✓" : "A" + (j + 1)}</button>`).join("")}${W.length ? `<span class="fx-sep" aria-hidden="true"></span>` : ""}${it.sets.map((y, j) => `<button class="fx-dot ${y.done ? "done" : ""} ${!c.w && j === k ? "cur" : ""}" data-fset="${j}" aria-label="Série ${j + 1}${y.done ? " feita" : ""}">${y.done ? "✓" : j + 1}</button>`).join("")}</div>
         <div class="fx-setlbl ${c.w ? "warm" : ""}">${c.w ? `Aquecimento ${k + 1} de ${W.length} · ~${x.pct}% da carga` : `Série ${k + 1} de ${it.sets.length}`}${x.done ? " · feita" : ""}</div>
         ${c.w && k === 0 && !x.done ? `<div class="fx-plan small" style="text-align:center;margin:-4px 0 8px">Leve e rápido, sem cansar: prepara articulações e o padrão do movimento.</div>` : ""}
-        <div class="fx-inputs">${stepper(fld, timed ? "Segundos" : "Repetições", timed ? 5 : 1, "numeric")}${stepper("load_kg", "Carga (kg)", 2.5, "decimal")}</div>
+        <div class="fx-inputs">${stepper(fld, timed ? "Segundos" : "Repetições", timed ? 5 : 1, "numeric")}${stepper("load_kg", it.sides ? "Carga total (kg)" : "Carga (kg)", loadStep(it, x.load_kg), "decimal")}</div>
+        ${it.sides ? `<div class="fx-side small" id="fx-side">${sideTxt(x.load_kg)}</div>` : ""}
         ${c.w ? "" : `<div class="fx-rpe"><span class="small muted">Esforço</span>${[6, 7, 8, 9, 10].map((r) => `<button class="${+x.rpe === r ? "on" : ""}" data-rpe="${r}">${r}</button>`).join("")}</div>`}
         ${timed && !x.done && !c.w ? workClock(`Iniciar ${x.duration_s || p.duration_s || 30} s`, x.duration_s || p.duration_s || 30, "set") : ""}
         ${x.done ? `<button class="btn ghost block fx-go" data-fx="undo-set">Desmarcar ${c.w ? "aquecimento" : "série"} ${k + 1}</button>`
@@ -3317,7 +3395,7 @@ function bindFocus() {
     const el = e.target;
     if (el.id === "s-notes") s.notes = el.value;
     const num = (v) => { const n = v === "" ? null : parseFloat(String(v).replace(",", ".")); return Number.isFinite(n) ? n : null; };
-    if (el.dataset.fv && it && fxStrength(it)) { const c = fxCur(it, s); const old = c.x[el.dataset.fv]; c.x[el.dataset.fv] = num(el.value); if (!c.w) fxCarry(it, c.k, el.dataset.fv, old, c.x[el.dataset.fv]); }
+    if (el.dataset.fv && it && fxStrength(it)) { const c = fxCur(it, s); const old = c.x[el.dataset.fv]; c.x[el.dataset.fv] = num(el.value); if (!c.w) fxCarry(it, c.k, el.dataset.fv, old, c.x[el.dataset.fv]); const sd = $("#fx-side"); if (sd && el.dataset.fv === "load_kg") sd.innerHTML = sideTxt(c.x.load_kg); }
     if (el.dataset.lv) { const L = fxLast_(s); if (L) { const old = L.x[el.dataset.lv]; L.x[el.dataset.lv] = num(el.value); if (!L.w) fxCarry(L.it, L.k, el.dataset.lv, old, L.x[el.dataset.lv]); const nb = $("#fx-next-box"); if (nb) nb.innerHTML = fxNextHtml(s, order); } }
     if (el.dataset.c) s.items[+el.dataset.i][el.dataset.c] = el.value === "" ? null : +String(el.value).replace(",", ".");
     if (el.dataset.t) s.items[+el.dataset.i][el.dataset.t] = el.value;
@@ -3347,7 +3425,7 @@ function bindFocus() {
     if (t.dataset.st && it) {
       const [f, d] = t.dataset.st.split(":"); const c = fxCur(it, s); const x = c.x; const old = x[f];
       x[f] = Math.max(0, Math.round(((+x[f] || 0) + +d) * 100) / 100); if (!c.w) fxCarry(it, c.k, f, old, x[f]);
-      const inp = $(`[data-fv="${f}"]`); if (inp) inp.value = x[f]; return save();
+      const inp = $(`[data-fv="${f}"]`); if (inp) inp.value = x[f]; const sd = $("#fx-side"); if (sd && f === "load_kg") sd.innerHTML = sideTxt(x[f]); return save();
     }
     if (t.dataset.rpe && it) { const x = fxCur(it, s).x; x.rpe = +x.rpe === +t.dataset.rpe ? null : +t.dataset.rpe; $$(".fx-rpe [data-rpe]").forEach((b) => b.classList.toggle("on", +b.dataset.rpe === x.rpe)); return save(); }
     const a = t.dataset.fx;

@@ -102,6 +102,9 @@ def suggest(plan_item: dict, last: dict | None, deload: bool = False, today: dat
         return {"load_kg": load, "note": "Sem histórico: escolha uma carga que deixe 2–3 reps \"no tanque\" (RPE 7–8)."}
     work_load, reps, avg_rpe = _work(last)
     inc = increment(ex)
+    from . import loads
+    if loads.sides(ex.get("id") or ""):
+        inc = max(inc, loads.step(ex["id"], work_load))
     if hi <= 6 and ex.get("equipment") == "barbell":
         inc = min(inc, 2.5)  # faixa de força (3–5 reps): saltos de 5 kg derrubam as reps — anilhas de 1,25 kg por lado
     if deload:

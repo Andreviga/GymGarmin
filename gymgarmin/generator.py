@@ -1114,6 +1114,10 @@ def generate(profile: dict, seed: int = 0, recent: dict | None = None, today=Non
             if _day_total(d) <= _b(d, budget):
                 break
 
+    kit = home_kit(p)
+    if kit is not None:
+        _to_home(days, p, kit, rationale)
+
     days.sort(key=lambda d: d["weekday"])
     if comp_at is not None:
         kept = [f"{catalog.get(i['exercise_id'])['name']} ({_short(d['name'])})" for d in days for i in d["items"] if i.get("complement")]
@@ -1169,6 +1173,70 @@ def generate(profile: dict, seed: int = 0, recent: dict | None = None, today=Non
         },
         "rationale": rationale,
     }
+
+
+# ------------------------------------------------------------- treino em casa ---
+HOME_CARDIO = {"hiit": ["cardio_corda", "atividade_hiit"], "leve": ["caminhada_rua"], "corrida": ["corrida_rua"]}
+
+
+def home_kit(p: dict) -> set[str] | None:
+    """Treina em casa? Devolve o que a pessoa tem (halteres, elástico, barra fixa, kettlebell, banco, corda); None = academia."""
+    g = (p or {}).get("gym")
+    if isinstance(g, dict) and g.get("id") == "casa":
+        return set(p.get("home_kit") or [])
+    return None
+
+
+def _home_cardio(it: dict, kit: set[str]) -> str:
+    if it.get("intervals") or (it.get("zone") or 2) >= 4:
+        return "cardio_corda" if "corda" in kit else "atividade_hiit"
+    if it.get("exercise_id") in ("cardio_esteira_corrida",):
+        return "corrida_rua"
+    return "caminhada_rua"
+
+
+def _to_home(days: list[dict], p: dict, kit: set[str], rationale: list[str]) -> None:
+    """Cada exercício vira o mais parecido que dá para fazer em casa com o que a pessoa tem; aparelho de cardio vira
+    caminhada/corrida na rua, corda ou HIIT com o peso do corpo. Carga leve: séries até perto do limite (o estímulo
+    para hipertrofia fica parecido com carga leve ou pesada quando a série vai perto da falha)."""
+    from . import alternative as A
+    ctx = A.Ctx(p)
+    for d in days:
+        if d.get("kind") != "forca":
+            for it in d["items"]:
+                ex = catalog.get(it.get("exercise_id")) or {}
+                if ex.get("kind") == "cardio" and str(it.get("exercise_id", "")).startswith("cardio_") and it["exercise_id"] != "cardio_corda":
+                    it["exercise_id"] = _home_cardio(it, kit)
+            continue
+        ctx.set_kit(kit)
+        prep = [i for i in d["items"] if i.get("phase") == "prep"]
+        post = [i for i in d["items"] if i.get("phase") == "post"]
+        main = [i for i in d["items"] if (i.get("phase") or "principal") == "principal"]
+        cardio = [i for i in main if (catalog.get(i.get("exercise_id")) or {}).get("kind") == "cardio"]
+        rest = [i for i in main if i not in cardio]
+        out, _, _, _ = A._r_fora(rest, ctx, {"kit": sorted(kit)})
+        for c in cardio:
+            if str(c.get("exercise_id", "")).startswith("cardio_") and c["exercise_id"] != "cardio_corda":
+                c["exercise_id"] = _home_cardio(c, kit)
+        d["items"] = prep + out + cardio + post
+        # exercício de casa é mais rápido (sem trocar aparelho/anilha): completa o tempo com mais séries (até 5)
+        budget = _b(d, float(p.get("session_minutes") or 60))
+        strength = [i for i in out if (catalog.get(i.get("exercise_id")) or {}).get("kind") != "cardio" and i.get("sets")]
+        for _ in range(12):
+            if not strength or _day_total(d) >= budget * 0.88:
+                break
+            grow = [i for i in strength if int(i["sets"]) < 5]
+            if not grow:
+                break
+            low = min(grow, key=lambda i: (int(i["sets"]), i.get("role") != "main"))
+            low["sets"] = int(low["sets"]) + 1
+            if _day_total(d) > budget:
+                low["sets"] -= 1
+                break
+    have = ", ".join(x["label"].lower() for x in A.KITS if x["id"] in kit) or "só o peso do corpo"
+    rationale.insert(0, f"Treino em casa com {have}: cada movimento pelo exercício mais parecido que dá para fazer aí. "
+                        "Com carga leve, as séries vão até 1–2 repetições do limite: assim o estímulo para ganhar músculo fica "
+                        "parecido com o de carga pesada. Cardio de aparelho vira caminhada/corrida na rua, corda ou HIIT.")
 
 
 def _default_days(n: int) -> list[int]:

@@ -74,7 +74,8 @@ REGIONS = [{"id": k, "label": v["label"].split(" (")[0]} for k, v in LIMITATIONS
            if k in ("ombro", "joelho", "lombar", "cotovelo", "punho", "quadril", "tornozelo", "cervical")]
 KITS = [{"id": "corpo", "label": "Só o peso do corpo"}, {"id": "halteres", "label": "Halteres"},
         {"id": "elastico", "label": "Elásticos"}, {"id": "barra", "label": "Barra fixa"},
-        {"id": "kettlebell", "label": "Kettlebell"}, {"id": "banco", "label": "Banco ou cadeira firme"}]
+        {"id": "kettlebell", "label": "Kettlebell"}, {"id": "banco", "label": "Banco ou cadeira firme"},
+        {"id": "corda", "label": "Corda de pular"}]
 MUSCLE_GROUPS = {
     "pernas": {"label": "Pernas", "muscles": ["quadriceps", "hamstrings", "glutes", "adductors", "abductors", "calves"]},
     "peito": {"label": "Peito", "muscles": ["chest"]},

@@ -1016,3 +1016,7 @@ body.timer-on { padding-bottom: calc(72px + 70px + env(safe-area-inset-bottom));
   background: transparent; border: 0; padding: 10px 2px; }
 .gym-row.on b { color: var(--brand); }
 .sw-row.best { outline: 2px solid var(--brand); border-radius: 12px; }
+
+/* exercícios de dois lados: peso total, metade de cada lado */
+.fx-side { text-align: center; margin: -2px 0 8px; color: var(--ink-2); }
+.side-hint { margin: 8px 0 0; }

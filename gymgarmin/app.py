@@ -18,7 +18,7 @@ from datetime import date, timedelta
 
 from . import adaptive, alternative, auth, coach, focus, gallery, ingest, my_gym, partners, training_rules
 from . import watch_review as wrv
-from . import gyms, personal, weather
+from . import gyms, loads, personal, weather
 from . import (analysis, calibration, catalog, clock, db, dedupe, health, endurance, garmin_export, garmin_sync, generator, history, limitations,
                load, plans_io, progression, readiness, schedule, sports, steps, templates, watch_labels)
 from .muscles import EQUIPMENT_PT, HR_ZONES, MUSCLES, hr_max, zone_bpm
@@ -1103,7 +1103,12 @@ def gym_set(body: dict = Body(...)):
         raise HTTPException(400, "Academia desconhecida")
     kit = gyms.data()["kits"][g["kit"]]
     unit = str(body.get("unit") or "").strip()[:60] or None
-    return db.save_profile({"gym": {"id": g["id"], "name": g["name"], "unit": unit}, "gym_type": kit["gym_type"], "equipment": []})
+    upd = {"gym": {"id": g["id"], "name": g["name"], "unit": unit}, "gym_type": kit["gym_type"], "equipment": []}
+    if g["id"] == "casa":   # em casa: o que a pessoa tem decide os exercícios
+        valid = {k["id"] for k in alternative.KITS}
+        upd["home_kit"] = [k for k in body.get("home_kit") or [] if k in valid and k != "corpo"]
+        upd["gym"]["name"] = "Em casa"
+    return db.save_profile(upd)
 
 
 def _subs_for(eid: str, prof: dict, exclude: set[str] | None = None) -> list[str]:
@@ -1709,10 +1714,31 @@ def match_session(session_id: int, body: dict = Body(...)):
         raise HTTPException(400, str(e)) from e
 
 
+def _known_e1rms() -> dict[str, dict]:
+    """1RM estimado recente de cada exercício que a pessoa faz (base para estimar a carga de um exercício novo).
+    Usa o treino mais recente de cada exercício (últimos ~4 meses), a mediana das séries de 3–15 reps:
+    uma série com peso errado do relógio não vira referência."""
+    out: dict[str, dict] = {}
+    since = (clock.today() - timedelta(days=120)).isoformat()
+    for s in db.list_sessions(limit=150, since=since):
+        for it in s.get("items") or []:
+            eid = it.get("exercise_id")
+            if not eid or eid in out:
+                continue
+            vals = sorted(e for e in (history.e1rm(float(x.get("load_kg") or 0), int(x.get("reps") or 0), x.get("rpe"))
+                                      for x in it.get("sets") or []
+                                      if x.get("done", True) and not x.get("warmup") and 3 <= int(x.get("reps") or 0) <= 15)
+                          if e)
+            if vals:
+                out[eid] = {"e1rm": vals[len(vals) // 2], "date": str(s.get("date"))[:10]}
+    return out
+
+
 def _prefill_items(day_items: list[dict], deload: bool = False) -> list[dict]:
     items = []
     prof = _profile()
     lims = prof.get("limitations") or []
+    known = None   # 1RM estimados: só calcula se algum exercício não tiver histórico
     for it in training_rules.apply(day_items, prof):
         ex = catalog.get(it.get("exercise_id"))
         if not ex:
@@ -1737,7 +1763,22 @@ def _prefill_items(day_items: list[dict], deload: bool = False) -> list[dict]:
                     if entry["phase"] == "principal" and not ex.get("timed") else {"load_kg": it.get("load_kg"), "note": None}
             except Exception:  # noqa: BLE001 — um histórico estranho de UM exercício nunca pode impedir o treino de abrir
                 sug = {"load_kg": it.get("load_kg"), "note": None}
+            # nunca fez este exercício: estima pela força num exercício parecido (equivalência entre aparelhos)
+            if not sug.get("load_kg") and entry["phase"] == "principal" and not ex.get("timed") and not it.get("duration_s"):
+                try:
+                    if known is None:
+                        known = _known_e1rms()
+                    lo, hi = progression._bounds(it.get("reps"))
+                    nums = [float(n) for n in __import__("re").findall(r"\d+(?:[.,]\d+)?", str(it.get("rir") or "").replace(",", "."))]
+                    rir = max(1.0, sum(nums) / len(nums)) if nums else 2.5
+                    est = loads.estimate(ex["id"], known, round((lo + hi) / 2), rir)
+                    if est:
+                        sug = {**sug, **est}
+                except Exception:  # noqa: BLE001
+                    pass
             entry["suggestion"] = sug
+            entry["sides"] = loads.sides(ex["id"])
+            entry["load_step"] = loads.step(ex["id"], sug.get("load_kg"))
             reps, _ = garmin_export.parse_reps(it.get("reps"))
             entry["sets"] = [{"reps": reps if not it.get("duration_s") else None,
                               "duration_s": it.get("duration_s"), "load_kg": sug.get("load_kg"), "rpe": None, "done": False}

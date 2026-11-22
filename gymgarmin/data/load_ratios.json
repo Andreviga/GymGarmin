@@ -1,0 +1,538 @@
+{
+ "updated": "2026-11",
+ "convention": "1RM típico (praticante intermediário) relativo à referência da família; carga TOTAL (dois halteres somados)",
+ "sources": [
+  {
+   "t": "Strength Level — padrões de força da comunidade (intermediário, homem)",
+   "u": "https://strengthlevel.com/strength-standards"
+  },
+  {
+   "t": "Saeterbakken et al., 2011 — supino com halteres ≈17% abaixo da barra",
+   "u": "https://doi.org/10.1080/02640414.2010.543916"
+  },
+  {
+   "t": "Cotterman et al., 2005 — Smith x peso livre (agachamento e supino)",
+   "u": "https://doi.org/10.1519/14433.1"
+  },
+  {
+   "t": "Muyor et al., 2023 — supino na máquina x barra",
+   "u": "https://pmc.ncbi.nlm.nih.gov/articles/PMC10203828/"
+  }
+ ],
+ "note": "'est' = estimativa (sem dado direto): o app avisa que é teste e ajusta pela 1ª série.",
+ "exercises": {
+  "Barbell_Squat": {
+   "family": "squat",
+   "ratio": 1.0
+  },
+  "Hack_Squat": {
+   "family": "squat",
+   "ratio": 1.19
+  },
+  "Leg_Press": {
+   "family": "squat",
+   "ratio": 1.74
+  },
+  "Horizontal_Leg_Press": {
+   "family": "squat",
+   "ratio": 1.48
+  },
+  "Smith_Machine_Squat": {
+   "family": "squat",
+   "ratio": 0.92
+  },
+  "Front_Barbell_Squat": {
+   "family": "squat",
+   "ratio": 0.81
+  },
+  "Goblet_Squat": {
+   "family": "squat",
+   "ratio": 0.31
+  },
+  "Dumbbell_Squat": {
+   "family": "squat",
+   "ratio": 0.49
+  },
+  "Pendulum_Squat": {
+   "family": "squat",
+   "ratio": 1.0,
+   "est": true
+  },
+  "VSquat_Machine": {
+   "family": "squat",
+   "ratio": 1.1,
+   "est": true
+  },
+  "Belt_Squat": {
+   "family": "squat",
+   "ratio": 0.9,
+   "est": true
+  },
+  "LeverSquat_Machine": {
+   "family": "squat",
+   "ratio": 1.0,
+   "est": true
+  },
+  "Reverse_Hack_Squat": {
+   "family": "squat",
+   "ratio": 1.1,
+   "est": true
+  },
+  "VerticalLegPress_Machine": {
+   "family": "squat",
+   "ratio": 1.3,
+   "est": true
+  },
+  "Dumbbell_Lunges": {
+   "family": "squat",
+   "ratio": 0.45
+  },
+  "Split_Squat_with_Dumbbells": {
+   "family": "squat",
+   "ratio": 0.48
+  },
+  "Dumbbell_Rear_Lunge": {
+   "family": "squat",
+   "ratio": 0.45
+  },
+  "Dumbbell_Step_Ups": {
+   "family": "squat",
+   "ratio": 0.4,
+   "est": true
+  },
+  "Barbell_Walking_Lunge": {
+   "family": "squat",
+   "ratio": 0.55,
+   "est": true
+  },
+  "Single-Leg_Leg_Press": {
+   "family": "squat",
+   "ratio": 1.9,
+   "est": true
+  },
+  "Horizontal_Leg_Press_Unilateral": {
+   "family": "squat",
+   "ratio": 1.6,
+   "est": true
+  },
+  "Barbell_Deadlift": {
+   "family": "hinge",
+   "ratio": 1.0
+  },
+  "Romanian_Deadlift": {
+   "family": "hinge",
+   "ratio": 0.79
+  },
+  "Stiff-Legged_Barbell_Deadlift": {
+   "family": "hinge",
+   "ratio": 0.82
+  },
+  "Stiff-Legged_Dumbbell_Deadlift": {
+   "family": "hinge",
+   "ratio": 0.55
+  },
+  "BackExtensionMachine": {
+   "family": "hinge",
+   "ratio": 0.68
+  },
+  "Barbell_Bench_Press_-_Medium_Grip": {
+   "family": "press",
+   "ratio": 1.0
+  },
+  "Dumbbell_Bench_Press": {
+   "family": "press",
+   "ratio": 0.79
+  },
+  "Machine_Bench_Press": {
+   "family": "press",
+   "ratio": 0.89
+  },
+  "Leverage_Chest_Press": {
+   "family": "press",
+   "ratio": 0.95,
+   "est": true
+  },
+  "Smith_Machine_Bench_Press": {
+   "family": "press",
+   "ratio": 0.95
+  },
+  "Barbell_Incline_Bench_Press_-_Medium_Grip": {
+   "family": "press",
+   "ratio": 0.88
+  },
+  "Incline_Dumbbell_Press": {
+   "family": "press",
+   "ratio": 0.78
+  },
+  "Leverage_Incline_Chest_Press": {
+   "family": "press",
+   "ratio": 0.85,
+   "est": true
+  },
+  "Smith_Machine_Incline_Bench_Press": {
+   "family": "press",
+   "ratio": 0.84,
+   "est": true
+  },
+  "Standing_Military_Press": {
+   "family": "press",
+   "ratio": 0.65
+  },
+  "Barbell_Shoulder_Press": {
+   "family": "press",
+   "ratio": 0.67,
+   "est": true
+  },
+  "Dumbbell_Shoulder_Press": {
+   "family": "press",
+   "ratio": 0.62
+  },
+  "Seated_Dumbbell_Press": {
+   "family": "press",
+   "ratio": 0.66
+  },
+  "Arnold_Dumbbell_Press": {
+   "family": "press",
+   "ratio": 0.49
+  },
+  "Machine_Shoulder_Military_Press": {
+   "family": "press",
+   "ratio": 0.77
+  },
+  "Leverage_Shoulder_Press": {
+   "family": "press",
+   "ratio": 0.77,
+   "est": true
+  },
+  "VikingPress_Machine": {
+   "family": "press",
+   "ratio": 0.75,
+   "est": true
+  },
+  "Wide-Grip_Lat_Pulldown": {
+   "family": "pull",
+   "ratio": 1.0
+  },
+  "Machine_Lat_Pulldown": {
+   "family": "pull",
+   "ratio": 1.05,
+   "est": true
+  },
+  "Close-Grip_Front_Lat_Pulldown": {
+   "family": "pull",
+   "ratio": 1.09
+  },
+  "V-Bar_Pulldown": {
+   "family": "pull",
+   "ratio": 1.09
+  },
+  "Underhand_Cable_Pulldowns": {
+   "family": "pull",
+   "ratio": 1.05,
+   "est": true
+  },
+  "Bent_Over_Barbell_Row": {
+   "family": "pull",
+   "ratio": 1.04
+  },
+  "Seated_Cable_Rows": {
+   "family": "pull",
+   "ratio": 1.02
+  },
+  "Wide-Grip_Seated_Cable_Row": {
+   "family": "pull",
+   "ratio": 0.98,
+   "est": true
+  },
+  "One-Arm_Dumbbell_Row": {
+   "family": "pull",
+   "ratio": 1.02
+  },
+  "T-Bar_Row_with_Handle": {
+   "family": "pull",
+   "ratio": 1.04
+  },
+  "Leverage_Iso_Row": {
+   "family": "pull",
+   "ratio": 1.15,
+   "est": true
+  },
+  "Leverage_Low_Row": {
+   "family": "pull",
+   "ratio": 1.15,
+   "est": true
+  },
+  "Leverage_High_Row": {
+   "family": "pull",
+   "ratio": 1.1,
+   "est": true
+  },
+  "DyRow_Machine": {
+   "family": "pull",
+   "ratio": 1.15,
+   "est": true
+  },
+  "SealRowBench": {
+   "family": "pull",
+   "ratio": 0.85,
+   "est": true
+  },
+  "Barbell_Curl": {
+   "family": "biceps",
+   "ratio": 1.0
+  },
+  "Dumbbell_Bicep_Curl": {
+   "family": "biceps",
+   "ratio": 0.93
+  },
+  "Hammer_Curls": {
+   "family": "biceps",
+   "ratio": 1.02
+  },
+  "EZ-Bar_Curl": {
+   "family": "biceps",
+   "ratio": 1.0
+  },
+  "Preacher_Curl": {
+   "family": "biceps",
+   "ratio": 0.96
+  },
+  "Machine_Preacher_Curls": {
+   "family": "biceps",
+   "ratio": 1.22
+  },
+  "Incline_Dumbbell_Curl": {
+   "family": "biceps",
+   "ratio": 0.8,
+   "est": true
+  },
+  "Standing_Biceps_Cable_Curl": {
+   "family": "biceps",
+   "ratio": 1.09
+  },
+  "Cable_Hammer_Curls_-_Rope_Attachment": {
+   "family": "biceps",
+   "ratio": 1.0,
+   "est": true
+  },
+  "Bayesian_Cable_Curl": {
+   "family": "biceps",
+   "ratio": 0.9,
+   "est": true
+  },
+  "Triceps_Pushdown": {
+   "family": "triceps",
+   "ratio": 1.0
+  },
+  "Triceps_Pushdown_-_Rope_Attachment": {
+   "family": "triceps",
+   "ratio": 0.85
+  },
+  "Cable_Rope_Overhead_Triceps_Extension": {
+   "family": "triceps",
+   "ratio": 0.74
+  },
+  "EZ-Bar_Skullcrusher": {
+   "family": "triceps",
+   "ratio": 0.78
+  },
+  "Standing_Dumbbell_Triceps_Extension": {
+   "family": "triceps",
+   "ratio": 0.56
+  },
+  "Machine_Triceps_Extension": {
+   "family": "triceps",
+   "ratio": 1.28
+  },
+  "OverheadTricepsMachine": {
+   "family": "triceps",
+   "ratio": 1.0,
+   "est": true
+  },
+  "Cable_Cross-Body_Triceps_Extension": {
+   "family": "triceps",
+   "ratio": 0.6,
+   "est": true
+  },
+  "Cable_Triceps_Kickback": {
+   "family": "triceps",
+   "ratio": 0.5,
+   "est": true
+  },
+  "Tricep_Dumbbell_Kickback": {
+   "family": "triceps",
+   "ratio": 0.4,
+   "est": true
+  },
+  "Side_Lateral_Raise": {
+   "family": "lateral",
+   "ratio": 1.0
+  },
+  "Seated_Side_Lateral_Raise": {
+   "family": "lateral",
+   "ratio": 0.9,
+   "est": true
+  },
+  "Cable_Seated_Lateral_Raise": {
+   "family": "lateral",
+   "ratio": 0.94
+  },
+  "Cable_Y_Raise": {
+   "family": "lateral",
+   "ratio": 0.8,
+   "est": true
+  },
+  "Machine_Lateral_Raise": {
+   "family": "lateral",
+   "ratio": 1.8
+  },
+  "Dumbbell_Flyes": {
+   "family": "chest_fly",
+   "ratio": 1.0
+  },
+  "Butterfly": {
+   "family": "chest_fly",
+   "ratio": 1.85
+  },
+  "Cable_Crossover": {
+   "family": "chest_fly",
+   "ratio": 0.76
+  },
+  "Low_Cable_Crossover": {
+   "family": "chest_fly",
+   "ratio": 0.7,
+   "est": true
+  },
+  "InclineFlyMachine": {
+   "family": "chest_fly",
+   "ratio": 1.6,
+   "est": true
+  },
+  "Incline_Dumbbell_Flyes": {
+   "family": "chest_fly",
+   "ratio": 0.9,
+   "est": true
+  },
+  "Face_Pull": {
+   "family": "rear_delt",
+   "ratio": 1.0
+  },
+  "Reverse_Machine_Flyes": {
+   "family": "rear_delt",
+   "ratio": 1.42
+  },
+  "Cable_Rear_Delt_Fly": {
+   "family": "rear_delt",
+   "ratio": 0.6,
+   "est": true
+  },
+  "Reverse_Flyes": {
+   "family": "rear_delt",
+   "ratio": 0.5,
+   "est": true
+  },
+  "RearDeltRow_Machine": {
+   "family": "rear_delt",
+   "ratio": 1.4,
+   "est": true
+  },
+  "Lying_Leg_Curls": {
+   "family": "leg_curl",
+   "ratio": 1.0
+  },
+  "Seated_Leg_Curl": {
+   "family": "leg_curl",
+   "ratio": 1.24
+  },
+  "KneelingLegCurl_Machine": {
+   "family": "leg_curl",
+   "ratio": 0.9,
+   "est": true
+  },
+  "Leg_Extensions": {
+   "family": "leg_ext",
+   "ratio": 1.0
+  },
+  "ReclinedLegExtension_Machine": {
+   "family": "leg_ext",
+   "ratio": 0.95,
+   "est": true
+  },
+  "Standing_Calf_Raises": {
+   "family": "calf",
+   "ratio": 1.0
+  },
+  "Seated_Calf_Raise": {
+   "family": "calf",
+   "ratio": 0.7
+  },
+  "Calf_Press_On_The_Leg_Press_Machine": {
+   "family": "calf",
+   "ratio": 1.3,
+   "est": true
+  },
+  "Hack_Machine_Calf_Raise": {
+   "family": "calf",
+   "ratio": 1.0,
+   "est": true
+  },
+  "Standing_Dumbbell_Calf_Raise": {
+   "family": "calf",
+   "ratio": 0.35,
+   "est": true
+  },
+  "Smith_Machine_Calf_Raise": {
+   "family": "calf",
+   "ratio": 0.9,
+   "est": true
+  },
+  "Barbell_Hip_Thrust": {
+   "family": "glute",
+   "ratio": 1.0
+  },
+  "Barbell_Glute_Bridge": {
+   "family": "glute",
+   "ratio": 0.91
+  },
+  "Hip_Thrust_Machine": {
+   "family": "glute",
+   "ratio": 1.0,
+   "est": true
+  },
+  "Smith_Machine_Hip_Thrust": {
+   "family": "glute",
+   "ratio": 0.95,
+   "est": true
+  },
+  "StandingHipThrust_Machine": {
+   "family": "glute",
+   "ratio": 0.8,
+   "est": true
+  },
+  "Barbell_Shrug": {
+   "family": "traps",
+   "ratio": 1.0
+  },
+  "Dumbbell_Shrug": {
+   "family": "traps",
+   "ratio": 0.7
+  },
+  "Thigh_Adductor": {
+   "family": "adductor",
+   "ratio": 1.0
+  },
+  "Cable_Hip_Adduction": {
+   "family": "adductor",
+   "ratio": 0.3,
+   "est": true
+  },
+  "Cable_Crunch": {
+   "family": "core",
+   "ratio": 1.0
+  },
+  "Ab_Crunch_Machine": {
+   "family": "core",
+   "ratio": 1.14
+  }
+ }
+}

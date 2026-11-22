@@ -158,6 +158,11 @@
   ],
   "generic": [
     {
+      "id": "casa",
+      "name": "🏠 Em casa",
+      "kit": "basica"
+    },
+    {
       "id": "outra_musculacao",
       "name": "Outra academia de musculação de alto nível",
       "kit": "musculacao"
