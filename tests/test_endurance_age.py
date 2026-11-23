@@ -65,3 +65,11 @@ def test_sixty_plus_advanced_one_quality_session():
     wp = en.week_plan(p, MONDAY + timedelta(weeks=5), MONDAY, "avancado")
     hard = [s for s in wp["sports"]["corrida"]["sessions"] if s["endurance"]["hard"]]
     assert len(hard) <= 1
+
+
+def test_imc_alto_mas_ja_corre_continuo_nao_vira_corre_caminha():
+    """IMC ≥ 30 força corre-caminha só para quem ainda não corre ~10 km/semana (músculo também dá IMC alto)."""
+    from gymgarmin import endurance as en
+    forced = {"_pers": {"force_run_walk": True}}
+    assert en.run_walk({**forced, "_start": 4}, "intermediario", 0) is not None
+    assert en.run_walk({**forced, "_start": 15}, "intermediario", 0) is None

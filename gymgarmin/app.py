@@ -3387,8 +3387,11 @@ def schedule_push_week(body: dict = Body(default={})):
     only_outdated = bool(body.get("only_outdated"))
     fmt = _garmin_fmt()
     today = clock.today()
-    ws = schedule.week_start(today)
-    entries = [e for e in db.list_schedule(today.isoformat(), (ws + timedelta(days=6)).isoformat())
+    # sempre os próximos 7 dias (no domingo, a semana que começa amanhã): a agenda da semana seguinte é montada se faltar
+    end = today + timedelta(days=6)
+    if schedule.week_start(end) != schedule.week_start(today):
+        schedule.ensure_week(_profile(), end)
+    entries = [e for e in db.list_schedule(today.isoformat(), end.isoformat())
                if e["status"] == "planejado" and (not only_outdated or _garmin_outdated(e, fmt) or not e.get("garmin_workout_id"))]
 
     def run():

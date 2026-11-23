@@ -290,7 +290,7 @@ async function viewHoje(weekDate) {
   </div></section>
   ${weekDate ? "" : weekMissHtml(g)}
   <details class="card more"><summary><b>Opções da semana</b></summary><div class="stack" style="padding-bottom:4px">
-    <button class="btn ghost block" id="push-week">${sch.entries.some((e) => e.garmin_outdated && e.status === "planejado") ? "Reenviar alterações ao Garmin" : "Enviar semana ao Garmin"}</button>
+    <button class="btn ghost block" id="push-week">${sch.entries.some((e) => e.garmin_outdated && e.status === "planejado") ? "Reenviar alterações ao Garmin" : "Enviar próximos 7 dias ao Garmin"}</button>
     <button class="btn ghost block" id="gen-open">Regerar treino</button>
     <button class="btn ghost block" id="rebuild">Refazer a semana pela planilha</button></div></details>`;
   sch._rd = rd;

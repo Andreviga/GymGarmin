@@ -519,8 +519,8 @@ def run_walk(c: dict, level: str, week_idx: int) -> tuple[float, float] | None:
     forced = bool((c.get("_pers") or {}).get("force_run_walk"))
     if not forced and (level != "iniciante" or start >= 10 or c.get("no_run_walk")):
         return None
-    if forced and start >= 25:
-        return None
+    if forced and start >= 10:
+        return None   # já corre ~10 km por semana contínuo (IMC alto por músculo, por exemplo): corre-caminha não faz sentido
     k = week_idx if age < 65 else week_idx // 2   # 65+: cada etapa dura 2 semanas
     return RUN_WALK[k] if k < len(RUN_WALK) else None
 
