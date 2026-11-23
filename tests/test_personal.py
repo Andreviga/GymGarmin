@@ -44,8 +44,11 @@ def test_high_bmi_no_jumps_and_run_walk():
     prof = {**BASE, "weight_kg": 105, "height_cm": 175}      # IMC ~34
     pl = G.generate({**prof, "age": 50, "sex": "F"})
     assert not (_all_ids(pl) & personal.JUMP_IDS)
-    s = _run(prof, week=0, tier="avancado", current_weekly=12)["corrida"]["sessions"]
+    s = _run(prof, week=0, tier="avancado", current_weekly=6)["corrida"]["sessions"]
     assert any("Corre-caminha" in x["endurance"]["title"] for x in s)
+    # quem já corre ~10 km/semana contínuo tolera o impacto: segue correndo, mesmo com IMC alto
+    s = _run(prof, week=0, tier="avancado", current_weekly=12)["corrida"]["sessions"]
+    assert not any("Corre-caminha" in x["endurance"]["title"] for x in s)
 
 
 def test_mobility_screens_change_exercise_choice():
