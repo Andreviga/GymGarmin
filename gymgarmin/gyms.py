@@ -167,9 +167,29 @@ def status(p: dict, eid: str) -> str:
     return "provavel" if kit_allows(kit_of(p), eid) else "improvavel"
 
 
-def checker(p: dict):
-    """Função eid → pode entrar no treino nesta academia?"""
+HOME_EQUIP = {"body only": None, "dumbbell": "halteres", "kettlebells": "kettlebell", "bands": "elastico"}
+
+
+def home_allows(kit: set[str], eid: str) -> bool:
+    """Em casa: só peso do corpo e o que a pessoa tem (halteres, kettlebell, elástico, barra fixa)."""
+    ex = catalog.get(eid) or {}
+    if eid in STATIONS["barra_fixa"]:
+        return "barra" in kit
+    eq = ex.get("equipment")
+    if eq not in HOME_EQUIP:
+        return False
+    need = HOME_EQUIP[eq]
+    return need is None or need in kit
+
+
+def checker(p: dict, home: bool = False):
+    """Função eid → pode entrar no treino nesta academia? home=True: em casa, só o que a pessoa tem (na troca; o
+    gerador monta o treino de academia e converte para casa depois)."""
     p = p or {}
+    g = p.get("gym")
+    if home and isinstance(g, dict) and g.get("id") == "casa":
+        hk = set(p.get("home_kit") or [])
+        return lambda eid: home_allows(hk, eid)
     missing, has, kit = set(p.get("gym_missing") or []), set(p.get("gym_has") or []), kit_of(p)
     return lambda eid: eid not in missing and (eid in has or kit_allows(kit, eid))
 
@@ -213,7 +233,7 @@ def substitutes(eid: str, p: dict, pool: list[str], *, my_ids: set[str] | None =
                 exclude: set[str] | None = None) -> list[str]:
     """Do mais parecido para o menos, só o que dá para fazer na academia da pessoa (e sem 'evitar' pelas limitações)."""
     from .limitations import check_exercise
-    ok = checker(p)
+    ok = checker(p, home=True)
     my_ids, exclude = my_ids or set(), exclude or set()
     cands = []
     for c in dict.fromkeys(list(CLOSEST.get(eid) or []) + list(pool)):
@@ -289,3 +309,147 @@ def adapt_day(items: list[dict], p: dict, day_p: dict, pool_for) -> tuple[list[d
             used.add(new)
             changes.append(f"{ex.get('name', eid)} → {catalog.get(new)['name']}")
     return items, changes
+
+
+# ------------------------------------------------- troca no meio do treino (aparelho ocupado) ----
+# Aparelhos/estações onde vários exercícios são feitos: se a estação está ocupada, nenhum deles serve agora.
+STATIONS: dict[str, set[str]] = {
+    "pulley_alto": {"Wide-Grip_Lat_Pulldown", "Close-Grip_Front_Lat_Pulldown", "V-Bar_Pulldown", "Underhand_Cable_Pulldowns",
+                    "Full_Range-Of-Motion_Lat_Pulldown", "Wide-Grip_Pulldown_Behind_The_Neck", "One_Arm_Lat_Pulldown",
+                    "Kneeling_High_Pulley_Row", "Kneeling_Single-Arm_High_Pulley_Row"},
+    "remada_baixa": {"Seated_Cable_Rows", "Wide-Grip_Seated_Cable_Row", "Seated_One-arm_Cable_Pulley_Rows", "Elevated_Cable_Rows",
+                     "Low_Pulley_Row_To_Neck"},
+    "barra_fixa": {"Pullups", "Chin-Up", "Mixed_Grip_Chin", "V-Bar_Pullup", "Wide-Grip_Rear_Pull-Up", "Band_Assisted_Pull-Up",
+                   "Scapular_Pull-Up", "One_Arm_Chin-Up", "Side_To_Side_Chins"},
+    "graviton": {"Assisted_Pull-Up_Machine", "Assisted_Dip_Machine"},
+    "paralelas": {"Parallel_Bar_Dip", "Dips_-_Chest_Version", "Dips_-_Triceps_Version"},
+    "peck_deck": {"Butterfly", "Reverse_Machine_Flyes"},
+    "leg_press_45": {"Leg_Press", "Narrow_Stance_Leg_Press", "Single-Leg_Leg_Press", "Calf_Press_On_The_Leg_Press_Machine"},
+    "leg_press_h": {"Horizontal_Leg_Press", "Horizontal_Leg_Press_Unilateral"},
+    "hack": {"Hack_Squat", "Narrow_Stance_Hack_Squats", "Reverse_Hack_Squat", "Hack_Machine_Calf_Raise"},
+    "extensora": {"Leg_Extensions", "Single-Leg_Leg_Extension"},
+    "abdutora": {"Thigh_Abductor", "Thigh_Adductor"},
+    "supino_reto": {"Barbell_Bench_Press_-_Medium_Grip", "Wide-Grip_Barbell_Bench_Press", "Close-Grip_Barbell_Bench_Press",
+                    "Bench_Press_-_Powerlifting"},
+    "supino_inclinado": {"Barbell_Incline_Bench_Press_-_Medium_Grip"},
+}
+SOFT_STATIONS = {"polia"}     # academia costuma ter várias polias: dá para usar outra livre
+# não oferecer como troca: risco sem ganho (atrás da nuca, guilhotina) ou precisa de equipamento especial
+NEVER_SUB = {"Wide-Grip_Pulldown_Behind_The_Neck", "Barbell_Guillotine_Bench_Press", "Standing_Barbell_Press_Behind_Neck",
+             "Push_Press_-_Behind_the_Neck", "Rocky_Pull-Ups_Pulldowns", "Bradford_Rocky_Presses", "Bench_Press_with_Chains",
+             "Bench_Press_-_With_Bands", "Reverse_Band_Bench_Press", "Neck_Press", "Front_Raise_And_Pullover",
+             "Gironda_Sternum_Chins", "Smith_Machine_Pistol_Squat"}
+# movimentos diferentes que treinam o mesmo músculo: servem quando não há troca do mesmo movimento
+COMPAT = {("v_pull", "h_pull"), ("h_pull", "v_pull"), ("v_pull", "pullover"), ("squat", "single_leg"), ("single_leg", "squat"),
+          ("h_push", "incline_push"), ("incline_push", "h_push"), ("leg_ext", "squat"), ("leg_ext", "single_leg"),
+          ("hinge", "glute"), ("glute", "hinge"), ("rear_delt", "h_pull"), ("chest_fly", "fly"), ("fly", "chest_fly"),
+          ("h_push", "fly"), ("incline_push", "fly"), ("lateral", "raise"), ("raise", "lateral")}
+
+
+def station_of(eid: str) -> str | None:
+    for st, ids in STATIONS.items():
+        if eid in ids:
+            return st
+    if "Smith" in eid:
+        return "smith"
+    eq = (catalog.get(eid) or {}).get("equipment")
+    if eq == "barbell" and motion(eid) == "squat":
+        return "rack"      # agachamentos com barra: o rack ocupado serve para todos eles
+    if eq == "cable":
+        return "polia"
+    if eq == "machine":
+        return eid
+    return None
+
+
+def motion(eid: str) -> str | None:
+    """Movimento de verdade (o catálogo chama crucifixo e pullover de 'empurrar' só por serem de peito)."""
+    import re
+    from .alternative import pattern_of
+    ex = catalog.get(eid) or {}
+    txt = f"{eid} {ex.get('name', '')}"
+    if re.search(r"pullover", txt, re.I):
+        return "pullover"
+    if re.search(r"fly|flye|butterfly|crossover|crucifixo|pec.?deck|iron.?cross", txt, re.I) and not re.search(r"rear|reverse|invers|posterior", txt, re.I):
+        return "fly"
+    if re.search(r"front.?raise|eleva[cç][aã]o frontal|front.?cable.?raise", txt, re.I):
+        return "raise"
+    if re.search(r"rota[cç][aã]o|rotation", txt, re.I):
+        return "rotator"
+    if re.search(r"jump|salto|plyo", txt, re.I):
+        return "plyo"
+    pat = pattern_of(eid)
+    if pat == "lateral" and re.search(r"rear|reverse|invertid|posterior", txt, re.I):
+        return "rear_delt"
+    if pat == "h_push" and re.search(r"inclin", txt, re.I):
+        return "incline_push"
+    return pat
+
+
+def _readable(eid: str) -> bool:
+    ex = catalog.get(eid) or {}
+    return eid in _curated() or bool(ex.get("popular")) or ex.get("name") != ex.get("name_en")
+
+
+def _near_dup(a: str, b: str) -> bool:
+    """Praticamente o mesmo exercício (fazer os dois no mesmo treino não acrescenta nada)."""
+    if a == b or a in (CLOSEST.get(b) or [])[:2] or b in (CLOSEST.get(a) or [])[:2]:
+        return True
+    ea, eb = catalog.get(a) or {}, catalog.get(b) or {}
+    return (motion(a) == motion(b) and ea.get("equipment") == eb.get("equipment")
+            and (ea.get("primaryMuscles") or [None])[:1] == (eb.get("primaryMuscles") or [None])[:1])
+
+
+def sensible(src: str, dst: str) -> str | None:
+    """'mesmo' (mesmo movimento), 'outro' (mesmo músculo de outro jeito) ou None (não faz sentido no lugar dele)."""
+    if dst in NEVER_SUB:
+        return None
+    a, b = catalog.get(src) or {}, catalog.get(dst) or {}
+    if a.get("kind") == "strength" and b.get("kind") != "strength":
+        return None
+    if dst in (CLOSEST.get(src) or []):
+        return "mesmo"
+    if not _readable(dst):
+        return None
+    ma, mb = motion(src), motion(dst)
+    if ma and ma == mb:
+        return "mesmo"
+    if (ma, mb) in COMPAT:
+        return "outro"
+    return None
+
+
+def session_options(eid: str, p: dict, pool: list[str], *, my_ids: set[str] | None = None, lims: list[dict] | None = None,
+                    in_session: list[str] | None = None, done: list[str] | None = None, busy: bool = True,
+                    limit: int = 10) -> list[dict]:
+    """Trocas que fazem sentido AGORA, neste treino: nada que já está no treino (feito ou por fazer), nada da mesma
+    estação quando o aparelho está ocupado, nada de outro movimento sem relação; o que repete quase igual algo já
+    feito vai para o fim, avisado. Devolve [{id, fit: mesmo|outro, note}]."""
+    in_session, done = list(in_session or []), list(done or [])
+    cands = substitutes(eid, p, pool, my_ids=my_ids, lims=lims, exclude=set(in_session) | set(done))
+    st = station_of(eid)
+    out = []
+    for k, c in enumerate(cands):
+        fit = sensible(eid, c)
+        if not fit:
+            continue
+        note, rank = None, 0
+        cs = station_of(c)
+        if busy and st and cs == st:
+            if st not in SOFT_STATIONS:
+                continue          # mesmo aparelho que está ocupado
+            note, rank = "em outra polia livre", 1
+        dup = next((d for d in done if _near_dup(c, d)), None) or next((d for d in in_session if _near_dup(c, d)), None)
+        if dup:
+            nm = (catalog.get(dup) or {}).get("name", dup)
+            note, rank = (f"parecido com {nm}, que você já fez" if dup in done else f"parecido com {nm}, que ainda vem no treino"), 3
+        if fit == "outro":
+            rank += 2
+            note = note or "mesmo músculo, outro movimento"
+        ea, eb = (catalog.get(eid) or {}).get("equipment"), (catalog.get(c) or {}).get("equipment")
+        if eb in ("body only", None) and ea not in ("body only", None) and c not in (CLOSEST.get(eid) or []):
+            rank += 4
+            note = note or "sem carga: só se o resto estiver ocupado"
+        out.append((rank, k, {"id": c, "fit": fit, "note": note}))
+    out.sort(key=lambda x: (x[0], x[1]))
+    return [o for _, _, o in out[:limit]]

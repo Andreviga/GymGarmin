@@ -1008,20 +1008,69 @@ def photo_get(pid: str):
                     headers={"Cache-Control": "private, max-age=31536000, immutable"})
 
 
+def _ids_param(v: str | None) -> list[str]:
+    return [x for x in (v or "").split(",") if x and catalog.get(x)]
+
+
+def _day_prof(prof: dict, schedule_id: int | None) -> dict:
+    """Perfil do dia: se o treino é numa academia do dia (viagem, casa), as trocas seguem o que tem lá."""
+    if not schedule_id:
+        return prof
+    e = db.get_entry(schedule_id)
+    g = (e or {}).get("gym_day")
+    if not g:
+        return prof
+    try:
+        return gyms.day_profile(prof, g["id"], g.get("home_kit"))
+    except KeyError:
+        return prof
+
+
 @app.get("/api/exercises/{exercise_id}/alternatives")
-def exercise_alternatives(exercise_id: str):
+def exercise_alternatives(exercise_id: str, session: str | None = None, done: str | None = None,
+                          schedule_id: int | None = None, reason: str = "ocupado"):
+    """Trocas para o exercício. Com o treino em andamento (session = exercícios do treino, done = já feitos), só o que
+    faz sentido agora: nada repetido, nada da mesma estação se ela está ocupada, nada de outro movimento sem relação."""
     prof = _profile()
     lims, ovr = prof.get("limitations") or [], db.garmin_overrides()
-    # do mais parecido para o menos, só o que a academia da pessoa tem (ou provavelmente tem)
-    ids = _subs_for(exercise_id, prof)[:14] or my_gym.alternatives(exercise_id)
+    day_p = _day_prof(prof, schedule_id)
+    mine = {m.get("exercise_id") for m in my_gym.list_mine()}
+    plims = generator.with_personal_lims(lims, personal.derive(prof))
+    in_s, dn = _ids_param(session), _ids_param(done)
+    opts = gyms.session_options(exercise_id, day_p, _subs_pool(exercise_id), my_ids=mine, lims=plims,
+                                in_session=[x for x in in_s if x != exercise_id], done=[x for x in dn if x != exercise_id],
+                                busy=reason != "falta", limit=12)
+    if not opts:   # catálogo sem equivalente curado: o que a busca por músculo achar, ainda sem repetir o treino
+        skip = set(in_s) | set(dn) | {exercise_id}
+        opts = [{"id": e, "fit": "outro", "note": None} for e in my_gym.alternatives(exercise_id) if e not in skip][:8]
     out = []
-    for eid in ids:
+    for o in opts:
+        eid = o["id"]
         ex = catalog.get(eid)
         v = _with_status(ex, lims, ovr)
         out.append({"id": eid, "name": v["name"], "equipment_pt": v.get("equipment_pt"), "limitation": v.get("limitation"),
-                    "kind": ex["kind"], "timed": ex.get("timed"), "my_machine": my_gym.for_exercise(eid), "gym": gyms.status(prof, eid)})
-    out.sort(key=lambda x: ((x["limitation"] or {}).get("status") == "evitar", not x["my_machine"]))
+                    "kind": ex["kind"], "timed": ex.get("timed"), "my_machine": my_gym.for_exercise(eid), "gym": gyms.status(day_p, eid),
+                    "fit": o["fit"], "note": o["note"]})
+    # o que já está na ordem certa (mesmo movimento primeiro); "seu aparelho" sobe dentro do mesmo grupo
+    # a ordem já vem do mais sensato agora; "seu aparelho" sobe entre os sem aviso; "evitar" pela limitação vai ao fim
+    order = {o["id"]: k for k, o in enumerate(opts)}
+    out.sort(key=lambda x: ((x["limitation"] or {}).get("status") == "evitar", not (x["my_machine"] and not x["note"]), order[x["id"]]))
     return out
+
+
+@app.post("/api/swap-options")
+def swap_options(body: dict = Body(...)):
+    """Aparelho ocupado no meio do treino: trocas que fazem sentido agora + exercícios que ainda vêm no treino e dá
+    para adiantar (não usam o mesmo aparelho), para voltar a este quando liberar."""
+    eid = body.get("exercise_id")
+    if not catalog.get(eid):
+        raise HTTPException(404, "Exercício desconhecido")
+    later = [x for x in body.get("later") or [] if catalog.get(x) and x != eid]
+    alts = exercise_alternatives(eid, session=",".join(body.get("session") or []), done=",".join(body.get("done") or []),
+                                 schedule_id=body.get("schedule_id"), reason=body.get("reason") or "ocupado")
+    st = gyms.station_of(eid)
+    adv = [x for x in later if not (st and gyms.station_of(x) == st and st not in gyms.SOFT_STATIONS)]
+    return {"alternatives": alts, "advance": [{"id": x, "name": catalog.get(x)["name"]} for x in adv[:3]]}
 
 
 @app.post("/api/sessions/item")
@@ -1232,6 +1281,10 @@ def _subs_pool(eid: str) -> list[str]:
     pat = alternative.pattern_of(eid)
     if pat:
         pool += list(generator.PATTERNS.get(pat, [])) + list(generator.PREMIUM_EXTRA.get(pat, []))
+        # movimentos que treinam o mesmo músculo (entram depois, como "mesmo músculo, outro movimento")
+        for a, b in gyms.COMPAT:
+            if a == pat and b in generator.PATTERNS:
+                pool += list(generator.PATTERNS[b])
     return pool
 
 
@@ -1258,7 +1311,8 @@ def gym_missing(body: dict = Body(...)):
     upd = {"gym_missing": missing + [eid], "gym_has": has}
     apply = body.get("apply", True)
     prof = db.save_profile(upd) if apply else {**prof, **upd}   # só consultar as opções não marca nada
-    subs = _subs_for(eid, prof, set(body.get("exclude") or []))
+    subs = [e for e in _subs_for(eid, prof, set(body.get("exclude") or [])) if gyms.sensible(eid, e)] or \
+        _subs_for(eid, prof, set(body.get("exclude") or []))
     to = body.get("to")
     if to and catalog.get(to):
         subs = [to] + [e for e in subs if e != to]
@@ -2431,6 +2485,11 @@ def _run_sync(trigger: str) -> dict:
                 db.kv_set("garmin_metrics", json.dumps(calibration.garmin_metrics(garmin_sync.current(), today)))
         except Exception:  # noqa: BLE001
             pass
+        if time.monotonic() < until:   # o que mudou no app vai para o relógio (prontidão de hoje inclusive)
+            try:
+                r["autopush"] = _autopush(until)
+            except Exception:  # noqa: BLE001
+                pass
         garmin_sync.persist()
     r["elapsed_s"] = round(time.monotonic() - t0, 1)
     return r
@@ -2455,7 +2514,11 @@ def g_sync(auto: bool = False):
                     _refresh_readiness(today, auto_apply=True)
             except Exception:  # noqa: BLE001 - prontidão é opcional
                 pass
-            return {"ok": True, "ran": False, "imported": []}
+            try:   # treino que mudou no app (ou a prontidão de hoje) vai para o relógio mesmo sem buscar atividades
+                ap = _autopush(time.monotonic() + 8)
+            except Exception:  # noqa: BLE001
+                ap = None
+            return {"ok": True, "ran": False, "imported": [], "autopush": ap}
     return {"ran": True, **_run_sync("auto" if auto else "manual")}
 
 
@@ -3319,7 +3382,7 @@ def schedule_gym(entry_id: int, body: dict = Body(...)):
     items, changes = gyms.adapt_day(base, prof, day_p, lambda eid: _subs_pool(eid))
     e["gym_orig_items"] = base
     e["items"] = items
-    e["gym_day"] = {"id": day_p["gym"]["id"], "name": day_p["gym"]["name"]}
+    e["gym_day"] = {"id": day_p["gym"]["id"], "name": day_p["gym"]["name"], **({"home_kit": day_p["home_kit"]} if "home_kit" in day_p else {})}
     e["gym_changes"] = changes
     if e.get("garmin_workout_id"):
         e["garmin_outdated"] = True
@@ -3398,6 +3461,48 @@ def schedule_push_week(body: dict = Body(default={})):
         _clear_garmin_orphans()
         return [{"date": e["date"], **_push_entry(e)} for e in entries]
     return _garmin_call(run)
+
+
+def _autopush(until: float | None = None) -> dict:
+    """Mantém o relógio igual ao celular: treinos dos próximos 7 dias que mudaram no app (troca, academia do dia,
+    prontidão, pular/mover, regerar) são reenviados e a versão antiga é apagada. Só para quem já usa os treinos no
+    relógio (já enviou algum); dias novos sem treino no relógio entram se a pessoa enviou nas últimas 2 semanas."""
+    if db.kv_get("garmin_autopush") == "off" or not garmin_sync.status().get("has_tokens"):
+        return {"ran": False, "pushed": []}
+    last = db.last_push_at()
+    if not last:
+        return {"ran": False, "pushed": []}
+    recent = last[:10] >= (clock.today() - timedelta(days=14)).isoformat()
+    fmt, today = _garmin_fmt(), clock.today()
+    end = today + timedelta(days=6)
+    orphans = json.loads(db.kv_get("garmin_orphans") or "[]")
+    if recent and schedule.week_start(end) != schedule.week_start(today):
+        schedule.ensure_week(_profile(), end)
+    todo = [e for e in db.list_schedule(today.isoformat(), end.isoformat()) if e["status"] == "planejado"
+            and ((e.get("garmin_workout_id") and _garmin_outdated(e, fmt)) or (not e.get("garmin_workout_id") and recent))]
+    if not todo and not orphans:
+        return {"ran": True, "pushed": []}
+    out, err = [], None
+    try:
+        _clear_garmin_orphans()
+        for e in todo:
+            if until and time.monotonic() > until:
+                break
+            out.append({"date": e["date"], "name": e.get("day_name") or e.get("name"), **_push_entry(e)})
+    except Exception as ex:  # noqa: BLE001 - sem rede/token: fica marcado para reenviar e o cartão avisa
+        err = str(ex)[:200]
+    return {"ran": True, "pushed": out, "error": err, "left": max(0, len(todo) - len(out))}
+
+
+@app.post("/api/garmin/autopush")
+def garmin_autopush():
+    return _autopush(time.monotonic() + 20)
+
+
+@app.put("/api/garmin/autopush")
+def garmin_autopush_pref(body: dict = Body(...)):
+    db.kv_set("garmin_autopush", "on" if body.get("on", True) else "off")
+    return {"on": body.get("on", True)}
 
 
 def _clear_garmin_orphans() -> int:

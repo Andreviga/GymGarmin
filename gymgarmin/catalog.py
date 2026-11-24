@@ -44,6 +44,24 @@ MUSCLE_FIXES = {
 
 # Nomes em português dos exercícios mais comuns de academia no Brasil
 NAMES_PT = {
+    "Cable_Incline_Triceps_Extension": "Tríceps testa na polia (banco inclinado)",
+    "Cable_Lying_Triceps_Extension": "Tríceps testa na polia (deitado)",
+    "Kneeling_Cable_Triceps_Extension": "Tríceps na polia ajoelhado (acima da cabeça)",
+    "One-Arm_Flat_Bench_Dumbbell_Flye": "Crucifixo unilateral com halter",
+    "Flat_Bench_Cable_Flyes": "Crucifixo na polia (banco reto)",
+    "Elevated_Cable_Rows": "Remada baixa sentado em banco elevado",
+    "Full_Range-Of-Motion_Lat_Pulldown": "Puxada com pegadores separados (amplitude total)",
+    "Kneeling_High_Pulley_Row": "Remada alta ajoelhado na polia",
+    "Cable_Shrugs": "Encolhimento na polia",
+    "Leverage_Shrug": "Encolhimento na máquina articulada",
+    "Calf-Machine_Shoulder_Shrug": "Encolhimento na máquina de panturrilha em pé",
+    "Standing_Leg_Curl": "Flexora em pé (unilateral)",
+    "Ball_Leg_Curl": "Flexão de joelhos na bola suíça",
+    "Reverse_Hyperextension": "Hiperextensão reversa",
+    "Calf_Press": "Panturrilha na máquina (calf press)",
+    "Barbell_Seated_Calf_Raise": "Panturrilha sentado com barra",
+    "Bent_Over_Two-Arm_Long_Bar_Row": "Remada cavalinho na barra livre (landmine)",
+    "Bent_Over_One-Arm_Long_Bar_Row": "Remada unilateral na barra livre (landmine)",
     # telas novas (famosos, bem-estar, casa, trocas): sem nome em inglês para quem usa
     "Air_Bike": "Abdominal bicicleta", "Barbell_Shoulder_Press": "Desenvolvimento com barra", "Bent-Arm_Barbell_Pullover": "Pullover com barra (braço dobrado)",
     "Butt_Lift_Bridge": "Ponte de glúteo", "Cable_One_Arm_Tricep_Extension": "Tríceps unilateral na polia", "Chair_Lower_Back_Stretch": "Alongamento de lombar na cadeira",

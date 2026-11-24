@@ -21,6 +21,21 @@ function swrSave() {
 }
 function swrClear() { SWR.mem.clear(); try { localStorage.removeItem(SWR.key); } catch (_) { /* */ } }
 const clone = (v) => (v && typeof v === "object" ? JSON.parse(JSON.stringify(v)) : v);
+// mudou o treino no celular (troca, academia do dia, pular/mover, regerar, prontidão...): o relógio recebe a versão nova
+// sozinho, apagando a antiga, para nunca fazer o treino errado no relógio
+const AUTOPUSH_RE = /^\/api\/(schedule\/(\d+\/(skip|undo|move|gym)|rebuild)|plans\/\d+(\/(swap|use))?$|gym\/missing|alternative\/(apply|undo)|readiness\/(apply|undo)|generator\/apply|sessions(\/\d+)?$)/;
+let autoPushT = null;
+function garminAutoPushSoon() {
+  if (!state.garmin || !state.garmin.connected) return;
+  clearTimeout(autoPushT);
+  autoPushT = setTimeout(async () => {
+    let r; try { r = await api("/api/garmin/autopush", { method: "POST" }); } catch (_) { return; }
+    if (!r || !r.ran) return;
+    if (r.error) return toast("⌚ Não consegui atualizar o relógio agora. Em Hoje → “Reenviar alterações ao Garmin”.", 6000);
+    if (r.pushed.length) toast(`⌚ Relógio atualizado: ${r.pushed.length} ${r.pushed.length === 1 ? "treino" : "treinos"} com a versão nova (a antiga foi apagada). Sincronize o relógio no Garmin Connect.`, 6000);
+  }, 1500);
+}
+
 async function api(path, opts = {}) {
   const act = actAs();
   const isGet = !opts.method || opts.method === "GET";
@@ -47,6 +62,7 @@ async function api(path, opts = {}) {
   }
   const ct = r.headers.get("content-type") || "";
   const out = ct.includes("json") ? await r.json() : await r.text();
+  if (!isGet && !act && AUTOPUSH_RE.test(path.split("?")[0])) garminAutoPushSoon();
   if (!isGet) { SWR.gen = (SWR.gen || 0) + 1; if (SWR.mem.size) swrClear(); }
   else if (ct.includes("json") && !SWR.skip.test(path) && gen === (SWR.gen || 0)) { SWR.mem.delete(ck); SWR.mem.set(ck, clone(out)); swrSave(); }
   return out;
@@ -358,8 +374,9 @@ function garminSyncCard(sch, gst) {
   const pend = (sch.entries || []).filter((e) => e.status === "planejado" && e.date >= sch.today);
   const out = pend.filter((e) => e.garmin_outdated); const missing = pend.filter((e) => !e.garmin_workout_id && !e.garmin_outdated);
   const n = out.length + missing.length; if (!n) return "";
-  return `<section class="garmin-card"><span class="gc-ico" aria-hidden="true">⌚</span><span class="grow"><b>${n} ${n === 1 ? "treino para atualizar" : "treinos para atualizar"} no relógio</b>
-    <span class="small muted">${out.length ? "O treino mudou desde o último envio (regras novas, troca ou regeração)" : "Ainda não foram para o Garmin"}</span></span>
+  const todayOld = out.some((e) => e.date === sch.today);
+  return `<section class="garmin-card ${todayOld ? "gc-alert" : ""}"><span class="gc-ico" aria-hidden="true">⌚</span><span class="grow"><b>${todayOld ? "O treino de HOJE no relógio é a versão antiga" : `${n} ${n === 1 ? "treino para atualizar" : "treinos para atualizar"} no relógio`}</b>
+    <span class="small muted">${todayOld ? "Atualize antes de começar (e sincronize o relógio no Garmin Connect) ou siga o treino pelo celular." : out.length ? "O treino mudou desde o último envio (troca, academia do dia, prontidão ou regeração)" : "Ainda não foram para o Garmin"}</span></span>
     <button class="btn sm" id="push-outdated">Reenviar ao Garmin</button></section>`;
 }
 
@@ -521,7 +538,7 @@ function bindAgenda(sch) {
       if (t.id === "legacy-clean" || t.id === "legacy-keep") {
         t.disabled = true; const keep = t.id === "legacy-keep";
         const r = await api("/api/schedule/legacy", { method: "POST", body: { keep } });
-        toast(keep ? "Ok, os treinos ficam como estão." : `Pronto: os treinos voltaram ao plano original${r.removed_sets ? ` (${r.removed_sets} ${r.removed_sets === 1 ? "série de reforço saiu" : "séries de reforço saíram"})` : ""}${state.garmin && state.garmin.connected ? ". Reenvie ao Garmin para atualizar o relógio" : ""}.`, 6000);
+        toast(keep ? "Ok, os treinos ficam como estão." : `Pronto: os treinos voltaram ao plano original${r.removed_sets ? ` (${r.removed_sets} ${r.removed_sets === 1 ? "série de reforço saiu" : "séries de reforço saíram"})` : ""}${state.garmin && state.garmin.connected ? ". O relógio é atualizado sozinho" : ""}.`, 6000);
         return again();
       }
       if (d.undo) { await api(`/api/schedule/${d.undo}/undo`, { method: "POST" }); toast("Ajuste desfeito"); return again(); }
@@ -539,7 +556,7 @@ function bindAgenda(sch) {
         updateGarminPill(); return again();
       }
       if (d.comeback) { const e = sch.entries.find((x) => x.date === sch.today && x.status === "planejado" && x.kind === "forca"); return openAlternative(e ? e.id : null, again, { reason: "tempo", opts: { minutes: 25 } }); }
-      if (d.altundo) { t.disabled = true; const e = await api(`/api/alternative/undo/${d.altundo}`, { method: "POST" }); toast(`Treino original de volta${e.garmin_outdated ? ". Reenvie ao relógio para atualizar" : ""}`, 4000); return again(); }
+      if (d.altundo) { t.disabled = true; const e = await api(`/api/alternative/undo/${d.altundo}`, { method: "POST" }); toast(`Treino original de volta${e.garmin_outdated ? ". O relógio recebe a versão nova sozinho" : ""}`, 4000); return again(); }
       if (d.altwhy) { const e = sch.entries.find((x) => String(x.id) === d.altwhy); if (e && e.alt) openModal(altResultHtml(e.alt, null) + `<button class="btn block" onclick="closeModal()">Ok</button>`); return; }
       if (t.id === "rd-open") return openReadiness(sch._rd);
       if (t.id === "rd-apply") { t.disabled = true; const r = await api("/api/readiness/apply", { method: "POST", body: {} }); toast(r.changed.length ? `Ajustado: ${r.changed.join(", ")}` : "Nada para ajustar hoje", 5000); return viewHoje(); }
@@ -2285,7 +2302,7 @@ async function openAlternative(entryId, again, preset) {
     const payload = { entry_id: entryId, reason: st.reason, opts: st.opts, seed: st.seed };
     if (entryId) {
       const e = await api("/api/alternative/apply", { method: "POST", body: payload });
-      closeModal(); toast(`Treino de hoje trocado${e.garmin_workout_id ? ". Reenvie ao relógio para atualizar" : ""}. Dá para voltar ao original.`, 5000);
+      closeModal(); toast(`Treino de hoje trocado${e.garmin_workout_id ? " (o relógio recebe a versão nova sozinho)" : ""}. Dá para voltar ao original.`, 5000);
       return again && again();
     }
     const cur = store("gg_session");
@@ -2827,16 +2844,30 @@ async function openSwap(it, onPick) {
     <p class="small muted" style="margin:4px 2px 14px">Troca pelo mais parecido que ela tem, em todo o treino, e não usa mais este aparelho.</p>
     <p class="small muted"><b>Só ocupado agora?</b> Escolha um destes para hoje:</p><div id="sw-list" class="sk"><span class="sk-line"></span><span class="sk-line"></span></div>`);
   const s = state.session;
-  let alts = [];
-  try { alts = await api(`/api/exercises/${encodeURIComponent(it.exercise_id)}/alternatives`); } catch (e) { $("#sw-list", body).innerHTML = `<p class="pill bad">${esc(e.message)}</p>`; return; }
+  // o treino em andamento: o que já foi feito e o que ainda vem não aparece como troca (e o que vem dá para adiantar)
+  const others = s ? s.items.filter((x) => x !== it && x.exercise_id) : [];
+  const isDone = (x) => (x.sets || []).some((y) => y.done) || fxDone(x);
+  const later = s ? fxOrder(s).map((k) => s.items[k]).filter((x) => x !== it && fxPh(x) === fxPh(it) && fxStrength(x) && !isDone(x)) : [];
+  let r = { alternatives: [], advance: [] };
+  try {
+    r = await api("/api/swap-options", { method: "POST", body: { exercise_id: it.exercise_id, session: others.map((x) => x.exercise_id),
+      done: others.filter(isDone).map((x) => x.exercise_id), later: later.map((x) => x.exercise_id), schedule_id: s && s.schedule_id ? +s.schedule_id : null } });
+  } catch (e) { $("#sw-list", body).innerHTML = `<p class="pill bad">${esc(e.message)}</p>`; return; }
+  const alts = r.alternatives;
+  const fitTxt = (x) => x.note ? `<span class="${/parecido|sem carga/.test(x.note) ? "warn-txt" : ""}">${esc(x.note)}</span>` : "";
   $("#sw-list", body).className = "";
-  $("#sw-list", body).innerHTML = `${alts.length ? `<ul class="list sw-list">${alts.map((x) => `<li><button class="sw-row" data-sw="${esc(x.id)}">${x.my_machine && x.my_machine.photo_url ? `<img class="sw-mine" src="${esc(x.my_machine.photo_url)}" alt="">` : mediaHtml(x.id, "s")}
-      <span class="grow"><b>${esc(x.name)}</b><span class="small muted">${esc(x.equipment_pt || "")}${x.my_machine ? ` · <span class="ok-txt">seu aparelho${x.my_machine.settings ? ` (${esc(x.my_machine.settings)})` : ""}</span>` : ""}</span></span>${limBadge(x.limitation)}</button></li>`).join("")}</ul>` : `<p class="muted">Não achei equivalente no catálogo.</p>`}
+  const advHtml = r.advance.length ? `<div class="sw-adv"><p class="small"><b>Ou adiante o próximo</b> e volte a este quando liberar:</p>
+      <div class="sw-adv-row">${r.advance.slice(0, 2).map((x) => `<button class="btn ghost sm" data-adv="${esc(x.id)}">⏩ ${esc(x.name)}</button>`).join("")}</div></div>` : "";
+  $("#sw-list", body).innerHTML = `${alts.length ? "" : advHtml}
+    ${alts.length ? `<ul class="list sw-list">${alts.map((x) => `<li><button class="sw-row" data-sw="${esc(x.id)}">${x.my_machine && x.my_machine.photo_url ? `<img class="sw-mine" src="${esc(x.my_machine.photo_url)}" alt="">` : mediaHtml(x.id, "s")}
+      <span class="grow"><b>${esc(x.name)}</b><span class="small muted">${esc(x.equipment_pt || "")}${x.my_machine ? ` · <span class="ok-txt">seu aparelho${x.my_machine.settings ? ` (${esc(x.my_machine.settings)})` : ""}</span>` : ""}${x.note ? ` · ${fitTxt(x)}` : ""}</span></span>${limBadge(x.limitation)}</button></li>`).join("")}</ul>` : `<p class="muted">Não achei uma troca que faça sentido sem repetir o que você já fez. Adiante o próximo exercício ou espere liberar.</p>`}${alts.length ? advHtml : ""}
     ${s && s.plan_id ? `<label class="row gap mg-sug"><input type="checkbox" id="sw-plan"> <span>Usar sempre: trocar na planilha e nos próximos treinos</span></label>` : ""}
     <button class="act" id="sw-photo" style="margin-top:12px">📷 Minha academia tem outro aparelho para isso</button>`;
   body.onclick = async (e) => {
     const b = e.target.closest("[data-sw]");
     if (b) { const also = !!($("#sw-plan", body) || {}).checked; closeModal(); return onPick(b.dataset.sw, also); }
+    const adv = e.target.closest("[data-adv]");
+    if (adv && s) { closeModal(); return fxAdvance(it, later.find((x) => x.exercise_id === adv.dataset.adv)); }
     if (e.target.id === "sw-missing") return openMissing(it, onPick);
     if (e.target.id === "sw-photo") openMyMachine({ exercise_id: it.exercise_id, exercise_name: it.name }, (mm) => { it.my_machine = mm; store("gg_session", state.session); renderSession(); });
   };
@@ -2864,6 +2895,19 @@ async function openMissing(it, onPick) {
     if (s) await onPick(res.to, false);
     toast(`${it.name} saiu dos seus treinos. No lugar: ${res.name}${res.changed ? ` (${res.changed} ${res.changed === 1 ? "lugar" : "lugares"} na planilha)` : ""}.`, 6000);
   };
+}
+
+// aparelho ocupado: faz agora um exercício que vinha depois e volta a este logo em seguida
+function fxAdvance(it, nxt) {
+  const s = state.session; if (!nxt) return;
+  s.items.splice(s.items.indexOf(nxt), 1);
+  s.items.splice(s.items.indexOf(it), 0, nxt);
+  s.fsel = null; s.restEnd = null; s.restOver = false; s.workEnd = null; s.prepEnd = null;
+  s.fx = fxOrder(s).indexOf(s.items.indexOf(nxt));
+  store("gg_session", s);
+  if (s.view === "foco") renderFocus(); else renderSession();
+  window.scrollTo(0, 0);
+  toast(`Agora: ${nxt.name}. Depois volta para ${it.name}.`, 5000);
 }
 
 async function fxSwap(it, toId, alsoPlan) {
@@ -3016,7 +3060,7 @@ async function openGymPicker(after, day) {
       const go = async (kit) => {
         let en; try { en = await api(`/api/schedule/${day.entry}/gym`, { method: "POST", body: { id: b.dataset.gym, home_kit: kit } }); } catch (err) { return toast(err.message, 5000); }
         closeModal(); const n = (en.gym_changes || []).length;
-        toast(n ? `Treino adaptado para ${en.gym_day.name}: ${n} ${n === 1 ? "troca" : "trocas"}${en.garmin_outdated ? ". Reenvie ao relógio" : ""}` : `${en.gym_day.name}: nada precisou mudar`, 6000);
+        toast(n ? `Treino adaptado para ${en.gym_day.name}: ${n} ${n === 1 ? "troca" : "trocas"}${en.garmin_outdated ? ". O relógio é atualizado sozinho" : ""}` : `${en.gym_day.name}: nada precisou mudar`, 6000);
         day.done && day.done();
       };
       if (b.dataset.gym === "casa") return openHomeKit(null, go);
@@ -4856,6 +4900,7 @@ async function autoSync() {
     const r = await syncAll("?auto=true");
     const msg = syncToast(r);
     if (msg) { toast(`${msg} 🎉`, 6000); if (["analise", "hoje", "evolucao"].includes((location.hash.slice(1) || "hoje").split("/")[0])) route(); }
+    else if (r && r.autopush && r.autopush.pushed && r.autopush.pushed.length) toast(`⌚ Relógio atualizado com a versão nova de ${r.autopush.pushed.length} ${r.autopush.pushed.length === 1 ? "treino" : "treinos"}.`, 5000);
     if (r && r.ran) updateGarminPill();
   } catch (_) { /* silencioso: o usuário pode sincronizar no Perfil */ }
 }

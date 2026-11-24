@@ -550,6 +550,13 @@ def set_garmin_override(exercise_id: str, category: str, exercise: str, user_id:
                   (user_id, exercise_id, category, exercise))
 
 
+def last_push_at(user_id: int | None = None) -> str | None:
+    user_id = user_id or current_user()
+    with conn() as c:
+        r = c.execute("SELECT MAX(created_at) AS m FROM garmin_pushes WHERE user_id = ?", (user_id,)).fetchone()
+    return (r["m"] if r else None) or None
+
+
 def log_push(plan_id: int | None, day_name: str, workout_id: int | None, scheduled: str | None, user_id: int | None = None) -> None:
     user_id = user_id or current_user()
     with conn() as c:

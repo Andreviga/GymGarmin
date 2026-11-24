@@ -481,6 +481,16 @@ def rebuild_week(profile: dict, today: date | None = None) -> list[dict]:
                             o["skip_result"]["strategy"] = "seguir"
                         db.save_entry(o)
             db.delete_entry(e["id"])
+    # semanas seguintes já montadas (o envio ao Garmin cobre 7 dias e cria a próxima semana): também saem da planilha
+    # antiga, senão o relógio fica com o treino velho nesses dias. Voltam montadas da planilha nova quando precisar.
+    later = db.list_schedule((ws + timedelta(days=7)).isoformat(), (ws + timedelta(days=70)).isoformat())
+    rebuild_later = set()
+    for e in later:
+        if e["status"] == "planejado":
+            if e.get("garmin_workout_id"):
+                orphans.append(e["garmin_workout_id"])
+            db.delete_entry(e["id"])
+            rebuild_later.add(week_start(_d(e["date"])))
     if orphans:
         import json
         old = json.loads(db.kv_get("garmin_orphans") or "[]")
@@ -493,6 +503,14 @@ def rebuild_week(profile: dict, today: date | None = None) -> list[dict]:
         for e in build_week(plan, profile, ws, from_date=today):
             if e["date"] not in existing and (e["date"], e.get("kind")) not in skipped:
                 db.save_entry(e)
+        for w in sorted(rebuild_later):   # semana futura que tinha algo além de planejado (pulado/feito antes): completa
+            rest = db.list_schedule(w.isoformat(), (w + timedelta(days=6)).isoformat())
+            if not rest:
+                continue
+            taken = {(e["date"], e.get("kind")) for e in rest} | {(e["date"], None) for e in rest if e["status"] == "feito"}
+            for e in build_week(plan, profile, w):
+                if (e["date"], e.get("kind")) not in taken and (e["date"], None) not in taken:
+                    db.save_entry(e)
     return ensure_week(profile, today, today)
 
 

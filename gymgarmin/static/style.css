@@ -171,6 +171,7 @@ body.timer-on { padding-bottom: calc(72px + 130px + env(safe-area-inset-bottom))
 .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(84px + env(safe-area-inset-bottom)); z-index: 30;
   background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 10px; max-width: calc(100% - 32px); }
 .toast[hidden] { display: none; }
+.toast { pointer-events: none; }   /* aviso só de texto: não impede tocar no botão que está atrás */
 .meter { height: 10px; border-radius: 5px; background: var(--line); overflow: hidden; }
 .meter > span { display: block; height: 100%; background: var(--brand); }
 .kpi { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
@@ -1102,3 +1103,10 @@ body.timer-on { padding-bottom: calc(72px + 70px + env(safe-area-inset-bottom));
 
 /* tela baixa (celular deitado): a barra de descanso não fica presa no topo (cobriria o exercício) */
 @media (max-height: 480px) { .fx-restbar { position: relative; } }
+
+/* troca no meio do treino: aviso de "parecido com o que já fez" e adiantar o próximo */
+.warn-txt { color: var(--warn, #b26a00); font-weight: 600; }
+.sw-adv { margin: 14px 0 4px; padding-top: 12px; border-top: 1px solid var(--line); }
+.sw-adv-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.sw-adv-row .btn { flex: 1 1 140px; min-height: 44px; text-align: left; }
+.garmin-card.gc-alert { border: 1px solid var(--warn); background: var(--warn-bg, color-mix(in srgb, var(--warn) 12%, var(--card))); }

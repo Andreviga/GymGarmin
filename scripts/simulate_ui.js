@@ -324,6 +324,26 @@ async function flows(page, base, persona, tag) {
           }
           await click("[data-fx='r+15']", "+15 s"); await click("[data-fx='r-skip']", "Pular descanso (guiado)");
         }
+        // aparelho ocupado: as trocas não podem repetir nada do treino; "adiantar" leva a outro exercício e volta
+        if (await page.locator("[data-fx='swap']").count()) {
+          await click("[data-fx='swap']", "Trocar (aparelho ocupado)");
+          await page.waitForSelector("#sw-list:not(.sk)", { timeout: 5000 }).catch(() => issue("troca: lista não carregou", W("treinar")));
+          await audit(page, W("troca: aparelho ocupado"));
+          const bad = await page.evaluate(() => {
+            const s = JSON.parse(localStorage.getItem("gg_session") || "{}");
+            const ids = new Set((s.items || []).map((x) => x.exercise_id));
+            return [...document.querySelectorAll("[data-sw]")].map((b) => b.dataset.sw).filter((x) => ids.has(x));
+          });
+          if (bad.length) issue("troca: oferece exercício que já está no treino", W(bad.join(",")));
+          const cur = await page.locator(".fx-count").textContent().catch(() => "");
+          if (await page.locator("[data-adv]").count()) {
+            await page.locator("[data-adv]").first().click(); await page.waitForTimeout(150);
+            const now = await page.locator(".fx-count").textContent().catch(() => "");
+            if (!(await page.locator("[data-fx='set']").count())) issue("adiantar: não abriu o outro exercício", W(`${cur} → ${now}`));
+            await audit(page, W("treino guiado: exercício adiantado"));
+          } else await page.evaluate(() => closeModal());
+          await page.evaluate(() => { const b = document.querySelector("[data-fx='list']"); if (b) b.scrollIntoView({ block: "center" }); });
+        }
       } else if (e.kind === "forca") issue("treino guiado: sem exercício com séries", W("treinar"));
       await click("[data-fx='list']", "Ver lista");
     } else issue("treino guiado não abriu", W("treinar"));
