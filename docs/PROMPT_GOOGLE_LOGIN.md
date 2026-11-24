@@ -37,3 +37,21 @@ de clicar em qualquer botão de pagamento (não deve haver nenhum: tudo aqui é 
 
 Depois disso, mande o ID do cliente para o Claude do app: ele publica a versão nova e avisa para conectar o YouTube.
 Para a Nathália usar também: em **Usuários de teste** (passo 2), adicione o e-mail do Google dela.
+
+---
+
+## Liberar para todos (sem lista de usuários de teste)
+
+Prompt para o navegador:
+
+> No Google Cloud Console, projeto **HAX** → **Google Auth Platform**:
+> 1. Em **Branding**: preencha "Link da Política de Privacidade" e "Link dos Termos de Serviço" com
+>    `https://haxfit.vercel.app/privacidade`, página inicial `https://haxfit.vercel.app`, e em
+>    **Domínios autorizados** adicione `haxfit.vercel.app`. Salve.
+> 2. Em **Público-alvo**: clique em **Publicar app** (passar de "Teste" para "Em produção") e confirme.
+>    Se aparecer o aviso de que o app precisa de verificação por usar o escopo do YouTube, **não** envie para
+>    verificação agora: só confirme a publicação.
+> 3. Me diga o status que ficou (ex.: "Em produção · Verificação necessária").
+
+Resultado: qualquer conta Google (até 100 pessoas) consegue conectar, com a tela "app não verificado" (Avançado →
+Acessar HAX), e o login não expira mais a cada 7 dias como acontece no modo de teste.
