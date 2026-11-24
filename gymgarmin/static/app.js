@@ -3484,6 +3484,7 @@ function scDraw(cv, d, st) {
   if (st.bg !== "cor") { c.shadowColor = "rgba(0,0,0,.45)"; c.shadowBlur = 18 * u; }
   const title = d.title || "Treino";
   const stats = scStats(d);
+  const trackTxt = st.music && (d.soundtrack || []).length ? `🎵 ${d.soundtrack.slice(0, 2).map((x) => x.name).join(" · ")}${d.soundtrack.length > 2 ? ` +${d.soundtrack.length - 2}` : ""}` : "";
   const gearTxt = st.gear && d.gear ? `${/bike|bici/.test(d.gear.type || "") ? "🚲" : "👟"} ${d.gear.name}${d.gear.km ? ` · ${d.gear.km} km` : ""}` : "";
   const tpl = st.tpl;
   if (tpl === "adesivo") {
@@ -3496,10 +3497,12 @@ function scDraw(cv, d, st) {
       scText(c, val, W / 2, y + 88 * u, 84 * u, { align: "center", w: 900 }); y += 150 * u;
     }
     if (gearTxt) { scText(c, gearTxt, W / 2, y, 32 * u, { align: "center", w: 700, max: W - 2 * pad }); y += 60 * u; }
+    if (trackTxt) { scText(c, trackTxt, W / 2, y, 30 * u, { align: "center", w: 600, max: W - 2 * pad }); y += 56 * u; }
     scText(c, "HAX", W / 2, y + 30 * u, 40 * u, { align: "center", w: 900 });
     c.restore(); return;
   }
   scBrand(c, W, H, u, d, true);
+  if (trackTxt) scText(c, trackTxt, pad, 140 * u, 26 * u, { w: 600, color: "rgba(255,255,255,.85)", max: W - 2 * pad });
   const bottomStats = (rows = 2) => {
     const h = Math.ceil(Math.min(stats.length, rows * 2) / 2) * 150 * u;
     scStatGrid(c, pad, H - pad - h + 70 * u, W - 2 * pad, u, stats.slice(0, rows * 2));
@@ -3577,7 +3580,7 @@ async function openStudio(sessionId) {
   const tpls = scTemplates(d);
   const pref = store("gg_sc") || {};
   const st = { tpl: d.endurance && d.endurance.route ? "mapa" : d.strength && d.strength.prs.length ? "recorde" : d.strength ? "musculos" : "classico",
-    fmt: pref.fmt || "story", bg: "cor", theme: pref.theme || "noite", img: null, imgKey: null, loads: pref.loads !== false, gear: pref.gear !== false };
+    fmt: pref.fmt || "story", bg: "cor", theme: pref.theme || "noite", img: null, imgKey: null, loads: pref.loads !== false, gear: pref.gear !== false, music: pref.music !== false };
   d.photos = d.photos || [];
   if (!tpls.includes(st.tpl)) st.tpl = tpls[0];
   const chip = (k, on, attr, txt) => `<button type="button" class="chip pc ${on ? "on" : ""}" data-${attr}="${k}">${txt}</button>`;
@@ -3585,7 +3588,8 @@ async function openStudio(sessionId) {
     <div class="sc-prev"><canvas id="sc-cv" aria-label="Prévia do cartão"></canvas></div>
     <div class="sc-row" id="sc-tpl"></div><div class="sc-row" id="sc-fmt"></div><div class="sc-row" id="sc-bg"></div>
     <div class="row gap wrap small" style="margin:6px 0">${d.strength ? `<label class="row gap" style="margin:0"><input type="checkbox" id="sc-loads" ${st.loads ? "checked" : ""}> Mostrar as cargas</label>` : ""}
-      ${d.gear ? `<label class="row gap" style="margin:0"><input type="checkbox" id="sc-gear" ${st.gear ? "checked" : ""}> Mostrar o tênis (${esc(d.gear.name)})</label>` : ""}</div>
+      ${d.gear ? `<label class="row gap" style="margin:0"><input type="checkbox" id="sc-gear" ${st.gear ? "checked" : ""}> Mostrar o tênis (${esc(d.gear.name)})</label>` : ""}
+      ${(d.soundtrack || []).length ? `<label class="row gap" style="margin:0"><input type="checkbox" id="sc-music" ${st.music ? "checked" : ""}> Mostrar a trilha (${d.soundtrack.length} ${d.soundtrack.length === 1 ? "música" : "músicas"})</label>` : ""}</div>
     <button class="btn block" id="sc-share">Compartilhar · Instagram, WhatsApp, Strava…</button>
     <div class="row gap" style="margin-top:8px"><button class="btn ghost grow" id="sc-copy">Copiar imagem</button><button class="btn ghost grow" id="sc-save">Salvar no celular</button></div>
     <p class="small muted" style="margin:8px 2px 0" id="sc-tip"></p>
@@ -3604,12 +3608,12 @@ async function openStudio(sessionId) {
       ? "Adesivo: no Instagram, abra o Story com a sua foto e cole a imagem (Copiar imagem) ou adicione pela galeria."
       : st.bg === "foto" ? "" : "Dica: ponha uma foto do treino de fundo, como no Strava.";
     scDraw(cv, d, st);
-    store("gg_sc", { fmt: st.fmt, theme: st.theme, loads: st.loads, gear: st.gear });
+    store("gg_sc", { fmt: st.fmt, theme: st.theme, loads: st.loads, gear: st.gear, music: st.music });
   };
   draw();
   const blob = () => new Promise((r) => cv.toBlob(r, "image/png"));
   const fname = () => `hax-${String(d.date).slice(0, 10)}-${st.tpl}.png`;
-  const caption = () => `${d.title} · ${scStats(d).map(([, v]) => v).join(" · ")} 💪 #HAX`;
+  const caption = () => `${d.title} · ${scStats(d).map(([, v]) => v).join(" · ")} 💪 #HAX${st.music && (d.soundtrack || []).length ? `\n🎵 Trilha: ${d.soundtrack.slice(0, 5).map((x) => `${x.name} (${x.artist})`).join(", ")}` : ""}`;
   const usePhoto = (url) => new Promise((res) => {
     const im = new Image();
     im.onload = () => { st.img = im; st.imgKey = url; st.bg = "foto"; if (st.tpl === "adesivo") st.tpl = "classico"; draw(); res(true); };
@@ -3620,6 +3624,7 @@ async function openStudio(sessionId) {
   body.onchange = async (e) => {
     if (e.target.id === "sc-loads") { st.loads = e.target.checked; draw(); }
     if (e.target.id === "sc-gear") { st.gear = e.target.checked; draw(); }
+    if (e.target.id === "sc-music") { st.music = e.target.checked; draw(); }
     if (e.target.id === "sc-photo" && e.target.files[0]) {
       let data; try { data = await shrinkPhoto(e.target.files[0], 1440, 0.82); } catch (err) { return toast(err.message, 5000); }
       await usePhoto(data);
@@ -3727,6 +3732,7 @@ async function openMusic(mode) {
     <p class="small muted" style="margin:0 2px 10px">${esc(cur.desc)} · ${esc(cur.range)} · ${cur.n} músicas suas</p>
     <button class="btn block" id="mu-play" ${cur.url ? "" : "disabled"}>▶ Tocar “HAX · ${esc(cur.label)}”</button>
     <div class="row gap" style="margin-top:8px"><button class="btn ghost grow" id="mu-gas">⚡ Mais gás agora</button><button class="btn ghost grow" id="mu-calm">🧘 Mais calma</button></div>
+    <button class="btn ghost block" id="mu-block" style="margin-top:8px">👎 Não tocar mais esta música</button>
     ${m.premium ? "" : `<p class="small muted" style="margin:10px 2px 0">Sem Premium o Spotify não deixa outro app dar play: os botões abrem a playlist no Spotify.</p>`}
     <a class="act" href="#musica" style="display:block;margin-top:10px">Ajustes da música ›</a>`;
   const loadNow = async () => {
@@ -3739,6 +3745,12 @@ async function openMusic(mode) {
     const t = e.target.closest("button"); if (!t) return;
     if (t.dataset.mm) return openMusic(t.dataset.mm);
     if (t.id === "mu-play") { t.disabled = true; await musicPlay(cur.id); if (state.session) { state.session.musicMode = cur.id; store("gg_session", state.session); } t.disabled = false; setTimeout(loadNow, 1500); return; }
+    if (t.id === "mu-block") {
+      t.disabled = true;
+      try { const r = await api("/api/music/block", { method: "POST", body: {} }); toast(`👎 ${r.name ? `“${r.name}”` : "Essa música"} saiu das playlists HAX`, 4000); setTimeout(loadNow, 1500); }
+      catch (err) { toast(err.message, 5000); }
+      t.disabled = false; return;
+    }
     if (t.id === "mu-gas" || t.id === "mu-calm") {
       const calmer = t.id === "mu-calm"; t.disabled = true;
       try { const r = await api("/api/music/boost", { method: "POST", body: { calmer } }); toast(`${calmer ? "🧘" : "⚡"} Agora: ${r.name} (${r.bpm} bpm)`, 4000); setTimeout(loadNow, 1500); }
@@ -3748,6 +3760,13 @@ async function openMusic(mode) {
   };
 }
 
+// músicas com que você rende mais (séries acima do seu normal naquele exercício e dia)
+function musicPerfHtml(p) {
+  if (!p) return "";
+  if (!p.top.length) return `<section class="card" style="margin-top:12px"><h2>🏆 Músicas que rendem mais</h2><p class="small muted" style="margin:0">O app anota o que tocava em cada série do treino guiado e compara com o seu normal naquele exercício. ${p.sets ? `Já são ${p.sets} séries em ${p.days} ${p.days === 1 ? "dia" : "dias"}:` : "Ainda sem séries:"} o resultado aparece depois de umas 3 a 4 semanas, e o ⚡ Mais gás passa a escolher essas primeiro.</p></section>`;
+  return `<section class="card" style="margin-top:12px"><h2>🏆 Músicas que rendem mais</h2><ol class="small" style="padding-left:18px;margin:0">${p.top.map((t) => `<li><b>${esc(t.name)}</b>${t.artist ? ` · ${esc(t.artist)}` : ""} — <span class="ok-txt">+${String(t.gain_pct).replace(".", ",")}%</span> <span class="muted">(${t.sets} séries)</span></li>`).join("")}</ol>
+    <p class="small muted" style="margin:8px 0 0">Força da série (carga × repetições) acima do seu normal naquele exercício e dia. O ⚡ Mais gás e as playlists de treino já priorizam essas.</p></section>`;
+}
 // ---- página de ajustes (#musica): conectar, montar as playlists, cadência e troca automática
 function b64url(buf) { return btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); }
 async function spotifyLogin(m) {
@@ -3808,6 +3827,7 @@ async function viewMusica() {
       <p class="small muted">${m.with_bpm} de ${m.tracks} músicas suas com BPM${m.pending ? ` · ${m.pending} ainda sem` : ""}.</p>
       <div id="mu-scan"></div>
       <button class="btn ghost block" id="mu-rescan">🔄 Atualizar minhas playlists</button></section>
+    ${musicPerfHtml(m.perf)}
     <h2 class="sec-title">Suas playlists HAX</h2>
     <div class="picks">${m.modes.map((x) => `<${x.url ? `a href="${esc(x.url)}" target="_blank" rel="noopener"` : "div"} class="pick"><span class="mu-ico" aria-hidden="true">${MUSIC_ICON[x.id]}</span>
       <span class="grow"><b>${esc(x.label)}</b><span class="small muted">${esc(x.range)} · ${x.n - (x.new || 0)} suas${x.new ? ` + ${x.new} novas` : ""}${x.n < 3 ? " · poucas: escolha estilos abaixo ou curta mais músicas nessa faixa" : ""}</span></span>${x.url ? `<span class="chev">›</span>` : ""}</${x.url ? "a" : "div"}>`).join("")}</div>
@@ -3823,6 +3843,15 @@ async function viewMusica() {
       <div class="chips" id="mu-mix">${m.mix_options.map((o) => `<button type="button" class="chip pc ${m.mix === o.id ? "on" : ""}" data-mix="${o.id}">${esc(o.label)}</button>`).join("")}</div>
       <button class="btn block" id="mu-gsave" style="margin-top:12px">Salvar estilos e atualizar playlists</button>
       ${m.discovered ? `<p class="small muted" style="margin:8px 0 0">${m.discovered} músicas novas encontradas nos seus estilos.</p>` : ""}</section>
+    <details class="card" style="margin-top:12px"><summary><b>⌚ Correr só com o relógio (sem celular)</b></summary>
+      <ol class="small" style="padding-left:18px;margin:8px 0 0">
+        <li>No relógio (modelos com música): abra os controles de música (na maioria, segurando o botão <b>DOWN</b>) → menu → <b>Fornecedores de música</b> → <b>Spotify</b> → entre com a sua conta (o relógio mostra um código para confirmar no celular).</li>
+        <li>No relógio, em Spotify: <b>Adicionar música e podcasts</b> → <b>Playlists</b> → marque <b>HAX · Tiros</b>, <b>HAX · Corrida leve</b> e <b>HAX · Corrida forte</b>.</li>
+        <li>Deixe o relógio no carregador e no Wi-Fi: as músicas baixam sozinhas (o app avisa quando terminar).</li>
+        <li>Na corrida: pareie o fone bluetooth no relógio, abra a música no relógio e corra sem o celular.</li>
+      </ol>
+      <p class="small muted" style="margin:8px 0 0">As playlists HAX mudam toda semana: o relógio atualiza quando sincronizar no Wi-Fi.</p></details>
+    ${(m.blocked || []).length ? `<details class="card" style="margin-top:12px"><summary><b>👎 Músicas que você tirou (${m.blocked.length})</b></summary><ul class="plain small">${m.blocked.map((b) => `<li class="row between gap"><span class="grow">${esc(b.name)}${b.artist ? ` · <span class="muted">${esc(b.artist)}</span>` : ""}</span><button class="act" data-unblock="${esc(b.id)}">voltar</button></li>`).join("")}</ul></details>` : ""}
     <section class="card" style="margin-top:12px"><h2>Ajustes</h2>
       <label class="row gap"><input type="checkbox" id="mu-auto" ${m.auto !== false ? "checked" : ""}> <span>Trocar a música sozinho conforme a fase do treino${m.premium ? "" : " (precisa do Premium)"}</span></label>
       <div class="field" style="margin-top:10px"><label for="mu-cad">Sua passada na corrida (passos por minuto)</label>
@@ -3852,6 +3881,7 @@ async function viewMusica() {
       return toast(`“${v}” entra quando você salvar`, 2500);
     }
     if (t.dataset.mix) { sel.mix = t.dataset.mix; $$("#mu-mix [data-mix]").forEach((b) => b.classList.toggle("on", b.dataset.mix === sel.mix)); return; }
+    if (t.dataset.unblock) { await api(`/api/music/block/${encodeURIComponent(t.dataset.unblock)}`, { method: "DELETE" }); toast("Volta nas playlists na próxima atualização", 3000); state.music = null; return viewMusica(); }
     if (t.id === "mu-gsave") {
       t.disabled = true; t.textContent = "Buscando músicas novas…";
       await api("/api/music/settings", { method: "PUT", body: { genres: sel.genres, mix: sel.mix } });
@@ -4194,6 +4224,10 @@ function fxSetDone() {
   s.lastSet = { i: order[s.fx], w: c.w, k: c.k };
   if (!c.w) fxCarry(it, c.k, "load_kg", null, c.x.load_kg);
   if (!c.w) { const msg = calibrate(it, c.k); if (msg) setTimeout(() => toast(msg, 7000), 300); }
+  if (!c.w && state.music && state.music.connected && (c.x.reps || c.x.load_kg)) {   // que música tocava nesta série
+    s.client_id = s.client_id || `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    api("/api/music/mark", { method: "POST", body: { exercise_id: it.exercise_id, reps: +c.x.reps || 0, load_kg: +c.x.load_kg || 0, session_key: s.client_id } }).catch(() => {});
+  }
   let rest;
   if (c.w) rest = (it.warmup || []).some((y) => !y.done && !y.skip) ? WARM_REST : WARM_LAST_REST;
   else { rest = (it.plan || {}).rest_s ?? 90; if (it.sets.every((y) => y.done)) s.fx = fxNextPos(s, order, s.fx); }

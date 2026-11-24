@@ -922,6 +922,10 @@ def share_card(session_id: int, garmin: bool = True):
     out["photos"] = ([{"url": f"/api/photos/{pid}", "src": "celular", "id": pid} for pid in _session_photos(session_id)]
                      + [{"url": f"/api/share/{session_id}/garmin-photo/{k}", "src": "garmin"} for k in range(min(int(g_photos or 0), 6))])
     out["garmin_fetched"] = extras is not None
+    try:
+        out["soundtrack"] = _soundtrack(s)
+    except Exception:  # noqa: BLE001 - opcional
+        out["soundtrack"] = []
     return out
 
 
@@ -1084,6 +1088,64 @@ def music_boost(body: dict = Body(default={})):
 @app.get("/api/music/now")
 def music_now():
     return _music_call(music.now_playing) or {}
+
+
+@app.post("/api/music/block")
+def music_block(body: dict = Body(default={})):
+    """👎 Não tocar mais: sai das playlists HAX (refeitas na hora) e pula para a próxima."""
+    def run():
+        r = music.block(body.get("track_id"))
+        try:
+            music.build_playlists(music.cadence_target(_run_cadences()))
+        except music.MusicError:
+            pass
+        return r
+    return _music_call(run)
+
+
+@app.delete("/api/music/block/{track_id}")
+def music_unblock(track_id: str):
+    music.unblock(track_id)
+    return {"ok": True}
+
+
+@app.post("/api/music/mark")
+def music_mark(body: dict = Body(...)):
+    """Série feita: anota a música que tocava (para descobrir com quais você rende mais). Silencioso se não der."""
+    if not music.connected():
+        return {"ok": False}
+    try:
+        return {"ok": True, "track": music.mark_set(body.get("exercise_id") or "", int(body.get("reps") or 0),
+                                                    body.get("load_kg"), body.get("session_key") or clock.today().isoformat())}
+    except (music.MusicError, ValueError):
+        return {"ok": False}
+
+
+def _soundtrack_now(s: dict) -> None:
+    """Ao salvar o treino: guarda a trilha enquanto o Spotify ainda lembra (só para quem conectou)."""
+    try:
+        if music.connected():
+            _soundtrack(s)
+    except Exception:  # noqa: BLE001 - nunca atrapalha salvar o treino
+        pass
+
+
+def _soundtrack(s: dict) -> list[dict]:
+    """Trilha do treino: guardada na primeira vez (o Spotify só lembra das últimas 50 músicas)."""
+    key = f"soundtrack:{s.get('id')}"
+    raw = db.kv_get(key)
+    if raw is not None:
+        return json.loads(raw)
+    if not music.connected():
+        return []
+    try:
+        tr = music.soundtrack(str(s.get("date")), float(s.get("duration_min") or (s.get("garmin_summary") or {}).get("duration_min") or 60), clock.TZ)
+    except music.MusicError:
+        return []
+    started = clock.now() - datetime.fromisoformat(str(s.get("date"))[:19])
+    if tr or started.days >= 2:          # vazio e recente: tenta de novo depois (o Spotify pode demorar a registrar)
+        db.kv_set(key, json.dumps(tr))
+    return tr
 
 
 @app.post("/api/music/disconnect")
@@ -1766,6 +1828,7 @@ def create_session(body: dict = Body(...)):
             _reopen_cardio_closed_by(saved)
             credit = schedule.credit_session(saved, _profile())
             saved = db.get_session(saved["id"]) or saved
+            _soundtrack_now(saved)
             return {**saved, "prs": history.session_prs(db.list_sessions(limit=5000), saved, _profile().get("weight_kg")),
                     "credit": credit, **_saved_extra(saved)}
         twin = None if body.get("garmin_activity_id") or no_merge else \
@@ -1782,6 +1845,7 @@ def create_session(body: dict = Body(...)):
         # que treino da agenda esta sessão fecha (pelo conteúdo) e o que ainda falta na semana
         credit = schedule.credit_session(saved, _profile())
         saved = db.get_session(saved["id"]) or saved
+        _soundtrack_now(saved)
         return {**saved, "prs": history.session_prs(db.list_sessions(limit=5000), saved, _profile().get("weight_kg")),
                 "credit": credit, **_saved_extra(saved)}
     except ValueError as e:

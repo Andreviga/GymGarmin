@@ -507,6 +507,8 @@ def pick(mode: str, cad: int, lib: dict | None = None, n: int = MAX_PER_LIST) ->
     tracks = (lib or _lib()).get("tracks") or {}
     st = settings()
     mix, genres = st.get("mix") or "completar", set(st.get("genres") or [])
+    blocked = set(st.get("blocked") or [])
+    lift = performers() if mode in ("gas", "musculacao", "tiros") else {}
     rows = []
     for tid, r in tracks.items():
         if not r.get("bpm"):
@@ -518,12 +520,16 @@ def pick(mode: str, cad: int, lib: dict | None = None, n: int = MAX_PER_LIST) ->
         f = _fit(r["bpm"], mode, cad)
         if f is None:
             continue
+        if tid in blocked:
+            continue
         energy = r.get("energy")
         if mode == "calma" and energy is not None and energy > 0.75:
             continue
         if mode in ("gas", "tiros", "musculacao") and energy is not None and energy < 0.45:
             continue
         score = r.get("aff", 1) * 1.0 - f * 6 + ((energy or 0.6) - 0.6) * (2 if mode in ("gas", "tiros", "musculacao") else -2 if mode == "calma" else 0)
+        if tid in lift:                       # música com que você rende mais: sobe (até +1,5)
+            score += min(1.5, lift[tid]["gain"] * 25)
         rows.append({"id": tid, **r, "eff": round(_eff_bpm(r["bpm"], mode, cad)), "score": round(score, 3)})
     order = MODES[mode]["order"]
     rows.sort(key=lambda x: -x["score"])
@@ -629,6 +635,8 @@ def boost(cad: int, calmer: bool = False) -> dict:
     if not rows:
         raise MusicError("Ainda não achei músicas suas nessa faixa de BPM.")
     recent = set(settings().get("boosted") or [])
+    lift = performers() if not calmer else {}
+    rows = sorted(rows, key=lambda x: -(lift.get(x["id"], {}).get("gain", 0))) if lift else rows
     r = next((x for x in rows if x["id"] not in recent), rows[0])
     call("POST", "/me/player/queue", params={"uri": r["uri"]})
     call("POST", "/me/player/next")
@@ -673,7 +681,10 @@ def summary(cad: int) -> dict:
             "disc_diag": lib.get("disc_diag") or {},
             "mix": s.get("mix") or "completar", "mix_options": [{"id": k, "label": v} for k, v in MIX.items()],
             "discovered": sum(1 for r in tracks.values() if r.get("src") == "descoberta"),
-            "stale": bool(s.get("built")) and (s.get("rules_v") != RULES_V or s.get("built_cad") != cad)}
+            "stale": bool(s.get("built")) and (s.get("rules_v") != RULES_V or s.get("built_cad") != cad),
+            "blocked": [{"id": t, "name": (tracks.get(t) or {}).get("name") or "música", "artist": (tracks.get(t) or {}).get("artist")}
+                        for t in (s.get("blocked") or [])[:30]],
+            "perf": perf_summary()}
 
 
 def search_url(mode: str, cad: int) -> str:
@@ -683,3 +694,116 @@ def search_url(mode: str, cad: int) -> str:
          "corrida_leve": f"corrida {cad} bpm", "corrida_ritmo": f"corrida {cad + 8} bpm", "tiros": f"corrida {cad + 18} bpm",
          "calma": "alongamento relaxar"}[mode]
     return "https://open.spotify.com/search/" + urllib.parse.quote(q) if m else "https://open.spotify.com"
+
+
+# ------------------------------------------------------------------ 👎 não tocar mais ----
+
+def block(track_id: str | None = None) -> dict:
+    """Tira a música de todas as playlists HAX para sempre (a que está tocando, se não disser qual) e pula."""
+    tid = track_id
+    if not tid:
+        d = call("GET", "/me/player/currently-playing")
+        tid = ((d or {}).get("item") or {}).get("id")
+    if not tid:
+        raise MusicError("Nada tocando no Spotify agora.")
+    s = settings()
+    s["blocked"] = list(dict.fromkeys([tid] + (s.get("blocked") or [])))[:500]
+    save_settings(s)
+    name = ((_lib().get("tracks") or {}).get(tid) or {}).get("name")
+    try:
+        call("POST", "/me/player/next")
+    except MusicError:
+        pass
+    return {"ok": True, "id": tid, "name": name}
+
+
+def unblock(track_id: str) -> None:
+    s = settings()
+    s["blocked"] = [x for x in s.get("blocked") or [] if x != track_id]
+    save_settings(s)
+
+
+# ------------------------------------------------------------------ trilha do treino ----
+
+def soundtrack(start_local: str, minutes: float, tz) -> list[dict]:
+    """Músicas que tocaram durante o treino (o Spotify guarda as últimas 50 com o horário)."""
+    from datetime import datetime, timedelta, timezone
+    try:
+        t0 = datetime.fromisoformat(str(start_local)[:19]).replace(tzinfo=tz)
+    except ValueError:
+        return []
+    t1 = t0 + timedelta(minutes=max(10.0, float(minutes or 60)) + 5)
+    after = int((t0 - timedelta(minutes=5)).astimezone(timezone.utc).timestamp() * 1000)
+    d = call("GET", "/me/player/recently-played", params={"limit": 50, "after": after}) or {}
+    out = []
+    for it in d.get("items") or []:
+        try:
+            at = datetime.fromisoformat(str(it.get("played_at")).replace("Z", "+00:00"))
+        except ValueError:
+            continue
+        if t0 - timedelta(minutes=5) <= at <= t1:
+            t = it.get("track") or {}
+            out.append({"name": t.get("name"), "artist": ", ".join(a.get("name", "") for a in t.get("artists") or []),
+                        "at": at.isoformat()})
+    out.sort(key=lambda x: x["at"])
+    return [{"name": x["name"], "artist": x["artist"]} for x in out if x["name"]][:30]
+
+
+# ------------------------------------------------------------------ músicas que rendem mais ----
+
+PERF_KEY = "music_perf"
+
+
+def mark_set(exercise_id: str, reps: int, load: float | None, session_key: str) -> dict | None:
+    """Anota a música que tocava nesta série (para descobrir com quais você rende mais)."""
+    if not reps:
+        return None
+    d = call("GET", "/me/player/currently-playing")
+    item = (d or {}).get("item") if (d or {}).get("is_playing") else None
+    if not item or not item.get("id"):
+        return None
+    rows = json.loads(db.kv_get(PERF_KEY) or "[]")
+    rows.append({"t": item["id"], "e": exercise_id, "r": int(reps), "l": float(load or 0), "k": str(session_key)[:40],
+                 "d": time.strftime("%Y-%m-%d")})
+    db.kv_set(PERF_KEY, json.dumps(rows[-3000:]))
+    return {"id": item["id"], "name": item.get("name")}
+
+
+def _set_score(r: dict) -> float:
+    """Força da série: 1RM estimado (Epley) com carga; só repetições sem carga."""
+    return r["l"] * (1 + r["r"] / 30) if r["l"] else float(r["r"])
+
+
+def performers(min_sets: int = 4) -> dict[str, dict]:
+    """Por música: quanto as séries feitas com ela rendem acima do normal daquele exercício naquele treino
+    (compara com a mediana das outras séries do mesmo exercício no mesmo dia: carga, cansaço e dia já ficam de fora)."""
+    rows = json.loads(db.kv_get(PERF_KEY) or "[]")
+    groups: dict[tuple, list] = {}
+    for r in rows:
+        groups.setdefault((r["k"], r["e"]), []).append(r)
+    rel: dict[str, list[float]] = {}
+    for g in groups.values():
+        if len(g) < 2:
+            continue
+        sc = sorted(_set_score(x) for x in g)
+        med = sc[len(sc) // 2] if len(sc) % 2 else (sc[len(sc) // 2 - 1] + sc[len(sc) // 2]) / 2
+        if med <= 0:
+            continue
+        for x in g:
+            rel.setdefault(x["t"], []).append(_set_score(x) / med - 1)
+    out = {}
+    for t, v in rel.items():
+        if len(v) >= min_sets:
+            gain = sum(v) / len(v)
+            if gain > 0.01:
+                out[t] = {"gain": round(gain, 4), "sets": len(v)}
+    return out
+
+
+def perf_summary() -> dict:
+    rows = json.loads(db.kv_get(PERF_KEY) or "[]")
+    lib = (_lib().get("tracks") or {})
+    best = sorted(performers().items(), key=lambda kv: -kv[1]["gain"])[:5]
+    return {"sets": len(rows), "days": len({r["d"] for r in rows}),
+            "top": [{"id": t, "name": (lib.get(t) or {}).get("name") or "música", "artist": (lib.get(t) or {}).get("artist"),
+                     "gain_pct": round(v["gain"] * 100, 1), "sets": v["sets"]} for t, v in best]}

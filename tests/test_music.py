@@ -208,3 +208,47 @@ def test_estilo_nichado_busca_pelo_nome_quando_o_genero_falha_e_parecidas(env, m
     lib = music._lib()
     assert "funk" not in lib["disc_at"] and "hardtechno" in lib["disc_at"]          # vazio tenta de novo depois
     assert lib["tracks"]["novo3"]["bpm"] == 178
+
+
+def test_nao_tocar_mais_trilha_e_musicas_que_rendem(env, monkeypatch):
+    from datetime import datetime, timezone
+    c, net = env
+    c.post("/api/music/connect", json={"code": "abc", "verifier": "v", "redirect_uri": "x"})
+    c.post("/api/music/scan", json={"refresh": True})
+    # 👎 a música que está tocando ("pesada") sai de todas as playlists e não volta
+    r = c.post("/api/music/block", json={}).json()
+    assert r["id"] == "pesada" and r["name"] == "Pesada"
+    assert all(x["id"] != "pesada" for m in music.MODES for x in music.pick(m, 162))
+    st = c.get("/api/music").json()
+    assert st["blocked"][0]["id"] == "pesada"
+    c.delete("/api/music/block/pesada")
+    assert any(x["id"] == "pesada" for x in music.pick("musculacao", 162))
+
+    # trilha: o que tocou durante o treino (horário do Spotify em UTC; treino no fuso de SP)
+    def recent(method, url, headers=None, body=None, timeout=12):
+        if "recently-played" in url:
+            return 200, {"items": [
+                {"played_at": "2026-11-24T10:10:00Z", "track": _track("treino")},     # 07:10 em SP: durante
+                {"played_at": "2026-11-24T10:40:00Z", "track": _track("rapida")},     # 07:40: durante
+                {"played_at": "2026-11-24T14:00:00Z", "track": _track("lenta")}]}     # 11:00: depois
+        return net(method, url, headers, body, timeout)
+    monkeypatch.setattr(music, "_http", recent)
+    s = db.save_session({"date": "2026-11-24T07:00", "day_name": "Puxar", "duration_min": 60, "items": [
+        {"exercise_id": "Pullups", "sets": [{"reps": 8, "done": True}]}]})
+    d = c.get(f"/api/share/{s['id']}").json()
+    assert [x["name"] for x in d["soundtrack"]] == ["Treino", "Rapida"]
+    monkeypatch.setattr(music, "_http", net)
+    assert [x["name"] for x in c.get(f"/api/share/{s['id']}").json()["soundtrack"]] == ["Treino", "Rapida"]   # guardada
+
+    # rende mais: séries com "pesada" tocando ficam acima do normal do exercício no dia
+    for day in range(4):
+        for k, (reps, playing) in enumerate([(8, False), (8, False), (11, True)]):
+            net.now = "pesada" if playing else "media"
+            monkeypatch.setattr(music, "call", lambda m, p, body=None, params=None, _n=net.now: (
+                {"is_playing": True, "item": _track(_n)} if "currently-playing" in p else None))
+            c.post("/api/music/mark", json={"exercise_id": "Barbell_Bench_Press_-_Medium_Grip", "reps": reps, "load_kg": 80,
+                                            "session_key": f"s{day}"})
+    perf = music.performers()
+    assert "pesada" in perf and perf["pesada"]["sets"] == 4 and perf["pesada"]["gain"] > 0.05 and "media" not in perf
+    top = music.perf_summary()["top"]
+    assert top[0]["id"] == "pesada" and top[0]["gain_pct"] > 5
