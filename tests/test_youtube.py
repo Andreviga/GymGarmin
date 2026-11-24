@@ -205,3 +205,18 @@ def test_pagina_de_privacidade_publica(env):
     c, _ = env
     r = c.get("/privacidade")
     assert r.status_code == 200 and "Política de Dados do Usuário" in r.text and "HAX" in r.text
+
+
+def test_rotina_diaria_continua_as_playlists(env, monkeypatch):
+    c, net = env
+    _connect(c)
+    monkeypatch.setattr(music, "connected", lambda: True)
+    out = c.get("/api/cron/youtube-sync").json()
+    assert out["users"] == 1 and out["results"]["1"]["ran"] and out["results"]["1"]["pending"] == 0
+    added = sum(len(v) for v in net.items.values())
+    assert added == 17
+    q = youtube._quota()
+    # cota contada certinho mesmo com a busca em paralelo: buscas×100 + playlists×50 + vídeos×50
+    assert q["used"] == net.searches * 100 + len(net.items) * 50 + added * 50
+    monkeypatch.setenv("CRON_SECRET", "x")
+    assert c.get("/api/cron/youtube-sync").status_code == 401

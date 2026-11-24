@@ -2891,6 +2891,31 @@ def g_sync(auto: bool = False):
     return {"ran": True, **_run_sync("auto" if auto else "manual")}
 
 
+@app.get("/api/cron/youtube-sync")
+def cron_youtube_sync(authorization: str | None = Header(None)):
+    """Rotina diária (logo depois que a cota do Google zera): continua as playlists HAX no YouTube de quem conectou."""
+    secret = os.environ.get("CRON_SECRET")
+    if (secret or os.environ.get("VERCEL")) and authorization != f"Bearer {secret}":
+        raise HTTPException(401, "Não autorizado")
+    with db.conn() as c:
+        users = [int(dict(r)["id"]) for r in c.execute("SELECT id FROM google_tokens WHERE refresh_token_enc IS NOT NULL").fetchall()]
+    t0, results = time.monotonic(), {}
+    for uid in users:
+        left = 25 - (time.monotonic() - t0)
+        if left < 4 or youtube.units_left() < youtube.COST["search"] + youtube.COST["insert"]:
+            break
+        with db.as_user(uid):
+            if not music.connected():
+                results[uid] = {"ran": False, "reason": "Spotify não conectado"}
+                continue
+            try:
+                r = youtube.sync(budget_s=left - 2, cad=music.cadence_target(_run_cadences()))
+                results[uid] = {"ran": True, "pending": r["pending"], "stopped": r.get("stopped")}
+            except youtube.YTError as e:
+                results[uid] = {"ran": False, "reason": str(e)}
+    return {"users": len(users), "results": results}
+
+
 @app.get("/api/cron/garmin-sync")
 def cron_garmin_sync(authorization: str | None = Header(None)):
     """Chamado pelo cron diário da Vercel (envia 'Authorization: Bearer $CRON_SECRET')."""

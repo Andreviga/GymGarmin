@@ -289,6 +289,47 @@ def find_video_id(query: str) -> str | None:
     return vid
 
 
+def _search_http(token: str, query: str) -> tuple[str, str | None, str | None]:
+    """(query, video_id, erro) — só HTTP, para rodar em paralelo."""
+    url = API + "/search?" + urllib.parse.urlencode({"part": "snippet", "type": "video", "maxResults": 1, "q": query,
+                                                    "videoCategoryId": "10"})
+    st, d = music._http("GET", url, {"Authorization": f"Bearer {token}"})
+    if st >= 400:
+        err = (d or {}).get("error") if isinstance(d, dict) else None
+        reason = ((err or {}).get("errors") or [{}])[0].get("reason") if isinstance(err, dict) else None
+        return query, None, reason or str(st)
+    items = (d or {}).get("items") or []
+    return query, ((items[0].get("id") or {}).get("videoId")) if items else None, None
+
+
+def prefetch(queries: list[str], workers: int = 8) -> int:
+    """Busca de uma vez (em paralelo) os vídeos que ainda não estão no cache, dentro da cota do dia."""
+    from concurrent.futures import ThreadPoolExecutor
+    todo = [q for q in dict.fromkeys(queries) if q and not _cached(q)[0]]
+    cap = units_left() // COST["search"]
+    todo = todo[:cap]
+    if not todo:
+        return 0
+    token = access_token()
+    q = _quota()
+    q["used"] += COST["search"] * len(todo)
+    db.kv_set(QUOTA_KEY, json.dumps(q), user_id=GLOBAL)
+    with ThreadPoolExecutor(max_workers=workers) as ex:
+        results = list(ex.map(lambda x: _search_http(token, x), todo))
+    n = 0
+    for query, vid, err in results:
+        if err in ("quotaExceeded", "dailyLimitExceeded"):
+            _block_quota()
+            continue
+        if err:
+            continue                       # erro passageiro: tenta de novo outro dia
+        with db.conn() as c:
+            c.execute("INSERT INTO youtube_video_cache (query, video_id, created_at) VALUES (?,?,?) "
+                      "ON CONFLICT (query) DO UPDATE SET video_id = excluded.video_id", (_norm_query(query), vid, db.now()))
+        n += 1
+    return n
+
+
 def playlist_url(pid: str) -> str:
     return f"https://music.youtube.com/playlist?list={pid}"
 
@@ -351,6 +392,12 @@ def sync(budget_s: float = 8.0, cad: int | None = None) -> dict:
     wanted = {m: music.pick(m, cad) for m in music.MODES}
     t0, stop, progressed = time.monotonic(), None, True
     try:
+        nxt_q, depth = [], max((len(v) for v in wanted.values()), default=0)
+        for k in range(depth):              # revezando: a 1ª de cada playlist, depois a 2ª...
+            for mode, rows in wanted.items():
+                if k < len(rows) and rows[k]["id"] not in set(st["added"].get(mode) or []):
+                    nxt_q.append(_query_for(rows[k]))
+        prefetch(nxt_q[: max(0, units_left() // (COST["search"] + COST["insert"]))])
         while progressed and time.monotonic() - t0 < budget_s:
             progressed = False
             for mode, rows in wanted.items():
