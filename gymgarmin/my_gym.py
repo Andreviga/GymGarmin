@@ -223,17 +223,61 @@ def _queue() -> list[dict]:
     return _get("dev_queue", GLOBAL, [])
 
 
+def _norm_words(s: str) -> set[str]:
+    stop = {"de", "da", "do", "na", "no", "com", "e", "a", "o", "em", "para", "the", "on", "with"}
+    return {w for w in re.findall(r"[a-z0-9]+", catalog.strip_accents((s or "").lower())) if len(w) > 1 and w not in stop}
+
+
+def located(exercise_id: str | None, name: str | None) -> str | None:
+    """A foto serve para localizar o aparelho no catálogo. Já existe se o exercício escolhido tem aparelho na galeria
+    ou se o nome que a pessoa deu é o do exercício (ou um apelido dele). Devolve o id do aparelho/exercício achado;
+    None = aparelho que o catálogo não tem (fica na fila para pesquisar e adicionar)."""
+    from . import gallery
+    ex = catalog.get(exercise_id) if exercise_id else None
+    if not ex:
+        return None
+    mid = gallery.by_exercise().get(exercise_id)
+    if mid:
+        return mid
+    given = _norm_words(name)
+    if not given:
+        return exercise_id
+    for ref in [ex.get("name"), ex.get("name_en")] + list(ex.get("aliases") or []):
+        w = _norm_words(ref or "")
+        if w and (given <= w or w <= given or len(given & w) / len(given | w) >= 0.6):
+            return exercise_id
+    return None
+
+
 def submit(pid: str, user_id: int, user_name: str | None, exercise_id: str | None, name: str, settings: str | None) -> dict:
     q = _queue()
     item = {"qid": secrets.token_hex(6), "photo_id": pid, "user_id": user_id, "user_name": user_name,
             "exercise_id": exercise_id, "name": name, "settings": settings, "status": "pendente",
             "created": clock.now().isoformat(timespec="seconds")}
+    hit = located(exercise_id, name)
+    if hit:   # aparelho que o catálogo já tem: localizado na hora (a foto não é publicada; só serviu para achar)
+        item.update(status="localizado", machine_id=hit, decided=item["created"])
     q.append(item)
     _put("dev_queue", q, GLOBAL)
     return item
 
 
+def _auto_locate() -> None:
+    """Fotos que ficaram na fila antes da localização automática: as de aparelhos que o catálogo já tem saem dela."""
+    q, changed = _queue(), False
+    for it in q:
+        if it.get("status") == "pendente":
+            hit = located(it.get("exercise_id"), it.get("name"))
+            if hit:
+                it.update(status="localizado", machine_id=hit, decided=clock.now().isoformat(timespec="seconds"))
+                changed = True
+    if changed:
+        _put("dev_queue", q, GLOBAL)
+
+
 def queue(status: str = "pendente") -> list[dict]:
+    if status == "pendente":
+        _auto_locate()
     out = []
     for q in _queue():
         if q.get("status") != status:

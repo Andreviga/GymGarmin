@@ -137,3 +137,32 @@ def test_family_feedback_reaches_dev_area(owner):
     assert fb[0]["user_name"] == "Maria" and fb[0]["where"] == "treinar" and not fb[0]["done"]
     assert owner.post(f"/api/dev/feedback/{fb[0]['id']}/done", json={"done": True}).status_code == 200
     assert owner.get("/api/dev/queue").json()["feedback"][0]["done"]
+
+
+def test_foto_de_aparelho_que_o_catalogo_tem_e_localizada_sozinha(owner):
+    """A foto serve para localizar o aparelho: se o catálogo já tem, sai da fila na hora (e a foto não é publicada);
+    só o aparelho que o catálogo não tem fica para pesquisar e adicionar."""
+    m = _member(owner)
+    # nome igual ao exercício do catálogo → localizado
+    r = m.post("/api/my-gym/machines", json={"image": JPEG, "exercise_id": "Machine_Lat_Pulldown",
+                                            "name": "Puxada articulada (máquina convergente)", "suggest": True})
+    assert r.status_code == 200
+    # aparelho com outro nome (talvez outro aparelho) → fica para pesquisar
+    m.post("/api/my-gym/machines", json={"image": JPEG, "exercise_id": "Seated_Cable_Rows",
+                                         "name": "Remada Hammer Strength ISO lateral", "suggest": True})
+    q = owner.get("/api/dev/queue").json()
+    assert [x["exercise_id"] for x in q["pending"]] == ["Seated_Cable_Rows"]
+    loc = q["located"]
+    assert [x["exercise_id"] for x in loc] == ["Machine_Lat_Pulldown"]
+    pid = loc[0]["photo_url"].rsplit("/", 1)[-1]
+    assert not (my_gym.photo(pid) or {}).get("public")              # localizar não publica a foto de ninguém
+
+
+def test_fila_antiga_e_localizada_ao_abrir(owner):
+    my_gym.submit("abc", 1, "André", "Dumbbell_Bench_Press", "Supino reto com halteres", None)
+    q = my_gym._queue()
+    for it in q:
+        it["status"] = "pendente"          # como estava antes da localização automática
+    my_gym._put("dev_queue", q, my_gym.GLOBAL)
+    assert owner.get("/api/dev/queue").json()["pending"] == []
+    assert my_gym._queue()[-1]["status"] == "localizado"

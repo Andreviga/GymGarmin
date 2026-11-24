@@ -1366,7 +1366,8 @@ def _dev() -> None:
 @app.get("/api/dev/queue")
 def dev_queue():
     _dev()
-    return {"pending": my_gym.queue("pendente"), "approved": my_gym.queue("aprovado")[:20], "feedback": my_gym.feedback(),
+    return {"pending": my_gym.queue("pendente"), "approved": my_gym.queue("aprovado")[:20], "located": my_gym.queue("localizado")[:12],
+            "feedback": my_gym.feedback(),
             "custom": [gallery.summary(m) for m in my_gym.custom_machines()],
             "categories": [{"id": k, "name": v} for k, v in gallery.CATEGORIES],
             "machines": [{"id": m["machine_id"], "name": m["name"]} for m in gallery.load()]}

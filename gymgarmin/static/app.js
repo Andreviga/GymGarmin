@@ -2805,14 +2805,13 @@ const myMachineChip = (mm, tappable = true) => mm ? `<${tappable ? "button" : "d
 // cadastrar/editar o aparelho da pessoa para um exercício (foto + nome + regulagem); st guarda o que já foi preenchido
 function openMyMachine(st, onSaved) {
   st = { suggest: true, ...st };
-  const isAdmin = !!(state.me && state.me.user && state.me.user.is_admin);
   const body = openModal(`<h2>${st.id ? "Seu aparelho" : "📷 Fotografar meu aparelho"}</h2>
     <p class="small muted">Para o exercício <b>${esc(st.exercise_name || "—")}</b> <button class="act" id="mg-ex">trocar exercício</button></p>
     <label class="photo-pick">${st.image || st.photo_url ? `<img id="mg-prev" src="${esc(st.image || st.photo_url)}" alt="">` : `<span class="pp-empty">📷<b>Tirar foto do aparelho</b><span class="small">ou escolher da galeria</span></span>`}
       <input type="file" id="mg-file" accept="image/*" capture="environment" ${st.id ? "disabled" : ""}></label>
     <div class="field"><label for="mg-name">Nome do aparelho</label><input id="mg-name" value="${esc(st.name || st.exercise_name || "")}" placeholder="ex.: Leg press 45° (Matrix)"></div>
     <div class="field"><label for="mg-set">Regulagem (o que você ajusta)</label><input id="mg-set" value="${esc(st.settings || "")}" placeholder="ex.: banco 4, encosto 2, pino da perna no 3"></div>
-    ${st.id ? "" : `<label class="row gap mg-sug"><input type="checkbox" id="mg-sug" ${st.suggest ? "checked" : ""}> <span>Sugerir para o catálogo do HAX${isAdmin ? " (vai para a sua área do desenvolvedor)" : " (o desenvolvedor aprova)"}</span></label>`}
+    ${st.id ? "" : `<label class="row gap mg-sug"><input type="checkbox" id="mg-sug" ${st.suggest ? "checked" : ""}> <span>Ajudar a localizar este aparelho no catálogo do HAX (se for um aparelho que o catálogo ainda não tem, ele é pesquisado e adicionado)</span></label>`}
     <button class="btn block" id="mg-save" ${st.exercise_id ? "" : "disabled"}>Salvar</button>
     ${st.id ? `<button class="act" id="mg-del" style="margin-top:10px">Remover este aparelho</button>` : ""}
     <p class="small muted" style="margin-top:10px">Da próxima vez que esse exercício aparecer, o app mostra a foto e a regulagem.</p>`);
@@ -2831,7 +2830,7 @@ function openMyMachine(st, onSaved) {
       const out = st.id
         ? await api(`/api/my-gym/machines/${st.id}`, { method: "PATCH", body: { name: st.name, settings: st.settings, exercise_id: st.exercise_id } })
         : await api("/api/my-gym/machines", { method: "POST", body: { image: st.image || null, exercise_id: st.exercise_id, name: st.name, settings: st.settings, suggest: !!(st.image && st.suggest) } });
-      closeModal(); toast(st.id ? "Regulagem salva" : out.suggested ? "Aparelho salvo e enviado para o catálogo 👍" : "Aparelho salvo 👍");
+      closeModal(); toast(st.id ? "Regulagem salva" : out.suggested ? "Aparelho salvo 👍 A foto ajuda a localizar o aparelho no catálogo" : "Aparelho salvo 👍");
       onSaved && onSaved(out);
     } catch (err) { e.target.disabled = false; toast(err.message, 5000); }
   };
@@ -3436,7 +3435,8 @@ async function viewDev() {
     <h2 class="sec-title">Feedback (${(q.feedback || []).filter((f) => !f.done).length} novos)</h2>
     ${(q.feedback || []).length ? `<div class="picks fb-list">${q.feedback.map((f) => `<div class="pick fb ${f.done ? "done" : ""}"><span class="grow"><b>${esc(f.user_name || "—")}</b><span class="small muted">${fmtDate(f.created)} · tela ${esc(f.where || "—")}${f.device ? ` · ${esc(f.device)}` : ""}</span>
       <span class="fb-text">${esc(f.text)}</span></span><button class="act" data-fbdone="${esc(f.id)}" data-v="${f.done ? 0 : 1}">${f.done ? "Reabrir" : "✓ Resolvido"}</button></div>`).join("")}</div>` : `<p class="muted small" style="margin:0 4px 14px">Ainda nenhum. Todo mundo tem o botão “Mandar sugestão ou problema” no Perfil.</p>`}
-    <h2 class="sec-title">Fotos para aprovar (${q.pending.length})</h2>
+    <h2 class="sec-title">Aparelhos para pesquisar (${q.pending.length})</h2>
+    <p class="small muted" style="margin:0 4px 10px">As fotos servem só para localizar o aparelho. Se o catálogo já tem, ele é localizado sozinho e não aparece aqui. Aqui ficam só os que o catálogo <b>não</b> tem: peça ao Claude para pesquisar e adicionar, ou cadastre você mesmo.</p>
     ${q.pending.length ? q.pending.map((x) => `<div class="card dv-card" data-q="${esc(x.qid)}">
       <img class="dv-img" src="${esc(x.photo_url)}" alt="">
       <p class="small muted">Enviada por <b>${esc(x.user_name || "—")}</b> · ${fmtDate(x.created)}${x.exercise_name ? ` · usada para <b>${esc(x.exercise_name)}</b>` : ""}${x.settings ? ` · regulagem: ${esc(x.settings)}` : ""}</p>
@@ -3445,7 +3445,8 @@ async function viewDev() {
         <div class="field"><label>Ou juntar a um aparelho que já existe</label><select data-k="merge_into"><option value="">— aparelho novo —</option>${q.machines.map((m) => `<option value="${esc(m.id)}">${esc(m.name)}</option>`).join("")}</select></div></div>
       <label>Exercícios que dá para fazer</label><div class="chips dv-exs" data-exs="${esc(x.exercise_id || "")}">${x.exercise_id ? `<span class="chip" data-rm-ex="${esc(x.exercise_id)}">${esc(x.exercise_name)} ✕</span>` : ""}<button class="chip" data-add-ex>+ exercício</button></div>
       <div class="field" style="margin-top:10px"><label>O que dá para fazer / dica de uso</label><textarea data-k="what" rows="2" style="min-height:64px" placeholder="ex.: Empurre a plataforma com os pés na largura do quadril…"></textarea></div>
-      <div class="row gap"><button class="btn grow" data-approve>Aprovar</button><button class="btn ghost" data-discard>Descartar</button></div></div>`).join("") : `<p class="muted small" style="margin:0 4px 14px">Nenhuma foto na fila. Quando alguém fotografar um aparelho e marcar “sugerir para o catálogo”, ela aparece aqui.</p>`}
+      <div class="row gap"><button class="btn grow" data-approve>Aprovar</button><button class="btn ghost" data-discard>Descartar</button></div></div>`).join("") : `<p class="muted small" style="margin:0 4px 14px">Nenhum aparelho novo para pesquisar. Tudo o que foi fotografado já está no catálogo.</p>`}
+    ${(q.located || []).length ? `<details class="adv"><summary class="small">Localizados automaticamente (${q.located.length})</summary><ul class="plain small">${q.located.map((x) => `<li>${esc(x.name || x.exercise_name || "")} → <b>${esc(x.exercise_name || "")}</b> <span class="muted">· ${esc(x.user_name || "")} · ${fmtDate(x.created)}</span></li>`).join("")}</ul></details>` : ""}
     <h2 class="sec-title">Aparelhos da comunidade (${q.custom.length})</h2>
     ${q.custom.length ? `<div class="picks">${q.custom.map((m) => `<div class="pick"><a class="grow" href="#aparelhos/${esc(m.id)}"><b>${esc(m.name)}</b><span class="small muted">${esc((q.categories.find((c) => c.id === m.category) || {}).name || "")}</span></a><button class="act" data-del-m="${esc(m.id)}">Remover</button></div>`).join("")}</div>` : `<p class="muted small" style="margin:0 4px">Ainda nenhum.</p>`}`;
   const exsOf = (card) => [...card.querySelectorAll("[data-rm-ex]")].map((c) => c.dataset.rmEx);
@@ -4859,7 +4860,7 @@ async function viewPerfil(openSec) {
   const fo = $("#fam-open"); if (fo) fo.onclick = () => openFamily();
   loadFocusBox(p);
   loadMyGym();
-  if (state.me && state.me.user && state.me.user.is_admin) api("/api/dev/queue").then((q) => { const el = $("#dev-count"); if (el) el.textContent = q.pending.length ? `${q.pending.length} ${q.pending.length === 1 ? "foto" : "fotos"} para aprovar` : "nenhuma foto na fila · adicionar aparelhos"; }).catch(() => {});
+  if (state.me && state.me.user && state.me.user.is_admin) api("/api/dev/queue").then((q) => { const el = $("#dev-count"); if (el) el.textContent = q.pending.length ? `${q.pending.length} ${q.pending.length === 1 ? "aparelho novo" : "aparelhos novos"} para pesquisar` : "catálogo em dia · adicionar aparelhos"; }).catch(() => {});
 }
 
 function syncInfo(sy) {
