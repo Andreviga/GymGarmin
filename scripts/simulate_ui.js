@@ -394,6 +394,20 @@ async function flows(page, base, persona, tag) {
     } else await click("#s-finish", "Finalizar e salvar");
     await page.waitForTimeout(500);
     await audit(page, W("depois de salvar o treino"));
+    // postar nas redes: o estúdio abre, desenha o cartão em todos os modelos e formatos sem erro
+    { const eff0 = page.locator("#modal:not([hidden]) [data-eff='7']"); if (await eff0.count()) { await eff0.click(); await page.waitForTimeout(300); } }
+    if (await page.locator("[data-studio]").count()) {
+      await click("[data-studio]", "Postar nas redes");
+      await page.waitForSelector("#sc-cv", { timeout: 6000 }).catch(() => issue("postar nas redes: cartão não abriu", W("salvo")));
+      await modalCheck("postar nas redes");
+      for (const t of await page.$$eval("[data-tpl]", (x) => x.map((b) => b.dataset.tpl))) {
+        await page.click(`[data-tpl="${t}"]`).catch(() => issue("postar nas redes: modelo não tocável", W(t)));
+        const blank = await page.$eval("#sc-cv", (c) => { const d = c.getContext("2d").getImageData(0, 0, c.width, c.height).data; let n = 0; for (let i = 3; i < d.length; i += 4000) if (d[i]) n++; return n < 5; });
+        if (blank) issue("postar nas redes: cartão em branco", W(t));
+      }
+      await page.click("[data-fmt='quad']").catch(() => {});
+      await page.evaluate(() => closeModal());
+    } else if (await page.locator(".saved-card").count()) issue("depois de salvar: sem botão de postar nas redes", W("salvo"));
   }
 
   // Treino livre: montar, tirar o exercício escolhido errado, registrar e ver o que contou

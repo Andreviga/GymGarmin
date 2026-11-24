@@ -1020,9 +1020,10 @@ async function openMySession(id, onChange) {
     <p class="ok-txt small">✓ Registrado: ${reg.exercises || 0} ${reg.exercises === 1 ? "exercício" : "exercícios"}, ${reg.sets || 0} ${reg.sets === 1 ? "série" : "séries"}</p>
     ${reg.no_load ? `<p class="small rec atencao">${reg.no_load} ${reg.no_load === 1 ? "série ficou" : "séries ficaram"} sem a sua carga: sem ela o app não acompanha sua evolução nesse exercício. Toque em Corrigir para preencher.</p>` : ""}
     <ul class="sv-list small">${(v.items || []).map((i) => i.kind === "forca" ? `<li><b>${esc(i.name)}</b><br>${(i.sets || []).map(setTxt2).join(" · ")}</li>` : `<li><b>${esc(i.name)}</b> · ${i.minutes} min</li>`).join("")}</ul>
-    <div class="row gap wrap" style="margin-top:12px">${v.has_sets ? `<button class="btn" id="ms-edit">Corrigir repetições e cargas</button>` : ""}<button class="btn ghost" id="ms-del">Apagar este registro</button></div>`);
+    <div class="row gap wrap" style="margin-top:12px">${v.has_sets ? `<button class="btn" id="ms-edit">Corrigir repetições e cargas</button>` : ""}<button class="btn ghost" id="ms-studio">📲 Postar nas redes</button><button class="btn ghost" id="ms-del">Apagar este registro</button></div>`);
   body.onclick = async (e) => {
     const t = e.target.closest("button"); if (!t) return;
+    if (t.id === "ms-studio") return openStudio(id);
     if (t.id === "ms-edit") {
       t.disabled = true;
       try { const d = await api(`/api/sessions/${id}/edit`); const cur = store("gg_session");
@@ -2800,11 +2801,13 @@ function showSaved(saved, cr, prTxt) {
       <p class="small muted" style="margin:6px 0 0">Séries de trabalho por músculo (aquecimento não conta; músculo auxiliar conta metade).</p>` : ""}
     <div id="sv-bal">${balanceAfterHtml(cr.balance)}</div>
     ${savedListHtml(sm)}
-    <button class="btn block" data-share="${saved.id}" style="margin-top:16px">📣 Compartilhar na comunidade</button>
+    <button class="btn block" data-studio="${saved.id}" style="margin-top:16px">📲 Postar nas redes (Instagram, WhatsApp…)</button>
+    <button class="btn ghost block" data-share="${saved.id}" style="margin-top:8px">📣 Compartilhar na comunidade HAX</button>
     <a class="btn ghost block" href="#hoje" style="margin-top:8px">Ver minha semana</a></section>`;
   window.scrollTo(0, 0);
   view.oninput = view.onchange = null;
   view.onclick = async (e) => {
+    const so = e.target.closest("[data-studio]"); if (so) return openStudio(+so.dataset.studio);
     const sh = e.target.closest("[data-share]");
     if (sh) return openShare(+sh.dataset.share, saved.day_name || "", () => { sh.textContent = "Compartilhado ✓ · ver na comunidade"; sh.onclick = () => { location.hash = "#social"; }; sh.removeAttribute("data-share"); });
     const b = e.target.closest("[data-match]"); if (!b) return;
@@ -3308,7 +3311,7 @@ function postHtml(p) {
 async function viewSocial() {
   const d = await api("/api/social");
   view.innerHTML = `<p class="small muted" style="margin:0 2px 10px">Mostre que treinou: no fim do treino, toque em “📣 Compartilhar”. Você escolhe quem vê, se aparece a carga e pode pôr uma foto.</p>
-    <button class="btn ghost block" id="soc-new" style="margin-bottom:12px">📣 Compartilhar um treino que já fiz</button>
+    <div class="row gap" style="margin-bottom:12px"><button class="btn ghost grow" id="soc-new">📣 Compartilhar aqui</button><button class="btn ghost grow" id="soc-redes">📲 Postar nas redes</button></div>
     <div id="feed">${d.posts.length ? d.posts.map(postHtml).join("") : `<section class="card"><p class="muted" style="margin:0">Ninguém compartilhou ainda. Seja o primeiro!</p></section>`}</div>
     ${d.posts.length >= 20 ? `<button class="act" id="soc-more" style="display:block;margin:10px auto">Ver mais</button>` : ""}`;
   bindFeed(d);
@@ -3326,6 +3329,7 @@ function bindFeed(d) {
     try {
       if (ds.ex && t.tagName !== "BUTTON") return showExercise(ds.ex);
       if (t.id === "soc-new") return openSharePicker();
+      if (t.id === "soc-redes") return openSharePicker("redes");
       if (t.id === "soc-more") {
         const last = d.posts[d.posts.length - 1]; const more = await api(`/api/social?before=${last.id}`);
         d.posts.push(...more.posts); $("#feed").insertAdjacentHTML("beforeend", more.posts.map(postHtml).join("")); if (more.posts.length < 20) t.remove(); return;
@@ -3346,13 +3350,284 @@ function bindFeed(d) {
   };
 }
 // escolher um treino já salvo para compartilhar
-async function openSharePicker() {
+
+/* ---- postar nas redes: cartões no estilo do Strava/Hevy, desenhados no próprio celular (canvas) ----
+   Modelos: clássico (foto + números), adesivo transparente (cola no Story do Instagram), mapa do percurso,
+   parciais por km, músculos trabalhados, lista do treino, recorde e semana. Formatos: Story, post 4:5, quadrado. */
+const SC_FMT = { story: [1080, 1920, "Story 9:16"], post: [1080, 1350, "Post 4:5"], quad: [1080, 1080, "Quadrado"] };
+const SC_THEMES = { noite: ["#0b1020", "#1e40af"], fogo: ["#f97316", "#be185d"], menta: ["#064e3b", "#0d9488"], grafite: ["#0a0a0a", "#404040"], roxo: ["#2e1065", "#7c3aed"] };
+const SC_TPL = { classico: "Clássico", adesivo: "Adesivo", mapa: "Mapa", parciais: "Parciais", musculos: "Músculos", lista: "Lista", recorde: "Recorde", semana: "Semana" };
+const scPace = (s) => s ? `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, "0")}` : "–";
+const scKm = (k) => (Math.round(k * 100) / 100).toFixed(k >= 10 ? 1 : 2).replace(".", ",");
+const scMin = (m) => !m ? "–" : m >= 60 ? `${Math.floor(m / 60)}h${String(Math.round(m % 60)).padStart(2, "0")}` : `${Math.round(m)} min`;
+const scKg = (kg) => kg >= 1000 ? `${(kg / 1000).toFixed(1).replace(".", ",")} t` : `${kg} kg`;
+const scDate = (iso) => { const d = new Date(String(iso).slice(0, 10) + "T12:00"); return `${d.getDate()} de ${MONTHS[d.getMonth()]}`; };
+
+function scStats(d) {
+  const e = d.endurance, st = d.strength, out = [];
+  if (e && e.distance_km) {
+    out.push(["Distância", `${scKm(e.distance_km)} km`]);
+    if (e.pace_s_km && ["corrida", "caminhada"].includes(e.sport)) out.push(["Ritmo", `${scPace(e.pace_s_km)} /km`]);
+    else if (e.speed_kmh) out.push(["Velocidade", `${String(e.speed_kmh).replace(".", ",")} km/h`]);
+    out.push(["Tempo", scMin(e.duration_min || d.minutes)]);
+  }
+  if (st) {
+    if (!e) out.push(["Tempo", scMin(d.minutes)]);
+    out.push(["Séries", String(st.sets)]);
+    if (st.volume_kg) out.push(["Volume", scKg(st.volume_kg)]);
+  }
+  if (!e && !st) out.push(["Tempo", scMin(d.minutes)]);
+  if (d.avg_hr && out.length < 4) out.push(["FC média", `${Math.round(d.avg_hr)} bpm`]);
+  if (d.kcal && out.length < 4) out.push(["Calorias", `${d.kcal} kcal`]);
+  return out.slice(0, 4);
+}
+function scTemplates(d) {
+  const e = d.endurance || {}, st = d.strength;
+  return Object.keys(SC_TPL).filter((k) => k === "mapa" ? (e.route || []).length > 4 : k === "parciais" ? (e.splits || []).length >= 2
+    : k === "musculos" ? st && st.muscles.length : k === "lista" ? st && st.exercises.length : k === "recorde" ? st && st.prs.length : true);
+}
+
+// ---- desenho
+function scFont(px, w = 800) { return `${w} ${Math.round(px)}px ${getComputedStyle(document.body).fontFamily}`; }
+function scText(c, t, x, y, px, opt = {}) {
+  c.font = scFont(px, opt.w || 800); c.textAlign = opt.align || "left"; c.textBaseline = opt.base || "alphabetic";
+  c.fillStyle = opt.color || "#fff";
+  if (opt.max) { while (c.measureText(t).width > opt.max && px > 18) { px -= 2; c.font = scFont(px, opt.w || 800); } }
+  c.fillText(t, x, y); return px;
+}
+function scBg(c, W, H, st) {
+  c.clearRect(0, 0, W, H);
+  if (st.bg === "transparente") return;
+  if (st.bg === "foto" && st.img) {
+    const im = st.img, r = Math.max(W / im.width, H / im.height), iw = im.width * r, ih = im.height * r;
+    c.drawImage(im, (W - iw) / 2, (H - ih) / 2, iw, ih);
+    const g = c.createLinearGradient(0, H * 0.35, 0, H); g.addColorStop(0, "rgba(0,0,0,0)"); g.addColorStop(1, "rgba(0,0,0,.78)");
+    c.fillStyle = g; c.fillRect(0, 0, W, H);
+    const g2 = c.createLinearGradient(0, 0, 0, H * 0.18); g2.addColorStop(0, "rgba(0,0,0,.45)"); g2.addColorStop(1, "rgba(0,0,0,0)");
+    c.fillStyle = g2; c.fillRect(0, 0, W, H * 0.18);
+    return;
+  }
+  const [a, b] = SC_THEMES[st.theme] || SC_THEMES.noite;
+  const g = c.createLinearGradient(0, 0, W, H); g.addColorStop(0, a); g.addColorStop(1, b); c.fillStyle = g; c.fillRect(0, 0, W, H);
+  c.fillStyle = "rgba(255,255,255,.05)"; c.beginPath(); c.arc(W * 0.9, H * 0.08, W * 0.45, 0, 7); c.fill();
+}
+function scBrand(c, W, H, u, d, top = true) {
+  const y = top ? 92 * u : H - 60 * u;
+  scText(c, "HAX", 64 * u, y, 46 * u, { w: 900 });
+  c.fillStyle = "#60a5fa"; c.font = scFont(46 * u, 900); const w = c.measureText("HA").width; c.fillText("X", 64 * u + w, y);
+  scText(c, `${d.who ? d.who + " · " : ""}${scDate(d.date)}`, W - 64 * u, y, 30 * u, { align: "right", w: 600, color: "rgba(255,255,255,.85)" });
+}
+function scStatGrid(c, x, y, w, u, stats, cols = 2, big = 76) {
+  const cw = w / cols;
+  stats.forEach(([lab, val], k) => {
+    const cx = x + (k % cols) * cw, cy = y + Math.floor(k / cols) * (big + 74) * u;
+    scText(c, lab.toUpperCase(), cx, cy, 26 * u, { w: 700, color: "rgba(255,255,255,.75)" });
+    scText(c, val, cx, cy + (big + 8) * u, big * u, { w: 900, max: cw - 24 * u });
+  });
+  return Math.ceil(stats.length / cols) * (big + 74) * u;
+}
+function scRoute(c, pts, x, y, w, h, u, color = "#fff") {
+  if (!pts || pts.length < 2) return;
+  const s = Math.min(w, h);
+  const ox = x + (w - s) / 2, oy = y + (h - s) / 2;
+  const P = (p) => [ox + p[0] * s, oy + p[1] * s];
+  c.lineJoin = c.lineCap = "round";
+  for (const [lw, col] of [[22 * u, "rgba(0,0,0,.25)"], [12 * u, color]]) {
+    c.strokeStyle = col; c.lineWidth = lw; c.beginPath();
+    pts.forEach((p, k) => { const [px, py] = P(p); k ? c.lineTo(px, py) : c.moveTo(px, py); }); c.stroke();
+  }
+  const [sx, sy] = P(pts[0]), [ex, ey] = P(pts[pts.length - 1]);
+  c.fillStyle = "#22c55e"; c.beginPath(); c.arc(sx, sy, 14 * u, 0, 7); c.fill();
+  c.fillStyle = "#ef4444"; c.beginPath(); c.arc(ex, ey, 14 * u, 0, 7); c.fill();
+}
+// corpo simplificado (frente e costas) com os músculos trabalhados acesos
+const SC_BODY = {
+  front: { trapezio: [[50, 30, 10, 4]], ombros: [[26, 40, 9, 8], [74, 40, 9, 8]], peito: [[41, 48, 10, 9], [59, 48, 10, 9]],
+    biceps: [[20, 54, 6, 12], [80, 54, 6, 12]], antebraco: [[16, 84, 5, 12], [84, 84, 5, 12]], abdomen: [[50, 74, 9, 16]],
+    quadriceps: [[39, 134, 8, 22], [61, 134, 8, 22]], adutores: [[46, 118, 3, 10], [54, 118, 3, 10]], panturrilha: [[39, 184, 5, 14], [61, 184, 5, 14]] },
+  back: { trapezio: [[50, 40, 14, 9]], ombros: [[26, 40, 9, 8], [74, 40, 9, 8]], dorsais: [[38, 62, 8, 16], [62, 62, 8, 16]],
+    costas_meio: [[50, 54, 7, 10]], lombar: [[50, 84, 10, 7]], triceps: [[20, 54, 6, 12], [80, 54, 6, 12]], antebraco: [[16, 84, 5, 12], [84, 84, 5, 12]],
+    gluteos: [[41, 102, 10, 10], [59, 102, 10, 10]], posterior: [[39, 136, 8, 20], [61, 136, 8, 20]], panturrilha: [[39, 182, 6, 14], [61, 182, 6, 14]] },
+};
+function scBody(c, x, y, s, side, heat) {
+  const R = (a, b, w, h, r) => { c.beginPath(); c.roundRect(x + a * s, y + b * s, w * s, h * s, r * s); c.fill(); };
+  c.fillStyle = "rgba(255,255,255,.16)";
+  c.beginPath(); c.arc(x + 50 * s, y + 14 * s, 11 * s, 0, 7); c.fill();
+  R(45, 23, 10, 9, 2); R(28, 32, 44, 62, 9); R(14, 36, 13, 34, 6); R(73, 36, 13, 34, 6); R(11, 70, 11, 32, 5); R(78, 70, 11, 32, 5);
+  R(30, 92, 40, 20, 6); R(30, 110, 18, 52, 8); R(52, 110, 18, 52, 8); R(32, 164, 14, 46, 6); R(54, 164, 14, 46, 6);
+  for (const [reg, shapes] of Object.entries(SC_BODY[side])) {
+    const i = heat[reg]; if (!i) continue;
+    c.fillStyle = `rgba(249,115,22,${0.35 + 0.65 * i})`;
+    for (const [a, b, rx, ry] of shapes) { c.beginPath(); c.ellipse(x + a * s, y + b * s, rx * s, ry * s, 0, 0, 7); c.fill(); }
+  }
+}
+
+function scDraw(cv, d, st) {
+  const [W, H] = SC_FMT[st.fmt]; cv.width = W; cv.height = H;
+  const c = cv.getContext("2d"), u = W / 1080, pad = 64 * u, e = d.endurance || {}, sx = d.strength;
+  scBg(c, W, H, st);
+  c.save();
+  if (st.bg !== "cor") { c.shadowColor = "rgba(0,0,0,.45)"; c.shadowBlur = 18 * u; }
+  const title = d.title || "Treino";
+  const stats = scStats(d);
+  const tpl = st.tpl;
+  if (tpl === "adesivo") {
+    // bloco central, sem fundo: salva/cola por cima de qualquer foto no Story
+    let y = H / 2 - (stats.length * 150 * u + (e.route ? 360 * u : 0)) / 2;
+    scText(c, title, W / 2, y, 52 * u, { align: "center", max: W - 2 * pad }); y += 110 * u;
+    if (e.route) { scRoute(c, e.route, W / 2 - 160 * u, y - 20 * u, 320 * u, 320 * u, u); y += 360 * u; }
+    for (const [lab, val] of stats) {
+      scText(c, lab.toUpperCase(), W / 2, y, 28 * u, { align: "center", w: 700, color: "rgba(255,255,255,.85)" });
+      scText(c, val, W / 2, y + 88 * u, 84 * u, { align: "center", w: 900 }); y += 150 * u;
+    }
+    scText(c, "HAX", W / 2, y + 30 * u, 40 * u, { align: "center", w: 900 });
+    c.restore(); return;
+  }
+  scBrand(c, W, H, u, d, true);
+  const bottomStats = (rows = 2) => { const h = Math.ceil(Math.min(stats.length, rows * 2) / 2) * 150 * u; scStatGrid(c, pad, H - pad - h + 70 * u, W - 2 * pad, u, stats.slice(0, rows * 2)); return h; };
+  if (tpl === "classico") {
+    const h = Math.ceil(stats.length / 2) * 150 * u;
+    if (st.bg !== "foto") {   // sem foto: o percurso (corrida) ou um ícone grande no meio, para não ficar vazio
+      const top = 180 * u, bot = H - pad - h - 140 * u;
+      if ((e.route || []).length > 4) scRoute(c, e.route, pad * 2, top, W - 4 * pad, bot - top, u, "rgba(255,255,255,.9)");
+      else { c.globalAlpha = 0.9; scText(c, sx ? "🏋️" : "🏃", W / 2, top + (bot - top) / 2 + 110 * u, Math.min(320 * u, (bot - top) * 0.7), { align: "center" }); c.globalAlpha = 1; }
+    }
+    scText(c, title, pad, H - pad - h - 40 * u, 72 * u, { max: W - 2 * pad });
+    bottomStats();
+  } else if (tpl === "mapa") {
+    const h = bottomStats();
+    scText(c, title, pad, 200 * u, 56 * u, { max: W - 2 * pad });
+    scRoute(c, e.route, pad, 250 * u, W - 2 * pad, H - h - 250 * u - pad - 80 * u, u);
+    if (e.weather) scText(c, `${e.weather.temp_c}°C${e.weather.desc ? " · " + e.weather.desc : ""}`, pad, 250 * u, 28 * u, { w: 600, color: "rgba(255,255,255,.8)" });
+  } else if (tpl === "parciais") {
+    scText(c, title, pad, 200 * u, 56 * u, { max: W - 2 * pad });
+    const sp = e.splits.slice(0, H > 1500 ? 14 : 9), h = bottomStats(1);
+    const avail0 = H - h - 270 * u - pad - 60 * u, rowH = Math.min(130 * u, avail0 / sp.length), top = 270 * u + Math.max(0, (avail0 - rowH * sp.length) / 2);
+    const fast = Math.min(...sp.map((x) => x.pace_s)), slow = Math.max(...sp.map((x) => x.pace_s));
+    sp.forEach((x, k) => {
+      const y = top + k * rowH, frac = slow === fast ? 0.8 : 0.35 + 0.65 * (slow - x.pace_s) / (slow - fast);
+      scText(c, `${x.n}`, pad, y + rowH * 0.62, 30 * u, { w: 700, color: "rgba(255,255,255,.75)" });
+      c.fillStyle = x.pace_s === fast ? "#22c55e" : "rgba(255,255,255,.85)";
+      c.beginPath(); c.roundRect(pad + 60 * u, y + rowH * 0.2, (W - 2 * pad - 260 * u) * frac, rowH * 0.6, 10 * u); c.fill();
+      scText(c, `${scPace(x.pace_s)} /km`, W - pad, y + rowH * 0.62, 34 * u, { align: "right", w: 800 });
+    });
+  } else if (tpl === "musculos") {
+    scText(c, title, pad, 200 * u, 56 * u, { max: W - 2 * pad });
+    const ms = sx.muscles, max = Math.max(...ms.map((m) => m.sets)), heat = {};
+    ms.forEach((m) => { if (m.region) heat[m.region] = Math.max(heat[m.region] || 0, m.sets / max); });
+    const h = bottomStats(1), avail = H - h - 260 * u - pad - 300 * u, s = Math.min(avail / 220, (W - 2 * pad) / 230);
+    const bx = W / 2 - 105 * s;
+    scBody(c, bx, 260 * u, s, "front", heat); scBody(c, bx + 110 * s, 260 * u, s, "back", heat);
+    let y = 260 * u + 225 * s;
+    ms.slice(0, 4).forEach((m) => { scText(c, m.name, pad, y, 34 * u, { w: 700, max: W * 0.6 }); scText(c, `${String(m.sets).replace(".", ",")} séries`, W - pad, y, 34 * u, { align: "right", w: 800, color: "#fdba74" }); y += 56 * u; });
+  } else if (tpl === "lista") {
+    scText(c, title, pad, 200 * u, 56 * u, { max: W - 2 * pad });
+    const h = bottomStats(1), exs = sx.exercises, rowH = Math.min(92 * u, (H - h - 300 * u - pad) / Math.max(1, exs.length));
+    exs.slice(0, Math.floor((H - h - 300 * u - pad) / rowH)).forEach((x, k) => {
+      const y = 290 * u + k * rowH;
+      scText(c, x.name, pad, y, Math.min(36, rowH / u * 0.42) * u, { w: 700, max: W * 0.58 });
+      scText(c, `${x.sets}×${st.loads && x.best ? " · " + x.best : ""}`, W - pad, y, Math.min(34, rowH / u * 0.4) * u, { align: "right", w: 800, color: "#bfdbfe" });
+      c.fillStyle = "rgba(255,255,255,.15)"; c.fillRect(pad, y + rowH * 0.32, W - 2 * pad, 2 * u);
+    });
+  } else if (tpl === "recorde") {
+    scText(c, "🏆", W / 2, H * 0.3, 200 * u, { align: "center" });
+    scText(c, sx.prs.length > 1 ? `${sx.prs.length} RECORDES PESSOAIS` : "RECORDE PESSOAL", W / 2, H * 0.3 + 120 * u, 50 * u, { align: "center", w: 900, color: "#fde68a" });
+    let y = H * 0.3 + 210 * u;
+    sx.prs.forEach((p) => { scText(c, p.name, W / 2, y, 46 * u, { align: "center", max: W - 2 * pad }); if (st.loads && p.what) scText(c, p.what, W / 2, y + 56 * u, 36 * u, { align: "center", w: 600, color: "rgba(255,255,255,.85)" }); y += 130 * u; });
+    bottomStats(1);
+  } else if (tpl === "semana") {
+    const wk = d.week || {};
+    scText(c, `${wk.days || 1}º treino da semana`, pad, H * 0.34, 84 * u, { w: 900, max: W - 2 * pad });
+    if (wk.streak_weeks > 1) scText(c, `🔥 ${wk.streak_weeks} semanas seguidas treinando`, pad, H * 0.34 + 90 * u, 44 * u, { w: 700, color: "#fdba74", max: W - 2 * pad });
+    const days = ["S", "T", "Q", "Q", "S", "S", "D"], wd = (new Date(String(d.date).slice(0, 10) + "T12:00").getDay() + 6) % 7;
+    days.forEach((t, k) => { const cx = pad + 40 * u + k * ((W - 2 * pad - 80 * u) / 6), cy = H * 0.34 + 220 * u;
+      c.fillStyle = k === wd ? "#22c55e" : "rgba(255,255,255,.18)"; c.beginPath(); c.arc(cx, cy, 40 * u, 0, 7); c.fill();
+      scText(c, t, cx, cy + 14 * u, 34 * u, { align: "center", w: 800 }); });
+    scText(c, title, pad, H - pad - Math.ceil(stats.length / 2) * 150 * u - 40 * u, 56 * u, { max: W - 2 * pad });
+    bottomStats();
+  }
+  c.restore();
+}
+
+async function openStudio(sessionId) {
+  const body = openModal(`<h2>📲 Postar nas redes</h2><div class="sk"><span class="sk-line"></span><span class="sk-line"></span></div>`);
+  let d;
+  try { d = await api(`/api/share/${sessionId}`); } catch (e) { body.innerHTML = `<h2>📲 Postar nas redes</h2><p class="pill bad">${esc(e.message)}</p>`; return; }
+  const tpls = scTemplates(d);
+  const pref = store("gg_sc") || {};
+  const st = { tpl: d.endurance && d.endurance.route ? "mapa" : d.strength && d.strength.prs.length ? "recorde" : d.strength ? "musculos" : "classico",
+    fmt: pref.fmt || "story", bg: "cor", theme: pref.theme || "noite", img: null, loads: pref.loads !== false };
+  if (!tpls.includes(st.tpl)) st.tpl = tpls[0];
+  const chip = (k, on, attr, txt) => `<button type="button" class="chip pc ${on ? "on" : ""}" data-${attr}="${k}">${txt}</button>`;
+  body.innerHTML = `<h2>📲 Postar nas redes</h2>
+    <div class="sc-prev"><canvas id="sc-cv" aria-label="Prévia do cartão"></canvas></div>
+    <div class="sc-row" id="sc-tpl"></div><div class="sc-row" id="sc-fmt"></div><div class="sc-row" id="sc-bg"></div>
+    ${d.strength ? `<label class="row gap small" style="margin:6px 0"><input type="checkbox" id="sc-loads" ${st.loads ? "checked" : ""}> Mostrar as cargas</label>` : ""}
+    <button class="btn block" id="sc-share">Compartilhar · Instagram, WhatsApp, Strava…</button>
+    <div class="row gap" style="margin-top:8px"><button class="btn ghost grow" id="sc-copy">Copiar imagem</button><button class="btn ghost grow" id="sc-save">Salvar no celular</button></div>
+    <p class="small muted" style="margin:8px 2px 0" id="sc-tip"></p>
+    <button class="act" id="sc-hax" style="margin-top:6px">📣 Postar também na Comunidade HAX</button>`;
+  const cv = $("#sc-cv", body);
+  const draw = () => {
+    $("#sc-tpl", body).innerHTML = tpls.map((k) => chip(k, st.tpl === k, "tpl", SC_TPL[k])).join("");
+    $("#sc-fmt", body).innerHTML = Object.entries(SC_FMT).map(([k, v]) => chip(k, st.fmt === k, "fmt", v[2])).join("");
+    $("#sc-bg", body).innerHTML = `<label class="chip pc ${st.bg === "foto" ? "on" : ""}" style="cursor:pointer">📷 ${st.img ? "Sua foto" : "Pôr foto"}<input type="file" accept="image/*" id="sc-photo" hidden></label>
+      ${Object.entries(SC_THEMES).map(([k, [a, b]]) => `<button type="button" class="sc-dot ${st.bg === "cor" && st.theme === k ? "on" : ""}" data-theme="${k}" style="background:linear-gradient(135deg,${a},${b})" aria-label="Fundo ${k}"></button>`).join("")}
+      ${chip("transparente", st.bg === "transparente", "bg", "Transparente")}`;
+    cv.parentElement.classList.toggle("sc-clear", st.bg === "transparente");
+    cv.parentElement.dataset.fmt = st.fmt;
+    $("#sc-tip", body).textContent = st.bg === "transparente" || st.tpl === "adesivo"
+      ? "Adesivo: no Instagram, abra o Story com a sua foto e cole a imagem (Copiar imagem) ou adicione pela galeria."
+      : st.bg === "foto" ? "" : "Dica: ponha uma foto do treino de fundo, como no Strava.";
+    scDraw(cv, d, st);
+    store("gg_sc", { fmt: st.fmt, theme: st.theme, loads: st.loads });
+  };
+  draw();
+  const blob = () => new Promise((r) => cv.toBlob(r, "image/png"));
+  const fname = () => `hax-${String(d.date).slice(0, 10)}-${st.tpl}.png`;
+  const caption = () => `${d.title} · ${scStats(d).map(([, v]) => v).join(" · ")} 💪 #HAX`;
+  body.onchange = (e) => {
+    if (e.target.id === "sc-loads") { st.loads = e.target.checked; draw(); }
+    if (e.target.id === "sc-photo" && e.target.files[0]) {
+      const fr = new FileReader();
+      fr.onload = () => { const im = new Image(); im.onload = () => { st.img = im; st.bg = "foto"; if (st.tpl === "adesivo") st.tpl = "classico"; draw(); }; im.src = fr.result; };
+      fr.readAsDataURL(e.target.files[0]);
+    }
+  };
+  body.onclick = async (e) => {
+    const t = e.target.closest("button"); if (!t) return;
+    if (t.dataset.tpl) { st.tpl = t.dataset.tpl; if (st.tpl === "adesivo") st.bg = "transparente"; else if (st.bg === "transparente") st.bg = st.img ? "foto" : "cor"; return draw(); }
+    if (t.dataset.fmt) { st.fmt = t.dataset.fmt; return draw(); }
+    if (t.dataset.theme) { st.theme = t.dataset.theme; st.bg = "cor"; if (st.tpl === "adesivo") st.tpl = tpls.includes("mapa") ? "mapa" : "classico"; return draw(); }
+    if (t.dataset.bg) { st.bg = "transparente"; return draw(); }
+    if (t.id === "sc-share") {
+      const f = new File([await blob()], fname(), { type: "image/png" });
+      if (navigator.canShare && navigator.canShare({ files: [f] })) {
+        try { await navigator.share({ files: [f], text: caption() }); } catch (_) { /* cancelou */ }
+      } else { scDownload(f); toast("Imagem salva. Abra o Instagram/WhatsApp e escolha da galeria.", 5000); }
+      return;
+    }
+    if (t.id === "sc-copy") {
+      try { const b = await blob(); await navigator.clipboard.write([new ClipboardItem({ "image/png": b })]); toast("Imagem copiada: cole no Story do Instagram ou no WhatsApp", 5000); }
+      catch (_) { scDownload(new File([await blob()], fname(), { type: "image/png" })); toast("Este navegador não copia imagem: ela foi salva no celular.", 5000); }
+      return;
+    }
+    if (t.id === "sc-save") { scDownload(new File([await blob()], fname(), { type: "image/png" })); return toast("Imagem salva", 3000); }
+    if (t.id === "sc-hax") return openShare(sessionId, d.title);
+  };
+}
+function scDownload(file) {
+  const a = document.createElement("a"); a.href = URL.createObjectURL(file); a.download = file.name;
+  document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
+}
+
+async function openSharePicker(mode) {
   const body = openModal(`<h2>Qual treino?</h2><div class="sk"><span class="sk-line"></span></div>`);
   const [ss, d] = await Promise.all([api("/api/sessions?limit=15"), api("/api/social")]);
   const list = (ss.sessions || ss).filter((x) => x.source !== "passos");
   body.innerHTML = `<h2>Qual treino?</h2><div class="picks">${list.map((x) => `<button class="pick" data-sh="${x.id}"><span class="grow"><b>${esc(x.day_name || x.notes || "Treino")}</b>
     <span class="small muted">${fmtDate(x.date)}${d.shared.includes(x.id) ? " · já compartilhado" : ""}</span></span><span class="chev">›</span></button>`).join("") || `<p class="muted">Nenhum treino salvo ainda.</p>`}</div>`;
-  body.onclick = (e) => { const b = e.target.closest("[data-sh]"); if (b) openShare(+b.dataset.sh, b.querySelector("b").textContent); };
+  body.onclick = (e) => { const b = e.target.closest("[data-sh]"); if (!b) return; if (mode === "redes") openStudio(+b.dataset.sh); else openShare(+b.dataset.sh, b.querySelector("b").textContent); };
 }
 // compartilhar: legenda, foto, quem vê, mostrar cargas
 function openShare(sessionId, title, after) {

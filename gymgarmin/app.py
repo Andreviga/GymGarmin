@@ -19,7 +19,7 @@ from datetime import date, timedelta
 from . import adaptive, alternative, auth, coach, focus, gallery, ingest, my_gym, partners, training_rules
 from . import watch_review as wrv
 from . import gyms, loads, personal, social, weather, wellness
-from . import (analysis, calibration, catalog, clock, db, dedupe, health, endurance, garmin_export, garmin_sync, generator, history, limitations,
+from . import (analysis, calibration, catalog, clock, db, dedupe, health, endurance, garmin_export, garmin_sync, generator, sharecard, history, limitations,
                load, plans_io, progression, readiness, schedule, sports, steps, templates, watch_labels)
 from .muscles import EQUIPMENT_PT, HR_ZONES, MUSCLES, hr_max, zone_bpm
 
@@ -887,6 +887,34 @@ def put_profile(body: dict = Body(...)):
 @app.get("/api/plans")
 def plans():
     return db.list_plans()
+
+
+@app.get("/api/share/{session_id}")
+def share_card(session_id: int, garmin: bool = True):
+    """Dados do cartão para postar o treino nas redes. Treino do relógio: busca no Garmin (uma vez, fica guardado)
+    o trajeto, as parciais, as zonas de FC e o clima."""
+    s = db.get_session(session_id)
+    if not s:
+        raise HTTPException(404, "Treino não encontrado")
+    uid, name, _ = _me_ids()
+    extras = None
+    aid = s.get("garmin_activity_id")
+    if aid and any(it.get("sport") or it.get("distance_km") for it in s.get("items") or []):
+        key = f"share_extras:{aid}"
+        raw = db.kv_get(key)
+        if raw is not None:
+            extras = json.loads(raw)
+        elif garmin:
+            try:
+                if garmin_sync.status().get("has_tokens"):
+                    extras = sharecard.garmin_extras(aid)
+                    db.kv_set(key, json.dumps(extras))
+                    garmin_sync.persist()
+            except Exception:  # noqa: BLE001 - sem Garmin agora: o cartão sai só com o resumo
+                extras = None
+    out = sharecard.build(s, _profile().get("weight_kg"), (name or "").split(" ")[0] or None, extras)
+    out["garmin_fetched"] = extras is not None
+    return out
 
 
 @app.get("/api/templates/especiais")
