@@ -3808,7 +3808,12 @@ async function viewMusica() {
       <span class="grow"><b>${esc(x.label)}</b><span class="small muted">${esc(x.range)} · ${x.n - (x.new || 0)} suas${x.new ? ` + ${x.new} novas` : ""}${x.n < 3 ? " · poucas: escolha estilos abaixo ou curta mais músicas nessa faixa" : ""}</span></span>${x.url ? `<span class="chev">›</span>` : ""}</${x.url ? "a" : "div"}>`).join("")}</div>
     <section class="card" style="margin-top:12px"><h2>Estilos que você curte</h2>
       <p class="small muted" style="margin-top:0">O app busca músicas novas desses estilos, no BPM certo, para completar as playlists. As suas continuam vindo primeiro.${m.genres.some((g) => g.seen) ? " <b>★</b> = estilos que você já ouve." : ""}</p>
-      <div class="fc-chips" id="mu-genres">${m.genres.map((g) => `<button type="button" class="wz-chip ${g.on ? "on" : ""}" data-genre="${g.id}">${g.seen ? "★ " : ""}${esc(g.label)}</button>`).join("")}</div>
+      ${[["voce", ""], ["popular", "Populares"], ["nicho", "Nichados (vários com BPM alto: ótimos para tiros)"], ["livre", "Os que você digitou"]].map(([grp, title]) => {
+        const gs = m.genres.filter((g) => g.group === grp); if (!gs.length) return "";
+        return `${title ? `<div class="small muted" style="margin:10px 0 4px">${title}</div>` : ""}<div class="fc-chips mu-genres">${gs.map((g) => `<button type="button" class="wz-chip ${g.on ? "on" : ""}" data-genre="${esc(g.id)}">${g.seen ? "★ " : ""}${esc(g.label)}${grp === "livre" ? " ✕" : ""}</button>`).join("")}</div>`;
+      }).join("")}
+      <div class="row gap" style="margin-top:10px"><input id="mu-custom" placeholder="Outro estilo (ex.: schranz, uptempo, emo)" maxlength="40" class="grow"><button type="button" class="btn ghost sm" id="mu-addg">Adicionar</button></div>
+      ${Object.keys(m.disc_diag || {}).length ? `<details class="small" style="margin-top:8px"><summary>O que veio de cada estilo</summary><ul class="plain">${Object.entries(m.disc_diag).map(([g, d]) => `<li>${esc((m.genres.find((x) => x.id === g) || { label: g.replace(/^custom:/, "") }).label)}: <b>${d.found}</b> ${d.found === 1 ? "música" : "músicas"}${d.found ? "" : d.status && d.status !== 200 ? ` (o Spotify respondeu ${d.status})` : " (nada achado com esse nome)"}</li>`).join("")}</ul></details>` : ""}
       <label style="margin-top:12px">Novidades nas playlists</label>
       <div class="chips" id="mu-mix">${m.mix_options.map((o) => `<button type="button" class="chip pc ${m.mix === o.id ? "on" : ""}" data-mix="${o.id}">${esc(o.label)}</button>`).join("")}</div>
       <button class="btn block" id="mu-gsave" style="margin-top:12px">Salvar estilos e atualizar playlists</button>
@@ -3825,9 +3830,21 @@ async function viewMusica() {
     const t = e.target.closest("button"); if (!t) return;
     if (t.dataset.genre) {
       const g = t.dataset.genre, on = sel.genres.includes(g);
-      if (!on && sel.genres.length >= 6) return toast("Até 6 estilos", 2500);
+      if (!on && sel.genres.length >= 8) return toast("Até 8 estilos", 2500);
       sel.genres = on ? sel.genres.filter((x) => x !== g) : [...sel.genres, g];
-      t.classList.toggle("on", !on); return;
+      t.classList.toggle("on", !on);
+      if (g.startsWith("custom:") && on) t.remove();
+      return;
+    }
+    if (t.id === "mu-addg") {
+      const v = ($("#mu-custom").value || "").trim().toLowerCase();
+      if (v.length < 2) return toast("Digite o nome do estilo", 2500);
+      if (sel.genres.length >= 8) return toast("Até 8 estilos", 2500);
+      const id = `custom:${v}`; if (!sel.genres.includes(id)) sel.genres.push(id);
+      $("#mu-custom").value = "";
+      const box = $$(".mu-genres"); const last = box[box.length - 1];
+      last.insertAdjacentHTML("beforeend", `<button type="button" class="wz-chip on" data-genre="${esc(id)}">${esc(v)} ✕</button>`);
+      return toast(`“${v}” entra quando você salvar`, 2500);
     }
     if (t.dataset.mix) { sel.mix = t.dataset.mix; $$("#mu-mix [data-mix]").forEach((b) => b.classList.toggle("on", b.dataset.mix === sel.mix)); return; }
     if (t.id === "mu-gsave") {

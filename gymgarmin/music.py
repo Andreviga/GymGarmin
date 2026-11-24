@@ -47,15 +47,29 @@ MODES: dict[str, dict] = {
 }
 # estilos para descobrir músicas novas no BPM certo (busca do Spotify por gênero; o BPM vem da ReccoBeats/Deezer)
 GENRES: dict[str, tuple[str, list[str]]] = {
+    # populares
     "sertanejo": ("Sertanejo", ["sertanejo", "sertanejo universitario"]), "funk": ("Funk", ["funk carioca", "funk"]),
     "pagode": ("Pagode / samba", ["pagode", "samba"]), "rock": ("Rock", ["rock", "classic rock"]),
     "pop": ("Pop", ["pop", "dance pop"]), "rap": ("Rap / hip-hop", ["hip hop", "rap"]), "trap": ("Trap", ["trap"]),
-    "eletronica": ("Eletrônica", ["edm", "electro house"]), "house": ("House / techno", ["house", "techno"]),
+    "eletronica": ("Eletrônica", ["edm", "electro house"]), "house": ("House", ["house", "tech house"]),
     "reggaeton": ("Reggaeton / latino", ["reggaeton", "latin"]), "forro": ("Forró / piseiro", ["forro", "piseiro"]),
     "mpb": ("MPB", ["mpb"]), "gospel": ("Gospel", ["gospel"]), "metal": ("Metal", ["metal", "heavy metal"]),
     "indie": ("Indie / alternativo", ["indie", "alternative rock"]), "anos80": ("Anos 80 e 90", ["80s", "90s"]),
     "kpop": ("K-pop", ["k-pop"]), "axe": ("Axé", ["axe"]),
+    # nichados (vários com BPM alto: bons para tiros e mais gás)
+    "hardtechno": ("Hard techno", ["hard techno", "industrial techno", "schranz"]),
+    "hardcore_el": ("Hardcore (eletrônico / gabber)", ["hardcore", "gabber", "uptempo hardcore", "frenchcore"]),
+    "hardstyle": ("Hardstyle", ["hardstyle", "rawstyle"]), "techno": ("Techno", ["techno", "melodic techno"]),
+    "dnb": ("Drum and bass", ["drum and bass", "liquid funk", "neurofunk"]), "dubstep": ("Dubstep / bass", ["dubstep", "riddim"]),
+    "psytrance": ("Psytrance", ["psytrance", "full on"]), "trance": ("Trance", ["trance", "uplifting trance"]),
+    "hardcore_punk": ("Hardcore punk", ["hardcore punk", "melodic hardcore"]), "metalcore": ("Metalcore / post-hardcore", ["metalcore", "post-hardcore"]),
+    "punk": ("Punk", ["punk", "pop punk"]), "numetal": ("Nu metal", ["nu metal"]), "thrash": ("Thrash / death metal", ["thrash metal", "death metal"]),
+    "industrial": ("Industrial / EBM", ["industrial", "ebm"]), "phonk": ("Phonk", ["phonk", "drift phonk"]),
+    "synthwave": ("Synthwave", ["synthwave", "darksynth"]), "rocknac": ("Rock nacional", ["rock nacional", "brazilian rock"]),
+    "brega": ("Brega funk / arrocha", ["brega funk", "arrocha"]), "afro": ("Afrobeats / amapiano", ["afrobeats", "amapiano"]),
+    "reggae": ("Reggae", ["reggae"]), "jazz": ("Jazz / blues", ["jazz", "blues"]), "lofi": ("Lo-fi / chill", ["lo-fi", "chill"]),
 }
+NICHE_FROM = "hardtechno"   # a partir deste, a tela mostra como "nichados"
 MIX = {"so_minhas": "Só as minhas", "completar": "Completar as curtas com novidades", "misturar": "Misturar novidades"}
 DISC_AFF = {"completar": 0.25, "misturar": 0.85}
 DEFAULT_CADENCE = 162
@@ -261,36 +275,88 @@ def fetch_library() -> dict:
     return lib
 
 
-def discover(budget_s: float = 8.0) -> int:
-    """Músicas novas dos estilos escolhidos (busca do Spotify por gênero). Entram com BPM descoberto depois, só
-    para completar/misturar as playlists, nunca no lugar das músicas da pessoa. Refaz a cada 7 dias."""
+def _search(q: str, off: int) -> tuple[int, list[dict]]:
+    """Busca de músicas no Spotify (até 10 por vez desde 2026). Sem 'market': ele pede uma permissão a mais."""
+    try:
+        d = call("GET", "/search", params={"q": q, "type": "track", "limit": 10, "offset": off}) or {}
+        return 200, ((d.get("tracks") or {}).get("items") or [])
+    except MusicError as e:
+        return getattr(e, "status", 0) or -1, []
+
+
+def _recco_similar(seeds: list[str], size: int = 40) -> list[dict]:
+    """Músicas parecidas com as da pessoa (ReccoBeats, a partir de ids do Spotify)."""
+    if not seeds:
+        return []
+    st, d = _http("GET", "https://api.reccobeats.com/v1/track/recommendation?" + urllib.parse.urlencode({"seeds": ",".join(seeds[:5]), "size": size}), timeout=10)
+    _DIAG["recco_rec"] = st
+    out = []
+    for c in ((d or {}).get("content") or []) if st == 200 and isinstance(d, dict) else []:
+        href = c.get("href") or ""
+        sid = href.rstrip("/").split("/")[-1] if "spotify.com" in href else None
+        name = c.get("trackTitle") or c.get("name")
+        if sid and name:
+            out.append({"id": sid, "name": name, "uri": f"spotify:track:{sid}", "type": "track", "duration_ms": c.get("durationMs"),
+                        "artists": [{"name": a.get("name", "")} for a in c.get("artists") or []], "external_ids": {"isrc": c.get("isrc")}})
+    return out
+
+
+def _genre_queries(g: str) -> list[str]:
+    if g.startswith("custom:"):
+        return [g[7:]]
+    return GENRES[g][1] if g in GENRES else []
+
+
+def discover(budget_s: float = 8.0, cad: int | None = None) -> int:
+    """Músicas novas dos estilos escolhidos. Para cada estilo: busca do Spotify por gênero; se não vier nada, pelo
+    nome do estilo; e "parecidas com as suas" pela ReccoBeats. Só completam/misturam as playlists (as da pessoa vêm
+    antes). Estilo que trouxe músicas só é buscado de novo em 7 dias; o que veio vazio tenta de novo no próximo."""
     s = settings()
-    genres = [g for g in s.get("genres") or [] if g in GENRES]
+    genres = [g for g in s.get("genres") or [] if g in GENRES or g.startswith("custom:") or g == "parecidas"]
     if not genres or s.get("mix") == "so_minhas":
         return 0
     lib = _lib()
     tracks = lib.setdefault("tracks", {})
     done = lib.setdefault("disc_at", {})
+    diag = lib.setdefault("disc_diag", {})
     t0, added = time.monotonic(), 0
+
+    def add(t: dict, g: str) -> int:
+        if t and t.get("id") and t["id"] not in tracks and t.get("uri"):
+            tracks[t["id"]] = {**_track_row(t, DISC_AFF["completar"], "descoberta"), "genre": g}
+            return 1
+        return 0
+
     for g in genres:
-        if time.time() - (done.get(g) or 0) < 7 * 86400:
+        recent = time.time() - (done.get(g) or 0) < 7 * 86400 and (diag.get(g) or {}).get("found")
+        if recent or time.monotonic() - t0 > budget_s:   # vazio (ou da busca antiga) tenta de novo
             continue
-        for q in GENRES[g][1]:
-            for off in (0, 10, 20, 30, 40):          # a busca do Spotify agora devolve até 10 por vez
-                if time.monotonic() - t0 > budget_s:
+        found, how, last = 0, None, None
+        if g == "parecidas":
+            own = sorted((r for r in tracks.values() if r.get("src") != "descoberta" and r.get("bpm")), key=lambda r: -r.get("aff", 0))
+            fast = [r for r in own if (r.get("bpm") or 0) >= 150][:3] + own[:2]
+            seeds = [r["uri"].split(":")[-1] for r in fast if r.get("uri")]
+            for t in _safe(_recco_similar, seeds) or []:
+                found += add(t, g)
+            how, last = "parecidas", _DIAG.get("recco_rec")
+        else:
+            for mode in ("genre", "texto"):
+                for q in _genre_queries(g):
+                    for off in (0, 10, 20, 30):
+                        if time.monotonic() - t0 > budget_s:
+                            break
+                        last, items = _search(f'genre:"{q}"' if mode == "genre" else q, off)
+                        for t in items:
+                            found += add(t, g)
+                        if len(items) < 10:
+                            break
+                if found >= 15:
+                    how = mode
                     break
-                try:
-                    items = ((call("GET", "/search", params={"q": f'genre:"{q}"', "type": "track", "limit": 10, "offset": off,
-                                                             "market": "from_token"}) or {}).get("tracks") or {}).get("items") or []
-                except MusicError:
-                    items = []
-                for t in items:
-                    if t and t.get("id") and t["id"] not in tracks:
-                        tracks[t["id"]] = {**_track_row(t, DISC_AFF["completar"], "descoberta"), "genre": g}
-                        added += 1
-                if len(items) < 10:
-                    break
-        if time.monotonic() - t0 <= budget_s:
+                how = mode
+        diag[g] = {"found": found, "how": how, "status": last, "at": int(time.time())}
+        added += found
+        if found:
             done[g] = time.time()
     _save_lib(lib)
     return added
@@ -428,7 +494,7 @@ def pick(mode: str, cad: int, lib: dict | None = None, n: int = MAX_PER_LIST) ->
         if not r.get("bpm"):
             continue
         if r.get("src") == "descoberta":
-            if mix == "so_minhas" or r.get("genre") not in genres:
+            if mix == "so_minhas" or r.get("genre") not in genres:   # estilo desmarcado: sai
                 continue
             r = {**r, "aff": DISC_AFF.get(mix, 0.25)}
         f = _fit(r["bpm"], mode, cad)
@@ -580,8 +646,12 @@ def summary(cad: int) -> dict:
                        "n": counts.get(k, 0), "new": news.get(k, 0), **({"url": f"https://open.spotify.com/playlist/{p['id']}"} if (p := (s.get("playlists") or {}).get(k)) else {})}
                       for k, m in MODES.items()],
             "built": s.get("built"), "updated": lib.get("updated"),
-            "genres": [{"id": g, "label": lab, "on": g in (s.get("genres") or []), "seen": (lib.get("genres_seen") or {}).get(g, 0)}
-                       for g, (lab, _) in GENRES.items()],
+            "genres": [{"id": "parecidas", "label": "Parecidas com as que você ouve", "on": "parecidas" in (s.get("genres") or []), "seen": 0, "group": "voce"}]
+                      + [{"id": g, "label": lab, "on": g in (s.get("genres") or []), "seen": (lib.get("genres_seen") or {}).get(g, 0),
+                          "group": "nicho" if list(GENRES).index(g) >= list(GENRES).index(NICHE_FROM) else "popular"}
+                         for g, (lab, _) in GENRES.items()]
+                      + [{"id": g, "label": g[7:], "on": True, "seen": 0, "group": "livre"} for g in s.get("genres") or [] if g.startswith("custom:")],
+            "disc_diag": lib.get("disc_diag") or {},
             "mix": s.get("mix") or "completar", "mix_options": [{"id": k, "label": v} for k, v in MIX.items()],
             "discovered": sum(1 for r in tracks.values() if r.get("src") == "descoberta")}
 

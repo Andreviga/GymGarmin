@@ -1054,7 +1054,14 @@ def music_settings(body: dict = Body(...)):
     if "auto" in body:
         s["auto"] = bool(body["auto"])
     if "genres" in body:
-        s["genres"] = [g for g in body.get("genres") or [] if g in music.GENRES][:6]
+        gs = []
+        for g in body.get("genres") or []:
+            g = str(g).strip()
+            if g in music.GENRES or g == "parecidas":
+                gs.append(g)
+            elif g.startswith("custom:") and 2 <= len(g[7:].strip()) <= 40:
+                gs.append("custom:" + g[7:].strip().lower())
+        s["genres"] = list(dict.fromkeys(gs))[:8]
     if body.get("mix") in music.MIX:
         s["mix"] = body["mix"]
     music.save_settings(s)

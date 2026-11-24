@@ -165,3 +165,39 @@ def test_estilos_favoritos_completam_as_playlists(env):
     c.put("/api/music/settings", json={"mix": "completar"})
     c.post("/api/music/scan", json={})
     assert sum(1 for k, _ in net.calls if k == "SEARCH") == n
+
+
+def test_estilo_nichado_busca_pelo_nome_quando_o_genero_falha_e_parecidas(env, monkeypatch):
+    c, net = env
+    orig = net.__call__
+
+    def fake(method, url, headers=None, body=None, timeout=12):
+        u = urllib.parse.urlparse(url)
+        if u.path.endswith("/search"):
+            q = urllib.parse.parse_qs(u.query)["q"][0]
+            net.calls.append(("SEARCH", q))
+            assert "market" not in urllib.parse.parse_qs(u.query)         # pedia permissão a mais
+            if q.startswith("genre:"):
+                return 400, {"error": {"status": 400, "message": "bad"}}
+            if q in ("hard techno", "schranz") and urllib.parse.parse_qs(u.query)["offset"] == ["0"]:
+                return 200, {"tracks": {"items": [_track("novo1"), _track("novo2")]}}
+            return 200, {"tracks": {"items": []}}
+        if u.netloc == "api.reccobeats.com" and "recommendation" in u.path:
+            return 200, {"content": [{"href": "https://open.spotify.com/track/novo3", "trackTitle": "Novo3", "artists": [{"name": "X"}], "isrc": "BR102"}]}
+        return orig(method, url, headers, body, timeout)
+
+    monkeypatch.setattr(music, "_http", fake)
+    c.post("/api/music/connect", json={"code": "abc", "verifier": "v", "redirect_uri": "x"})
+    c.post("/api/music/scan", json={"refresh": True})
+    c.put("/api/music/settings", json={"genres": ["hardtechno", "custom:  Schranz ", "custom:x", "parecidas", "funk"], "mix": "completar"})
+    st = c.get("/api/music").json()
+    assert [g for g in st["genres"] if g["on"]] and any(g["id"] == "custom:schranz" and g["group"] == "livre" for g in st["genres"])
+    assert not any(g["id"] == "custom:x" for g in st["genres"])                     # curto demais
+    assert next(g for g in st["genres"] if g["id"] == "hardtechno")["group"] == "nicho"
+    c.post("/api/music/scan", json={})
+    d = c.get("/api/music").json()["disc_diag"]
+    assert d["hardtechno"]["found"] == 2 and d["hardtechno"]["how"] == "texto"
+    assert d["parecidas"]["found"] == 1 and d["funk"]["found"] == 0
+    lib = music._lib()
+    assert "funk" not in lib["disc_at"] and "hardtechno" in lib["disc_at"]          # vazio tenta de novo depois
+    assert lib["tracks"]["novo3"]["bpm"] == 178
