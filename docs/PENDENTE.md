@@ -14,7 +14,7 @@ Gatilho: quando o André disser **"estou no computador"**.
 4. Posts de teste sempre como **"Só eu"** (não aparecem na Comunidade de ninguém).
 5. No fim: relatar o que achou, corrigir, publicar e perguntar se apaga a conta de teste.
 
-## Spotify (música no treino) — fazer no computador
+## Spotify (música no treino) — ✅ app criado e SPOTIFY_CLIENT_ID na Vercel (24/11); falta só o passo 4 (Nathália) e conectar
 
 O código está pronto; falta só criar o app no Spotify (5 minutos):
 
