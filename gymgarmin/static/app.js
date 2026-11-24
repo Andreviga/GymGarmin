@@ -3767,6 +3767,38 @@ function musicPerfHtml(p) {
   return `<section class="card" style="margin-top:12px"><h2>🏆 Músicas que rendem mais</h2><ol class="small" style="padding-left:18px;margin:0">${p.top.map((t) => `<li><b>${esc(t.name)}</b>${t.artist ? ` · ${esc(t.artist)}` : ""} — <span class="ok-txt">+${String(t.gain_pct).replace(".", ",")}%</span> <span class="muted">(${t.sets} séries)</span></li>`).join("")}</ol>
     <p class="small muted" style="margin:8px 0 0">Força da série (carga × repetições) acima do seu normal naquele exercício e dia. O ⚡ Mais gás e as playlists de treino já priorizam essas.</p></section>`;
 }
+// ---- YouTube Music: as mesmas playlists HAX no YouTube (enchem aos poucos pela cota diária do Google)
+async function ytLogin(y) {
+  const verifier = b64url(crypto.getRandomValues(new Uint8Array(48)));
+  const challenge = b64url(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier)));
+  const st = b64url(crypto.getRandomValues(new Uint8Array(12)));
+  store("gg_yt_pkce", { verifier, state: st, redirect: y.redirect_uri });
+  location.href = "https://accounts.google.com/o/oauth2/v2/auth?" + new URLSearchParams({ client_id: y.client_id, redirect_uri: y.redirect_uri,
+    response_type: "code", scope: y.scope, access_type: "offline", prompt: "consent", include_granted_scopes: "true", state: st,
+    code_challenge: challenge, code_challenge_method: "S256" });
+}
+function ytCardHtml(y) {
+  if (!y || !y.configured) return "";
+  if (!y.connected) return `<section class="card" style="margin-top:12px"><h2>▶️ YouTube Music</h2>
+    <p class="small muted" style="margin-top:0">Cria as mesmas playlists HAX no seu YouTube (aparecem no YouTube Music). O YouTube não deixa o app dar play: você toca por lá. O Google limita o uso grátis, então elas enchem aos poucos (umas 50 músicas por dia).</p>
+    <button class="btn ghost block" id="yt-login">Conectar o YouTube</button></section>`;
+  const tot = y.playlists.reduce((a, p) => a + p.total, 0), done = y.playlists.reduce((a, p) => a + p.done, 0);
+  return `<section class="card" style="margin-top:12px" id="yt-card"><div class="row between"><h2>▶️ YouTube Music</h2><span class="pill ${y.pending ? "muted" : "ok"}">${done}/${tot}</span></div>
+    <div class="picks">${y.playlists.map((p) => `<${p.url ? `a href="${esc(p.url)}" target="_blank" rel="noopener"` : "div"} class="pick"><span class="mu-ico" aria-hidden="true">${MUSIC_ICON[p.id] || "🎵"}</span>
+      <span class="grow"><b>HAX · ${esc(p.label)}</b><span class="small muted">${p.done} de ${p.total} no YouTube</span></span>${p.url ? `<span class="chev">›</span>` : ""}</${p.url ? "a" : "div"}>`).join("")}</div>
+    <p class="small muted" style="margin:8px 0">${y.pending ? (y.today_left ? `Faltam ${y.pending}. Hoje ainda dá para pôr umas ${y.today_left} (limite do Google); o resto entra nos próximos dias, quando você abrir esta página.` : `Faltam ${y.pending}: o limite do Google de hoje acabou, continua amanhã.`) : "Tudo no YouTube ✓"}</p>
+    <div id="yt-prog"></div>
+    ${y.pending && y.today_left ? `<button class="btn ghost block" id="yt-sync">Continuar agora</button>` : ""}
+    <button class="act" id="yt-off" style="margin-top:8px">Desconectar o YouTube</button></section>`;
+}
+async function ytSync(box, rounds = 4) {
+  for (let k = 0; k < rounds; k++) {
+    let r; try { r = await api("/api/youtube/sync", { method: "POST" }); } catch (e) { if (box) box.innerHTML = `<p class="pill bad">${esc(e.message)}</p>`; return null; }
+    const tot = r.playlists.reduce((a, p) => a + p.total, 0), done = r.playlists.reduce((a, p) => a + p.done, 0);
+    if (box) box.innerHTML = `<p class="small">▶️ ${done} de ${tot} músicas no YouTube…</p>`;
+    if (!r.pending || r.stopped === "cota" || !r.today_left) return r;
+  }
+}
 // ---- página de ajustes (#musica): conectar, montar as playlists, cadência e troca automática
 function b64url(buf) { return btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); }
 async function spotifyLogin(m) {
@@ -3788,6 +3820,18 @@ async function musicScan(box, refresh) {
 }
 async function viewMusica() {
   const q = new URLSearchParams((location.hash.split("?")[1]) || "");
+  if (q.get("yt_code") || q.get("yt_error")) {
+    const pk = store("gg_yt_pkce") || {};
+    history.replaceState(null, "", "#musica");
+    if (q.get("yt_error")) toast("O YouTube não foi conectado.", 4000);
+    else if (pk.state !== q.get("yt_state")) toast("A conexão do YouTube expirou: tente de novo.", 5000);
+    else {
+      view.innerHTML = `<section class="card"><h2>▶️ Conectando ao YouTube…</h2><div id="yt-prog"></div></section>`;
+      try { await api("/api/youtube/connect", { method: "POST", body: { code: q.get("yt_code"), verifier: pk.verifier, redirect_uri: pk.redirect } });
+        store("gg_yt_pkce", null); toast("▶️ YouTube conectado: criando as playlists HAX", 4000); await ytSync($("#yt-prog"), 3);
+      } catch (e) { toast(e.message, 6000); }
+    }
+  }
   if (q.get("code") || q.get("error")) {
     const pk = store("gg_sp_pkce") || {};
     history.replaceState(null, "", "#musica");
@@ -3828,6 +3872,7 @@ async function viewMusica() {
       <div id="mu-scan"></div>
       <button class="btn ghost block" id="mu-rescan">🔄 Atualizar minhas playlists</button></section>
     ${musicPerfHtml(m.perf)}
+    <div id="yt-slot"></div>
     <h2 class="sec-title">Suas playlists HAX</h2>
     <div class="picks">${m.modes.map((x) => `<${x.url ? `a href="${esc(x.url)}" target="_blank" rel="noopener"` : "div"} class="pick"><span class="mu-ico" aria-hidden="true">${MUSIC_ICON[x.id]}</span>
       <span class="grow"><b>${esc(x.label)}</b><span class="small muted">${esc(x.range)} · ${x.n - (x.new || 0)} suas${x.new ? ` + ${x.new} novas` : ""}${x.n < 3 ? " · poucas: escolha estilos abaixo ou curta mais músicas nessa faixa" : ""}</span></span>${x.url ? `<span class="chev">›</span>` : ""}</${x.url ? "a" : "div"}>`).join("")}</div>
@@ -3860,6 +3905,14 @@ async function viewMusica() {
       <button class="btn ghost block" id="mu-save">Salvar</button>
       <button class="act" id="mu-off" style="margin-top:10px">Desconectar o Spotify</button></section>`;
   const sel = { genres: m.genres.filter((g) => g.on).map((g) => g.id), mix: m.mix };
+  api("/api/youtube").then(async (y) => {
+    const slot = $("#yt-slot"); if (!slot) return;
+    slot.innerHTML = ytCardHtml(y);
+    if (y.connected && y.pending && y.today_left && !viewMusica.ytRan) {   // continua sozinho ao abrir a página
+      viewMusica.ytRan = true; const r = await ytSync($("#yt-prog"), 3);
+      if (r && $("#yt-slot")) $("#yt-slot").innerHTML = ytCardHtml({ ...y, ...r });
+    }
+  }).catch(() => {});
   view.onclick = async (e) => {
     const t = e.target.closest("button"); if (!t) return;
     if (t.dataset.genre) {
@@ -3881,6 +3934,9 @@ async function viewMusica() {
       return toast(`“${v}” entra quando você salvar`, 2500);
     }
     if (t.dataset.mix) { sel.mix = t.dataset.mix; $$("#mu-mix [data-mix]").forEach((b) => b.classList.toggle("on", b.dataset.mix === sel.mix)); return; }
+    if (t.id === "yt-login") { const y = await api("/api/youtube"); return ytLogin(y); }
+    if (t.id === "yt-sync") { t.disabled = true; const r = await ytSync($("#yt-prog"), 4); const y = await api("/api/youtube"); $("#yt-slot").innerHTML = ytCardHtml(y); return r; }
+    if (t.id === "yt-off") { if (!confirm("Desconectar o YouTube? As playlists HAX continuam no seu YouTube.")) return; await api("/api/youtube/disconnect", { method: "POST" }); const y = await api("/api/youtube"); $("#yt-slot").innerHTML = ytCardHtml(y); return; }
     if (t.dataset.unblock) { await api(`/api/music/block/${encodeURIComponent(t.dataset.unblock)}`, { method: "DELETE" }); toast("Volta nas playlists na próxima atualização", 3000); state.music = null; return viewMusica(); }
     if (t.id === "mu-gsave") {
       t.disabled = true; t.textContent = "Buscando músicas novas…";

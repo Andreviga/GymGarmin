@@ -20,7 +20,7 @@ from datetime import date, timedelta
 from . import adaptive, alternative, auth, coach, focus, gallery, ingest, my_gym, partners, training_rules
 from . import watch_review as wrv
 from . import gyms, loads, personal, social, weather, wellness
-from . import (analysis, calibration, catalog, clock, db, dedupe, health, endurance, garmin_export, garmin_sync, generator, music, sharecard, history, limitations,
+from . import (analysis, calibration, catalog, clock, db, dedupe, health, endurance, garmin_export, garmin_sync, generator, music, sharecard, youtube, history, limitations,
                load, plans_io, progression, readiness, schedule, sports, steps, templates, watch_labels)
 from .muscles import EQUIPMENT_PT, HR_ZONES, MUSCLES, hr_max, zone_bpm
 
@@ -1146,6 +1146,49 @@ def _soundtrack(s: dict) -> list[dict]:
     if tr or started.days >= 2:          # vazio e recente: tenta de novo depois (o Spotify pode demorar a registrar)
         db.kv_set(key, json.dumps(tr))
     return tr
+
+
+# ---- YouTube Music: as mesmas playlists HAX no YouTube (enchem aos poucos: cota diária do Google)
+
+def _yt_call(fn):
+    try:
+        return fn()
+    except youtube.YTError as e:
+        raise HTTPException(400, str(e)) from e
+
+
+@app.get("/api/youtube")
+def youtube_status(request: Request):
+    out = youtube.summary(cad=music.cadence_target(_run_cadences())) if youtube.connected() else \
+        {"configured": youtube.configured(), "connected": False, "playlists": [], "pending": 0, "today_left": 0}
+    return {**out, "client_id": youtube.client_id(), "redirect_uri": youtube.redirect_uri(str(request.base_url)), "scope": youtube.SCOPE}
+
+
+@app.get("/google-callback")
+def google_callback(code: str | None = None, state: str | None = None, error: str | None = None):
+    q = urllib.parse.urlencode({k: v for k, v in (("yt_code", code), ("yt_state", state), ("yt_error", error)) if v})
+    return RedirectResponse(f"/#musica?{q}", status_code=302)
+
+
+@app.post("/api/youtube/connect")
+def youtube_connect(body: dict = Body(...)):
+    if not youtube.configured():
+        raise HTTPException(400, "Login do Google ainda não configurado no servidor.")
+    _yt_call(lambda: youtube.exchange(body.get("code") or "", body.get("verifier") or "", body.get("redirect_uri") or ""))
+    return {"ok": True}
+
+
+@app.post("/api/youtube/sync")
+def youtube_sync(body: dict = Body(default={})):
+    if not youtube.connected():
+        raise HTTPException(400, "YouTube não conectado.")
+    return _yt_call(lambda: youtube.sync(budget_s=float(body.get("budget") or 8), cad=music.cadence_target(_run_cadences())))
+
+
+@app.post("/api/youtube/disconnect")
+def youtube_disconnect():
+    youtube.disconnect()
+    return {"ok": True}
 
 
 @app.post("/api/music/disconnect")
