@@ -89,7 +89,10 @@ def test_bpm_por_momento():
     assert music._fit(81, "corrida_leve", cad) == 0 and music._fit(162, "corrida_leve", cad) == 0   # metade também serve
     assert music._fit(150, "corrida_leve", cad) is None                                             # fora do ritmo
     assert music._fit(72, "calma", cad) is not None and music._fit(140, "calma", cad) is None
-    assert music._fit(176, "tiros", cad) is not None                                                 # 162 + 12 = 174
+    assert music._fit(176, "tiros", cad) is not None and music._fit(190, "tiros", cad) is not None   # 168–191
+    assert music._fit(166, "tiros", cad) is None and music._fit(194, "tiros", cad) is None
+    assert music._fit(90, "tiros", cad) is not None                                                  # metade (180)
+    assert music._range_txt(music.MODES["tiros"], 156) == "162–185 bpm"
     assert music.cadence_target([133, 158, 164, 166]) == 164    # corre-caminha (133) não puxa a passada para baixo
     assert music.cadence_target([]) == music.DEFAULT_CADENCE
 
@@ -156,7 +159,8 @@ def test_estilos_favoritos_completam_as_playlists(env):
     tiros = next(m for m in st["modes"] if m["id"] == "tiros")
     assert tiros["new"] == 3 and tiros["n"] == tiros0["n"] + 3 and st["discovered"] == 3
     rows = music.pick("tiros", 162)
-    assert [r["src"] for r in rows][: tiros0["n"]] == [r["src"] for r in rows if r["src"] != "descoberta"]   # as suas primeiro
+    assert sum(1 for r in rows if r["src"] != "descoberta") == tiros0["n"]          # as suas continuam todas (novas só somam)
+    assert [r["eff"] // 8 for r in rows] == sorted((r["eff"] // 8 for r in rows), reverse=True)   # mais rápidas primeiro
     # "só as minhas": novidades saem
     c.put("/api/music/settings", json={"mix": "so_minhas"})
     assert next(m for m in c.get("/api/music").json()["modes"] if m["id"] == "tiros")["new"] == 0

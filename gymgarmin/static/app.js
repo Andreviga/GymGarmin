@@ -3799,6 +3799,11 @@ async function viewMusica() {
     $("#mu-login").onclick = () => spotifyLogin(m);
     return;
   }
+  if (m.stale && !viewMusica.rebuilt) {   // faixas mudaram (ou a passada): refaz as playlists sozinho
+    viewMusica.rebuilt = true;
+    view.innerHTML = `<section class="card"><h2>🎵 Atualizando suas playlists</h2><p class="small muted">As faixas de BPM mudaram: refazendo as playlists HAX…</p><div id="mu-scan"></div></section>`;
+    await musicScan($("#mu-scan"), false); state.music = null; return viewMusica();
+  }
   view.innerHTML = `<section class="card"><div class="row between"><h2>🎵 Spotify${m.name ? ` · ${esc(m.name)}` : ""}</h2><span class="pill ${m.premium ? "ok" : "muted"}">${m.premium ? "Premium" : "sem Premium"}</span></div>
       <p class="small muted">${m.with_bpm} de ${m.tracks} músicas suas com BPM${m.pending ? ` · ${m.pending} ainda sem` : ""}.</p>
       <div id="mu-scan"></div>

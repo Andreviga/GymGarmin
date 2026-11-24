@@ -42,7 +42,8 @@ MODES: dict[str, dict] = {
     "gas": {"label": "Mais gás", "lo": 145, "hi": 180, "order": "rapida", "desc": "última série, finalizador, tiros"},
     "corrida_leve": {"label": "Corrida leve", "cad": 0, "order": "ajuste", "desc": "no ritmo da sua passada"},
     "corrida_ritmo": {"label": "Corrida forte", "cad": 6, "order": "ajuste", "desc": "passada um pouco mais rápida"},
-    "tiros": {"label": "Tiros", "cad": 12, "order": "ajuste", "desc": "passada rápida: tiros e intervalados"},
+    # tiros: faixa (não um alvo exato) da passada +6 até +29 — no tiro, música mais rápida dá mais gás
+    "tiros": {"label": "Tiros", "cad_lo": 6, "cad_hi": 29, "order": "rapida", "desc": "tiros e intervalados: rápida, para dar gás"},
     "calma": {"label": "Calma", "lo": 60, "hi": 95, "order": "desce", "desc": "volta à calma, alongamento, yoga"},
 }
 # estilos para descobrir músicas novas no BPM certo (busca do Spotify por gênero; o BPM vem da ReccoBeats/Deezer)
@@ -462,7 +463,7 @@ def _safe(fn, *a):
 def _cands(bpm: float, mode: str, cad: int) -> list[float]:
     """BPMs que a música "vale": corrida aceita metade/dobro (um passo por batida ou a cada duas); nas outras,
     só corrige o detector que às vezes dobra o BPM de música lenta (acima de 185)."""
-    if "cad" in MODES[mode]:
+    if "cad" in MODES[mode] or "cad_lo" in MODES[mode]:
         return [bpm, bpm * 2, bpm / 2]
     return [bpm] + ([bpm / 2] if bpm > 185 else [])
 
@@ -470,6 +471,10 @@ def _cands(bpm: float, mode: str, cad: int) -> list[float]:
 def _fit(bpm: float, mode: str, cad: int) -> float | None:
     """0 = no alvo; None = não serve."""
     m = MODES[mode]
+    if "cad_lo" in m:
+        lo, hi = cad + m["cad_lo"], cad + m["cad_hi"]
+        ok = [abs(b - (lo + hi) / 2) / hi * 0.5 for b in _cands(bpm, mode, cad) if lo <= b <= hi]
+        return min(ok) if ok else None
     if "cad" in m:
         target = cad + m["cad"]
         best = min(abs(b - target) / target for b in _cands(bpm, mode, cad))
@@ -481,8 +486,20 @@ def _fit(bpm: float, mode: str, cad: int) -> float | None:
 
 def _eff_bpm(bpm: float, mode: str, cad: int) -> float:
     m = MODES[mode]
-    target = cad + m["cad"] if "cad" in m else (m["lo"] + m["hi"]) / 2
+    target = (cad + m["cad"] if "cad" in m else cad + (m["cad_lo"] + m["cad_hi"]) / 2 if "cad_lo" in m
+              else (m["lo"] + m["hi"]) / 2)
     return min(_cands(bpm, mode, cad), key=lambda b: abs(b - target))
+
+
+RULES_V = 2   # muda quando as faixas mudam: a tela refaz as playlists sozinha
+
+
+def _range_txt(m: dict, cad: int) -> str:
+    if "cad_lo" in m:
+        return f"{cad + m['cad_lo']}–{cad + m['cad_hi']} bpm"
+    if "cad" in m:
+        return f"{cad + m['cad']} passos/min"
+    return f"{m['lo']}–{m['hi']} bpm"
 
 
 def pick(mode: str, cad: int, lib: dict | None = None, n: int = MAX_PER_LIST) -> list[dict]:
@@ -552,7 +569,7 @@ def build_playlists(cad: int) -> dict:
     out = {}
     for mode, m in MODES.items():
         rows = pick(mode, cad, lib)
-        extra = f" · alvo {cad + m['cad']} passos/min" if "cad" in m else f" · {m['lo']}–{m['hi']} bpm"
+        extra = f" · {_range_txt(m, cad)}"
         name = f"HAX · {m['label']}"
         desc = f"Feita pelo app HAX com as músicas que você mais ouve: {m['desc']}{extra}."
         if len(rows) < 3:
@@ -576,6 +593,7 @@ def build_playlists(cad: int) -> dict:
     s["playlists"] = {k: v for k, v in out.items() if v.get("id")}
     s["built_cad"] = cad
     s["built"] = time.time()
+    s["rules_v"] = RULES_V
     save_settings(s)
     return out
 
@@ -642,7 +660,7 @@ def summary(cad: int) -> dict:
             "pending": sum(1 for r in tracks.values() if r.get("bpm") is None and not r.get("tried")),
             "cadence": cad, "cadence_manual": bool(s.get("cadence")), "auto": s.get("auto", True),
             "modes": [{"id": k, "label": m["label"], "desc": m["desc"],
-                       "range": f"{cad + m['cad']} passos/min" if "cad" in m else f"{m['lo']}–{m['hi']} bpm",
+                       "range": _range_txt(m, cad),
                        "n": counts.get(k, 0), "new": news.get(k, 0), **({"url": f"https://open.spotify.com/playlist/{p['id']}"} if (p := (s.get("playlists") or {}).get(k)) else {})}
                       for k, m in MODES.items()],
             "built": s.get("built"), "updated": lib.get("updated"),
@@ -653,13 +671,14 @@ def summary(cad: int) -> dict:
                       + [{"id": g, "label": g[7:], "on": True, "seen": 0, "group": "livre"} for g in s.get("genres") or [] if g.startswith("custom:")],
             "disc_diag": lib.get("disc_diag") or {},
             "mix": s.get("mix") or "completar", "mix_options": [{"id": k, "label": v} for k, v in MIX.items()],
-            "discovered": sum(1 for r in tracks.values() if r.get("src") == "descoberta")}
+            "discovered": sum(1 for r in tracks.values() if r.get("src") == "descoberta"),
+            "stale": bool(s.get("built")) and (s.get("rules_v") != RULES_V or s.get("built_cad") != cad)}
 
 
 def search_url(mode: str, cad: int) -> str:
     """Sem conectar: abre a busca do Spotify com o tipo de música do momento."""
     m = MODES[mode]
     q = {"aquecimento": "aquecimento treino", "musculacao": "treino academia 130 bpm", "gas": "treino pesado 160 bpm",
-         "corrida_leve": f"corrida {cad} bpm", "corrida_ritmo": f"corrida {cad + 6} bpm", "tiros": f"corrida {cad + 12} bpm",
+         "corrida_leve": f"corrida {cad} bpm", "corrida_ritmo": f"corrida {cad + 6} bpm", "tiros": f"corrida {cad + 18} bpm",
          "calma": "alongamento relaxar"}[mode]
     return "https://open.spotify.com/search/" + urllib.parse.quote(q) if m else "https://open.spotify.com"
