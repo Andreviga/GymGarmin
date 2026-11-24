@@ -3805,7 +3805,14 @@ async function viewMusica() {
       <button class="btn ghost block" id="mu-rescan">🔄 Atualizar minhas playlists</button></section>
     <h2 class="sec-title">Suas playlists HAX</h2>
     <div class="picks">${m.modes.map((x) => `<${x.url ? `a href="${esc(x.url)}" target="_blank" rel="noopener"` : "div"} class="pick"><span class="mu-ico" aria-hidden="true">${MUSIC_ICON[x.id]}</span>
-      <span class="grow"><b>${esc(x.label)}</b><span class="small muted">${esc(x.range)} · ${x.n} ${x.n === 1 ? "música" : "músicas"}${x.n < 3 ? " · poucas: curta mais músicas nessa faixa" : ""}</span></span>${x.url ? `<span class="chev">›</span>` : ""}</${x.url ? "a" : "div"}>`).join("")}</div>
+      <span class="grow"><b>${esc(x.label)}</b><span class="small muted">${esc(x.range)} · ${x.n - (x.new || 0)} suas${x.new ? ` + ${x.new} novas` : ""}${x.n < 3 ? " · poucas: escolha estilos abaixo ou curta mais músicas nessa faixa" : ""}</span></span>${x.url ? `<span class="chev">›</span>` : ""}</${x.url ? "a" : "div"}>`).join("")}</div>
+    <section class="card" style="margin-top:12px"><h2>Estilos que você curte</h2>
+      <p class="small muted" style="margin-top:0">O app busca músicas novas desses estilos, no BPM certo, para completar as playlists. As suas continuam vindo primeiro.${m.genres.some((g) => g.seen) ? " <b>★</b> = estilos que você já ouve." : ""}</p>
+      <div class="fc-chips" id="mu-genres">${m.genres.map((g) => `<button type="button" class="wz-chip ${g.on ? "on" : ""}" data-genre="${g.id}">${g.seen ? "★ " : ""}${esc(g.label)}</button>`).join("")}</div>
+      <label style="margin-top:12px">Novidades nas playlists</label>
+      <div class="chips" id="mu-mix">${m.mix_options.map((o) => `<button type="button" class="chip pc ${m.mix === o.id ? "on" : ""}" data-mix="${o.id}">${esc(o.label)}</button>`).join("")}</div>
+      <button class="btn block" id="mu-gsave" style="margin-top:12px">Salvar estilos e atualizar playlists</button>
+      ${m.discovered ? `<p class="small muted" style="margin:8px 0 0">${m.discovered} músicas novas encontradas nos seus estilos.</p>` : ""}</section>
     <section class="card" style="margin-top:12px"><h2>Ajustes</h2>
       <label class="row gap"><input type="checkbox" id="mu-auto" ${m.auto !== false ? "checked" : ""}> <span>Trocar a música sozinho conforme a fase do treino${m.premium ? "" : " (precisa do Premium)"}</span></label>
       <div class="field" style="margin-top:10px"><label for="mu-cad">Sua passada na corrida (passos por minuto)</label>
@@ -3813,8 +3820,21 @@ async function viewMusica() {
         <p class="small muted">${m.cadence_manual ? "Você escolheu este número." : "Calculado pelas suas corridas no relógio (ou 162 se ainda não há)."} As músicas da corrida acompanham esse ritmo (ou a metade dele).</p></div>
       <button class="btn ghost block" id="mu-save">Salvar</button>
       <button class="act" id="mu-off" style="margin-top:10px">Desconectar o Spotify</button></section>`;
+  const sel = { genres: m.genres.filter((g) => g.on).map((g) => g.id), mix: m.mix };
   view.onclick = async (e) => {
     const t = e.target.closest("button"); if (!t) return;
+    if (t.dataset.genre) {
+      const g = t.dataset.genre, on = sel.genres.includes(g);
+      if (!on && sel.genres.length >= 6) return toast("Até 6 estilos", 2500);
+      sel.genres = on ? sel.genres.filter((x) => x !== g) : [...sel.genres, g];
+      t.classList.toggle("on", !on); return;
+    }
+    if (t.dataset.mix) { sel.mix = t.dataset.mix; $$("#mu-mix [data-mix]").forEach((b) => b.classList.toggle("on", b.dataset.mix === sel.mix)); return; }
+    if (t.id === "mu-gsave") {
+      t.disabled = true; t.textContent = "Buscando músicas novas…";
+      await api("/api/music/settings", { method: "PUT", body: { genres: sel.genres, mix: sel.mix } });
+      await musicScan($("#mu-scan"), false); state.music = null; return viewMusica();
+    }
     if (t.id === "mu-rescan") { t.disabled = true; await musicScan($("#mu-scan"), true); t.disabled = false; state.music = null; return viewMusica(); }
     if (t.id === "mu-save") {
       await api("/api/music/settings", { method: "PUT", body: { auto: $("#mu-auto").checked, cadence: +$("#mu-cad").value || null } });

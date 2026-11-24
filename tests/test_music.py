@@ -12,6 +12,7 @@ SONGS = {
     "lenta": (72, "BR001"), "media": (118, "BR002"), "treino": (132, "BR003"), "pesada": (140, "BR004"),
     "rapida": (168, "BR005"), "corrida": (162, "BR006"), "metade": (81, "BR007"), "sem_bpm": (0, "BR008"),
     "turbo": (176, "BR009"), "aquece": (108, "BR010"), "calma2": (88, "BR011"), "treino2": (145, "BR012"), "passo": (160, "BR013"),
+    "novo1": (172, "BR100"), "novo2": (175, "BR101"), "novo3": (178, "BR102"),
 }
 
 
@@ -40,8 +41,15 @@ class FakeNet:
             return 200, {"id": "andre", "display_name": "André", "product": "premium" if self.premium else "free"}
         if p == "/me/top/tracks":
             rng = urllib.parse.parse_qs(u.query)["time_range"][0]
-            names = list(SONGS)[:8] if rng == "short_term" else list(SONGS)[4:]
+            own = [n for n in SONGS if not n.startswith("novo")]
+            names = own[:8] if rng == "short_term" else own[4:]
             return 200, {"items": [_track(n) for n in names]}
+        if p == "/me/top/artists":
+            return 200, {"items": [{"name": "Banda", "genres": ["classic rock", "sertanejo universitario"]}]}
+        if p == "/search":
+            qs = urllib.parse.parse_qs(u.query)
+            self.calls.append(("SEARCH", qs["q"][0]))
+            return 200, {"tracks": {"items": [_track(n) for n in ("novo1", "novo2", "novo3")] if qs.get("offset") == ["0"] else []}}
         if p == "/me/tracks":
             return 200, {"items": [{"track": _track("calma2")}]}
         if p == "/me/player/recently-played":
@@ -94,7 +102,8 @@ def test_conectar_ler_musicas_e_montar_playlists(env):
     assert r.status_code == 302 and r.headers["location"].startswith("/#musica?") and "code=abc" in r.headers["location"]
     assert c.post("/api/music/connect", json={"code": "abc", "verifier": "v", "redirect_uri": st["redirect_uri"]}).json()["product"] == "premium"
     out = c.post("/api/music/scan", json={"refresh": True}).json()
-    assert out["built"] and out["total"] == len(SONGS) and out["known"] == len(SONGS) - 1     # "sem_bpm" fica de fora
+    own = [n for n in SONGS if not n.startswith("novo")]
+    assert out["built"] and out["total"] == len(own) and out["known"] == len(own) - 1     # "sem_bpm" fica de fora
     st = c.get("/api/music").json()
     modes = {m["id"]: m for m in st["modes"]}
     assert st["connected"] and st["premium"] and modes["musculacao"]["url"]
@@ -129,3 +138,30 @@ def test_sem_premium_avisa_e_abre_a_playlist(env, monkeypatch):
     assert c.post("/api/music/play", json={"mode": "xx"}).status_code == 400
     c.post("/api/music/disconnect")
     assert not c.get("/api/music").json()["connected"]
+
+
+def test_estilos_favoritos_completam_as_playlists(env):
+    c, net = env
+    c.post("/api/music/connect", json={"code": "abc", "verifier": "v", "redirect_uri": "x"})
+    c.post("/api/music/scan", json={"refresh": True})
+    st = c.get("/api/music").json()
+    g = {x["id"]: x for x in st["genres"]}
+    assert g["rock"]["seen"] and g["sertanejo"]["seen"] and not g["funk"]["seen"]      # sugestão pelo que já ouve
+    tiros0 = next(m for m in st["modes"] if m["id"] == "tiros")
+    assert tiros0["new"] == 0
+    c.put("/api/music/settings", json={"genres": ["rock", "xx"], "mix": "completar"})
+    c.post("/api/music/scan", json={})
+    assert any(k == "SEARCH" and 'genre:"rock"' in q for k, q in net.calls)
+    st = c.get("/api/music").json()
+    tiros = next(m for m in st["modes"] if m["id"] == "tiros")
+    assert tiros["new"] == 3 and tiros["n"] == tiros0["n"] + 3 and st["discovered"] == 3
+    rows = music.pick("tiros", 162)
+    assert [r["src"] for r in rows][: tiros0["n"]] == [r["src"] for r in rows if r["src"] != "descoberta"]   # as suas primeiro
+    # "só as minhas": novidades saem
+    c.put("/api/music/settings", json={"mix": "so_minhas"})
+    assert next(m for m in c.get("/api/music").json()["modes"] if m["id"] == "tiros")["new"] == 0
+    # nova busca do mesmo estilo só depois de 7 dias
+    n = sum(1 for k, _ in net.calls if k == "SEARCH")
+    c.put("/api/music/settings", json={"mix": "completar"})
+    c.post("/api/music/scan", json={})
+    assert sum(1 for k, _ in net.calls if k == "SEARCH") == n

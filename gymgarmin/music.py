@@ -45,6 +45,19 @@ MODES: dict[str, dict] = {
     "tiros": {"label": "Tiros", "cad": 12, "order": "ajuste", "desc": "passada rápida: tiros e intervalados"},
     "calma": {"label": "Calma", "lo": 60, "hi": 95, "order": "desce", "desc": "volta à calma, alongamento, yoga"},
 }
+# estilos para descobrir músicas novas no BPM certo (busca do Spotify por gênero; o BPM vem da ReccoBeats/Deezer)
+GENRES: dict[str, tuple[str, list[str]]] = {
+    "sertanejo": ("Sertanejo", ["sertanejo", "sertanejo universitario"]), "funk": ("Funk", ["funk carioca", "funk"]),
+    "pagode": ("Pagode / samba", ["pagode", "samba"]), "rock": ("Rock", ["rock", "classic rock"]),
+    "pop": ("Pop", ["pop", "dance pop"]), "rap": ("Rap / hip-hop", ["hip hop", "rap"]), "trap": ("Trap", ["trap"]),
+    "eletronica": ("Eletrônica", ["edm", "electro house"]), "house": ("House / techno", ["house", "techno"]),
+    "reggaeton": ("Reggaeton / latino", ["reggaeton", "latin"]), "forro": ("Forró / piseiro", ["forro", "piseiro"]),
+    "mpb": ("MPB", ["mpb"]), "gospel": ("Gospel", ["gospel"]), "metal": ("Metal", ["metal", "heavy metal"]),
+    "indie": ("Indie / alternativo", ["indie", "alternative rock"]), "anos80": ("Anos 80 e 90", ["80s", "90s"]),
+    "kpop": ("K-pop", ["k-pop"]), "axe": ("Axé", ["axe"]),
+}
+MIX = {"so_minhas": "Só as minhas", "completar": "Completar as curtas com novidades", "misturar": "Misturar novidades"}
+DISC_AFF = {"completar": 0.25, "misturar": 0.85}
 DEFAULT_CADENCE = 162
 TOL = 0.035          # corrida: até 3,5% fora da cadência ainda dá para acompanhar
 MAX_PER_LIST = 40
@@ -231,9 +244,56 @@ def fetch_library() -> dict:
             add(it.get("track"), 0.6, "recente")
     except MusicError:
         pass
-    lib.update(tracks=found, updated=time.time())
+    for tid, r in old.items():          # descobertas (estilos favoritos) continuam enquanto o estilo estiver escolhido
+        if r.get("src") == "descoberta" and tid not in found and r.get("genre") in (settings().get("genres") or []):
+            found[tid] = r
+    seen: dict[str, int] = {}
+    try:                                # estilos que a pessoa já ouve (sugestão na tela; o Spotify pode não mandar)
+        for a in (call("GET", "/me/top/artists", params={"time_range": "medium_term", "limit": 30}) or {}).get("items") or []:
+            for g in a.get("genres") or []:
+                for gid, (_, qs) in GENRES.items():
+                    if any(q in g.lower() for q in qs):
+                        seen[gid] = seen.get(gid, 0) + 1
+    except MusicError:
+        pass
+    lib.update(tracks=found, updated=time.time(), genres_seen=seen)
     _save_lib(lib)
     return lib
+
+
+def discover(budget_s: float = 8.0) -> int:
+    """Músicas novas dos estilos escolhidos (busca do Spotify por gênero). Entram com BPM descoberto depois, só
+    para completar/misturar as playlists, nunca no lugar das músicas da pessoa. Refaz a cada 7 dias."""
+    s = settings()
+    genres = [g for g in s.get("genres") or [] if g in GENRES]
+    if not genres or s.get("mix") == "so_minhas":
+        return 0
+    lib = _lib()
+    tracks = lib.setdefault("tracks", {})
+    done = lib.setdefault("disc_at", {})
+    t0, added = time.monotonic(), 0
+    for g in genres:
+        if time.time() - (done.get(g) or 0) < 7 * 86400:
+            continue
+        for q in GENRES[g][1]:
+            for off in (0, 10, 20, 30, 40):          # a busca do Spotify agora devolve até 10 por vez
+                if time.monotonic() - t0 > budget_s:
+                    break
+                try:
+                    items = ((call("GET", "/search", params={"q": f'genre:"{q}"', "type": "track", "limit": 10, "offset": off,
+                                                             "market": "from_token"}) or {}).get("tracks") or {}).get("items") or []
+                except MusicError:
+                    items = []
+                for t in items:
+                    if t and t.get("id") and t["id"] not in tracks:
+                        tracks[t["id"]] = {**_track_row(t, DISC_AFF["completar"], "descoberta"), "genre": g}
+                        added += 1
+                if len(items) < 10:
+                    break
+        if time.monotonic() - t0 <= budget_s:
+            done[g] = time.time()
+    _save_lib(lib)
+    return added
 
 
 def _deezer_bpm(row: dict) -> float | None:
@@ -361,10 +421,16 @@ def _eff_bpm(bpm: float, mode: str, cad: int) -> float:
 
 def pick(mode: str, cad: int, lib: dict | None = None, n: int = MAX_PER_LIST) -> list[dict]:
     tracks = (lib or _lib()).get("tracks") or {}
+    st = settings()
+    mix, genres = st.get("mix") or "completar", set(st.get("genres") or [])
     rows = []
     for tid, r in tracks.items():
         if not r.get("bpm"):
             continue
+        if r.get("src") == "descoberta":
+            if mix == "so_minhas" or r.get("genre") not in genres:
+                continue
+            r = {**r, "aff": DISC_AFF.get(mix, 0.25)}
         f = _fit(r["bpm"], mode, cad)
         if f is None:
             continue
@@ -501,7 +567,9 @@ def summary(cad: int) -> dict:
     lib = _lib()
     tracks = lib.get("tracks") or {}
     s = settings()
-    counts = {m: len(pick(m, cad, lib)) for m in MODES} if tracks else {}
+    picks = {m: pick(m, cad, lib) for m in MODES} if tracks else {}
+    counts = {m: len(v) for m, v in picks.items()}
+    news = {m: sum(1 for r in v if r.get("src") == "descoberta") for m, v in picks.items()}
     premium = s.get("product") == "premium" or (not s.get("product") and s.get("premium_ok") is not False)
     return {"configured": bool(client_id()), "connected": connected(), "name": s.get("name"), "premium": premium,
             "product": s.get("product"), "tracks": len(tracks), "with_bpm": sum(1 for r in tracks.values() if r.get("bpm")),
@@ -509,9 +577,13 @@ def summary(cad: int) -> dict:
             "cadence": cad, "cadence_manual": bool(s.get("cadence")), "auto": s.get("auto", True),
             "modes": [{"id": k, "label": m["label"], "desc": m["desc"],
                        "range": f"{cad + m['cad']} passos/min" if "cad" in m else f"{m['lo']}–{m['hi']} bpm",
-                       "n": counts.get(k, 0), **({"url": f"https://open.spotify.com/playlist/{p['id']}"} if (p := (s.get("playlists") or {}).get(k)) else {})}
+                       "n": counts.get(k, 0), "new": news.get(k, 0), **({"url": f"https://open.spotify.com/playlist/{p['id']}"} if (p := (s.get("playlists") or {}).get(k)) else {})}
                       for k, m in MODES.items()],
-            "built": s.get("built"), "updated": lib.get("updated")}
+            "built": s.get("built"), "updated": lib.get("updated"),
+            "genres": [{"id": g, "label": lab, "on": g in (s.get("genres") or []), "seen": (lib.get("genres_seen") or {}).get(g, 0)}
+                       for g, (lab, _) in GENRES.items()],
+            "mix": s.get("mix") or "completar", "mix_options": [{"id": k, "label": v} for k, v in MIX.items()],
+            "discovered": sum(1 for r in tracks.values() if r.get("src") == "descoberta")}
 
 
 def search_url(mode: str, cad: int) -> str:

@@ -1035,6 +1035,7 @@ def music_scan(body: dict = Body(default={})):
         lib_age = time.time() - (music._lib().get("updated") or 0)
         if body.get("refresh") or lib_age > 86400:
             music.fetch_library()
+        music.discover(budget_s=6)
         st = music.enrich(budget_s=float(body.get("budget") or 8))
         out = {**st, "built": False}
         if st["pending"] == 0:
@@ -1052,6 +1053,10 @@ def music_settings(body: dict = Body(...)):
         s["cadence"] = int(c) if c and 140 <= int(c) <= 200 else None
     if "auto" in body:
         s["auto"] = bool(body["auto"])
+    if "genres" in body:
+        s["genres"] = [g for g in body.get("genres") or [] if g in music.GENRES][:6]
+    if body.get("mix") in music.MIX:
+        s["mix"] = body["mix"]
     music.save_settings(s)
     return {"ok": True}
 
