@@ -1,7 +1,7 @@
 """Cria bancos de exemplo (personas) para a simulação das telas no celular.
 
 Uso:  python scripts/ui_seed.py <persona> <arquivo.sqlite3>
-Personas: novo · musculacao · hibrido · extremo
+Personas: novo · plano · musculacao · hibrido · extremo
 """
 from __future__ import annotations
 
@@ -93,6 +93,10 @@ def health_days(days: int, short_recent: bool = False, alert: bool = False):
 with TestClient(app) as c:
     if persona == "novo":
         pass
+    elif persona == "plano":           # conta nova com treino gerado: sem relógio e sem histórico
+        must(c.put("/api/profile", json={"name": "Bia", "age": 29, "sex": "F", "weight_kg": 60, "training_months": 6,
+                                         "goal": "hipertrofia", "available_days": [0, 1, 3, 4], "session_minutes": 60}))
+        must(c.post("/api/generator/apply", json={}))
     elif persona == "musculacao":
         must(c.put("/api/profile", json={"name": "Ana", "age": 31, "sex": "F", "weight_kg": 62, "training_months": 14,
                                          "goal": "hipertrofia", "available_days": [0, 1, 3, 4], "session_minutes": 60}))

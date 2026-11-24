@@ -261,6 +261,9 @@ async function flows(page, base, persona, tag) {
   if (await sum.count()) { await sum.scrollIntoViewIfNeeded(); await sum.click(); await page.waitForTimeout(100); await audit(page, W("hoje com treino aberto")); }
   await openDay("[data-move]");
   if (await page.locator("#day-panel [data-move]").count()) {
+    // Mover fica no menu "⋯ Mais" do cartão do treino
+    const more = page.locator("#day-panel .tc-more > summary").first();
+    if (await more.count()) { await more.scrollIntoViewIfNeeded(); await more.click(); await page.waitForTimeout(100); await audit(page, W("hoje com o menu Mais aberto")); }
     await click("#day-panel [data-move]", "Mover");
     await modalCheck("mover");
     await page.click(".modal-close").catch(() => issue("não fechou o modal", W("mover")));
