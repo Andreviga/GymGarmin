@@ -1020,10 +1020,20 @@ async function openMySession(id, onChange) {
     <p class="ok-txt small">✓ Registrado: ${reg.exercises || 0} ${reg.exercises === 1 ? "exercício" : "exercícios"}, ${reg.sets || 0} ${reg.sets === 1 ? "série" : "séries"}</p>
     ${reg.no_load ? `<p class="small rec atencao">${reg.no_load} ${reg.no_load === 1 ? "série ficou" : "séries ficaram"} sem a sua carga: sem ela o app não acompanha sua evolução nesse exercício. Toque em Corrigir para preencher.</p>` : ""}
     <ul class="sv-list small">${(v.items || []).map((i) => i.kind === "forca" ? `<li><b>${esc(i.name)}</b><br>${(i.sets || []).map(setTxt2).join(" · ")}</li>` : `<li><b>${esc(i.name)}</b> · ${i.minutes} min</li>`).join("")}</ul>
+    <div id="ms-photos"></div>
     <div class="row gap wrap" style="margin-top:12px">${v.has_sets ? `<button class="btn" id="ms-edit">Corrigir repetições e cargas</button>` : ""}<button class="btn ghost" id="ms-studio">📲 Postar nas redes</button><button class="btn ghost" id="ms-del">Apagar este registro</button></div>`);
+  const loadPhotos = async () => {
+    const box = $("#ms-photos", body); if (!box) return;
+    let ph = []; try { ph = await api(`/api/sessions/${id}/photos`); } catch (_) { /* sem fotos */ }
+    box.innerHTML = `<div class="ms-photos">${ph.map((p) => `<span class="ms-ph"><img src="${esc(p.url)}" alt="Foto do treino"><button data-delph="${esc(p.id)}" aria-label="Tirar foto">✕</button></span>`).join("")}</div>
+      <label class="btn ghost sm" style="cursor:pointer">📷 ${ph.length ? "Mais fotos" : "Pôr fotos deste treino"}<input type="file" accept="image/*" multiple id="ms-addph" hidden></label>`;
+  };
+  loadPhotos();
+  body.onchange = async (e) => { if (e.target.id === "ms-addph") { await addSessionPhotos(id, e.target.files); loadPhotos(); } };
   body.onclick = async (e) => {
     const t = e.target.closest("button"); if (!t) return;
     if (t.id === "ms-studio") return openStudio(id);
+    if (t.dataset.delph) { if (!confirm("Tirar esta foto do treino?")) return; await api(`/api/sessions/${id}/photos/${t.dataset.delph}`, { method: "DELETE" }); return loadPhotos(); }
     if (t.id === "ms-edit") {
       t.disabled = true;
       try { const d = await api(`/api/sessions/${id}/edit`); const cur = store("gg_session");
@@ -2801,11 +2811,13 @@ function showSaved(saved, cr, prTxt) {
       <p class="small muted" style="margin:6px 0 0">Séries de trabalho por músculo (aquecimento não conta; músculo auxiliar conta metade).</p>` : ""}
     <div id="sv-bal">${balanceAfterHtml(cr.balance)}</div>
     ${savedListHtml(sm)}
-    <button class="btn block" data-studio="${saved.id}" style="margin-top:16px">📲 Postar nas redes (Instagram, WhatsApp…)</button>
+    <label class="btn ghost block" style="margin-top:16px;cursor:pointer">📷 Pôr fotos deste treino<input type="file" accept="image/*" multiple id="sv-photos" hidden></label>
+    <button class="btn block" data-studio="${saved.id}" style="margin-top:8px">📲 Postar nas redes (Instagram, WhatsApp…)</button>
     <button class="btn ghost block" data-share="${saved.id}" style="margin-top:8px">📣 Compartilhar na comunidade HAX</button>
     <a class="btn ghost block" href="#hoje" style="margin-top:8px">Ver minha semana</a></section>`;
   window.scrollTo(0, 0);
-  view.oninput = view.onchange = null;
+  view.oninput = null;
+  view.onchange = async (e) => { if (e.target.id === "sv-photos" && e.target.files.length) { const n = await addSessionPhotos(saved.id, e.target.files); if (n) e.target.parentElement.firstChild.textContent = `📷 ${n} ${n === 1 ? "foto" : "fotos"} no treino · pôr mais`; } };
   view.onclick = async (e) => {
     const so = e.target.closest("[data-studio]"); if (so) return openStudio(+so.dataset.studio);
     const sh = e.target.closest("[data-share]");
@@ -3470,6 +3482,7 @@ function scDraw(cv, d, st) {
   if (st.bg !== "cor") { c.shadowColor = "rgba(0,0,0,.45)"; c.shadowBlur = 18 * u; }
   const title = d.title || "Treino";
   const stats = scStats(d);
+  const gearTxt = st.gear && d.gear ? `${/bike|bici/.test(d.gear.type || "") ? "🚲" : "👟"} ${d.gear.name}${d.gear.km ? ` · ${d.gear.km} km` : ""}` : "";
   const tpl = st.tpl;
   if (tpl === "adesivo") {
     // bloco central, sem fundo: salva/cola por cima de qualquer foto no Story
@@ -3480,11 +3493,17 @@ function scDraw(cv, d, st) {
       scText(c, lab.toUpperCase(), W / 2, y, 28 * u, { align: "center", w: 700, color: "rgba(255,255,255,.85)" });
       scText(c, val, W / 2, y + 88 * u, 84 * u, { align: "center", w: 900 }); y += 150 * u;
     }
+    if (gearTxt) { scText(c, gearTxt, W / 2, y, 32 * u, { align: "center", w: 700, max: W - 2 * pad }); y += 60 * u; }
     scText(c, "HAX", W / 2, y + 30 * u, 40 * u, { align: "center", w: 900 });
     c.restore(); return;
   }
   scBrand(c, W, H, u, d, true);
-  const bottomStats = (rows = 2) => { const h = Math.ceil(Math.min(stats.length, rows * 2) / 2) * 150 * u; scStatGrid(c, pad, H - pad - h + 70 * u, W - 2 * pad, u, stats.slice(0, rows * 2)); return h; };
+  const bottomStats = (rows = 2) => {
+    const h = Math.ceil(Math.min(stats.length, rows * 2) / 2) * 150 * u;
+    scStatGrid(c, pad, H - pad - h + 70 * u, W - 2 * pad, u, stats.slice(0, rows * 2));
+    if (gearTxt && ["classico", "mapa", "parciais", "semana"].includes(tpl)) scText(c, gearTxt, W - pad, H - pad - h + 6 * u, 30 * u, { align: "right", w: 700, color: "rgba(255,255,255,.88)", max: W - 2 * pad });
+    return h;
+  };
   if (tpl === "classico") {
     const h = Math.ceil(stats.length / 2) * 150 * u;
     if (st.bg !== "foto") {   // sem foto: o percurso (corrida) ou um ícone grande no meio, para não ficar vazio
@@ -3556,13 +3575,15 @@ async function openStudio(sessionId) {
   const tpls = scTemplates(d);
   const pref = store("gg_sc") || {};
   const st = { tpl: d.endurance && d.endurance.route ? "mapa" : d.strength && d.strength.prs.length ? "recorde" : d.strength ? "musculos" : "classico",
-    fmt: pref.fmt || "story", bg: "cor", theme: pref.theme || "noite", img: null, loads: pref.loads !== false };
+    fmt: pref.fmt || "story", bg: "cor", theme: pref.theme || "noite", img: null, imgKey: null, loads: pref.loads !== false, gear: pref.gear !== false };
+  d.photos = d.photos || [];
   if (!tpls.includes(st.tpl)) st.tpl = tpls[0];
   const chip = (k, on, attr, txt) => `<button type="button" class="chip pc ${on ? "on" : ""}" data-${attr}="${k}">${txt}</button>`;
   body.innerHTML = `<h2>📲 Postar nas redes</h2>
     <div class="sc-prev"><canvas id="sc-cv" aria-label="Prévia do cartão"></canvas></div>
     <div class="sc-row" id="sc-tpl"></div><div class="sc-row" id="sc-fmt"></div><div class="sc-row" id="sc-bg"></div>
-    ${d.strength ? `<label class="row gap small" style="margin:6px 0"><input type="checkbox" id="sc-loads" ${st.loads ? "checked" : ""}> Mostrar as cargas</label>` : ""}
+    <div class="row gap wrap small" style="margin:6px 0">${d.strength ? `<label class="row gap" style="margin:0"><input type="checkbox" id="sc-loads" ${st.loads ? "checked" : ""}> Mostrar as cargas</label>` : ""}
+      ${d.gear ? `<label class="row gap" style="margin:0"><input type="checkbox" id="sc-gear" ${st.gear ? "checked" : ""}> Mostrar o tênis (${esc(d.gear.name)})</label>` : ""}</div>
     <button class="btn block" id="sc-share">Compartilhar · Instagram, WhatsApp, Strava…</button>
     <div class="row gap" style="margin-top:8px"><button class="btn ghost grow" id="sc-copy">Copiar imagem</button><button class="btn ghost grow" id="sc-save">Salvar no celular</button></div>
     <p class="small muted" style="margin:8px 2px 0" id="sc-tip"></p>
@@ -3571,7 +3592,8 @@ async function openStudio(sessionId) {
   const draw = () => {
     $("#sc-tpl", body).innerHTML = tpls.map((k) => chip(k, st.tpl === k, "tpl", SC_TPL[k])).join("");
     $("#sc-fmt", body).innerHTML = Object.entries(SC_FMT).map(([k, v]) => chip(k, st.fmt === k, "fmt", v[2])).join("");
-    $("#sc-bg", body).innerHTML = `<label class="chip pc ${st.bg === "foto" ? "on" : ""}" style="cursor:pointer">📷 ${st.img ? "Sua foto" : "Pôr foto"}<input type="file" accept="image/*" id="sc-photo" hidden></label>
+    $("#sc-bg", body).innerHTML = `${d.photos.map((p, k) => `<button type="button" class="sc-ph ${st.bg === "foto" && st.imgKey === p.url ? "on" : ""}" data-ph="${k}" aria-label="Foto ${k + 1}${p.src === "garmin" ? " do Garmin" : ""}"><img src="${esc(p.url)}" alt="" loading="lazy">${p.src === "garmin" ? `<span class="sc-ph-g">G</span>` : ""}</button>`).join("")}
+      <label class="chip pc" style="cursor:pointer">📷 Pôr foto<input type="file" accept="image/*" id="sc-photo" hidden></label>
       ${Object.entries(SC_THEMES).map(([k, [a, b]]) => `<button type="button" class="sc-dot ${st.bg === "cor" && st.theme === k ? "on" : ""}" data-theme="${k}" style="background:linear-gradient(135deg,${a},${b})" aria-label="Fundo ${k}"></button>`).join("")}
       ${chip("transparente", st.bg === "transparente", "bg", "Transparente")}`;
     cv.parentElement.classList.toggle("sc-clear", st.bg === "transparente");
@@ -3580,22 +3602,32 @@ async function openStudio(sessionId) {
       ? "Adesivo: no Instagram, abra o Story com a sua foto e cole a imagem (Copiar imagem) ou adicione pela galeria."
       : st.bg === "foto" ? "" : "Dica: ponha uma foto do treino de fundo, como no Strava.";
     scDraw(cv, d, st);
-    store("gg_sc", { fmt: st.fmt, theme: st.theme, loads: st.loads });
+    store("gg_sc", { fmt: st.fmt, theme: st.theme, loads: st.loads, gear: st.gear });
   };
   draw();
   const blob = () => new Promise((r) => cv.toBlob(r, "image/png"));
   const fname = () => `hax-${String(d.date).slice(0, 10)}-${st.tpl}.png`;
   const caption = () => `${d.title} · ${scStats(d).map(([, v]) => v).join(" · ")} 💪 #HAX`;
-  body.onchange = (e) => {
+  const usePhoto = (url) => new Promise((res) => {
+    const im = new Image();
+    im.onload = () => { st.img = im; st.imgKey = url; st.bg = "foto"; if (st.tpl === "adesivo") st.tpl = "classico"; draw(); res(true); };
+    im.onerror = () => { toast("Não consegui abrir essa foto agora.", 4000); res(false); };
+    im.src = url;
+  });
+  if (d.photos.length && st.tpl !== "adesivo" && st.tpl !== "mapa") usePhoto(d.photos[0].url);   // começa com a foto do treino
+  body.onchange = async (e) => {
     if (e.target.id === "sc-loads") { st.loads = e.target.checked; draw(); }
+    if (e.target.id === "sc-gear") { st.gear = e.target.checked; draw(); }
     if (e.target.id === "sc-photo" && e.target.files[0]) {
-      const fr = new FileReader();
-      fr.onload = () => { const im = new Image(); im.onload = () => { st.img = im; st.bg = "foto"; if (st.tpl === "adesivo") st.tpl = "classico"; draw(); }; im.src = fr.result; };
-      fr.readAsDataURL(e.target.files[0]);
+      let data; try { data = await shrinkPhoto(e.target.files[0], 1440, 0.82); } catch (err) { return toast(err.message, 5000); }
+      await usePhoto(data);
+      try { const r = await api(`/api/sessions/${sessionId}/photos`, { method: "POST", body: { image: data } }); d.photos.unshift({ url: r.url, src: "celular", id: r.id }); st.imgKey = r.url; draw(); toast("Foto guardada neste treino 📷", 3000); }
+      catch (err) { toast(err.message, 5000); }
     }
   };
   body.onclick = async (e) => {
     const t = e.target.closest("button"); if (!t) return;
+    if (t.dataset.ph) { const p = d.photos[+t.dataset.ph]; t.classList.add("busy"); await usePhoto(p.url); return; }
     if (t.dataset.tpl) { st.tpl = t.dataset.tpl; if (st.tpl === "adesivo") st.bg = "transparente"; else if (st.bg === "transparente") st.bg = st.img ? "foto" : "cor"; return draw(); }
     if (t.dataset.fmt) { st.fmt = t.dataset.fmt; return draw(); }
     if (t.dataset.theme) { st.theme = t.dataset.theme; st.bg = "cor"; if (st.tpl === "adesivo") st.tpl = tpls.includes("mapa") ? "mapa" : "classico"; return draw(); }
@@ -3615,6 +3647,16 @@ async function openStudio(sessionId) {
     if (t.id === "sc-save") { scDownload(new File([await blob()], fname(), { type: "image/png" })); return toast("Imagem salva", 3000); }
     if (t.id === "sc-hax") return openShare(sessionId, d.title);
   };
+}
+// fotos do celular ligadas ao treino (várias de uma vez): ficam no histórico e aparecem no cartão para postar
+async function addSessionPhotos(id, files) {
+  let n = 0;
+  for (const f of [...(files || [])].slice(0, 6)) {
+    try { const data = await shrinkPhoto(f, 1440, 0.82); await api(`/api/sessions/${id}/photos`, { method: "POST", body: { image: data } }); n++; }
+    catch (err) { toast(err.message, 5000); break; }
+  }
+  if (n) toast(`${n} ${n === 1 ? "foto guardada" : "fotos guardadas"} neste treino 📷`, 3000);
+  return n;
 }
 function scDownload(file) {
   const a = document.createElement("a"); a.href = URL.createObjectURL(file); a.download = file.name;

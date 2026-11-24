@@ -101,12 +101,67 @@ def _weather(raw: dict | None) -> dict | None:
     return {"temp_c": c, "desc": desc, "humidity": raw.get("relativeHumidity")}
 
 
-def garmin_extras(activity_id) -> dict:
-    """Busca no Garmin o que o resumo da atividade não traz. Cada parte é opcional (falha não derruba o resto)."""
+EXTRAS_V = 2   # versão do que é buscado: guardado com versão antiga busca só o que falta
+
+
+def _gear(api, aid: str) -> dict | None:
+    """Tênis (ou bike) ligado à atividade no Garmin e quantos km ele já tem."""
+    rows = api.get_activity_gear_v2(aid) or []
+    rows = rows if isinstance(rows, list) else [rows]
+    g = next((r for r in rows if isinstance(r, dict)), None)
+    if not g:
+        return None
+    name = (g.get("displayName") or g.get("customMakeModel")
+            or " ".join(x for x in (g.get("gearMakeName"), g.get("gearModelName")) if x and x != "Other").strip())
+    if not name:
+        return None
+    out = {"name": name[:40], "type": (g.get("gearTypeName") or "").lower()}
+    uuid = g.get("uuid") or g.get("gearPk")
+    try:
+        st = api.get_gear_stats(str(uuid)) if uuid else None
+        if st and st.get("totalDistance"):
+            out["km"] = round(st["totalDistance"] / 1000)
+    except Exception:  # noqa: BLE001
+        pass
+    return out
+
+
+def _photo_url(img: dict) -> str | None:
+    return img.get("mediumUrl") or img.get("largeUrl") or img.get("url") or img.get("smallUrl")
+
+
+def garmin_photo_bytes(activity_id, n: int) -> tuple[bytes, str]:
+    """Foto n anexada à atividade no Garmin Connect. O link do Garmin vale 24 h: é pedido na hora e a foto passa
+    pelo app (o cartão só consegue usar imagem do próprio app)."""
+    import urllib.request
+    from . import garmin_sync
+    imgs = garmin_sync.client().get_activity_images(str(activity_id)) or []
+    if not 0 <= n < len(imgs) or not _photo_url(imgs[n]):
+        raise LookupError("Foto não encontrada")
+    with urllib.request.urlopen(_photo_url(imgs[n]), timeout=15) as r:   # noqa: S310 - link do próprio Garmin
+        data = r.read(4_000_000 + 1)
+        mime = r.headers.get("Content-Type") or "image/jpeg"
+    if len(data) > 4_000_000:
+        raise ValueError("Foto do Garmin grande demais")
+    return data, mime
+
+
+def garmin_extras(activity_id, have: dict | None = None) -> dict:
+    """Busca no Garmin o que o resumo da atividade não traz. Cada parte é opcional (falha não derruba o resto).
+    `have`: o que já foi buscado antes (versão antiga): só completa o que falta."""
     from . import garmin_sync
     api = garmin_sync.client()
-    out: dict = {}
     aid = str(activity_id)
+    out: dict = {**(have or {}), "v": EXTRAS_V}
+    for key, fn in (("gear", lambda: _gear(api, aid)), ("photos", lambda: len(api.get_activity_images(aid) or []))):
+        try:
+            v = fn()
+            if v:
+                out[key] = v
+        except Exception:  # noqa: BLE001
+            pass
+    if have is not None:
+        return out
     try:
         poly = api.get_activity_polyline(aid) or {}
         enc = poly.get("gPolyline") or poly.get("polyline") or ""

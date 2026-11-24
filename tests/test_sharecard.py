@@ -81,3 +81,68 @@ def test_corrida_do_relogio_busca_extras_uma_vez(c, monkeypatch):
 
 def test_treino_de_outra_pessoa_nao(c):
     assert c.get("/api/share/9999").status_code == 404
+
+
+PNG = ("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==")
+
+
+def test_tenis_e_fotos_do_garmin_e_do_celular(c, monkeypatch):
+    s = db.save_session({"date": "2026-11-24T06:04", "source": "garmin", "garmin_activity_id": 555, "items": [
+        {"exercise_id": "cardio_esteira_corrida", "sport": "corrida", "duration_min": 25, "distance_km": 3.1, "pace_s_km": 484}]})
+    # já buscado antes, na versão antiga (sem tênis e fotos): completa só o que falta
+    db.kv_set("share_extras:555", '{"route": [[0.1,0.1],[0.2,0.2],[0.3,0.3],[0.4,0.4],[0.5,0.5]]}')
+
+    class Fake:
+        def get_activity_gear_v2(self, aid):
+            return [{"displayName": "Pegasus 40", "uuid": "abc", "gearTypeName": "Shoes"}]
+
+        def get_gear_stats(self, uuid):
+            return {"totalDistance": 312400.0}
+
+        def get_activity_images(self, aid):
+            return [{"imageId": 1, "url": "https://garmin.example/a.jpg"}, {"imageId": 2, "url": "https://garmin.example/b.jpg"}]
+
+        def get_activity_polyline(self, aid):
+            raise AssertionError("o trajeto já estava guardado")
+
+    monkeypatch.setattr(garmin_sync, "client", lambda: Fake())
+    monkeypatch.setattr(garmin_sync, "status", lambda: {"has_tokens": True})
+    monkeypatch.setattr(garmin_sync, "persist", lambda: None)
+    up = c.post(f"/api/sessions/{s['id']}/photos", json={"image": PNG}).json()
+    d = c.get(f"/api/share/{s['id']}").json()
+    assert d["gear"] == {"name": "Pegasus 40", "type": "shoes", "km": 312}
+    assert d["endurance"]["route"]                                          # o que já tinha continua
+    assert [p["src"] for p in d["photos"]] == ["celular", "garmin", "garmin"] and d["photos"][0]["id"] == up["id"]
+    # foto do Garmin passa pelo app (link de 24 h pedido na hora)
+    import urllib.request
+
+    class R:
+        headers = {"Content-Type": "image/jpeg"}
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def read(self, n):
+            return b"JPEGDATA"
+
+    monkeypatch.setattr(urllib.request, "urlopen", lambda url, timeout=0: R())
+    r = c.get(d["photos"][2]["url"])
+    assert r.status_code == 200 and r.content == b"JPEGDATA"
+    assert c.get(f"/api/share/{s['id']}/garmin-photo/9").status_code == 404
+    # tirar a foto do celular / apagar o treino apaga as fotos
+    assert c.get(up["url"]).status_code == 200
+    c.delete(f"/api/sessions/{s['id']}/photos/{up['id']}")
+    assert c.get(f"/api/sessions/{s['id']}/photos").json() == [] and c.get(up["url"]).status_code == 404
+
+
+def test_fotos_do_treino_limite_e_apagar_treino(c):
+    s = db.save_session({"date": "2026-11-24T07:00", "day_name": "Puxar", "items": [
+        {"exercise_id": "Pullups", "sets": [{"reps": 8, "done": True}]}]})
+    urls = [c.post(f"/api/sessions/{s['id']}/photos", json={"image": PNG}).json()["url"] for _ in range(6)]
+    assert c.post(f"/api/sessions/{s['id']}/photos", json={"image": PNG}).status_code == 400
+    c.delete(f"/api/sessions/{s['id']}")
+    assert all(c.get(u).status_code == 404 for u in urls)
+    assert c.post("/api/sessions/99999/photos", json={"image": PNG}).status_code == 404

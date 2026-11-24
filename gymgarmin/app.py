@@ -899,22 +899,87 @@ def share_card(session_id: int, garmin: bool = True):
     uid, name, _ = _me_ids()
     extras = None
     aid = s.get("garmin_activity_id")
-    if aid and any(it.get("sport") or it.get("distance_km") for it in s.get("items") or []):
+    if aid:
         key = f"share_extras:{aid}"
         raw = db.kv_get(key)
-        if raw is not None:
-            extras = json.loads(raw)
-        elif garmin:
+        extras = json.loads(raw) if raw is not None else None
+        stale = extras is None or (extras.get("v") or 1) < sharecard.EXTRAS_V
+        if stale and garmin:
             try:
                 if garmin_sync.status().get("has_tokens"):
-                    extras = sharecard.garmin_extras(aid)
+                    extras = sharecard.garmin_extras(aid, extras)
                     db.kv_set(key, json.dumps(extras))
                     garmin_sync.persist()
             except Exception:  # noqa: BLE001 - sem Garmin agora: o cartão sai só com o resumo
-                extras = None
-    out = sharecard.build(s, _profile().get("weight_kg"), (name or "").split(" ")[0] or None, extras)
+                pass
+    is_endu = any(it.get("sport") or it.get("distance_km") for it in s.get("items") or [])
+    ex = dict(extras or {})
+    g_photos, gear = ex.pop("photos", 0), ex.pop("gear", None)
+    ex.pop("v", None)
+    out = sharecard.build(s, _profile().get("weight_kg"), (name or "").split(" ")[0] or None, ex if is_endu else None)
+    out["gear"] = gear
+    out["photos"] = ([{"url": f"/api/photos/{pid}", "src": "celular", "id": pid} for pid in _session_photos(session_id)]
+                     + [{"url": f"/api/share/{session_id}/garmin-photo/{k}", "src": "garmin"} for k in range(min(int(g_photos or 0), 6))])
     out["garmin_fetched"] = extras is not None
     return out
+
+
+@app.get("/api/share/{session_id}/garmin-photo/{n}")
+def share_garmin_photo(session_id: int, n: int):
+    """Foto que a pessoa anexou à atividade no Garmin Connect (passa pelo app para o cartão poder usar)."""
+    s = db.get_session(session_id)
+    if not s or not s.get("garmin_activity_id"):
+        raise HTTPException(404, "Foto não encontrada")
+    try:
+        data, mime = sharecard.garmin_photo_bytes(s["garmin_activity_id"], n)
+    except LookupError as e:
+        raise HTTPException(404, str(e)) from e
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(502, f"Não consegui buscar a foto no Garmin agora: {e}") from e
+    return Response(data, media_type=mime, headers={"Cache-Control": "private, max-age=3600"})
+
+
+# ---- fotos do celular ligadas ao treino (aparecem no histórico e no cartão para postar)
+MAX_SESSION_PHOTOS = 6
+
+
+def _session_photos(session_id: int) -> list[str]:
+    return json.loads(db.kv_get(f"session_photos:{session_id}") or "[]")
+
+
+@app.get("/api/sessions/{session_id}/photos")
+def session_photos(session_id: int):
+    if not db.get_session(session_id):
+        raise HTTPException(404, "Treino não encontrado")
+    return [{"id": p, "url": f"/api/photos/{p}"} for p in _session_photos(session_id)]
+
+
+@app.post("/api/sessions/{session_id}/photos")
+def session_photo_add(session_id: int, body: dict = Body(...)):
+    if not db.get_session(session_id):
+        raise HTTPException(404, "Treino não encontrado")
+    ids = _session_photos(session_id)
+    if len(ids) >= MAX_SESSION_PHOTOS:
+        raise HTTPException(400, f"Até {MAX_SESSION_PHOTOS} fotos por treino. Apague uma para pôr outra.")
+    uid, _, _ = _me_ids()
+    try:
+        pid = my_gym.save_photo(body.get("image") or "", uid)
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from e
+    db.kv_set(f"session_photos:{session_id}", json.dumps(ids + [pid]))
+    return {"id": pid, "url": f"/api/photos/{pid}"}
+
+
+@app.delete("/api/sessions/{session_id}/photos/{pid}")
+def session_photo_del(session_id: int, pid: str):
+    ids = _session_photos(session_id)
+    if pid not in ids:
+        raise HTTPException(404, "Foto não encontrada")
+    db.kv_set(f"session_photos:{session_id}", json.dumps([x for x in ids if x != pid]))
+    p = my_gym.photo(pid)
+    if p and not p.get("public"):
+        db.kv_delete(f"photo:{pid}", user_id=my_gym.GLOBAL)
+    return {"ok": True}
 
 
 @app.get("/api/templates/especiais")
@@ -1884,6 +1949,12 @@ def _reopen_cardio_closed_by(saved: dict) -> None:
 @app.delete("/api/sessions/{session_id}")
 def del_session(session_id: int):
     s = db.get_session(session_id)
+    if s and not (s.get("garmin_activity_id") and dedupe.unmerge_watch(dict(s), garmin_sync.STRENGTH_GENERIC)):
+        for pid in _session_photos(session_id):   # o treino sai de vez: as fotos dele também
+            p = my_gym.photo(pid)
+            if p and not p.get("public"):
+                db.kv_delete(f"photo:{pid}", user_id=my_gym.GLOBAL)
+        db.kv_set(f"session_photos:{session_id}", "[]")
     if s:
         schedule.reopen_for_session(s)  # o treino que esta sessão tinha fechado volta para a agenda
         back = dedupe.unmerge_watch(s, garmin_sync.STRENGTH_GENERIC)
