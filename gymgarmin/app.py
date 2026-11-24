@@ -12,7 +12,7 @@ from pathlib import Path
 
 from fastapi import Body, FastAPI, Header, HTTPException, Query, Request
 from starlette.concurrency import run_in_threadpool
-from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from datetime import date, timedelta
@@ -1148,45 +1148,97 @@ def _soundtrack(s: dict) -> list[dict]:
     return tr
 
 
-# ---- YouTube Music: as mesmas playlists HAX no YouTube (enchem aos poucos: cota diária do Google)
+# ---- Google / YouTube Music: login no servidor (state em cookie) e playlists no YouTube
 
 def _yt_call(fn):
     try:
         return fn()
+    except youtube.QuotaExceeded as e:
+        raise HTTPException(429, str(e)) from e
     except youtube.YTError as e:
-        raise HTTPException(400, str(e)) from e
+        raise HTTPException(e.status if 400 <= e.status < 600 else 400, str(e)) from e
+
+
+def _host(request: Request) -> str:
+    return (request.headers.get("x-forwarded-host") or request.headers.get("host") or "").split(",")[0].strip()
+
+
+@app.get("/api/google/login")
+def google_login(request: Request):
+    """Começa o login do Google: state aleatório num cookie httpOnly (10 min) e vai para a tela do Google."""
+    if not youtube.oauth_available(_host(request)):
+        return RedirectResponse("/#musica?youtube=indisponivel", status_code=302)
+    state, cookie = youtube.new_state(db.current_user())
+    r = RedirectResponse(youtube.login_url(state), status_code=302)
+    r.set_cookie(youtube.STATE_COOKIE, cookie, max_age=youtube.STATE_TTL_S, httponly=True,
+                 secure=bool(os.environ.get("VERCEL")), samesite="lax", path="/")
+    return r
+
+
+def _callback_error(msg: str, status: int = 400) -> HTMLResponse:
+    r = HTMLResponse(f"""<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HAX · YouTube</title><body style="font:16px system-ui;max-width:520px;margin:40px auto;padding:0 16px">
+<h2>Não deu para conectar o YouTube</h2><p>{msg}</p><p><a href="/#musica">Voltar ao app e tentar de novo</a></p></body>""", status_code=status)
+    r.delete_cookie(youtube.STATE_COOKIE, path="/")
+    return r
+
+
+@app.get("/google-callback")
+def google_callback(request: Request, code: str | None = None, state: str | None = None, error: str | None = None):
+    """Volta do Google: confere o state com o cookie, troca o código por tokens (no servidor) e grava criptografado."""
+    uid = youtube.check_state(request.cookies.get(youtube.STATE_COOKIE), state)
+    if uid is None:
+        return _callback_error("O pedido de conexão expirou ou não começou neste aparelho.")
+    acc = auth.read_session(request.cookies.get(auth.COOKIE))
+    if auth.accounts_exist() and (not acc or int(acc["user_id"]) != uid):
+        return _callback_error("Entre na sua conta do HAX neste aparelho e conecte de novo.")
+    if error or not code:
+        r = RedirectResponse("/#musica?youtube=cancelado", status_code=302)
+        r.delete_cookie(youtube.STATE_COOKIE, path="/")
+        return r
+    try:
+        youtube.exchange_code(code, uid)
+    except youtube.YTError as e:
+        return _callback_error(str(e))
+    r = RedirectResponse("/#musica?youtube=conectado", status_code=302)
+    r.delete_cookie(youtube.STATE_COOKIE, path="/")
+    return r
 
 
 @app.get("/api/youtube")
 def youtube_status(request: Request):
-    out = youtube.summary(cad=music.cadence_target(_run_cadences())) if youtube.connected() else \
-        {"configured": youtube.configured(), "connected": False, "playlists": [], "pending": 0, "today_left": 0}
-    return {**out, "client_id": youtube.client_id(), "redirect_uri": youtube.redirect_uri(str(request.base_url)), "scope": youtube.SCOPE}
+    host = _host(request)
+    out = {"configured": youtube.configured(), "available": youtube.oauth_available(host), "production_host": youtube.PROD_HOST,
+           "connected": youtube.connected(), "note": youtube.status_note()}
+    if out["connected"] and music.connected():
+        out.update(youtube.summary(cad=music.cadence_target(_run_cadences())))
+    else:
+        out.update(playlists=[], pending=0, today_left=youtube.units_left() // 150)
+    return out
 
 
-@app.get("/google-callback")
-def google_callback(code: str | None = None, state: str | None = None, error: str | None = None):
-    q = urllib.parse.urlencode({k: v for k, v in (("yt_code", code), ("yt_state", state), ("yt_error", error)) if v})
-    return RedirectResponse(f"/#musica?{q}", status_code=302)
-
-
-@app.post("/api/youtube/connect")
-def youtube_connect(body: dict = Body(...)):
-    if not youtube.configured():
-        raise HTTPException(400, "Login do Google ainda não configurado no servidor.")
-    _yt_call(lambda: youtube.exchange(body.get("code") or "", body.get("verifier") or "", body.get("redirect_uri") or ""))
-    return {"ok": True}
+@app.post("/api/youtube/playlist")
+def youtube_playlist(body: dict = Body(...)):
+    """{nome, musicas: [{artista, titulo}]} → cria a playlist no YouTube com as músicas achadas, na ordem."""
+    songs = body.get("musicas") or []
+    if not isinstance(songs, list):
+        raise HTTPException(400, "musicas deve ser uma lista")
+    return _yt_call(lambda: youtube.make_playlist(str(body.get("nome") or ""), [x for x in songs if isinstance(x, dict)]))
 
 
 @app.post("/api/youtube/sync")
 def youtube_sync(body: dict = Body(default={})):
+    """Playlists HAX automáticas (as mesmas do Spotify) no YouTube, um pouco por vez dentro da cota."""
     if not youtube.connected():
         raise HTTPException(400, "YouTube não conectado.")
+    if not music.connected():
+        raise HTTPException(400, "Conecte o Spotify: as playlists HAX são montadas com as músicas de lá.")
     return _yt_call(lambda: youtube.sync(budget_s=float(body.get("budget") or 8), cad=music.cadence_target(_run_cadences())))
 
 
 @app.post("/api/youtube/disconnect")
 def youtube_disconnect():
+    """Revoga o acesso no Google e apaga os tokens."""
     youtube.disconnect()
     return {"ok": True}
 

@@ -151,6 +151,20 @@ CREATE TABLE IF NOT EXISTS post_comments (
     text TEXT NOT NULL,
     created_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS google_tokens (
+    id INTEGER PRIMARY KEY,
+    refresh_token_enc TEXT,
+    access_token TEXT,
+    expires_at DOUBLE PRECISION,
+    scope TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS youtube_video_cache (
+    query TEXT PRIMARY KEY,
+    video_id TEXT,
+    created_at TEXT NOT NULL
+);
 """
 
 DEFAULT_PROFILE = {

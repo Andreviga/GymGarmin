@@ -1,6 +1,6 @@
 # Prompt para o navegador: criar o login do Google (YouTube Music) do app HAX
 
-Cole o texto abaixo no Claude do navegador (Claude in Chrome), logado na sua conta Google e na Vercel.
+Cole o texto abaixo no assistente do navegador, logado na sua conta Google e na Vercel.
 
 ---
 
@@ -35,7 +35,7 @@ de clicar em qualquer botão de pagamento (não deve haver nenhum: tudo aqui é 
 
 ---
 
-Depois disso, mande o ID do cliente para o Claude do app: ele publica a versão nova e avisa para conectar o YouTube.
+Depois disso, o botão "Conectar o YouTube" aparece em Perfil → Música no treino (só em haxfit.vercel.app).
 Para a Nathália usar também: em **Usuários de teste** (passo 2), adicione o e-mail do Google dela.
 
 ---
