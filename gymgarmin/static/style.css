@@ -1141,3 +1141,6 @@ body.timer-on { padding-bottom: calc(72px + 70px + env(safe-area-inset-bottom));
 /* música */
 .mu-now { padding: 10px 12px; border-radius: 10px; background: var(--bg); margin-bottom: 6px; min-height: 40px; }
 .mu-ico { font-size: 22px; width: 34px; text-align: center; flex: none; }
+
+/* Entrar com Google */
+.auth-google { display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 10px; background: var(--card); color: var(--ink); }

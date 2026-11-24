@@ -368,10 +368,31 @@ def _fix_sequences(c) -> None:
         c.execute(f"SELECT setval(pg_get_serial_sequence('{t}', 'id'), COALESCE((SELECT MAX(id) FROM {t}), 0) + 1, false)")
 
 
+# Mudanças em tabelas que já existem (rodam toda vez que o app liga; "já existe" é ignorado).
+# SQLite não aceita ADD COLUMN ... UNIQUE: a unicidade vem de um índice único (vale nos dois bancos).
+MIGRATIONS = (
+    "ALTER TABLE accounts ADD COLUMN google_sub TEXT",
+    "CREATE UNIQUE INDEX IF NOT EXISTS accounts_google_sub ON accounts (google_sub)",
+)
+
+
+def _migrate(c) -> None:
+    for stmt in MIGRATIONS:
+        if is_postgres():
+            c.executescript(stmt)          # já ignora "already exists" (inclusive duas instâncias ao mesmo tempo)
+            continue
+        try:
+            c.execute(stmt)
+        except Exception as e:
+            if "duplicate column" not in str(e) and "already exists" not in str(e):
+                raise
+
+
 def init() -> None:
     _ready.add(database_url() or str(db_path()))
     with conn() as c:
         c.executescript(SCHEMA)
+        _migrate(c)
         if not c.execute("SELECT 1 FROM users WHERE id = 1").fetchone():
             c.execute("INSERT INTO users (id, name, profile, created_at) VALUES (1, 'Eu', ?, ?)",
                       (json.dumps(DEFAULT_PROFILE), now()))
@@ -712,6 +733,19 @@ def get_account_by_email(email: str) -> dict | None:
     with conn() as c:
         r = c.execute("SELECT * FROM accounts WHERE email = ?", (email.strip().lower(),)).fetchone()
     return dict(r) if r else None
+
+
+def get_account_by_google_sub(sub: str) -> dict | None:
+    if not sub:
+        return None
+    with conn() as c:
+        r = c.execute("SELECT * FROM accounts WHERE google_sub = ?", (str(sub),)).fetchone()
+    return dict(r) if r else None
+
+
+def set_google_sub(user_id: int, sub: str | None) -> None:
+    with conn() as c:
+        c.execute("UPDATE accounts SET google_sub = ? WHERE user_id = ?", (sub, user_id))
 
 
 def get_account(user_id: int) -> dict | None:

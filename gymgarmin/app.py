@@ -20,6 +20,7 @@ from datetime import date, timedelta
 from . import adaptive, alternative, auth, coach, focus, gallery, ingest, my_gym, partners, training_rules
 from . import watch_review as wrv
 from . import gyms, loads, personal, social, weather, wellness
+from . import google_login as glogin
 from . import (analysis, calibration, catalog, clock, db, dedupe, health, endurance, garmin_export, garmin_sync, generator, music, sharecard, youtube, history, limitations,
                load, plans_io, progression, readiness, schedule, sports, steps, templates, watch_labels)
 from .muscles import EQUIPMENT_PT, HR_ZONES, MUSCLES, hr_max, zone_bpm
@@ -145,11 +146,14 @@ def _coach_log(athlete_id: int, coach_acc: dict, method: str, path: str) -> None
     db.kv_set("coach_log", json.dumps(log[-40:], ensure_ascii=False), user_id=athlete_id)
 
 
-def _with_cookie(payload: dict, acc: dict) -> JSONResponse:
-    r = JSONResponse(payload)
+def _set_session(r: Response, acc: dict) -> Response:
     r.set_cookie(auth.COOKIE, auth.make_session(acc), max_age=auth.SESSION_DAYS * 86400, httponly=True,
                  secure=bool(os.environ.get("VERCEL")), samesite="lax", path="/")
     return r
+
+
+def _with_cookie(payload: dict, acc: dict) -> JSONResponse:
+    return _set_session(JSONResponse(payload), acc)
 
 
 def _me_payload(acc: dict | None) -> dict:
@@ -157,7 +161,8 @@ def _me_payload(acc: dict | None) -> dict:
         return {"logged_in": False, "setup_needed": not auth.accounts_exist()}
     prof = db.get_profile(acc["user_id"])
     return {"logged_in": True, "setup_needed": False,
-            "user": {**auth.public(acc, prof.get("name")), "is_coach": db.is_coach(acc["user_id"])}}
+            "user": {**auth.public(acc, prof.get("name")), "is_coach": db.is_coach(acc["user_id"]),
+                     "google": bool(acc.get("google_sub")), "google_only": glogin.google_only(acc["user_id"])}}
 
 
 def _require_admin() -> dict:
@@ -255,10 +260,26 @@ def _signup_cfg() -> dict:
     return {**SIGNUP_DEFAULT, **json.loads(db.kv_get("signup", user_id=-1) or "{}")}
 
 
-@app.get("/api/public/signup")
-def signup_status():
+def _signup_open() -> bool:
     c = _signup_cfg()
-    return {"open": bool(c["open"]) and db.count_accounts() < int(c["max"]) and auth.accounts_exist()}
+    return bool(c["open"]) and db.count_accounts() < int(c["max"]) and auth.accounts_exist()
+
+
+@app.get("/api/public/signup")
+def signup_status(request: Request):
+    return {"open": _signup_open(), "google": glogin.available(_host(request)) and auth.accounts_exist()}
+
+
+@app.get("/api/auth/google")
+def auth_google(request: Request):
+    """Entrar com Google: state (finalidade "login") no mesmo cookie criptografado do YouTube e vai para o Google."""
+    if not glogin.available(_host(request)):
+        return RedirectResponse("/", status_code=302)
+    state, cookie = youtube.new_state(0, purpose="login")
+    r = RedirectResponse(glogin.login_url(state), status_code=302)
+    r.set_cookie(youtube.STATE_COOKIE, cookie, max_age=youtube.STATE_TTL_S, httponly=True,
+                 secure=bool(os.environ.get("VERCEL")), samesite="lax", path="/")
+    return r
 
 
 @app.post("/api/auth/signup")
@@ -310,13 +331,15 @@ def account_password(body: dict = Body(...)):
     acc = auth.current_account()
     if not acc:
         raise HTTPException(401, "Entre na sua conta.")
-    if not auth.check_password(body.get("current") or "", acc["pw_hash"]):
+    first = glogin.google_only(acc["user_id"])
+    if not first and not auth.check_password(body.get("current") or "", acc["pw_hash"]):
         raise HTTPException(400, "Senha atual incorreta.")
     try:
         auth.validate_password(body.get("new") or "")
     except ValueError as e:
         raise HTTPException(400, str(e)) from e
     db.set_password(acc["user_id"], auth.hash_password(body["new"]))
+    glogin.clear_google_only(acc["user_id"])
     return _with_cookie({"ok": True}, db.get_account(acc["user_id"]))
 
 
@@ -1175,18 +1198,38 @@ def google_login(request: Request):
     return r
 
 
-def _callback_error(msg: str, status: int = 400) -> HTMLResponse:
+def _callback_error(msg: str, status: int = 400, title: str = "Não deu para conectar o YouTube") -> HTMLResponse:
+    import html as _html
+    back = "/" if "entrar" in title.lower() else "/#musica"
     r = HTMLResponse(f"""<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>HAX · YouTube</title><body style="font:16px system-ui;max-width:520px;margin:40px auto;padding:0 16px">
-<h2>Não deu para conectar o YouTube</h2><p>{msg}</p><p><a href="/#musica">Voltar ao app e tentar de novo</a></p></body>""", status_code=status)
+<title>HAX · Google</title><body style="font:16px system-ui;max-width:520px;margin:40px auto;padding:0 16px">
+<h2>{_html.escape(title)}</h2><p>{_html.escape(msg)}</p><p><a href="{back}">Voltar</a></p></body>""", status_code=status)
+    r.delete_cookie(youtube.STATE_COOKIE, path="/")
+    return r
+
+
+def _google_login_callback(code: str | None, error: str | None) -> Response:
+    if error or not code:
+        r = RedirectResponse("/", status_code=302)
+        r.delete_cookie(youtube.STATE_COOKIE, path="/")
+        return r
+    try:
+        acc = glogin.account_for(glogin.exchange(code), _signup_open())
+    except glogin.LoginError as e:
+        return _callback_error(str(e), title="Não deu para entrar com o Google")
+    r = _set_session(RedirectResponse("/", status_code=302), acc)
     r.delete_cookie(youtube.STATE_COOKIE, path="/")
     return r
 
 
 @app.get("/google-callback")
 def google_callback(request: Request, code: str | None = None, state: str | None = None, error: str | None = None):
-    """Volta do Google: confere o state com o cookie, troca o código por tokens (no servidor) e grava criptografado."""
-    uid = youtube.check_state(request.cookies.get(youtube.STATE_COOKIE), state)
+    """Volta do Google. O state diz a finalidade: "login" (Entrar com Google) ou "youtube" (conectar o YouTube:
+    confere o state, troca o código por tokens no servidor e grava criptografado)."""
+    st = youtube.read_state(request.cookies.get(youtube.STATE_COOKIE), state)
+    if st and st["p"] == "login":
+        return _google_login_callback(code, error)
+    uid = youtube.check_state(request.cookies.get(youtube.STATE_COOKIE), state, purpose="youtube")
     if uid is None:
         return _callback_error("O pedido de conexão expirou ou não começou neste aparelho.")
     acc = auth.read_session(request.cookies.get(auth.COOKIE))

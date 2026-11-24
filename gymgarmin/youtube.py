@@ -74,15 +74,17 @@ def _fernet():
     return f()
 
 
-def new_state(user_id: int) -> tuple[str, str]:
-    """(state para o Google, valor do cookie). O cookie é criptografado: guarda o state, a pessoa e a validade."""
+def new_state(user_id: int, purpose: str = "youtube") -> tuple[str, str]:
+    """(state para o Google, valor do cookie). O cookie é criptografado: guarda o state, a pessoa, a finalidade
+    ("youtube" = conectar o YouTube; "login" = entrar com Google) e a validade."""
     state = secrets.token_urlsafe(24)
-    cookie = _fernet().encrypt(json.dumps({"s": state, "u": int(user_id), "exp": time.time() + STATE_TTL_S}).encode()).decode()
+    cookie = _fernet().encrypt(json.dumps({"s": state, "u": int(user_id), "p": purpose,
+                                           "exp": time.time() + STATE_TTL_S}).encode()).decode()
     return state, cookie
 
 
-def check_state(cookie: str | None, state: str | None) -> int | None:
-    """Usuário dono do login se o state bate com o cookie e não venceu; senão None."""
+def read_state(cookie: str | None, state: str | None) -> dict | None:
+    """{"u": usuário, "p": finalidade} se o state bate com o cookie e não venceu; senão None."""
     if not cookie or not state:
         return None
     try:
@@ -91,7 +93,13 @@ def check_state(cookie: str | None, state: str | None) -> int | None:
         return None
     if not secrets.compare_digest(str(d.get("s")), str(state)) or time.time() > float(d.get("exp") or 0):
         return None
-    return int(d["u"])
+    return {"u": int(d.get("u") or 0), "p": d.get("p") or "youtube"}
+
+
+def check_state(cookie: str | None, state: str | None, purpose: str = "youtube") -> int | None:
+    """Usuário dono do pedido se o state bate, não venceu e é da mesma finalidade; senão None."""
+    d = read_state(cookie, state)
+    return d["u"] if d and d["p"] == purpose else None
 
 
 def login_url(state: str) -> str:

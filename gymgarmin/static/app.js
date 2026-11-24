@@ -1242,12 +1242,12 @@ async function showAuth(mode, code) {
   $("#modal").hidden = true;
   let inv = null;
   if (mode === "convite") { try { inv = await api(`/api/auth/invite/${encodeURIComponent(code)}`); } catch (_) { inv = { valid: false }; } }
-  let open = false;
-  if (mode !== "convite") { try { open = (await api("/api/public/signup")).open; } catch (_) { open = false; } }
-  if (mode === "criar" && open) return showSignup();
+  let open = false, google = false;
+  if (mode !== "convite") { try { const ps = await api("/api/public/signup"); open = ps.open; google = !!ps.google; } catch (_) { open = false; } }
+  if (mode === "criar" && open) return showSignup(google);
   const isReg = mode === "convite" && inv && inv.valid;
   view.innerHTML = `${open && !isReg ? `<div class="auth-hero"><img src="/static/icon-192.png" alt=""><b>HAX</b><span>Seu treino de musculação e corrida, montado e guiado.</span></div>
-    <button class="btn block auth-new" id="go-signup">✨ Sou novo: criar minha conta</button><p class="small muted auth-or">ou entre com a sua conta</p>` : ""}
+    <button class="btn block auth-new" id="go-signup">✨ Sou novo: criar minha conta</button>${googleBtn(google)}<p class="small muted auth-or">ou entre com a sua conta</p>` : google && !isReg ? `${googleBtn(true)}<p class="small muted auth-or">ou entre com e-mail e senha</p>` : ""}
     <div class="card auth-card"><h2>${isReg ? "Criar sua conta" : "Entrar"}</h2>
     ${mode === "convite" && !isReg ? `<p class="pill bad">Convite inválido ou já usado. Peça um novo a quem te convidou.</p>` : ""}
     ${isReg ? `<p class="small muted">Você foi convidado${inv.note ? ` (${esc(inv.note)})` : ""} para o HAX. Seus treinos, planilhas e Garmin ficam só na sua conta.</p>` : ""}
@@ -1258,7 +1258,7 @@ async function showAuth(mode, code) {
       <button class="btn" type="submit">${isReg ? "Criar conta" : "Entrar"}</button>
     </form>
     ${!isReg ? `<p class="small muted">Esqueceu a senha? Peça ao administrador uma senha provisória.</p>` : ""}</div>`;
-  const gs = $("#go-signup"); if (gs) gs.onclick = () => showSignup();
+  const gs = $("#go-signup"); if (gs) gs.onclick = () => showSignup(google);
   $("#auth-form").onsubmit = async (e) => {
     e.preventDefault();
     const f = Object.fromEntries(new FormData(e.target));
@@ -1273,10 +1273,16 @@ async function showAuth(mode, code) {
     } catch (err) { toast(err.message, 5000); btn.disabled = false; }
   };
 }
+// Entrar com Google (só no endereço oficial: é o único que o Google aceita de volta)
+function googleBtn(on) {
+  if (!on) return "";
+  return `<a class="btn ghost block auth-google" href="/api/auth/google"><svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.6l6.7-6.7C35.6 2.4 30.2 0 24 0 14.6 0 6.6 5.4 2.6 13.3l7.8 6C12.3 13.4 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.1 24.6c0-1.6-.1-3.2-.4-4.6H24v9.1h12.4c-.5 2.9-2.2 5.3-4.6 6.9l7.2 5.6c4.2-3.9 6.6-9.6 6.6-16.5z"/><path fill="#FBBC05" d="M10.4 28.7c-.5-1.4-.8-3-.8-4.7s.3-3.2.8-4.7l-7.8-6C.9 16.6 0 20.2 0 24s.9 7.4 2.6 10.7l7.8-6z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.2-5.6c-2.2 1.5-5.1 2.4-8.7 2.4-6.3 0-11.7-3.9-13.6-9.4l-7.8 6C6.6 42.6 14.6 48 24 48z"/></svg> Entrar com Google</a>`;
+}
 // criar conta sem convite: só nome, e-mail e senha; o resto vem no passo a passo
-function showSignup() {
+function showSignup(google) {
   document.body.classList.add("auth-mode");
   view.innerHTML = `<div class="auth-hero"><img src="/static/icon-192.png" alt=""><b>Criar sua conta</b><span>Leva 1 minuto. Depois o app faz 7 perguntas rápidas e monta seu treino.</span></div>
+    ${google ? `${googleBtn(true)}<p class="small muted auth-or">ou crie com e-mail e senha</p>` : ""}
     <div class="card auth-card"><form id="su-form" class="stack">
       <div class="field"><label for="su-name">Seu nome</label><input id="su-name" name="name" autocomplete="given-name" required placeholder="ex.: Rosa"></div>
       <div class="field"><label for="su-email">E-mail</label><input id="su-email" name="email" type="email" inputmode="email" autocomplete="email" autocapitalize="off" required placeholder="voce@email.com"></div>
@@ -1427,8 +1433,9 @@ async function accountCard() {
       <p class="small muted">Cada convite vale para uma pessoa (crie um por pessoa). Ela cria e-mail e senha e começa com o app vazio: perfil, treino e Garmin próprios. Você não vê os treinos dela (só se ela te escolher como coach).</p></div>`;
   }
   return `<div class="card"><h2>Sua conta</h2><p><b>${esc(u.name || "")}</b> <span class="small muted">${esc(u.email)}${u.is_admin ? " · administrador" : ""}</span></p>
-    <details><summary class="small">Trocar senha</summary><form id="pw-form" class="stack"><div class="grid2">
-      <div class="field"><label>Senha atual</label><input name="current" type="password" autocomplete="current-password" required></div>
+    ${u.google ? `<p class="small muted">Entra com Google${u.google_only ? " · ainda sem senha (dá para criar uma abaixo e entrar também com e-mail e senha)" : ""}</p>` : ""}
+    <details><summary class="small">${u.google_only ? "Criar uma senha" : "Trocar senha"}</summary><form id="pw-form" class="stack"><div class="grid2">
+      ${u.google_only ? "" : `<div class="field"><label>Senha atual</label><input name="current" type="password" autocomplete="current-password" required></div>`}
       <div class="field"><label>Nova senha (mín. 8)</label><input name="new" type="password" minlength="8" autocomplete="new-password" required></div></div>
       <button class="btn sm" type="submit">Salvar senha</button></form></details>
     <p><button class="btn ghost sm" id="logout">Sair</button></p></div>${admin}`;

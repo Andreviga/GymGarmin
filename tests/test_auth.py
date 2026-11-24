@@ -90,10 +90,10 @@ def test_short_password_rejected(app_client):
 
 def test_open_signup_without_invite_and_admin_can_close(app_client):
     c = app_client
-    assert c.get("/api/public/signup").json() == {"open": False}  # sem dono ainda
+    assert c.get("/api/public/signup").json()["open"] is False  # sem dono ainda
     c.post("/api/auth/setup", json={"email": "dono@x.com", "password": "senha-forte"})
     anon = _new(c)
-    assert anon.get("/api/public/signup").json() == {"open": True}
+    assert anon.get("/api/public/signup").json()["open"] is True
     r = anon.post("/api/auth/signup", json={"name": "Tia Rosa", "email": "Rosa@x.com", "password": "senha-da-rosa"})
     assert r.status_code == 200 and r.json()["user"]["name"] == "Tia Rosa" and not r.json()["user"]["is_admin"]
     assert anon.get("/api/profile").json()["name"] == "Tia Rosa"
@@ -102,5 +102,5 @@ def test_open_signup_without_invite_and_admin_can_close(app_client):
     assert anon.put("/api/admin/signup", json={"open": False}).status_code == 403
     assert c.put("/api/admin/signup", json={"open": False}).json()["open"] is False
     other = _new(c)
-    assert other.get("/api/public/signup").json() == {"open": False}
+    assert other.get("/api/public/signup").json()["open"] is False
     assert other.post("/api/auth/signup", json={"name": "Y", "email": "y@x.com", "password": "senha-do-y1"}).status_code == 403
