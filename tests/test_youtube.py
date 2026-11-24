@@ -103,3 +103,9 @@ def test_limite_proprio_de_unidades(env, monkeypatch):
     monkeypatch.setattr(youtube, "DAILY_UNITS", 100 + 2 * 50 + 2 * 150)   # 2 playlists + 2 músicas
     out = c.post("/api/youtube/sync", json={}).json()
     assert out["stopped"] == "cota" and sum(p["done"] for p in out["playlists"]) == 2
+
+
+def test_pagina_de_privacidade_publica(env):
+    c, _ = env
+    r = c.get("/privacidade")
+    assert r.status_code == 200 and "Política de Dados do Usuário" in r.text and "HAX" in r.text

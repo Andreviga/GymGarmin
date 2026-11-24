@@ -3896,6 +3896,12 @@ def index():
     return Response(html, media_type="text/html; charset=utf-8", headers={"Cache-Control": "no-cache"})
 
 
+@app.get("/privacidade")
+def privacy_page():
+    """Privacidade e termos (pública: o Google e o Spotify pedem o link para liberar o login)."""
+    return Response((STATIC / "privacidade.html").read_text(), media_type="text/html; charset=utf-8")
+
+
 @app.get("/manifest.webmanifest")
 def manifest():
     return FileResponse(STATIC / "manifest.webmanifest", media_type="application/manifest+json")
