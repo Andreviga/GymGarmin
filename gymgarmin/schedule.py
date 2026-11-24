@@ -462,6 +462,51 @@ def ensure_week(profile: dict, any_day: date, today: date | None = None) -> list
     return sync_status(entries, _sessions_in_week(ws), today)
 
 
+USER_ADJUST_KEYS = ("moved_from", "readiness_backup", "alt_backup", "gym_orig_items", "added_from")
+
+
+def _sig(e: dict) -> tuple:
+    """O que a pessoa enxerga de um treino: nome, exercícios principais e a sessão de corrida/cardio."""
+    main = tuple(i.get("exercise_id") for i in e.get("items") or [] if (i.get("phase") or "principal") == "principal")
+    endu = tuple((i.get("endurance") or {}).get("title") or "" for i in e.get("items") or [] if i.get("endurance"))
+    return (e.get("day_name") or "", main, endu)
+
+
+def rebuild_preview(profile: dict, today: date | None = None) -> list[dict]:
+    """O que 'Atualizar os próximos treinos' mudaria agora (só os ainda não feitos desta semana): a pessoa vê antes
+    e o app avisa quando a semana ficou desatualizada (regras novas, treinos feitos fora do plano, planilha trocada)."""
+    today = today or clock.today()
+    plan = schedule_plan(profile)
+    if not plan:
+        return []
+    ws = week_start(today)
+    week = db.list_schedule(ws.isoformat(), (ws + timedelta(days=6)).isoformat())
+    cur = [e for e in week if e["date"] >= today.isoformat() and e["status"] in ("planejado", "perdido")]
+    done = {e["date"] for e in week if e["status"] == "feito"}
+    skipped = {(e["date"], e.get("kind")) for e in week if e["status"] == "pulado"}
+    new = [e for e in build_week(plan, profile, ws, from_date=today)
+           if e["date"] not in done and (e["date"], e.get("kind")) not in skipped]
+    adj = lambda o: any(o.get(k) for k in USER_ADJUST_KEYS)  # noqa: E731
+    left = list(cur)
+    rest_new = []
+    for n in new:                       # iguais: nada muda (vários treinos no mesmo dia, em qualquer ordem)
+        o = next((x for x in left if x["date"] == n["date"] and _sig(x) == _sig(n)), None)
+        if o:
+            left.remove(o)
+        else:
+            rest_new.append(n)
+    out = []
+    for n in rest_new:                  # mesmo dia e tipo, conteúdo diferente: troca; senão é treino novo
+        o = next((x for x in left if x["date"] == n["date"] and x.get("kind") == n.get("kind")), None)
+        if o:
+            left.remove(o)
+        out.append({"date": n["date"], "before": o.get("day_name") if o else None, "after": n.get("day_name"),
+                    "adjusted": bool(o and adj(o))})
+    for o in left:
+        out.append({"date": o["date"], "before": o.get("day_name"), "after": None, "adjusted": adj(o)})
+    return sorted(out, key=lambda x: x["date"])
+
+
 def rebuild_week(profile: dict, today: date | None = None) -> list[dict]:
     """Recria os treinos ainda não feitos da semana atual a partir da planilha da agenda."""
     today = today or clock.today()

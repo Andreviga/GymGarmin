@@ -1110,3 +1110,10 @@ body.timer-on { padding-bottom: calc(72px + 70px + env(safe-area-inset-bottom));
 .sw-adv-row { display: flex; flex-wrap: wrap; gap: 8px; }
 .sw-adv-row .btn { flex: 1 1 140px; min-height: 44px; text-align: left; }
 .garmin-card.gc-alert { border: 1px solid var(--warn); background: var(--warn-bg, color-mix(in srgb, var(--warn) 12%, var(--card))); }
+
+/* atualizar os próximos treinos */
+.upd-card { border: 1px solid var(--brand); }
+.upd-card .eyebrow { color: var(--brand); }
+.upd-list { margin: 8px 0 12px; }
+.upd-list li { margin: 4px 0; }
+.upd-btn { margin: 4px 0 14px; }

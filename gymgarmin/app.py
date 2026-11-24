@@ -3250,7 +3250,15 @@ def get_schedule(date_: str | None = Query(None, alias="date")):
         "legacy": schedule.legacy_compensation(entries, today) if current else None,  # reforço da regra antiga
         "time_warnings": _time_warnings(views, budget),
         "comeback": _comeback(today) if current and plan else None,
+        "rebuild": _rebuild_preview(prof, today) if current and plan else [],
     }
+
+
+def _rebuild_preview(prof: dict, today: date) -> list[dict]:
+    try:
+        return schedule.rebuild_preview(prof, today)
+    except Exception:  # noqa: BLE001 - aviso opcional: nunca derruba a agenda
+        return []
 
 
 def _comeback(today: date) -> dict | None:
@@ -3331,8 +3339,12 @@ def schedule_move(entry_id: int, body: dict = Body(...)):
 
 @app.post("/api/schedule/rebuild")
 def schedule_rebuild():
-    schedule.rebuild_week(_profile())
-    return {"ok": True}
+    """Atualizar os próximos treinos: refaz só o que ainda não foi feito (desta semana e da seguinte, se já montada)
+    pela planilha e regras atuais. Os feitos ficam; o relógio recebe a versão nova pelo envio automático."""
+    prof = _profile()
+    changes = schedule.rebuild_preview(prof)
+    schedule.rebuild_week(prof)
+    return {"ok": True, "changes": changes}
 
 
 def _alerts() -> list[str]:

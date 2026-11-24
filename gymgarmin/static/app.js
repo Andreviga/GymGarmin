@@ -288,6 +288,7 @@ async function viewHoje(weekDate) {
     <div class="wstrip" role="tablist">${weekStrip(sch, sel)}</div>
   </section>
   <div id="day-panel">${dayPanel(sch, sel)}</div>
+  ${weekDate ? "" : updateWeekHtml(sch)}
   ${weekDate ? "" : (() => {
     // depois do treino do dia: o que precisa de resposta, o check-in e o resto (configuração e parceiro) por último
     const todo = `<div id="hx"></div>` + (sch.pending || []).map(questionHtml).join("") + watchInboxHtml(wib) + stepsAskHtml(stp, sch.today);
@@ -307,11 +308,42 @@ async function viewHoje(weekDate) {
   ${weekDate ? "" : weekMissHtml(g)}
   <details class="card more"><summary><b>Opções da semana</b></summary><div class="stack" style="padding-bottom:4px">
     <button class="btn ghost block" id="push-week">${sch.entries.some((e) => e.garmin_outdated && e.status === "planejado") ? "Reenviar alterações ao Garmin" : "Enviar próximos 7 dias ao Garmin"}</button>
-    <button class="btn ghost block" id="gen-open">Regerar treino</button>
-    <button class="btn ghost block" id="rebuild">Refazer a semana pela planilha</button></div></details>`;
+    <button class="btn ghost block" id="rebuild-open-2">🔄 Atualizar os próximos treinos</button>
+    <button class="btn ghost block" id="gen-open">Gerar um treino novo (troca a planilha)</button></div></details>`;
   sch._rd = rd;
   bindAgenda(sch);
   if (!weekDate) hojeExtras(sch).catch(() => {});
+}
+
+// "Atualizar os próximos treinos": refaz só o que ainda não foi feito, pela planilha e pelas regras atuais.
+// Quando a semana ficou desatualizada, o cartão aparece sozinho com o que muda; senão, fica só o botão.
+const rbLine = (c) => `<li><b>${WD_SHORT[new Date(c.date + "T12:00").getDay()]} ${ddmm(c.date)}</b>: ${c.before ? esc(c.before) : "<i>nada</i>"} → <b>${c.after ? esc(c.after) : "sai da agenda"}</b>${c.adjusted ? ` <span class="small warn-txt">(desfaz um ajuste seu)</span>` : ""}</li>`;
+function updateWeekHtml(sch) {
+  if (!sch.plan) return "";
+  const ch = (sch.rebuild || []).filter((c) => !c.adjusted);
+  if (!ch.length) return `<button class="btn ghost block upd-btn" id="rebuild-open">🔄 Atualizar os próximos treinos</button>`;
+  return `<section class="card upd-card"><div class="eyebrow">🔄 Semana desatualizada</div>
+    <b>${ch.length} ${ch.length === 1 ? "treino muda" : "treinos mudam"} com a sua planilha e as regras atuais</b>
+    <ul class="plain small upd-list">${ch.slice(0, 5).map(rbLine).join("")}${ch.length > 5 ? `<li class="muted">e mais ${ch.length - 5}</li>` : ""}</ul>
+    <button class="btn block" id="rebuild-go">Atualizar os próximos treinos</button>
+    <p class="small muted" style="margin:8px 0 0">Os treinos já feitos ficam como estão.${sch._garmin ? " O relógio recebe a versão nova sozinho." : ""}</p></section>`;
+}
+function openRebuild(sch, again) {
+  const ch = sch.rebuild || [];
+  const body = openModal(`<h2>🔄 Atualizar os próximos treinos</h2>
+    <p class="small muted">Refaz só os treinos que ainda não foram feitos (desta semana e da próxima), pela sua planilha e pelo que você já fez. Os feitos ficam como estão.${sch._garmin ? " O relógio recebe a versão nova sozinho." : ""}</p>
+    ${ch.length ? `<p class="small"><b>O que muda:</b></p><ul class="plain small upd-list">${ch.map(rbLine).join("")}</ul>` : `<p class="small ok-txt">✓ Sua semana já está em dia com a planilha. Atualizar agora só recria os mesmos treinos.</p>`}
+    <button class="btn block" id="rb-go" style="margin-top:10px">Atualizar agora</button>
+    <p class="small muted" style="margin-top:12px">Quer outro tipo de treino (mais dias, outro objetivo)? Use “Gerar um treino novo” em Opções da semana.</p>`);
+  body.onclick = (e) => { if (e.target.id === "rb-go") doRebuild(e.target, again, true); };
+}
+async function doRebuild(btn, again, modal) {
+  btn.disabled = true; const txt = btn.textContent; btn.textContent = "Atualizando…";
+  let r; try { r = await api("/api/schedule/rebuild", { method: "POST" }); } catch (err) { btn.disabled = false; btn.textContent = txt; return toast(err.message, 5000); }
+  if (modal) closeModal();
+  const n = (r.changes || []).length;
+  toast(n ? `Pronto: ${n} ${n === 1 ? "treino atualizado" : "treinos atualizados"}. Os feitos ficaram como estavam.` : "Pronto: a semana já estava em dia.", 5000);
+  again();
 }
 
 // o que fica faltando na semana, por músculo, mesmo com os treinos que ainda estão na agenda
@@ -583,7 +615,8 @@ function bindAgenda(sch) {
         toast(`${r.length} treinos enviados ao Garmin Connect`); return again();
       }
       if (t.id === "gen-open") return openGenerator();
-      if (t.id === "rebuild") { if (!confirm("Recriar os treinos ainda não feitos desta semana a partir da planilha?")) return; await api("/api/schedule/rebuild", { method: "POST" }); return again(); }
+      if (t.id === "rebuild-open" || t.id === "rebuild-open-2") return openRebuild(sch, again);
+      if (t.id === "rebuild-go") return doRebuild(t, again);
     } catch (err) { t.disabled = false; toast(err.message, 5000); if (/login|conectado/i.test(err.message)) location.hash = "#perfil"; }
   };
 }

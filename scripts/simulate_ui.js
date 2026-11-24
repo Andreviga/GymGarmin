@@ -288,6 +288,15 @@ async function flows(page, base, persona, tag) {
     if (await page.locator("[data-undo]").count()) { await openDay("[data-undo]"); } if (await page.locator("[data-undo]").count()) await click("#day-panel [data-undo]", "Desfazer ajuste");
   }
   if (await page.locator("#rd-apply").count()) await audit(page, W("cartão de prontidão"));
+  // atualizar os próximos treinos: botão visível em Hoje, janela com o que muda e confirmação
+  if (await page.locator("#rebuild-open, #rebuild-go").count()) {
+    if (await page.locator("#rebuild-open").count()) {
+      await click("#rebuild-open", "Atualizar os próximos treinos");
+      await modalCheck("atualizar os próximos treinos");
+      await click("#rb-go", "Atualizar agora");
+    } else await click("#rebuild-go", "Atualizar (cartão semana desatualizada)");
+    if (await page.locator("#rebuild-go").count()) issue("semana continua desatualizada depois de atualizar", W("hoje"));
+  } else if (persona !== "novo") issue("Hoje: sem botão de atualizar os próximos treinos", W("hoje"));
 
   // Treinar a partir da agenda
   const sch = await (await fetch(`${base}/api/schedule`)).json();
