@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import urllib.parse
 import time
 import os
 from contextlib import asynccontextmanager
@@ -19,7 +20,7 @@ from datetime import date, timedelta
 from . import adaptive, alternative, auth, coach, focus, gallery, ingest, my_gym, partners, training_rules
 from . import watch_review as wrv
 from . import gyms, loads, personal, social, weather, wellness
-from . import (analysis, calibration, catalog, clock, db, dedupe, health, endurance, garmin_export, garmin_sync, generator, sharecard, history, limitations,
+from . import (analysis, calibration, catalog, clock, db, dedupe, health, endurance, garmin_export, garmin_sync, generator, music, sharecard, history, limitations,
                load, plans_io, progression, readiness, schedule, sports, steps, templates, watch_labels)
 from .muscles import EQUIPMENT_PT, HR_ZONES, MUSCLES, hr_max, zone_bpm
 
@@ -979,6 +980,103 @@ def session_photo_del(session_id: int, pid: str):
     p = my_gym.photo(pid)
     if p and not p.get("public"):
         db.kv_delete(f"photo:{pid}", user_id=my_gym.GLOBAL)
+    return {"ok": True}
+
+
+# ------------------------------------------------------- música (Spotify) ----
+
+def _run_cadences() -> list[float]:
+    since = (clock.today() - timedelta(days=90)).isoformat()
+    return [float(it["cadence"]) for s in db.list_sessions(since=since, limit=300) for it in s.get("items") or []
+            if it.get("sport") == "corrida" and it.get("cadence")]
+
+
+def _music_call(fn):
+    try:
+        return fn()
+    except music.MusicError as e:
+        st = getattr(e, "status", None)
+        reason = getattr(e, "reason", None)
+        if reason == "PREMIUM_REQUIRED" or st == 403:
+            raise HTTPException(403, "Tocar direto pelo app precisa do Spotify Premium. Abra a playlist no Spotify.") from e
+        if reason == "NO_ACTIVE_DEVICE" or st == 404:
+            raise HTTPException(409, "Abra o Spotify no celular (ou no relógio/fone) e dê play uma vez: aí o app consegue trocar a música.") from e
+        raise HTTPException(400, str(e)) from e
+
+
+@app.get("/api/music")
+def music_status(request: Request):
+    cad = music.cadence_target(_run_cadences())
+    out = music.summary(cad)
+    out["client_id"] = music.client_id()
+    out["redirect_uri"] = music.redirect_uri(str(request.base_url))
+    out["scopes"] = music.SCOPES
+    out["search"] = {m: music.search_url(m, cad) for m in music.MODES}
+    return out
+
+
+@app.get("/spotify-callback")
+def spotify_callback(code: str | None = None, state: str | None = None, error: str | None = None):
+    """Volta do login do Spotify: o app (hash #musica) termina a conexão com o código e o verificador PKCE."""
+    q = urllib.parse.urlencode({k: v for k, v in (("code", code), ("state", state), ("error", error)) if v})
+    return RedirectResponse(f"/#musica?{q}", status_code=302)
+
+
+@app.post("/api/music/connect")
+def music_connect(body: dict = Body(...)):
+    return _music_call(lambda: music.exchange(body.get("code") or "", body.get("verifier") or "", body.get("redirect_uri") or ""))
+
+
+@app.post("/api/music/scan")
+def music_scan(body: dict = Body(default={})):
+    """Lê as músicas da pessoa (se pedir ou se faz mais de 1 dia), descobre os BPM aos poucos e, no fim, monta as
+    playlists. O app chama de novo enquanto 'pending' > 0."""
+    def run():
+        lib_age = time.time() - (music._lib().get("updated") or 0)
+        if body.get("refresh") or lib_age > 86400:
+            music.fetch_library()
+        st = music.enrich(budget_s=float(body.get("budget") or 8))
+        out = {**st, "built": False}
+        if st["pending"] == 0:
+            music.build_playlists(music.cadence_target(_run_cadences()))
+            out["built"] = True
+        return out
+    return _music_call(run)
+
+
+@app.put("/api/music/settings")
+def music_settings(body: dict = Body(...)):
+    s = music.settings()
+    if "cadence" in body:
+        c = body.get("cadence")
+        s["cadence"] = int(c) if c and 140 <= int(c) <= 200 else None
+    if "auto" in body:
+        s["auto"] = bool(body["auto"])
+    music.save_settings(s)
+    return {"ok": True}
+
+
+@app.post("/api/music/play")
+def music_play(body: dict = Body(...)):
+    mode = body.get("mode")
+    if mode not in music.MODES:
+        raise HTTPException(400, "Momento desconhecido")
+    return _music_call(lambda: music.play(mode))
+
+
+@app.post("/api/music/boost")
+def music_boost(body: dict = Body(default={})):
+    return _music_call(lambda: music.boost(music.cadence_target(_run_cadences()), calmer=bool(body.get("calmer"))))
+
+
+@app.get("/api/music/now")
+def music_now():
+    return _music_call(music.now_playing) or {}
+
+
+@app.post("/api/music/disconnect")
+def music_disconnect():
+    music.disconnect()
     return {"ok": True}
 
 

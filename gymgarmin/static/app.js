@@ -500,6 +500,7 @@ function dayPanel(sch, date) {
       ${planned.length ? `<button class="act" data-move="${first.id}" data-date="${date}">Mover</button>
         <button class="act" data-skip="${first.id}">Não vou treinar</button>
         <button class="act" data-push="${first.id}">Enviar ao relógio</button>
+        <button class="act" data-music="${musicModeFor((first.items || []).find((i) => i.endurance && (i.phase || "principal") === "principal") || (first.items || []).find((i) => (i.phase || "principal") === "principal"))}">🎵 Música</button>
         <a class="act" href="/api/schedule/${first.id}/fit">.FIT</a>` : ""}
       ${es.filter((e) => e.status === "pulado" && e.can_undo).map((e, _i, all) => `<button class="act" data-undo="${e.id}">${all.length > 1 ? `Desfazer: ${esc(shortName(e))}` : "Desfazer ajuste"}</button>`).join("")}
       ${es.filter((e) => e.readiness_backup && e.status === "planejado").map((e) => `<button class="act" data-rundo="${e.id}">Desfazer ajuste de prontidão</button>`).join("")}
@@ -603,6 +604,7 @@ function bindAgenda(sch) {
         };
         return;
       }
+      if (d.music) return openMusic(d.music);
       if (d.push) { t.disabled = true; const r = await api(`/api/schedule/${d.push}/push`, { method: "POST" }); toast(`Enviado ao Garmin para ${r.scheduled}`); return again(); }
       if (t.id === "push-outdated") {
         t.disabled = true; t.textContent = "Enviando…";
@@ -3663,6 +3665,165 @@ function scDownload(file) {
   document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
 }
 
+
+/* ---- música no treino (Spotify): as músicas que a pessoa gosta, no BPM de cada momento ---- */
+const MUSIC_ICON = { aquecimento: "🔥", musculacao: "🏋️", gas: "⚡", corrida_leve: "🏃", corrida_ritmo: "🏃‍♂️", tiros: "💨", calma: "🧘" };
+async function musicState(force) {
+  if (!force && state.music && Date.now() - state.music._t < 120000) return state.music;
+  try { state.music = { ...(await api("/api/music")), _t: Date.now() }; } catch (_) { state.music = { connected: false, modes: [], search: {}, _t: Date.now() }; }
+  return state.music;
+}
+// momento do treino → playlist: aquecimento, musculação, corrida no ritmo da passada, tiros, calma
+function musicModeFor(it) {
+  if (!it) return "musculacao";
+  const ph = it.phase || "principal";
+  if (ph === "preparo") return "aquecimento";
+  if (ph === "pos") return "calma";
+  const en = it.endurance;
+  if (en) {
+    const t = `${en.type || ""} ${en.title || ""} ${en.role || ""}`.toLowerCase();
+    if (en.sport && en.sport !== "corrida") return en.hard ? "gas" : "musculacao";
+    if (en.hard || /tiro|interval|vo2|fartlek|hiit|norueg|4 ?× ?4/.test(t)) return "tiros";
+    if (/teste|tempo|limiar|ritmo|progress|forte/.test(t)) return "corrida_ritmo";
+    return "corrida_leve";
+  }
+  return "musculacao";
+}
+function spotifyOpen(url) { if (url) window.open(url, "_blank", "noopener"); }
+async function musicPlay(mode, quiet) {
+  const m = await musicState();
+  const pl = m && (m.modes || []).find((x) => x.id === mode);
+  if (!m || !m.connected || !pl || !pl.url) { if (!quiet) spotifyOpen((m && m.search && m.search[mode]) || "https://open.spotify.com"); return false; }
+  try { await api("/api/music/play", { method: "POST", body: { mode } }); if (!quiet) toast(`🎵 Tocando “HAX · ${pl.label}”`, 3000); return true; }
+  catch (e) { if (!quiet) { toast(e.message, 5000); spotifyOpen(pl.url); } return false; }
+}
+// troca sozinho ao mudar de fase no treino guiado (Premium + opção ligada); não insiste se não der
+async function musicAuto(it) {
+  const s = state.session; if (!s) return;
+  const mode = musicModeFor(it);
+  if (s.musicMode === mode) return;
+  const m = state.music; if (!m || !m.connected || !m.premium || m.auto === false) return;
+  if (!s.musicMode) { s.musicMode = mode; store("gg_session", s); return; }   // começa no que a pessoa já está ouvindo
+  s.musicMode = mode; store("gg_session", s);
+  if (await musicPlay(mode, true)) toast(`🎵 ${MUSIC_ICON[mode] || ""} Música de ${(m.modes.find((x) => x.id === mode) || {}).label || mode}`, 2500);
+}
+
+async function openMusic(mode) {
+  const body = openModal(`<h2>🎵 Música</h2><div class="sk"><span class="sk-line"></span></div>`);
+  const m = await musicState(true);
+  if (!m) { body.innerHTML = `<h2>🎵 Música</h2><p class="pill bad">Sem conexão agora.</p>`; return; }
+  const cur = m.modes.find((x) => x.id === mode) || m.modes[1];
+  if (!m.connected) {
+    body.innerHTML = `<h2>🎵 Música para ${esc(cur.label.toLowerCase())}</h2>
+      <a class="btn block" href="${esc(m.search[cur.id])}" target="_blank" rel="noopener">Abrir no Spotify</a>
+      <p class="small muted" style="margin:12px 2px">Conecte o Spotify para o app montar playlists com <b>as músicas que você mais ouve</b>, no BPM certo de cada momento (aquecimento, treino, mais gás, corrida no ritmo da passada, calma) e trocar sozinho durante o treino.</p>
+      ${m.client_id ? `<a class="btn ghost block" href="#musica">Conectar o Spotify</a>` : `<p class="small muted">O administrador do app ainda precisa ativar a conexão com o Spotify.</p>`}`;
+    return;
+  }
+  const chips = m.modes.map((x) => `<button type="button" class="chip pc ${x.id === cur.id ? "on" : ""}" data-mm="${x.id}">${MUSIC_ICON[x.id] || ""} ${esc(x.label)}</button>`).join("");
+  body.innerHTML = `<h2>🎵 Música</h2>
+    <div id="mu-now" class="mu-now small muted">…</div>
+    <div class="sc-row" style="margin:6px 0 10px">${chips}</div>
+    <p class="small muted" style="margin:0 2px 10px">${esc(cur.desc)} · ${esc(cur.range)} · ${cur.n} músicas suas</p>
+    <button class="btn block" id="mu-play" ${cur.url ? "" : "disabled"}>▶ Tocar “HAX · ${esc(cur.label)}”</button>
+    <div class="row gap" style="margin-top:8px"><button class="btn ghost grow" id="mu-gas">⚡ Mais gás agora</button><button class="btn ghost grow" id="mu-calm">🧘 Mais calma</button></div>
+    ${m.premium ? "" : `<p class="small muted" style="margin:10px 2px 0">Sem Premium o Spotify não deixa outro app dar play: os botões abrem a playlist no Spotify.</p>`}
+    <a class="act" href="#musica" style="display:block;margin-top:10px">Ajustes da música ›</a>`;
+  const loadNow = async () => {
+    let n = null; try { n = await api("/api/music/now"); } catch (_) { /* sem player */ }
+    const el = $("#mu-now", body); if (!el) return;
+    el.innerHTML = n && n.name ? `${n.playing ? "▶" : "⏸"} <b>${esc(n.name)}</b> · ${esc(n.artist || "")}${n.bpm ? ` · <b>${n.bpm} bpm</b>` : ""}` : "Nada tocando no Spotify agora.";
+  };
+  loadNow();
+  body.onclick = async (e) => {
+    const t = e.target.closest("button"); if (!t) return;
+    if (t.dataset.mm) return openMusic(t.dataset.mm);
+    if (t.id === "mu-play") { t.disabled = true; await musicPlay(cur.id); if (state.session) { state.session.musicMode = cur.id; store("gg_session", state.session); } t.disabled = false; setTimeout(loadNow, 1500); return; }
+    if (t.id === "mu-gas" || t.id === "mu-calm") {
+      const calmer = t.id === "mu-calm"; t.disabled = true;
+      try { const r = await api("/api/music/boost", { method: "POST", body: { calmer } }); toast(`${calmer ? "🧘" : "⚡"} Agora: ${r.name} (${r.bpm} bpm)`, 4000); setTimeout(loadNow, 1500); }
+      catch (err) { toast(err.message, 5000); const pl = m.modes.find((x) => x.id === (calmer ? "calma" : "gas")); if (pl && pl.url) spotifyOpen(pl.url); }
+      t.disabled = false;
+    }
+  };
+}
+
+// ---- página de ajustes (#musica): conectar, montar as playlists, cadência e troca automática
+function b64url(buf) { return btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); }
+async function spotifyLogin(m) {
+  const verifier = b64url(crypto.getRandomValues(new Uint8Array(48)));
+  const challenge = b64url(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier)));
+  const st = b64url(crypto.getRandomValues(new Uint8Array(12)));
+  store("gg_sp_pkce", { verifier, state: st, redirect: m.redirect_uri });
+  location.href = "https://accounts.spotify.com/authorize?" + new URLSearchParams({ client_id: m.client_id, response_type: "code", redirect_uri: m.redirect_uri,
+    code_challenge_method: "S256", code_challenge: challenge, scope: m.scopes, state: st });
+}
+async function musicScan(box, refresh) {
+  let first = true;
+  for (let k = 0; k < 20; k++) {
+    let r; try { r = await api("/api/music/scan", { method: "POST", body: { refresh: refresh && first } }); } catch (e) { box.innerHTML = `<p class="pill bad">${esc(e.message)}</p>`; return; }
+    first = false;
+    box.innerHTML = `<p class="small">🔎 ${r.known} de ${r.total} músicas com BPM${r.pending ? ` · faltam ${r.pending}…` : ""}</p>`;
+    if (r.built) { toast("🎵 Playlists HAX prontas no seu Spotify", 4000); return true; }
+  }
+}
+async function viewMusica() {
+  const q = new URLSearchParams((location.hash.split("?")[1]) || "");
+  if (q.get("code") || q.get("error")) {
+    const pk = store("gg_sp_pkce") || {};
+    history.replaceState(null, "", "#musica");
+    if (q.get("error")) toast("O Spotify não foi conectado.", 4000);
+    else if (pk.state !== q.get("state")) toast("Conexão do Spotify expirou: tente de novo.", 5000);
+    else {
+      view.innerHTML = `<p class="muted">Conectando ao Spotify…</p>`;
+      try { await api("/api/music/connect", { method: "POST", body: { code: q.get("code"), verifier: pk.verifier, redirect_uri: pk.redirect } }); store("gg_sp_pkce", null);
+        view.innerHTML = `<section class="card"><h2>🎵 Spotify conectado</h2><p class="small muted">Lendo as músicas que você mais ouve e descobrindo o BPM de cada uma…</p><div id="mu-scan"></div></section>`;
+        await musicScan($("#mu-scan"), true);
+      } catch (e) { toast(e.message, 6000); }
+    }
+  }
+  const m = await musicState(true);
+  if (!m) { view.innerHTML = `<p class="pill bad">Sem conexão agora.</p>`; return; }
+  if (!m.client_id) {
+    view.innerHTML = `<section class="card"><h2>🎵 Música no treino</h2><p class="small muted">A conexão com o Spotify ainda não foi ativada neste app.</p>
+      <p class="small">Enquanto isso, o botão 🎵 do treino abre o Spotify com músicas para cada momento.</p></section>`;
+    return;
+  }
+  if (!m.connected) {
+    view.innerHTML = `<section class="card"><h2>🎵 Música no treino</h2>
+      <p>O app lê as músicas que você <b>mais ouve</b> no Spotify, descobre o BPM de cada uma e monta playlists na sua conta para cada momento:</p>
+      <ul class="plain small">${m.modes.map((x) => `<li>${MUSIC_ICON[x.id]} <b>${esc(x.label)}</b> · ${esc(x.range)} — ${esc(x.desc)}</li>`).join("")}</ul>
+      <p class="small muted">Durante o treino guiado, a música troca sozinha ao passar do aquecimento para o treino e para o alongamento (Spotify Premium). “⚡ Mais gás” põe na hora a música mais rápida que você gosta.</p>
+      <button class="btn block" id="mu-login">Conectar o Spotify</button>
+      <p class="small muted" style="margin-top:8px">O app não vê sua senha. Dá para desconectar quando quiser.</p></section>`;
+    $("#mu-login").onclick = () => spotifyLogin(m);
+    return;
+  }
+  view.innerHTML = `<section class="card"><div class="row between"><h2>🎵 Spotify${m.name ? ` · ${esc(m.name)}` : ""}</h2><span class="pill ${m.premium ? "ok" : "muted"}">${m.premium ? "Premium" : "sem Premium"}</span></div>
+      <p class="small muted">${m.with_bpm} de ${m.tracks} músicas suas com BPM${m.pending ? ` · ${m.pending} ainda sem` : ""}.</p>
+      <div id="mu-scan"></div>
+      <button class="btn ghost block" id="mu-rescan">🔄 Atualizar minhas playlists</button></section>
+    <h2 class="sec-title">Suas playlists HAX</h2>
+    <div class="picks">${m.modes.map((x) => `<${x.url ? `a href="${esc(x.url)}" target="_blank" rel="noopener"` : "div"} class="pick"><span class="mu-ico" aria-hidden="true">${MUSIC_ICON[x.id]}</span>
+      <span class="grow"><b>${esc(x.label)}</b><span class="small muted">${esc(x.range)} · ${x.n} ${x.n === 1 ? "música" : "músicas"}${x.n < 3 ? " · poucas: curta mais músicas nessa faixa" : ""}</span></span>${x.url ? `<span class="chev">›</span>` : ""}</${x.url ? "a" : "div"}>`).join("")}</div>
+    <section class="card" style="margin-top:12px"><h2>Ajustes</h2>
+      <label class="row gap"><input type="checkbox" id="mu-auto" ${m.auto !== false ? "checked" : ""}> <span>Trocar a música sozinho conforme a fase do treino${m.premium ? "" : " (precisa do Premium)"}</span></label>
+      <div class="field" style="margin-top:10px"><label for="mu-cad">Sua passada na corrida (passos por minuto)</label>
+        <input id="mu-cad" type="number" inputmode="numeric" min="140" max="200" value="${m.cadence}">
+        <p class="small muted">${m.cadence_manual ? "Você escolheu este número." : "Calculado pelas suas corridas no relógio (ou 162 se ainda não há)."} As músicas da corrida acompanham esse ritmo (ou a metade dele).</p></div>
+      <button class="btn ghost block" id="mu-save">Salvar</button>
+      <button class="act" id="mu-off" style="margin-top:10px">Desconectar o Spotify</button></section>`;
+  view.onclick = async (e) => {
+    const t = e.target.closest("button"); if (!t) return;
+    if (t.id === "mu-rescan") { t.disabled = true; await musicScan($("#mu-scan"), true); t.disabled = false; state.music = null; return viewMusica(); }
+    if (t.id === "mu-save") {
+      await api("/api/music/settings", { method: "PUT", body: { auto: $("#mu-auto").checked, cadence: +$("#mu-cad").value || null } });
+      toast("Salvo. Atualizando as playlists de corrida…", 3000); await musicScan($("#mu-scan"), false); state.music = null; return viewMusica();
+    }
+    if (t.id === "mu-off") { if (!confirm("Desconectar o Spotify? As playlists HAX continuam no seu Spotify.")) return; await api("/api/music/disconnect", { method: "POST" }); state.music = null; return viewMusica(); }
+  };
+}
+
 async function openSharePicker(mode) {
   const body = openModal(`<h2>Qual treino?</h2><div class="sk"><span class="sk-line"></span></div>`);
   const [ss, d] = await Promise.all([api("/api/sessions?limit=15"), api("/api/social")]);
@@ -4023,7 +4184,8 @@ function renderFocus() {
     <div class="grow"><div class="fx-count">${esc(s.day_name || "Treino")} · ${it ? `${pos + 1} de ${order.length}` : "fim"}</div>
       <div class="meter"><span style="width:${order.length ? Math.round(100 * doneN / order.length) : 0}%"></span></div></div>
     <button class="fx-nav" data-fx="next" ${pos >= order.length ? "disabled" : ""} aria-label="Próximo exercício">›</button></div>`;
-  const tools = `<div class="fx-tools"><button class="act" data-fx="list">☰ Ver lista</button><button class="act" data-fx="add">+ Exercício</button></div>`;
+  const tools = `<div class="fx-tools"><button class="act" data-fx="list">☰ Ver lista</button><button class="act" data-fx="music">🎵 Música</button><button class="act" data-fx="add">+ Exercício</button></div>`;
+  if (it) { if (!state.music) musicState().then(() => musicAuto(it)).catch(() => {}); else musicAuto(it); }
   let body;
   if (!it) {
     const sets = s.items.reduce((n, x) => n + (fxStrength(x) ? x.sets.filter((y) => y.done).length : 0), 0);
@@ -4146,6 +4308,7 @@ function bindFocus() {
     const saveMM = (mm) => { it.my_machine = mm; save(); renderFocus(); };
     if (t.dataset.mm && it) { const mm = it.my_machine || {}; return openMyMachine({ ...mm, exercise_id: it.exercise_id, exercise_name: it.name }, saveMM); }
     if (t.dataset.fx === "mymachine" && it) return openMyMachine({ exercise_id: it.exercise_id, exercise_name: it.name }, saveMM);
+    if (t.dataset.fx === "music") return openMusic(musicModeFor(it));
     if (t.dataset.fx === "swap" && it) return openSwap(it, (to, also) => fxSwap(it, to, also));
     if (t.dataset.ex && !t.dataset.fx) return showExercise(t.dataset.ex);
     if (t.dataset.cdone) { const x = s.items[+t.dataset.cdone]; x.done = !x.done; t.classList.toggle("on", x.done); return save(); }
@@ -5105,6 +5268,7 @@ async function viewPerfil(openSec) {
     <a class="btn ghost block" href="#esportes">Configurar esportes e provas</a>`)}
   ${sect("foco", "🎯", "Foco: músculo ou aptidão", p.focus ? esc(p.focus.label || "foco ativo") : "melhorar algo específico (opcional)", `<div id="focus-box"><div class="sk"><span class="sk-line"></span></div></div>`)}
   ${sect("academia", "🏟️", "Minha academia", "fotos e regulagem dos aparelhos que você usa", `<div id="mygym-box"><div class="sk"><span class="sk-line"></span></div></div>`)}
+  <a class="link-card sect" href="#musica"><span class="sect-ico" aria-hidden="true">🎵</span><span class="grow"><b>Música no treino (Spotify)</b><span class="small muted">suas músicas no BPM certo de cada momento</span></span><span class="chev" aria-hidden="true">›</span></a>
   <h2 class="sec-title">Pessoas e conta</h2>
   ${partnerHtml ? sect("parceiro", "🤝", "Treinar com alguém", "parceiro de treino e placar da semana", partnerHtml) : ""}
   ${coachHtml ? sect("coach", "🧑‍🏫", "Coach", "quem acompanha seus treinos", coachHtml) : ""}
@@ -5269,13 +5433,14 @@ function route() {
 }
 async function doRoute(ctl) {
   route.lastHash = location.hash; route.again = false;
-  const [name, a, b] = (location.hash.slice(1) || "hoje").split("/");
+  const [name0, a, b] = (location.hash.slice(1) || "hoje").split("/");
+  const name = name0.split("?")[0];
   closeModal.hook = null;                 // ...e quem abriu a janela não é avisado: a tela dele já não é a que está na frente
   if (!$("#modal").hidden) closeModal();  // trocar de tela fecha a janela aberta (não fica por cima da tela nova)
   if (name !== "treinar") fxLeave();
   if (name !== "bemestar" || b !== "play") { clearInterval(wsInt); wsInt = null; WS = null; }
   $$(".tabbar a").forEach((el) => el.classList.toggle("active", el.dataset.tab === ({ plano: "planilhas", exercicios: "planilhas", aparelhos: "planilhas", evolucao: "analise", saude: "analise", esportes: "perfil", coach: "perfil", dev: "perfil", bemvindo: "hoje" }[name] || name)));
-  const TITLES = { planilhas: "Planos", exercicios: "Planos", aparelhos: "Planos", plano: "Planilha", treinar: "Treinar", social: "Comunidade", especiais: "Treinos de famosos", bemestar: "Bem-estar", analise: "Progresso", evolucao: "Evolução", saude: "Saúde e sono", perfil: "Perfil", esportes: "Esportes", coach: "Coach", dev: "Desenvolvedor" };
+  const TITLES = { planilhas: "Planos", exercicios: "Planos", aparelhos: "Planos", plano: "Planilha", treinar: "Treinar", social: "Comunidade", especiais: "Treinos de famosos", musica: "Música", bemestar: "Bem-estar", analise: "Progresso", evolucao: "Evolução", saude: "Saúde e sono", perfil: "Perfil", esportes: "Esportes", coach: "Coach", dev: "Desenvolvedor" };
   const pt = $("#page-title"); pt.textContent = TITLES[name] || ""; pt.hidden = !TITLES[name] || (name === "treinar" && a);
   const sn = $("#subnav"); sn.hidden = !["planilhas", "exercicios", "aparelhos"].includes(name);
   $$("#subnav a").forEach((x) => x.classList.toggle("on", x.dataset.sub === name));
@@ -5298,7 +5463,7 @@ async function doRoute(ctl) {
         document.querySelector(".topbar").insertAdjacentHTML("afterend", `<div id="eph" class="rec atencao small" style="margin:8px 16px 0">Versão de teste online: os dados podem ser apagados pelo servidor. Use <a href="#perfil">Perfil → Backup</a> para salvar e restaurar.</div>`);
       }
     }
-    const routes = { hoje: () => viewHoje(a), planilhas: viewPlanilhas, plano: () => viewPlano(a), treinar: () => viewTreinar(a, b), social: viewSocial, especiais: () => viewEspeciais(a), bemestar: () => viewBemEstar(a, b), analise: viewAnalise, evolucao: () => viewEvolucao(decodeURIComponent(a || "")), esportes: viewEsportes, saude: viewSaude, exercicios: viewExercicios, aparelhos: () => viewAparelhos(a), perfil: () => viewPerfil(a), coach: viewCoach, dev: viewDev, bemvindo: viewBemVindo };
+    const routes = { hoje: () => viewHoje(a), planilhas: viewPlanilhas, plano: () => viewPlano(a), treinar: () => viewTreinar(a, b), social: viewSocial, especiais: () => viewEspeciais(a), musica: viewMusica, bemestar: () => viewBemEstar(a, b), analise: viewAnalise, evolucao: () => viewEvolucao(decodeURIComponent(a || "")), esportes: viewEsportes, saude: viewSaude, exercicios: viewExercicios, aparelhos: () => viewAparelhos(a), perfil: () => viewPerfil(a), coach: viewCoach, dev: viewDev, bemvindo: viewBemVindo };
     const render = async () => {
       await (routes[name] || viewHoje)();
       if (!view.onclick) view.onclick = (e) => { const id = e.target.dataset && e.target.dataset.ex; if (id) showExercise(id); };

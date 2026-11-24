@@ -353,6 +353,14 @@ async function flows(page, base, persona, tag) {
           } else await page.evaluate(() => closeModal());
           await page.evaluate(() => { const b = document.querySelector("[data-fx='list']"); if (b) b.scrollIntoView({ block: "center" }); });
         }
+        // 🎵 música: abre a janela do momento (sem Spotify conectado: abrir no Spotify)
+        if (await page.locator("[data-fx='music']").count()) {
+          await click("[data-fx='music']", "Música (treino guiado)");
+          await page.waitForTimeout(400);
+          if (!(await page.locator("#modal:not([hidden]) h2").count())) issue("música: janela não abriu", W("treinar"));
+          else await modalCheck("música no treino");
+          await page.evaluate(() => closeModal());
+        } else issue("treino guiado: sem botão de música", W("treinar"));
       } else if (e.kind === "forca") issue("treino guiado: sem exercício com séries", W("treinar"));
       await click("[data-fx='list']", "Ver lista");
     } else issue("treino guiado não abriu", W("treinar"));
@@ -521,7 +529,7 @@ async function offline(context, page, base, tag) {
     try {
       const plans = await (await fetch(`${base}/api/plans`)).json();
       const hist = await (await fetch(`${base}/api/history`)).json().catch(() => ({ exercises: [] }));
-      const routes = ["#hoje", "#planilhas", "#treinar", "#analise", "#evolucao", "#saude", "#esportes", "#exercicios", "#aparelhos", "#perfil", "#perfil/academia", "#perfil/foco", "#dev", "#bemestar", "#bemestar/yoga_estresse", "#social", "#especiais", "#especiais/arnold_golden_six"];
+      const routes = ["#hoje", "#planilhas", "#treinar", "#analise", "#evolucao", "#saude", "#esportes", "#exercicios", "#aparelhos", "#perfil", "#perfil/academia", "#perfil/foco", "#dev", "#bemestar", "#bemestar/yoga_estresse", "#social", "#especiais", "#especiais/arnold_golden_six", "#musica"];
       if (plans.length) routes.push(`#plano/${plans[0].id}`, `#treinar/${plans[0].id}/0`);
       if ((hist.exercises || []).length) routes.push(`#evolucao/${encodeURIComponent(hist.exercises[0].exercise_id)}`);
       for (const [dname, dev] of DEVICES) {

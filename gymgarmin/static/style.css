@@ -1137,3 +1137,7 @@ body.timer-on { padding-bottom: calc(72px + 70px + env(safe-area-inset-bottom));
 .ms-ph { position: relative; flex: none; }
 .ms-ph img { width: 84px; height: 84px; object-fit: cover; border-radius: 10px; display: block; }
 .ms-ph button { position: absolute; top: 2px; right: 2px; min-width: 32px; min-height: 32px; border-radius: 50%; border: 0; background: #000b; color: #fff; font-size: 14px; cursor: pointer; }
+
+/* música */
+.mu-now { padding: 10px 12px; border-radius: 10px; background: var(--bg); margin-bottom: 6px; min-height: 40px; }
+.mu-ico { font-size: 22px; width: 34px; text-align: center; flex: none; }
