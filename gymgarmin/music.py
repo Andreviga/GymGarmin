@@ -64,8 +64,11 @@ def redirect_uri(base: str) -> str:
 
 # ------------------------------------------------------------------ HTTP ----
 
+UA = "HAX-fitness/1.0 (+https://haxfit.vercel.app)"   # sem identificação, Deezer/ReccoBeats bloqueiam (Cloudflare)
+
+
 def _http(method: str, url: str, headers: dict | None = None, body: bytes | None = None, timeout: float = 12) -> tuple[int, dict | None]:
-    req = urllib.request.Request(url, data=body, method=method, headers=headers or {})
+    req = urllib.request.Request(url, data=body, method=method, headers={"User-Agent": UA, "Accept": "application/json", **(headers or {})})
     try:
         with urllib.request.urlopen(req, timeout=timeout) as r:  # noqa: S310 - hosts fixos (Spotify, Deezer, ReccoBeats)
             raw = r.read()
@@ -236,6 +239,7 @@ def fetch_library() -> dict:
 def _deezer_bpm(row: dict) -> float | None:
     if row.get("isrc"):
         st, d = _http("GET", f"https://api.deezer.com/track/isrc:{urllib.parse.quote(row['isrc'])}", timeout=8)
+        _DIAG["deezer"] = st
         if st == 200 and isinstance(d, dict) and not d.get("error") and d.get("bpm"):
             return float(d["bpm"])
     q = f'artist:"{(row.get("artist") or "").split(",")[0]}" track:"{row.get("name") or ""}"'
@@ -252,7 +256,8 @@ def _recco(ids: list[str]) -> dict[str, dict]:
     """BPM e energia pela ReccoBeats (por id do Spotify). Opcional: se falhar, fica só o do Deezer."""
     if not ids:
         return {}
-    st, d = _http("GET", "https://api.reccobeats.com/v1/audio-features?" + urllib.parse.urlencode({"ids": ",".join(ids)}), timeout=10)
+    st, d = _http("GET", "https://api.reccobeats.com/v1/audio-features?" + urllib.parse.urlencode({"ids": ",".join(ids[:40])}), timeout=10)
+    _DIAG["recco"] = st
     out = {}
     for f in ((d or {}).get("content") or []) if st == 200 and isinstance(d, dict) else []:
         href = f.get("href") or ""
@@ -262,30 +267,58 @@ def _recco(ids: list[str]) -> dict[str, dict]:
     return out
 
 
+_DIAG: dict = {}
+BPM_V = 2   # versão da busca de BPM: subir faz tentar de novo as músicas que ficaram sem
+
+
+def _spotify_features(ids: list[str]) -> dict[str, dict]:
+    """O próprio Spotify (apps antigos ainda têm acesso; apps novos recebem 403 — aí para de tentar)."""
+    if _DIAG.get("spotify_af") == 403 or not ids:
+        return {}
+    try:
+        d = call("GET", "/audio-features", params={"ids": ",".join(ids[:100])}) or {}
+        _DIAG["spotify_af"] = 200
+    except MusicError as e:
+        _DIAG["spotify_af"] = getattr(e, "status", 0) or -1
+        return {}
+    return {f["id"]: {"bpm": f.get("tempo"), "energy": f.get("energy")} for f in d.get("audio_features") or [] if f and f.get("id")}
+
+
 def enrich(budget_s: float = 8.0, batch: int = 40) -> dict:
     """Descobre o BPM das músicas que ainda não têm (em lotes, para caber no tempo do servidor)."""
     lib = _lib()
     tracks = lib.get("tracks") or {}
+    if lib.get("bpm_v") != BPM_V:          # busca melhorou: tenta de novo as que ficaram sem BPM
+        for r in tracks.values():
+            if r.get("bpm") is None:
+                r.pop("tried", None)
+        lib["bpm_v"] = BPM_V
     todo = [tid for tid, r in tracks.items() if r.get("bpm") is None and not r.get("tried")]
+    src = lib.setdefault("diag", {"spotify": 0, "recco": 0, "deezer": 0, "none": 0})
     t0 = time.monotonic()
     while todo and time.monotonic() - t0 < budget_s:
         chunk, todo = todo[:batch], todo[batch:]
+        sp = _safe(_spotify_features, chunk) or {}
         try:
-            rec = _recco(chunk)
-        except Exception:  # noqa: BLE001
+            rec = _recco([t for t in chunk if not (sp.get(t) or {}).get("bpm")])
+        except Exception as e:  # noqa: BLE001
+            _DIAG["recco_err"] = str(e)[:120]
             rec = {}
-        need = [tid for tid in chunk if not (rec.get(tid) or {}).get("bpm")]
+        need = [tid for tid in chunk if not (sp.get(tid) or {}).get("bpm") and not (rec.get(tid) or {}).get("bpm")]
         with ThreadPoolExecutor(max_workers=8) as ex:
             dz = dict(zip(need, ex.map(lambda tid: _safe(_deezer_bpm, tracks[tid]), need)))
         for tid in chunk:
             r = tracks[tid]
-            rr = rec.get(tid) or {}
-            bpm = rr.get("bpm") or dz.get(tid)
+            ss, rr = sp.get(tid) or {}, rec.get(tid) or {}
+            bpm = ss.get("bpm") or rr.get("bpm") or dz.get(tid)
             r["tried"] = True
             if bpm:
                 r["bpm"] = round(float(bpm), 1)
-            if rr.get("energy") is not None:
-                r["energy"] = round(float(rr["energy"]), 2)
+            src["spotify" if ss.get("bpm") else "recco" if rr.get("bpm") else "deezer" if dz.get(tid) else "none"] += 1
+            energy = ss.get("energy") if ss.get("energy") is not None else rr.get("energy")
+            if energy is not None:
+                r["energy"] = round(float(energy), 2)
+    src["last"] = dict(_DIAG)
     _save_lib(lib)
     pending = sum(1 for r in tracks.values() if r.get("bpm") is None and not r.get("tried"))
     return {"pending": pending, "known": sum(1 for r in tracks.values() if r.get("bpm")), "total": len(tracks)}
@@ -426,7 +459,15 @@ def play(mode: str) -> dict:
         call("PUT", "/me/player/shuffle", params={"state": "false"})
     except MusicError:
         pass
-    call("PUT", "/me/player/play", {"context_uri": f"spotify:playlist:{pl['id']}"})
+    try:
+        call("PUT", "/me/player/play", {"context_uri": f"spotify:playlist:{pl['id']}"})
+    except MusicError as e:
+        if getattr(e, "reason", None) == "PREMIUM_REQUIRED":
+            s = settings(); s["premium_ok"] = False; save_settings(s)
+        raise
+    s = settings()
+    if s.get("premium_ok") is not True:
+        s["premium_ok"] = True; save_settings(s)
     return {"ok": True, "url": f"https://open.spotify.com/playlist/{pl['id']}"}
 
 
@@ -461,7 +502,8 @@ def summary(cad: int) -> dict:
     tracks = lib.get("tracks") or {}
     s = settings()
     counts = {m: len(pick(m, cad, lib)) for m in MODES} if tracks else {}
-    return {"configured": bool(client_id()), "connected": connected(), "name": s.get("name"), "premium": s.get("product") == "premium",
+    premium = s.get("product") == "premium" or (not s.get("product") and s.get("premium_ok") is not False)
+    return {"configured": bool(client_id()), "connected": connected(), "name": s.get("name"), "premium": premium,
             "product": s.get("product"), "tracks": len(tracks), "with_bpm": sum(1 for r in tracks.values() if r.get("bpm")),
             "pending": sum(1 for r in tracks.values() if r.get("bpm") is None and not r.get("tried")),
             "cadence": cad, "cadence_manual": bool(s.get("cadence")), "auto": s.get("auto", True),
