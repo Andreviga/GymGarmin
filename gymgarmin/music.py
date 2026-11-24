@@ -41,7 +41,8 @@ MODES: dict[str, dict] = {
     "musculacao": {"label": "Musculação", "lo": 125, "hi": 150, "order": "gosto", "desc": "a faixa que mais ajuda no treino forte"},
     "gas": {"label": "Mais gás", "lo": 145, "hi": 180, "order": "rapida", "desc": "última série, finalizador, tiros"},
     "corrida_leve": {"label": "Corrida leve", "cad": 0, "order": "ajuste", "desc": "no ritmo da sua passada"},
-    "corrida_ritmo": {"label": "Corrida forte", "cad": 6, "order": "ajuste", "desc": "passada um pouco mais rápida"},
+    # corrida forte: faixa da passada até +16 (156–172 bpm para passada 156): acompanha o ritmo e dá um pouco mais de gás
+    "corrida_ritmo": {"label": "Corrida forte", "cad_lo": 0, "cad_hi": 16, "order": "ajuste", "desc": "passada firme, um pouco mais rápida"},
     # tiros: faixa (não um alvo exato) da passada +6 até +29 — no tiro, música mais rápida dá mais gás
     "tiros": {"label": "Tiros", "cad_lo": 6, "cad_hi": 29, "order": "rapida", "desc": "tiros e intervalados: rápida, para dar gás"},
     "calma": {"label": "Calma", "lo": 60, "hi": 95, "order": "desce", "desc": "volta à calma, alongamento, yoga"},
@@ -491,7 +492,7 @@ def _eff_bpm(bpm: float, mode: str, cad: int) -> float:
     return min(_cands(bpm, mode, cad), key=lambda b: abs(b - target))
 
 
-RULES_V = 2   # muda quando as faixas mudam: a tela refaz as playlists sozinha
+RULES_V = 3   # muda quando as faixas mudam: a tela refaz as playlists sozinha
 
 
 def _range_txt(m: dict, cad: int) -> str:
@@ -679,6 +680,6 @@ def search_url(mode: str, cad: int) -> str:
     """Sem conectar: abre a busca do Spotify com o tipo de música do momento."""
     m = MODES[mode]
     q = {"aquecimento": "aquecimento treino", "musculacao": "treino academia 130 bpm", "gas": "treino pesado 160 bpm",
-         "corrida_leve": f"corrida {cad} bpm", "corrida_ritmo": f"corrida {cad + 6} bpm", "tiros": f"corrida {cad + 18} bpm",
+         "corrida_leve": f"corrida {cad} bpm", "corrida_ritmo": f"corrida {cad + 8} bpm", "tiros": f"corrida {cad + 18} bpm",
          "calma": "alongamento relaxar"}[mode]
     return "https://open.spotify.com/search/" + urllib.parse.quote(q) if m else "https://open.spotify.com"

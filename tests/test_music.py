@@ -93,6 +93,9 @@ def test_bpm_por_momento():
     assert music._fit(166, "tiros", cad) is None and music._fit(194, "tiros", cad) is None
     assert music._fit(90, "tiros", cad) is not None                                                  # metade (180)
     assert music._range_txt(music.MODES["tiros"], 156) == "162–185 bpm"
+    assert music._range_txt(music.MODES["corrida_ritmo"], 156) == "156–172 bpm"
+    assert music._fit(170, "corrida_ritmo", 156) is not None and music._fit(174, "corrida_ritmo", 156) is None
+    assert music._fit(80, "corrida_ritmo", 156) is not None
     assert music.cadence_target([133, 158, 164, 166]) == 164    # corre-caminha (133) não puxa a passada para baixo
     assert music.cadence_target([]) == music.DEFAULT_CADENCE
 
