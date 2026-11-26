@@ -20,6 +20,7 @@ from datetime import date, timedelta
 from . import adaptive, alternative, auth, coach, focus, gallery, ingest, my_gym, partners, training_rules
 from . import watch_review as wrv
 from . import gyms, loads, personal, social, weather, wellness
+from . import cardio
 from . import google_login as glogin
 from . import (analysis, calibration, catalog, clock, db, dedupe, health, endurance, garmin_export, garmin_sync, generator, music, sharecard, youtube, history, limitations,
                load, plans_io, progression, readiness, schedule, sports, steps, templates, watch_labels)
@@ -1029,6 +1030,8 @@ def _music_call(fn):
         if reason == "NO_ACTIVE_DEVICE" or st == 404:
             raise HTTPException(409, "Abra o Spotify no celular (ou no relógio/fone) e dê play uma vez: aí o app consegue trocar a música.") from e
         raise HTTPException(400, str(e)) from e
+    except (OSError, TimeoutError) as e:          # sem conexão com o Spotify (rede, DNS, tempo esgotado)
+        raise HTTPException(502, "Não consegui falar com o Spotify agora. Tente de novo em instantes.") from e
 
 
 @app.get("/api/music")
@@ -1062,12 +1065,17 @@ def music_scan(body: dict = Body(default={})):
         lib_age = time.time() - (music._lib().get("updated") or 0)
         if body.get("refresh") or lib_age > 86400:
             music.fetch_library()
-        music.discover(budget_s=6)
-        st = music.enrich(budget_s=float(body.get("budget") or 8))
-        out = {**st, "built": False}
+        t0 = time.monotonic()
+        music.discover(budget_s=5)
+        st = music.enrich(budget_s=float(body.get("budget") or 7))
+        out = {**st, "built": False, "styles_pending": 0}
         if st["pending"] == 0:
-            music.build_playlists(music.cadence_target(_run_cadences()))
-            out["built"] = True
+            # estilo de cada música (para as playlists por estilo) e, com tudo pronto, as playlists
+            out["styles_pending"] = music.classify(budget_s=max(2.0, 12 - (time.monotonic() - t0)))
+            if out["styles_pending"] == 0:
+                r = music.build_playlists(music.cadence_target(_run_cadences()), budget_s=max(3.0, 21 - (time.monotonic() - t0)))
+                out["built"] = r["done"]
+                out["styles"] = len(r["styles"])
         return out
     return _music_call(run)
 
@@ -1100,7 +1108,8 @@ def music_play(body: dict = Body(...)):
     mode = body.get("mode")
     if mode not in music.MODES:
         raise HTTPException(400, "Momento desconhecido")
-    return _music_call(lambda: music.play(mode))
+    fam = body.get("fam") if body.get("fam") in music.FAMILIES else None
+    return _music_call(lambda: music.play(mode, fam))
 
 
 @app.post("/api/music/boost")
@@ -3493,6 +3502,95 @@ def alternative_draft(body: dict = Body(...)):
     return {"date": clock.now().strftime("%Y-%m-%dT%H:%M"), "day_name": prop["day_name"].replace(" (alternativo)", " (gerado)"),
             "items": _prefill_items(prop["items"]), "alt": {k: prop[k] for k in ("reason", "label", "why", "base", "changes", "warnings")},
             "view": "lista", "generated": True, "alerts": _alerts(), "kit": _alt_opts(body).get("kit") if body.get("reason") == "fora" else None}
+
+
+# ---------------------------------------------------------------- cardio avulso com música seguindo as fases
+def _cardio_build(body: dict) -> dict:
+    try:
+        w = cardio.build(body.get("tpl") or "", body.get("minutes"), _profile(), env=body.get("env"), machine=body.get("machine"))
+    except cardio.CardioError as e:
+        raise HTTPException(400, str(e)) from e
+    w["segments"] = cardio.timeline(w["items"])
+    return w
+
+
+def _cardio_music(w: dict, fam: str | None) -> dict:
+    """Sequência de músicas (se o Spotify estiver conectado e a biblioteca tiver BPM)."""
+    if not music.connected():
+        return {"connected": False, "tracks": []}
+    cad = music.cadence_target(_run_cadences())
+    tracks = music.sequence(w["segments"], cad, fam if fam in music.FAMILIES else None)
+    return {"connected": True, "tracks": tracks, "cadence": cad}
+
+
+@app.get("/api/cardio/options")
+def cardio_options():
+    out = cardio.options()
+    lib = music._lib().get("tracks") or {} if music.connected() else {}
+    cnt: dict[str, int] = {}
+    for r in lib.values():
+        if r.get("fam") and r.get("bpm"):
+            cnt[r["fam"]] = cnt.get(r["fam"], 0) + 1
+    out["styles"] = [{"id": f, "label": music.FAMILIES[f]["label"], "n": n} for f, n in sorted(cnt.items(), key=lambda x: -x[1])
+                     if n >= music.STYLE_MIN]
+    out["spotify"] = music.connected()
+    out["garmin"] = bool(garmin_sync.status().get("has_tokens"))
+    return out
+
+
+@app.post("/api/cardio/preview")
+def cardio_preview(body: dict = Body(...)):
+    w = _cardio_build(body)
+    try:
+        mu = _cardio_music(w, body.get("fam"))
+    except music.MusicError as e:
+        mu = {"connected": True, "tracks": [], "error": str(e)}
+    return {**w, "music": mu}
+
+
+@app.post("/api/cardio/draft")
+def cardio_draft(body: dict = Body(...)):
+    """O treino avulso como rascunho de treino (abre no Treinar, igual ao 'gerar um treino agora')."""
+    w = _cardio_build(body)
+    return {"date": clock.now().strftime("%Y-%m-%dT%H:%M"), "day_name": w["title"], "items": _prefill_items(w["items"]),
+            "view": "lista", "generated": True, "alerts": _alerts(), "cardio": {k: body.get(k) for k in ("tpl", "minutes", "env", "machine", "fam")},
+            "music_seq": bool(body.get("music_seq")),
+            "musicMode": w["segments"][0]["mode"] if w["segments"] else None}
+
+
+@app.post("/api/cardio/music")
+def cardio_music(body: dict = Body(...)):
+    w = _cardio_build(body)
+
+    def run():
+        mu = _cardio_music(w, body.get("fam"))
+        return music.session_playlist(w["title"], mu["tracks"], play_now=body.get("play", True) is not False)
+    return _music_call(run)
+
+
+@app.post("/api/cardio/push")
+def cardio_push(body: dict = Body(...)):
+    """Manda o treino avulso para o relógio, marcado para hoje."""
+    w = _cardio_build(body)
+    today = clock.today()
+    day = {"name": f"{w['title']} {today.day:02d}/{today.month:02d}", "items": w["items"]}
+
+    def run():
+        payload = garmin_export.to_connect_json(day, "", db.garmin_overrides(), prefs=_profile())
+        res = garmin_sync.push_workout(payload, today.isoformat())
+        db.log_push(None, w["title"], res.get("workout_id"), today.isoformat())
+        return res
+    return _garmin_call(run)
+
+
+@app.post("/api/cardio/fit")
+def cardio_fit(body: dict = Body(...)):
+    w = _cardio_build(body)
+    today = clock.today()
+    day = {"name": f"{w['title']} {today.day:02d}/{today.month:02d}", "items": w["items"]}
+    data = garmin_export.to_fit(day, "", db.garmin_overrides(), prefs=_profile())
+    return Response(data, media_type="application/octet-stream",
+                    headers={"Content-Disposition": f'attachment; filename="{garmin_export.fit_filename(today.isoformat(), w["title"])}"'})
 
 
 @app.post("/api/suggest/next")

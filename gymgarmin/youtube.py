@@ -392,12 +392,40 @@ def _cached(query: str) -> tuple[bool, str | None]:
     return (r is not None, dict(r)["video_id"] if r is not None else None)
 
 
+def _label(key: str) -> str:
+    mode, _, fam = key.partition("|")
+    lab = music.MODES[mode]["label"]
+    return f"{lab} · {music.FAMILIES[fam]['label']}" if fam else lab
+
+
+def _pending(st: dict, rows: list[dict], key: str) -> int:
+    added = set(st["added"].get(key) or [])
+    n = 0
+    for r in rows:
+        if r["id"] not in added:
+            hit, vid = _cached(_query_for(r))
+            n += 0 if (hit and not vid) else 1
+    return n
+
+
+def wanted_lists(st: dict, cad: int) -> dict[str, list[dict]]:
+    """As playlists do YouTube: primeiro as 7 misturadas; quando elas estão completas, entram as de cada estilo
+    (mesmo esquema do Spotify: momento × família de estilo)."""
+    lib = music._lib()
+    out = {m: music.pick(m, cad, lib) for m in music.MODES}
+    if all(_pending(st, rows, k) == 0 for k, rows in out.items()):
+        for m in music.MODES:
+            for sty in music.styles_for(m, cad, lib):
+                out[f"{m}|{sty['fam']}"] = music.pick(m, cad, lib, fam=sty["fam"])
+    return out
+
+
 def sync(budget_s: float = 8.0, cad: int | None = None) -> dict:
     """As mesmas playlists HAX do Spotify (no BPM de cada momento) no YouTube, revezando entre elas para todas
     crescerem juntas, até acabar o tempo desta chamada ou a cota do dia."""
     st = _state()
     cad = cad or music.cadence_target()
-    wanted = {m: music.pick(m, cad) for m in music.MODES}
+    wanted = wanted_lists(st, cad)
     t0, stop, progressed = time.monotonic(), None, True
     try:
         nxt_q, depth = [], max((len(v) for v in wanted.values()), default=0)
@@ -425,8 +453,8 @@ def sync(budget_s: float = 8.0, cad: int | None = None) -> dict:
                     continue
                 pid = st["playlists"].get(mode)
                 if not pid:
-                    m = music.MODES[mode]
-                    pid = create_playlist(f"HAX · {m['label']}", f"Feita pelo app HAX: {m['desc']}. Suas músicas no BPM certo.")
+                    m = music.MODES[mode.partition("|")[0]]
+                    pid = create_playlist(f"HAX · {_label(mode)}", f"Feita pelo app HAX: {m['desc']}. Suas músicas no BPM certo.")
                     st["playlists"][mode] = pid
                 vid = find_video_id(_query_for(nxt))
                 if vid:
@@ -451,16 +479,13 @@ def summary(st: dict | None = None, wanted: dict | None = None, cad: int | None 
     st = st or _state()
     if wanted is None:
         cad = cad or music.cadence_target()
-        wanted = {m: music.pick(m, cad) for m in music.MODES}
+        wanted = wanted_lists(st, cad)
     pls, pending = [], 0
-    for mode, m in music.MODES.items():
-        rows = wanted.get(mode) or []
+    for mode, rows in wanted.items():
         added = set(st["added"].get(mode) or [])
         done = sum(1 for r in rows if r["id"] in added)
-        for r in rows:
-            if r["id"] not in added:
-                hit, vid = _cached(_query_for(r))
-                pending += 0 if (hit and not vid) else 1
+        pending += _pending(st, rows, mode)
         pid = st["playlists"].get(mode)
-        pls.append({"id": mode, "label": m["label"], "done": done, "total": len(rows), "url": playlist_url(pid) if pid else None})
+        pls.append({"id": mode, "label": _label(mode), "done": done, "total": len(rows), "url": playlist_url(pid) if pid else None,
+                    **({"style": True} if "|" in mode else {})})
     return {"playlists": pls, "pending": pending, "today_left": units_left() // (COST["search"] + COST["insert"])}

@@ -72,6 +72,43 @@ GENRES: dict[str, tuple[str, list[str]]] = {
     "reggae": ("Reggae", ["reggae"]), "jazz": ("Jazz / blues", ["jazz", "blues"]), "lofi": ("Lo-fi / chill", ["lo-fi", "chill"]),
 }
 NICHE_FROM = "hardtechno"   # a partir deste, a tela mostra como "nichados"
+# famílias de estilos parecidos: cada momento ganha uma playlist por família (quando tem músicas suficientes),
+# para não pular de hard techno para sertanejo no meio do treino
+FAMILIES: dict[str, dict] = {
+    "pesada": {"label": "Eletrônica pesada", "genres": {"hardtechno", "hardcore_el", "hardstyle", "techno", "industrial", "dnb", "dubstep", "psytrance"},
+               "kw": ("hard techno", "hardstyle", "gabber", "frenchcore", "uptempo", "schranz", "industrial", "techno", "drum", "dnb", "dubstep",
+                      "riddim", "psy", "neurofunk", "bass music", "jungle", "ebm")},
+    "eletronica": {"label": "Eletrônica e dance", "genres": {"eletronica", "house", "trance", "synthwave"},
+                   "kw": ("house", "dance", "electro", "edm", "trance", "synth", "disco", "big room", "club")},
+    "rock": {"label": "Rock e metal", "genres": {"rock", "metal", "indie", "punk", "hardcore_punk", "metalcore", "numetal", "thrash", "rocknac"},
+             "kw": ("metal", "rock", "punk", "hardcore", "grunge", "emo", "alternative", "alternativ", "indie", "post-hardcore")},
+    "rap": {"label": "Rap, trap e phonk", "genres": {"rap", "trap", "phonk"},
+            "kw": ("rap", "hip hop", "hip-hop", "trap", "phonk", "drill", "r&b", "grime")},
+    "br": {"label": "Brasileiras", "genres": {"sertanejo", "funk", "pagode", "forro", "axe", "brega", "mpb", "gospel"},
+           "kw": ("sertanejo", "pagode", "samba", "axé", "axe", "forró", "forro", "piseiro", "mpb", "brazil", "brasil", "funk carioca",
+                  "baile funk", "brega", "arrocha", "bossa", "gospel", "música brasileira")},
+    "pop": {"label": "Pop e latino", "genres": {"pop", "kpop", "anos80", "reggaeton", "afro"},
+            "kw": ("pop", "k-pop", "latin", "reggaeton", "afro", "amapiano", "80s", "90s", "dancehall")},
+    "calma": {"label": "Calmas e acústicas", "genres": {"lofi", "jazz", "reggae"},
+              "kw": ("jazz", "blues", "soul", "lo-fi", "lofi", "chill", "reggae", "classical", "clássica", "folk", "acoustic", "ambient",
+                     "country", "funk", "bossa")},
+}
+GENRE_FAM = {g: f for f, d in FAMILIES.items() for g in d["genres"]}
+STYLE_MIN = 12          # músicas para a família virar playlist própria no momento
+STYLE_MAX_PER_MODE = 3  # no máximo 3 estilos por momento (os que têm mais músicas)
+
+
+def family_of(text: str | None) -> str | None:
+    """Família de um nome de gênero (do Deezer, do Spotify ou digitado). Ordem importa: pesada antes de eletrônica e rock."""
+    t = (text or "").lower()
+    if not t:
+        return None
+    if "funk" in t and ("carioca" in t or "baile" in t or "brasil" in t or t.strip() == "funk"):
+        return "br"
+    for fam in ("pesada", "rap", "br", "rock", "eletronica", "pop", "calma"):
+        if any(k in t for k in FAMILIES[fam]["kw"]):
+            return fam
+    return None
 MIX = {"so_minhas": "Só as minhas", "completar": "Completar as curtas com novidades", "misturar": "Misturar novidades"}
 DISC_AFF = {"completar": 0.25, "misturar": 0.85}
 DEFAULT_CADENCE = 162
@@ -452,6 +489,97 @@ def enrich(budget_s: float = 8.0, batch: int = 40) -> dict:
     return {"pending": pending, "known": sum(1 for r in tracks.values() if r.get("bpm")), "total": len(tracks)}
 
 
+STYLE_V = 1   # versão da classificação de estilo: subir faz classificar de novo
+
+
+def _deezer_genres(row: dict, albums: dict) -> list[str]:
+    """Gêneros do álbum da música no Deezer (pelo ISRC; sem ele, pela busca de artista + nome)."""
+    t = None
+    if row.get("isrc"):
+        st, d = _http("GET", f"https://api.deezer.com/track/isrc:{urllib.parse.quote(row['isrc'])}", timeout=8)
+        if st == 200 and isinstance(d, dict) and not d.get("error"):
+            t = d
+    if t is None:
+        q = f'artist:"{(row.get("artist") or "").split(",")[0]}" track:"{row.get("name") or ""}"'
+        st, d = _http("GET", "https://api.deezer.com/search?" + urllib.parse.urlencode({"q": q, "limit": 1}), timeout=8)
+        t = ((d or {}).get("data") or [None])[0] if st == 200 and isinstance(d, dict) else None
+    alb = str(((t or {}).get("album") or {}).get("id") or "")
+    if not alb:
+        return []
+    if alb not in albums:
+        st, a = _http("GET", f"https://api.deezer.com/album/{alb}", timeout=8)
+        albums[alb] = [g.get("name") for g in ((a or {}).get("genres") or {}).get("data") or [] if g.get("name")] \
+            if st == 200 and isinstance(a, dict) else []
+    return albums[alb]
+
+
+FAM_PRIORITY = ("pesada", "rap", "br", "rock", "calma", "eletronica", "pop")   # do mais específico ao mais genérico
+
+
+def _fam_from(row: dict, genres: list[str]) -> str | None:
+    """Família pelos gêneros do álbum: vale a mais específica. "Techno/House" do Deezer junta as duas coisas: com
+    140 bpm ou mais é eletrônica pesada (hard techno), abaixo é house/dance."""
+    found = set()
+    for g in genres:
+        gl = (g or "").lower()
+        if "techno" in gl and "house" in gl:
+            found.add("pesada" if (row.get("bpm") or 0) >= 140 else "eletronica")
+            continue
+        f = family_of(g)
+        if f:
+            found.add(f)
+    return next((f for f in FAM_PRIORITY if f in found), None)
+
+
+def classify(budget_s: float = 6.0) -> int:
+    """Põe cada música numa família de estilo. Descobertas já vêm com o estilo; as suas, pelo gênero do álbum no Deezer.
+    Devolve quantas ainda faltam."""
+    lib = _lib()
+    tracks = lib.get("tracks") or {}
+    if lib.get("style_v") != STYLE_V:
+        for r in tracks.values():
+            r.pop("fam", None)
+            r.pop("fam_tried", None)
+        lib["style_v"] = STYLE_V
+    albums = lib.setdefault("albums", {})
+    todo = []
+    for r in tracks.values():
+        if r.get("fam") or r.get("fam_tried") or not r.get("bpm"):
+            continue
+        g = r.get("genre") or ""
+        f = GENRE_FAM.get(g) or (family_of(g[7:]) if g.startswith("custom:") else None)
+        if f:
+            r["fam"] = f
+        else:
+            todo.append(r)
+    t0 = time.monotonic()
+    while todo and time.monotonic() - t0 < budget_s:
+        chunk, todo = todo[:24], todo[24:]
+        with ThreadPoolExecutor(max_workers=8) as ex:
+            res = list(ex.map(lambda r: _safe(_deezer_genres, r, albums) or [], chunk))
+        for r, gs in zip(chunk, res):
+            r["fam_tried"] = True
+            f = _fam_from(r, gs)
+            if f:
+                r["fam"] = f
+    if len(albums) > 3000:                   # cache de álbuns não cresce para sempre
+        lib["albums"] = dict(list(albums.items())[-2000:])
+    _save_lib(lib)
+    return sum(1 for r in tracks.values() if r.get("bpm") and not r.get("fam") and not r.get("fam_tried"))
+
+
+def styles_for(mode: str, cad: int, lib: dict | None = None) -> list[dict]:
+    """Famílias de estilo que viram playlist neste momento: as que têm músicas suficientes, das maiores para as menores."""
+    lib = lib or _lib()
+    rows = pick(mode, cad, lib, n=10_000)
+    cnt: dict[str, int] = {}
+    for r in rows:
+        if r.get("fam"):
+            cnt[r["fam"]] = cnt.get(r["fam"], 0) + 1
+    fams = sorted((f for f, n in cnt.items() if n >= STYLE_MIN), key=lambda f: -cnt[f])[:STYLE_MAX_PER_MODE]
+    return [{"fam": f, "label": FAMILIES[f]["label"], "n": min(cnt[f], MAX_PER_LIST)} for f in fams]
+
+
 def _safe(fn, *a):
     try:
         return fn(*a)
@@ -492,7 +620,7 @@ def _eff_bpm(bpm: float, mode: str, cad: int) -> float:
     return min(_cands(bpm, mode, cad), key=lambda b: abs(b - target))
 
 
-RULES_V = 3   # muda quando as faixas mudam: a tela refaz as playlists sozinha
+RULES_V = 4   # muda quando as faixas mudam: a tela refaz as playlists sozinha (4: playlists por estilo)
 
 
 def _range_txt(m: dict, cad: int) -> str:
@@ -503,7 +631,7 @@ def _range_txt(m: dict, cad: int) -> str:
     return f"{m['lo']}–{m['hi']} bpm"
 
 
-def pick(mode: str, cad: int, lib: dict | None = None, n: int = MAX_PER_LIST) -> list[dict]:
+def pick(mode: str, cad: int, lib: dict | None = None, n: int = MAX_PER_LIST, fam: str | None = None) -> list[dict]:
     tracks = (lib or _lib()).get("tracks") or {}
     st = settings()
     mix, genres = st.get("mix") or "completar", set(st.get("genres") or [])
@@ -521,6 +649,8 @@ def pick(mode: str, cad: int, lib: dict | None = None, n: int = MAX_PER_LIST) ->
         if f is None:
             continue
         if tid in blocked:
+            continue
+        if fam and r.get("fam") != fam:
             continue
         energy = r.get("energy")
         if mode == "calma" and energy is not None and energy > 0.75:
@@ -568,50 +698,84 @@ def _create(name: str, desc: str) -> dict:
         return call("POST", f"/users/{uid}/playlists", body) or {}
 
 
-def build_playlists(cad: int) -> dict:
-    """Cria/atualiza as playlists HAX com as músicas da pessoa no BPM de cada momento."""
+def _fill(pid: str | None, name: str, desc: str, rows: list[dict]) -> str | None:
+    if not pid:
+        pid = _create(name, desc).get("id")
+        if not pid:
+            return None
+    try:
+        _set_items(pid, [r["uri"] for r in rows])
+    except MusicError as e:
+        if getattr(e, "status", 0) != 404:
+            raise
+        pid = _create(name, desc).get("id")   # a pessoa apagou a playlist no Spotify: cria de novo
+        _set_items(pid, [r["uri"] for r in rows])
+    return pid
+
+
+def build_playlists(cad: int, budget_s: float = 14.0) -> dict:
+    """Cria/atualiza as playlists HAX com as músicas da pessoa no BPM de cada momento: a mistura de cada momento e uma
+    por família de estilo (quando tem músicas suficientes). Para não passar do tempo do servidor, as de estilo que não
+    couberem ficam para a próxima chamada ("done": False)."""
+    t0 = time.monotonic()
     lib = _lib()
     s = settings()
     pls = s.get("playlists") or {}
-    out = {}
+    sty = s.get("style_playlists") or {}
+    out, styles_out, done = {}, {}, True
     for mode, m in MODES.items():
         rows = pick(mode, cad, lib)
-        extra = f" · {_range_txt(m, cad)}"
-        name = f"HAX · {m['label']}"
-        desc = f"Feita pelo app HAX com as músicas que você mais ouve: {m['desc']}{extra}."
         if len(rows) < 3:
             out[mode] = {"n": len(rows), "id": (pls.get(mode) or {}).get("id"), "few": True}
             continue
-        pid = (pls.get(mode) or {}).get("id")
-        if not pid:
-            p = _create(name, desc)
-            pid = p.get("id")
-            if not pid:
+        pid = _fill((pls.get(mode) or {}).get("id"), f"HAX · {m['label']}",
+                    f"Feita pelo app HAX com as músicas que você mais ouve: {m['desc']} · {_range_txt(m, cad)}.", rows)
+        if pid:
+            out[mode] = {"id": pid, "n": len(rows), "url": f"https://open.spotify.com/playlist/{pid}"}
+    for mode, m in MODES.items():
+        for st in styles_for(mode, cad, lib):
+            key = f"{mode}|{st['fam']}"
+            old = sty.get(key) or ({"id": (s.get("style_ids") or {}).get(key)} if (s.get("style_ids") or {}).get(key) else {})
+            if time.monotonic() - t0 > budget_s:
+                done = False
+                if old.get("id"):
+                    styles_out[key] = old
                 continue
-        try:
-            _set_items(pid, [r["uri"] for r in rows])
-        except MusicError as e:
-            if getattr(e, "status", 0) == 404:   # a pessoa apagou a playlist no Spotify: cria de novo
-                pid = _create(name, desc).get("id")
-                _set_items(pid, [r["uri"] for r in rows])
-            else:
-                raise
-        out[mode] = {"id": pid, "n": len(rows), "url": f"https://open.spotify.com/playlist/{pid}"}
+            rows = pick(mode, cad, lib, fam=st["fam"])
+            pid = _fill(old.get("id"), f"HAX · {m['label']} · {st['label']}",
+                        f"Feita pelo app HAX: {m['desc']}, só {st['label'].lower()} · {_range_txt(m, cad)}.", rows)
+            if pid:
+                styles_out[key] = {"id": pid, "n": len(rows), "fam": st["fam"], "mode": mode,
+                                   "url": f"https://open.spotify.com/playlist/{pid}"}
+    # estilo que perdeu músicas continua guardado (a playlist não é apagada no Spotify), só sai da lista do app
     s["playlists"] = {k: v for k, v in out.items() if v.get("id")}
-    s["built_cad"] = cad
-    s["built"] = time.time()
-    s["rules_v"] = RULES_V
+    s["style_playlists"] = styles_out
+    s["style_ids"] = {**(s.get("style_ids") or {}), **{k: v["id"] for k, v in styles_out.items()}}
+    if done:
+        s["built_cad"] = cad
+        s["built"] = time.time()
+        s["rules_v"] = RULES_V
     save_settings(s)
-    return out
+    return {"modes": out, "styles": styles_out, "done": done}
 
 
 # ------------------------------------------------------------------ tocar ----
 
-def play(mode: str) -> dict:
-    """Toca a playlist do momento (Spotify Premium, com o app do Spotify aberto em algum aparelho)."""
-    pl = (settings().get("playlists") or {}).get(mode)
+def play(mode: str, fam: str | None = None) -> dict:
+    """Toca a playlist do momento (ou a do estilo escolhido). Spotify Premium, com o app do Spotify aberto em algum aparelho."""
+    s0 = settings()
+    pl = (s0.get("style_playlists") or {}).get(f"{mode}|{fam}") if fam else None
+    pl = pl or (s0.get("playlists") or {}).get(mode)
     if not pl:
         raise MusicError("Playlist ainda não montada: toque em 'Atualizar minhas playlists'.")
+    if fam:
+        s0.setdefault("style_pref", {})[mode] = fam
+        save_settings(s0)
+    return _play_playlist(pl["id"])
+
+
+def _play_playlist(pid: str) -> dict:
+    pl = {"id": pid}
     try:
         call("PUT", "/me/player/shuffle", params={"state": "false"})
     except MusicError:
@@ -626,6 +790,61 @@ def play(mode: str) -> dict:
     if s.get("premium_ok") is not True:
         s["premium_ok"] = True; save_settings(s)
     return {"ok": True, "url": f"https://open.spotify.com/playlist/{pl['id']}"}
+
+
+# ------------------------------------------------------------------ treino avulso: músicas na ordem das fases ----
+SESSION_KEY = "session"   # uma playlist só ("HAX · Treino avulso"), refeita a cada treino
+
+
+SEQ_FALLBACK = {"calma": "aquecimento", "aquecimento": "musculacao", "tiros": "gas", "gas": "tiros", "corrida_ritmo": "corrida_leve",
+                "corrida_leve": "corrida_ritmo", "musculacao": "aquecimento"}
+
+
+def sequence(segments: list[dict], cad: int, fam: str | None = None, lib: dict | None = None) -> list[dict]:
+    """Enche cada fase do treino com músicas do momento certo (no estilo escolhido, se tiver o bastante), na ordem.
+    A música que passa do fim de uma fase continua tocando: a próxima fase começa na música seguinte."""
+    lib = lib or _lib()
+    used: set[str] = set()
+    out: list[dict] = []
+    t, end = 0.0, 0.0
+    for i, sg in enumerate(segments):
+        end += sg["dur_s"]
+        cands = pick(sg["mode"], cad, lib, n=200, fam=fam) if fam else []
+        if len([c for c in cands if c["id"] not in used]) < 4:
+            cands = cands + [c for c in pick(sg["mode"], cad, lib, n=200) if c not in cands]
+        if len([c for c in cands if c["id"] not in used]) < 2:      # sem músicas nessa faixa: a mais parecida
+            cands = cands + [c for c in pick(SEQ_FALLBACK[sg["mode"]], cad, lib, n=200) if c not in cands]
+        for r in cands:
+            if t >= end - 45:          # falta menos de 45 s na fase: a próxima música já é da fase seguinte
+                break
+            if r["id"] in used:
+                continue
+            used.add(r["id"])
+            dur = (r.get("ms") or 210_000) / 1000
+            out.append({"seg": i, "start_s": int(t), "id": r["id"], "uri": r["uri"], "name": r["name"], "artist": r["artist"],
+                        "bpm": r.get("eff") or round(r.get("bpm") or 0), "fam": r.get("fam"), "ms": r.get("ms")})
+            t += dur
+    return out
+
+
+def session_playlist(title: str, tracks: list[dict], play_now: bool = True) -> dict:
+    """Põe as músicas do treino avulso, na ordem, na playlist "HAX · Treino avulso" e dá play (Premium)."""
+    if not tracks:
+        raise MusicError("Ainda não há músicas suas com BPM para montar a sequência.")
+    s = settings()
+    old = (s.get("playlists_extra") or {}).get(SESSION_KEY)
+    pid = _fill(old, "HAX · Treino avulso", f"Feita pelo app HAX para o treino: {title}. Toque em ordem (sem aleatório).", tracks)
+    s = settings()
+    s.setdefault("playlists_extra", {})[SESSION_KEY] = pid
+    save_settings(s)
+    url = f"https://open.spotify.com/playlist/{pid}"
+    if not play_now:
+        return {"ok": True, "url": url, "played": False}
+    try:
+        _play_playlist(pid)
+        return {"ok": True, "url": url, "played": True}
+    except MusicError as e:
+        return {"ok": True, "url": url, "played": False, "why": str(e)}
 
 
 def boost(cad: int, calmer: bool = False) -> dict:
@@ -670,8 +889,13 @@ def summary(cad: int) -> dict:
             "cadence": cad, "cadence_manual": bool(s.get("cadence")), "auto": s.get("auto", True),
             "modes": [{"id": k, "label": m["label"], "desc": m["desc"],
                        "range": _range_txt(m, cad),
-                       "n": counts.get(k, 0), "new": news.get(k, 0), **({"url": f"https://open.spotify.com/playlist/{p['id']}"} if (p := (s.get("playlists") or {}).get(k)) else {})}
+                       "n": counts.get(k, 0), "new": news.get(k, 0), **({"url": f"https://open.spotify.com/playlist/{p['id']}"} if (p := (s.get("playlists") or {}).get(k)) else {}),
+                       "styles": [{"fam": v["fam"], "label": FAMILIES[v["fam"]]["label"], "n": v["n"], "url": v["url"]}
+                                  for v in (s.get("style_playlists") or {}).values() if v.get("mode") == k and v.get("fam") in FAMILIES],
+                       "style_pref": (s.get("style_pref") or {}).get(k)}
                       for k, m in MODES.items()],
+            "styled": sum(1 for r in tracks.values() if r.get("fam")),
+            "families": [{"id": k, "label": v["label"]} for k, v in FAMILIES.items()],
             "built": s.get("built"), "updated": lib.get("updated"),
             "genres": [{"id": "parecidas", "label": "Parecidas com as que você ouve", "on": "parecidas" in (s.get("genres") or []), "seen": 0, "group": "voce"}]
                       + [{"id": g, "label": lab, "on": g in (s.get("genres") or []), "seen": (lib.get("genres_seen") or {}).get(g, 0),

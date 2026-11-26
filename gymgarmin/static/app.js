@@ -2002,6 +2002,7 @@ async function viewTreinar(planId, idx) {
       })()}
       <button class="btn block" id="gen-now" style="margin-top:14px"><i data-i=sparkle aria-hidden=true></i> Gerar um treino agora</button>
       <div class="picks link-list" style="margin-top:12px">
+        <a class="pick" href="#cardio"><i data-i=run aria-hidden=true></i><span class="grow"><b>Cardio avulso com música</b><span class="small muted">corrida, bike, aparelhos ou HIIT; a música segue as fases</span></span><span class="chev" aria-hidden="true">›</span></a>
         <button class="pick" id="free" type="button"><i data-i=dumbbell aria-hidden=true></i><span class="grow"><b>Treino livre</b><span class="small muted">monte na hora, exercício por exercício</span></span><span class="chev" aria-hidden="true">›</span></button>
         <a class="pick" href="#bemestar"><i data-i=yoga aria-hidden=true></i><span class="grow"><b>Yoga, Pilates, alongamento e respiração</b><span class="small muted">sessões guiadas por objetivo</span></span><span class="chev" aria-hidden="true">›</span></a>
         <a class="pick" href="#especiais"><i data-i=star aria-hidden=true></i><span class="grow"><b>Treinos inspirados em famosos</b><span class="small muted">Arnold, Bruce Lee, Kipchoge…</span></span><span class="chev" aria-hidden="true">›</span></a></div>`;
@@ -3720,16 +3721,19 @@ function musicModeFor(it) {
   return "musculacao";
 }
 function spotifyOpen(url) { if (url) window.open(url, "_blank", "noopener"); }
-async function musicPlay(mode, quiet) {
+async function musicPlay(mode, quiet, fam) {
   const m = await musicState();
   const pl = m && (m.modes || []).find((x) => x.id === mode);
   if (!m || !m.connected || !pl || !pl.url) { if (!quiet) spotifyOpen((m && m.search && m.search[mode]) || "https://open.spotify.com"); return false; }
-  try { await api("/api/music/play", { method: "POST", body: { mode } }); if (!quiet) toast(`🎵 Tocando “HAX · ${pl.label}”`, 3000); return true; }
-  catch (e) { if (!quiet) { toast(e.message, 5000); spotifyOpen(pl.url); } return false; }
+  // estilo: o que a pessoa escolheu agora, senão o último que usou nesse momento
+  if (fam === undefined) fam = (state.session && state.session.musicFam) || pl.style_pref || "";
+  const sty = (pl.styles || []).find((y) => y.fam === fam);
+  try { await api("/api/music/play", { method: "POST", body: { mode, fam: sty ? fam : null } }); if (!quiet) toast(`🎵 Tocando “HAX · ${pl.label}${sty ? ` · ${sty.label}` : ""}”`, 3000); return true; }
+  catch (e) { if (!quiet) { toast(e.message, 5000); spotifyOpen(sty ? sty.url : pl.url); } return false; }
 }
 // troca sozinho ao mudar de fase no treino guiado (Premium + opção ligada); não insiste se não der
 async function musicAuto(it) {
-  const s = state.session; if (!s) return;
+  const s = state.session; if (!s || s.music_seq) return;   // cardio avulso: a sequência montada já segue as fases
   const mode = musicModeFor(it);
   if (s.musicMode === mode) return;
   const m = state.music; if (!m || !m.connected || !m.premium || m.auto === false) return;
@@ -3750,12 +3754,16 @@ async function openMusic(mode) {
       ${m.client_id ? `<a class="btn ghost block" href="#musica">Conectar o Spotify</a>` : `<p class="small muted">O administrador do app ainda precisa ativar a conexão com o Spotify.</p>`}`;
     return;
   }
-  const chips = m.modes.map((x) => `<button type="button" class="chip pc ${x.id === cur.id ? "on" : ""}" data-mm="${x.id}">${MUSIC_ICON[x.id] || ""} ${esc(x.label)}</button>`).join("");
+  const chips = m.modes.map((x) => `<button type="button" class="chip pc ${x.id === cur.id ? "on" : ""}" data-mm="${x.id}" aria-pressed="${x.id === cur.id}">${MUSIC_ICON[x.id] || ""} ${esc(x.label)}</button>`).join("");
+  const stys = cur.styles || [];
+  let fam = stys.some((y) => y.fam === cur.style_pref) ? cur.style_pref : "";
+  const styChips = () => stys.length ? `<div class="small muted" style="margin:0 2px 4px">Estilo</div><div class="sc-row mu-fams" style="margin:0 0 10px">${[{ fam: "", label: "Misturado" }, ...stys].map((y) => `<button type="button" class="chip pc ${y.fam === fam ? "on" : ""}" data-mf="${esc(y.fam)}" aria-pressed="${y.fam === fam}">${esc(y.label)}</button>`).join("")}</div>` : "";
   body.innerHTML = `<h2><i data-i=music aria-hidden=true></i> Música</h2>
     <div id="mu-now" class="mu-now small muted">…</div>
     <div class="sc-row" style="margin:6px 0 10px">${chips}</div>
+    <div id="mu-fams">${styChips()}</div>
     <p class="small muted" style="margin:0 2px 10px">${esc(cur.desc)} · ${esc(cur.range)} · ${cur.n} músicas suas</p>
-    <button class="btn block" id="mu-play" ${cur.url ? "" : "disabled"}>▶ Tocar “HAX · ${esc(cur.label)}”</button>
+    <button class="btn block" id="mu-play" ${cur.url ? "" : "disabled"}>▶ Tocar</button>
     <div class="row gap" style="margin-top:8px"><button class="btn ghost grow" id="mu-gas">⚡ Mais gás agora</button><button class="btn ghost grow" id="mu-calm"><i data-i=yoga aria-hidden=true></i> Mais calma</button></div>
     <button class="btn ghost block" id="mu-block" style="margin-top:8px">👎 Não tocar mais esta música</button>
     ${m.premium ? "" : `<p class="small muted" style="margin:10px 2px 0">Sem Premium o Spotify não deixa outro app dar play: os botões abrem a playlist no Spotify.</p>`}
@@ -3769,7 +3777,8 @@ async function openMusic(mode) {
   body.onclick = async (e) => {
     const t = e.target.closest("button"); if (!t) return;
     if (t.dataset.mm) return openMusic(t.dataset.mm);
-    if (t.id === "mu-play") { t.disabled = true; await musicPlay(cur.id); if (state.session) { state.session.musicMode = cur.id; store("gg_session", state.session); } t.disabled = false; setTimeout(loadNow, 1500); return; }
+    if (t.dataset.mf !== undefined) { fam = t.dataset.mf; $("#mu-fams", body).innerHTML = styChips(); return; }
+    if (t.id === "mu-play") { t.disabled = true; await musicPlay(cur.id, false, fam); if (state.session) { state.session.musicMode = cur.id; state.session.musicFam = fam; store("gg_session", state.session); } t.disabled = false; setTimeout(loadNow, 1500); return; }
     if (t.id === "mu-block") {
       t.disabled = true;
       try { const r = await api("/api/music/block", { method: "POST", body: {} }); toast(`👎 ${r.name ? `“${r.name}”` : "Essa música"} saiu das playlists HAX`, 4000); setTimeout(loadNow, 1500); }
@@ -3855,7 +3864,7 @@ async function musicScan(box, refresh) {
   for (let k = 0; k < 20; k++) {
     let r; try { r = await api("/api/music/scan", { method: "POST", body: { refresh: refresh && first } }); } catch (e) { box.innerHTML = `<p class="pill bad">${esc(e.message)}</p>`; return; }
     first = false;
-    box.innerHTML = `<p class="small">🔎 ${r.known} de ${r.total} músicas com BPM${r.pending ? ` · faltam ${r.pending}…` : ""}</p>`;
+    box.innerHTML = `<p class="small">🔎 ${r.known} de ${r.total} músicas com BPM${r.pending ? ` · faltam ${r.pending}…` : r.styles_pending ? ` · descobrindo o estilo de ${r.styles_pending}…` : !r.built ? " · montando as playlists por estilo…" : ""}</p>`;
     if (r.built) { toast("🎵 Playlists HAX prontas no seu Spotify", 4000); return true; }
   }
 }
@@ -3912,8 +3921,10 @@ async function viewMusica() {
     ${musicPerfHtml(m.perf)}
     <div id="yt-slot"></div>
     <h2 class="sec-title">Suas playlists HAX</h2>
+    <p class="small muted" style="margin:-4px 2px 8px">Cada momento tem a mistura e, quando dá, uma playlist por estilo parecido (${m.styled || 0} músicas com estilo identificado).</p>
     <div class="picks">${m.modes.map((x) => `<${x.url ? `a href="${esc(x.url)}" target="_blank" rel="noopener"` : "div"} class="pick"><span class="mu-ico" aria-hidden="true">${MUSIC_ICON[x.id]}</span>
-      <span class="grow"><b>${esc(x.label)}</b><span class="small muted">${esc(x.range)} · ${x.n - (x.new || 0)} suas${x.new ? ` + ${x.new} novas` : ""}${x.n < 3 ? " · poucas: escolha estilos abaixo ou curta mais músicas nessa faixa" : ""}</span></span>${x.url ? `<span class="chev">›</span>` : ""}</${x.url ? "a" : "div"}>`).join("")}</div>
+      <span class="grow"><b>${esc(x.label)}</b><span class="small muted">${esc(x.range)} · ${x.n - (x.new || 0)} suas${x.new ? ` + ${x.new} novas` : ""}${x.n < 3 ? " · poucas: escolha estilos abaixo ou curta mais músicas nessa faixa" : ""}</span></span>${x.url ? `<span class="chev">›</span>` : ""}</${x.url ? "a" : "div"}>
+      ${(x.styles || []).map((y) => `<a class="pick mu-sty" href="${esc(y.url)}" target="_blank" rel="noopener"><span class="grow"><b>${esc(y.label)}</b><span class="small muted">${y.n} músicas · só esse estilo</span></span><span class="chev">›</span></a>`).join("")}`).join("")}</div>
     <section class="card" style="margin-top:12px"><h2>Estilos que você curte</h2>
       <p class="small muted" style="margin-top:0">O app busca músicas novas desses estilos, no BPM certo, para completar as playlists. As suas continuam vindo primeiro.${m.genres.some((g) => g.seen) ? " <b>★</b> = estilos que você já ouve." : ""}</p>
       ${[["voce", ""], ["popular", "Populares"], ["nicho", "Nichados (vários com BPM alto: ótimos para tiros)"], ["livre", "Os que você digitou"]].map(([grp, title]) => {
@@ -4029,6 +4040,106 @@ function discoverHtml(first) {
   return `${first ? `<h2 class="sec-title">Também tem</h2>` : `<h2 class="sec-title">Descubra</h2>`}
     <div class="disc">${tiles.map(([h, i, t, s]) => `<a class="disc-t" href="${h}"><span class="disc-i" aria-hidden="true">${i}</span><b>${t}</b><span class="small muted">${s}</span></a>`).join("")}</div>`;
 }
+// ---------------------------------------------------------------- cardio avulso com música seguindo as fases
+const PHASE_COLOR = { aquecimento: "var(--c-prep)", corrida_leve: "var(--c-work)", musculacao: "var(--c-work)", corrida_ritmo: "var(--c-cardio)",
+  gas: "var(--bad)", tiros: "var(--bad)", calma: "var(--c-post)" };
+const mmss2 = (s) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, "0")}`;
+async function viewCardio() {
+  const o = await api("/api/cardio/options");
+  const saved = store("gg_cardio") || {};
+  const st = { cat: saved.cat || "corrida", tpl: saved.tpl, minutes: saved.minutes, env: saved.env, machine: saved.machine || "cardio_eliptico", fam: saved.fam || "" };
+  const tpls = (c) => o.templates.filter((t) => t.cat === c);
+  const fix = () => {
+    if (!tpls(st.cat).some((t) => t.id === st.tpl)) st.tpl = tpls(st.cat)[0].id;
+    const t = o.templates.find((x) => x.id === st.tpl);
+    if (!t.mins.includes(+st.minutes)) st.minutes = t.min;
+    const envs = o.envs[st.cat] || [];
+    if (envs.length && !envs.some((e) => e.id === st.env)) st.env = envs[0].id;
+    if (st.fam && !o.styles.some((y) => y.id === st.fam)) st.fam = "";
+  };
+  const chip = (attr, v, label, on) => `<button type="button" class="chip pc ${on ? "on" : ""}" ${attr}="${esc(v)}" aria-pressed="${!!on}">${esc(label)}</button>`;
+  let seq = 0, last = null;
+  const render = () => {
+    fix(); store("gg_cardio", st);
+    const t = o.templates.find((x) => x.id === st.tpl);
+    view.innerHTML = `<p class="muted small" style="margin:0 2px 10px">Escolha o treino: o app monta os passos (com seus ritmos e zonas), manda para o relógio e põe a música certa em cada fase.</p>
+      <div class="seg cd-cats" role="tablist">${o.cats.map((c) => `<button type="button" role="tab" class="${c.id === st.cat ? "on" : ""}" aria-selected="${c.id === st.cat}" data-cat="${c.id}">${esc(c.label)}</button>`).join("")}</div>
+      <div class="picks cd-tpls">${tpls(st.cat).map((x) => `<button type="button" class="pick ${x.id === st.tpl ? "hl" : ""}" data-tpl="${x.id}" aria-pressed="${x.id === st.tpl}"><span class="grow"><b>${esc(x.label)}</b><span class="small muted">${esc(x.desc)}</span></span>${x.id === st.tpl ? `<span class="pill ok">✓</span>` : ""}</button>`).join("")}</div>
+      ${(o.envs[st.cat] || []).length ? `<label class="cd-l">Onde</label><div class="chips">${o.envs[st.cat].map((e) => chip("data-env", e.id, e.label, e.id === st.env)).join("")}</div>` : ""}
+      ${st.cat === "academia" ? `<label class="cd-l">Aparelho</label><div class="chips">${o.machines.map((m) => chip("data-mach", m.id, m.label, m.id === st.machine)).join("")}</div>` : ""}
+      <label class="cd-l">Tempo</label><div class="chips">${t.mins.map((m) => chip("data-min", m, `${m} min`, +m === +st.minutes)).join("")}</div>
+      ${o.spotify ? `<label class="cd-l">Estilo da música</label><div class="chips">${chip("data-fam", "", "Misturado", !st.fam)}${o.styles.map((y) => chip("data-fam", y.id, y.label, y.id === st.fam)).join("")}</div>` : ""}
+      <section class="card cd-prev" id="cd-prev"><div class="sk"><span class="sk-line"></span><span class="sk-line"></span></div></section>
+      <div class="cd-go">
+        <button class="btn block" id="cd-start">${o.spotify ? `<i data-i=music aria-hidden=true></i> Começar com música` : "Começar"}</button>
+        <div class="picks link-list" style="margin-top:10px">
+          ${o.garmin ? `<button class="pick" id="cd-push" type="button"><i data-i=watch aria-hidden=true></i><span class="grow"><b>Enviar ao relógio</b><span class="small muted">fica no Garmin como treino de hoje</span></span><span class="chev" aria-hidden="true">›</span></button>` : ""}
+          <button class="pick" id="cd-fit" type="button"><i data-i=file aria-hidden=true></i><span class="grow"><b>Baixar arquivo do relógio (.FIT)</b><span class="small muted">para copiar pelo cabo (Garmin/NewFiles)</span></span><span class="chev" aria-hidden="true">›</span></button>
+          ${o.spotify ? "" : `<a class="pick" href="#musica"><i data-i=music aria-hidden=true></i><span class="grow"><b>Conectar o Spotify</b><span class="small muted">para a música seguir as fases do treino</span></span><span class="chev" aria-hidden="true">›</span></a>`}
+        </div></div>`;
+    preview();
+  };
+  const body = () => ({ tpl: st.tpl, minutes: +st.minutes, env: st.env, machine: st.machine, fam: st.fam || null });
+  const preview = async () => {
+    const my = ++seq;
+    let w; try { w = await api("/api/cardio/preview", { method: "POST", body: body() }); } catch (e) { const b = $("#cd-prev"); if (b) b.innerHTML = `<p class="pill bad">${esc(e.message)}</p>`; return; }
+    if (my !== seq) return;
+    last = w;
+    const total = w.segments.reduce((a, x) => a + x.dur_s, 0) || 1;
+    const tr = (w.music && w.music.tracks) || [];
+    const box = $("#cd-prev"); if (!box) return;
+    box.innerHTML = `<div class="row between gap"><b class="cd-title">${esc(w.title)}</b><span class="pill">${w.minutes} min</span></div>
+      <div class="cd-bar" aria-hidden="true">${w.segments.map((x) => `<span style="flex:${x.dur_s};background:${PHASE_COLOR[x.mode] || "var(--line)"}"></span>`).join("")}</div>
+      <ol class="cd-phases">${w.segments.map((x, i) => { const songs = tr.filter((s) => s.seg === i);
+        return `<li><span class="cd-dot" style="background:${PHASE_COLOR[x.mode] || "var(--line)"}"></span><span class="grow"><b>${esc(x.label)}</b>
+          <span class="small muted">${mmss2(x.start_s)}–${mmss2(x.start_s + x.dur_s)}${songs.length ? ` · ${songs.length} ${songs.length === 1 ? "música" : "músicas"}, ${Math.min(...songs.map((s) => s.bpm))}–${Math.max(...songs.map((s) => s.bpm))} bpm` : ""}</span>
+          ${songs.length ? `<span class="small cd-songs">${songs.map((s) => `${esc(s.name)} <span class="muted">· ${esc(s.artist.split(",")[0])}</span>`).join("<br>")}</span>` : ""}</span></li>`; }).join("")}</ol>
+      ${o.spotify && !tr.length ? `<p class="small muted" style="margin:6px 0 0">Ainda sem músicas com BPM para montar a sequência: abra Música e atualize as playlists.</p>` : ""}
+      <details class="small sub"><summary>Passos que vão para o relógio</summary>${(w.items || []).map((it) => it.endurance ? endStepsHtml(it.endurance, true) : `<p style="margin:4px 0">${esc((it.phase === "preparo" ? "Aquecimento" : it.phase === "pos" ? "Volta à calma" : "Principal"))}: ${it.intervals ? `${it.intervals.repeats} × (${it.intervals.work_s}s forte / ${it.intervals.rest_s}s leve)` : `${it.duration_min} min, zona ${it.zone}`}${it.notes ? ` · ${esc(it.notes)}` : ""}</p>`).join("")}</details>`;
+  };
+  view.onclick = async (e) => {
+    const t = e.target.closest("button"); if (!t) return;
+    const d = t.dataset;
+    if (d.cat) { st.cat = d.cat; st.tpl = null; return render(); }
+    if (d.tpl) { st.tpl = d.tpl; return render(); }
+    if (d.env) { st.env = d.env; return render(); }
+    if (d.mach) { st.machine = d.mach; return render(); }
+    if (d.min) { st.minutes = +d.min; return render(); }
+    if (d.fam !== undefined) { st.fam = d.fam; return render(); }
+    try {
+      if (t.id === "cd-start") {
+        const cur = store("gg_session");
+        if (cur && (cur.items || []).length && !confirm(`Você tem um treino em andamento (“${cur.day_name || "Treino"}”). Trocar por este?`)) return;
+        t.disabled = true; t.textContent = "Montando…";
+        let seqOk = false;
+        if (o.spotify) {
+          try { const r = await api("/api/cardio/music", { method: "POST", body: body() }); seqOk = true;
+            if (r.played) toast("🎵 Tocando “HAX · Treino avulso” no Spotify: em ordem, sem aleatório", 4500);
+            else { toast(r.why || "Abra o Spotify e toque “HAX · Treino avulso” em ordem", 5000); spotifyOpen(r.url); }
+          } catch (err) { toast(err.message, 5000); }
+        }
+        const dr = await api("/api/cardio/draft", { method: "POST", body: { ...body(), music_seq: seqOk } });
+        state.session = dr; store("gg_session", dr);
+        location.hash = "#treinar/pronto"; return;
+      }
+      if (t.id === "cd-push") {
+        t.disabled = true; const r = await api("/api/cardio/push", { method: "POST", body: body() });
+        toast(`Enviado ao Garmin para hoje${r.scheduled ? ` (${r.scheduled})` : ""}. Sincronize o relógio pelo app Garmin Connect.`, 5000); t.disabled = false; return;
+      }
+      if (t.id === "cd-fit") {
+        t.disabled = true;
+        const res = await fetch("/api/cardio/fit", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body()), credentials: "same-origin" });
+        if (!res.ok) throw new Error("Não deu para gerar o arquivo agora.");
+        const blob = await res.blob(); const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob); a.download = ((res.headers.get("Content-Disposition") || "").match(/filename="([^"]+)"/) || [])[1] || "treino.fit";
+        document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+        t.disabled = false; return;
+      }
+    } catch (err) { t.disabled = false; toast(err.message, 5000); }
+  };
+  render();
+}
+
 // ---------------------------------------------------------------- modelos especiais: treinos de famosos
 const LEVEL_TXT = { iniciante: "iniciante", intermediario: "intermediário", avancado: "avançado", todos: "todos os níveis" };
 let FAM = null;
@@ -5623,8 +5734,8 @@ async function doRoute(ctl) {
   if (!$("#modal").hidden) closeModal();  // trocar de tela fecha a janela aberta (não fica por cima da tela nova)
   if (name !== "treinar") fxLeave();
   if (name !== "bemestar" || b !== "play") { clearInterval(wsInt); wsInt = null; WS = null; }
-  $$(".tabbar a").forEach((el) => el.classList.toggle("active", el.dataset.tab === ({ plano: "planilhas", exercicios: "planilhas", aparelhos: "planilhas", evolucao: "analise", saude: "analise", esportes: "perfil", coach: "perfil", dev: "perfil", bemvindo: "hoje" }[name] || name)));
-  const TITLES = { planilhas: "Planos", exercicios: "Planos", aparelhos: "Planos", plano: "Planilha", treinar: "Treinar", social: "Comunidade", especiais: "Treinos de famosos", musica: "Música", bemestar: "Bem-estar", analise: "Progresso", evolucao: "Evolução", saude: "Saúde e sono", perfil: "Perfil", esportes: "Esportes", coach: "Coach", dev: "Desenvolvedor" };
+  $$(".tabbar a").forEach((el) => el.classList.toggle("active", el.dataset.tab === ({ plano: "planilhas", exercicios: "planilhas", aparelhos: "planilhas", evolucao: "analise", saude: "analise", cardio: "treinar", esportes: "perfil", coach: "perfil", dev: "perfil", bemvindo: "hoje" }[name] || name)));
+  const TITLES = { planilhas: "Planos", exercicios: "Planos", aparelhos: "Planos", plano: "Planilha", treinar: "Treinar", social: "Comunidade", especiais: "Treinos de famosos", musica: "Música", cardio: "Cardio avulso", bemestar: "Bem-estar", analise: "Progresso", evolucao: "Evolução", saude: "Saúde e sono", perfil: "Perfil", esportes: "Esportes", coach: "Coach", dev: "Desenvolvedor" };
   const pt = $("#page-title"); pt.textContent = TITLES[name] || ""; pt.hidden = !TITLES[name] || (name === "treinar" && a);
   const sn = $("#subnav"); sn.hidden = !["planilhas", "exercicios", "aparelhos"].includes(name);
   $$("#subnav a").forEach((x) => x.classList.toggle("on", x.dataset.sub === name));
@@ -5644,7 +5755,7 @@ async function doRoute(ctl) {
         document.querySelector(".topbar").insertAdjacentHTML("afterend", `<div id="eph" class="rec atencao small" style="margin:8px 16px 0">Versão de teste online: os dados podem ser apagados pelo servidor. Use <a href="#perfil">Perfil → Backup</a> para salvar e restaurar.</div>`);
       }
     }
-    const routes = { hoje: () => viewHoje(a), planilhas: viewPlanilhas, plano: () => viewPlano(a), treinar: () => viewTreinar(a, b), social: viewSocial, especiais: () => viewEspeciais(a), musica: viewMusica, bemestar: () => viewBemEstar(a, b), analise: viewAnalise, evolucao: () => viewEvolucao(decodeURIComponent(a || "")), esportes: viewEsportes, saude: viewSaude, exercicios: viewExercicios, aparelhos: () => viewAparelhos(a), perfil: () => viewPerfil(a), coach: viewCoach, dev: viewDev, bemvindo: viewBemVindo };
+    const routes = { hoje: () => viewHoje(a), planilhas: viewPlanilhas, plano: () => viewPlano(a), treinar: () => viewTreinar(a, b), social: viewSocial, especiais: () => viewEspeciais(a), musica: viewMusica, cardio: viewCardio, bemestar: () => viewBemEstar(a, b), analise: viewAnalise, evolucao: () => viewEvolucao(decodeURIComponent(a || "")), esportes: viewEsportes, saude: viewSaude, exercicios: viewExercicios, aparelhos: () => viewAparelhos(a), perfil: () => viewPerfil(a), coach: viewCoach, dev: viewDev, bemvindo: viewBemVindo };
     const render = async () => {
       await (routes[name] || viewHoje)();
       if (!view.onclick) view.onclick = (e) => { const id = e.target.dataset && e.target.dataset.ex; if (id) showExercise(id); };
