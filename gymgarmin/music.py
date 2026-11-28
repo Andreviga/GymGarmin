@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import base64
 import json
+import re
 import os
 import time
 import urllib.error
@@ -39,7 +40,7 @@ SCOPES = ("user-top-read user-library-read user-read-recently-played playlist-re
 MODES: dict[str, dict] = {
     "aquecimento": {"label": "Aquecimento", "lo": 100, "hi": 125, "order": "sobe", "desc": "sobe aos poucos, prepara sem cansar"},
     "musculacao": {"label": "Musculação", "lo": 125, "hi": 150, "order": "gosto", "desc": "a faixa que mais ajuda no treino forte"},
-    "gas": {"label": "Mais gás", "lo": 145, "hi": 180, "order": "rapida", "desc": "última série, finalizador, tiros"},
+    "gas": {"label": "Mais gás", "lo": 145, "hi": 240, "order": "rapida", "desc": "última série, finalizador, tiros (cabe até uptempo)"},
     "corrida_leve": {"label": "Corrida leve", "cad": 0, "order": "ajuste", "desc": "no ritmo da sua passada"},
     # corrida forte: faixa da passada até +16 (156–172 bpm para passada 156): acompanha o ritmo e dá um pouco mais de gás
     "corrida_ritmo": {"label": "Corrida forte", "cad_lo": 0, "cad_hi": 16, "order": "ajuste", "desc": "passada firme, um pouco mais rápida"},
@@ -60,7 +61,7 @@ GENRES: dict[str, tuple[str, list[str]]] = {
     "kpop": ("K-pop", ["k-pop"]), "axe": ("Axé", ["axe"]),
     # nichados (vários com BPM alto: bons para tiros e mais gás)
     "hardtechno": ("Hard techno", ["hard techno", "industrial techno", "schranz"]),
-    "hardcore_el": ("Hardcore (eletrônico / gabber)", ["hardcore", "gabber", "uptempo hardcore", "frenchcore"]),
+    "hardcore_el": ("Hardcore (eletrônico / gabber)", ["gabber", "uptempo hardcore", "frenchcore", "hardcore techno"]),
     "hardstyle": ("Hardstyle", ["hardstyle", "rawstyle"]), "techno": ("Techno", ["techno", "melodic techno"]),
     "dnb": ("Drum and bass", ["drum and bass", "liquid funk", "neurofunk"]), "dubstep": ("Dubstep / bass", ["dubstep", "riddim"]),
     "psytrance": ("Psytrance", ["psytrance", "full on"]), "trance": ("Trance", ["trance", "uplifting trance"]),
@@ -75,13 +76,20 @@ NICHE_FROM = "hardtechno"   # a partir deste, a tela mostra como "nichados"
 # famílias de estilos parecidos: cada momento ganha uma playlist por família (quando tem músicas suficientes),
 # para não pular de hard techno para sertanejo no meio do treino
 FAMILIES: dict[str, dict] = {
-    "pesada": {"label": "Eletrônica pesada", "genres": {"hardtechno", "hardcore_el", "hardstyle", "techno", "industrial", "dnb", "dubstep", "psytrance"},
-               "kw": ("hard techno", "hardstyle", "gabber", "frenchcore", "uptempo", "schranz", "industrial", "techno", "drum", "dnb", "dubstep",
-                      "riddim", "psy", "neurofunk", "bass music", "jungle", "ebm")},
-    "eletronica": {"label": "Eletrônica e dance", "genres": {"eletronica", "house", "trance", "synthwave"},
-                   "kw": ("house", "dance", "electro", "edm", "trance", "synth", "disco", "big room", "club")},
+    # eletrônica pesada separada pelo que soa parecido: hard dance (hardstyle → uptempo), techno e graves (dubstep/DnB)
+    "hardcore": {"label": "Hardcore, uptempo e hardstyle", "genres": {"hardcore_el", "hardstyle"},
+                 "kw": ("hardstyle", "rawstyle", "hard dance", "hardcore techno", "gabber", "frenchcore", "uptempo", "terror", "early hardcore",
+                        "happy hardcore", "euphoric", "hard bass")},
+    "bass": {"label": "Dubstep e drum and bass", "genres": {"dnb", "dubstep"},
+             "kw": ("dubstep", "riddim", "drum and bass", "drum & bass", "drum n bass", "dnb", "neurofunk", "jungle", "bass music",
+                    "brostep", "liquid funk", "trap edm")},
+    "techno": {"label": "Techno e hard techno", "genres": {"hardtechno", "techno", "industrial"},
+               "kw": ("techno", "schranz", "industrial", "ebm", "acid")},
+    "eletronica": {"label": "Eletrônica e dance", "genres": {"eletronica", "house", "trance", "synthwave", "psytrance"},
+                   "kw": ("house", "dance", "electro", "edm", "trance", "psy", "synth", "disco", "big room", "club", "progressive")},
     "rock": {"label": "Rock e metal", "genres": {"rock", "metal", "indie", "punk", "hardcore_punk", "metalcore", "numetal", "thrash", "rocknac"},
-             "kw": ("metal", "rock", "punk", "hardcore", "grunge", "emo", "alternative", "alternativ", "indie", "post-hardcore")},
+             "kw": ("metal", "rock", "punk", "grunge", "emo", "alternative", "alternativ", "indie", "post-hardcore", "hardcore punk",
+                    "melodic hardcore", "screamo", "thrash", "djent")},
     "rap": {"label": "Rap, trap e phonk", "genres": {"rap", "trap", "phonk"},
             "kw": ("rap", "hip hop", "hip-hop", "trap", "phonk", "drill", "r&b", "grime")},
     "br": {"label": "Brasileiras", "genres": {"sertanejo", "funk", "pagode", "forro", "axe", "brega", "mpb", "gospel"},
@@ -94,21 +102,29 @@ FAMILIES: dict[str, dict] = {
                      "country", "funk", "bossa")},
 }
 GENRE_FAM = {g: f for f, d in FAMILIES.items() for g in d["genres"]}
+AMBIGUOUS_GENRES = {"hardcore_el", "parecidas"}   # a busca por "hardcore" traz banda de punk também: decide pelos outros sinais
+LEGACY_FAM = {"pesada": "hardcore"}                # playlist de estilo antiga reaproveitada (e renomeada) pela família nova
 STYLE_MIN = 12          # músicas para a família virar playlist própria no momento
 STYLE_MAX_PER_MODE = 3  # no máximo 3 estilos por momento (os que têm mais músicas)
+FAM_ORDER = ("hardcore", "bass", "techno", "rap", "br", "rock", "eletronica", "pop", "calma")
 
 
 def family_of(text: str | None) -> str | None:
-    """Família de um nome de gênero (do Deezer, do Spotify ou digitado). Ordem importa: pesada antes de eletrônica e rock."""
+    """Família de um texto de gênero (Deezer, nome digitado, nome da música). Ordem importa: as mais específicas primeiro.
+    "Hardcore" sozinho é ambíguo (eletrônico ou punk): só conta junto de outra pista."""
     t = (text or "").lower()
     if not t:
         return None
     if "funk" in t and ("carioca" in t or "baile" in t or "brasil" in t or t.strip() == "funk"):
         return "br"
-    for fam in ("pesada", "rap", "br", "rock", "eletronica", "pop", "calma"):
+    if "techno" in t and "house" in t:          # "Techno/House" do Deezer: decide pelo BPM (quem chama)
+        return None
+    for fam in FAM_ORDER:
         if any(k in t for k in FAMILIES[fam]["kw"]):
             return fam
     return None
+
+
 MIX = {"so_minhas": "Só as minhas", "completar": "Completar as curtas com novidades", "misturar": "Misturar novidades"}
 DISC_AFF = {"completar": 0.25, "misturar": 0.85}
 DEFAULT_CADENCE = 162
@@ -489,7 +505,8 @@ def enrich(budget_s: float = 8.0, batch: int = 40) -> dict:
     return {"pending": pending, "known": sum(1 for r in tracks.values() if r.get("bpm")), "total": len(tracks)}
 
 
-STYLE_V = 1   # versão da classificação de estilo: subir faz classificar de novo
+STYLE_V = 2   # versão da classificação de estilo: subir faz classificar de novo (2: artista, nome e BPM de meio tempo)
+NAME_FAM = re.compile(r"hardstyle|rawstyle|uptempo|frenchcore|gabber|hardcore|dubstep|riddim|\bdnb\b|drum ?(?:&|and|n) ?bass|techno|schranz", re.I)
 
 
 def _deezer_genres(row: dict, albums: dict) -> list[str]:
@@ -513,43 +530,120 @@ def _deezer_genres(row: dict, albums: dict) -> list[str]:
     return albums[alb]
 
 
-FAM_PRIORITY = ("pesada", "rap", "br", "rock", "calma", "eletronica", "pop")   # do mais específico ao mais genérico
+def _artists(r: dict) -> list[str]:
+    return [a.strip().lower() for a in (r.get("artist") or "").split(",") if a.strip()]
+
+
+def _artist_fams(tracks: dict) -> dict[str, str]:
+    """Estilo de cada artista pelo que o app achou buscando por estilo (busca por gênero do Spotify = gênero do artista).
+    Só vale quando a maioria das músicas daquele artista veio do mesmo estilo."""
+    votes: dict[str, dict[str, int]] = {}
+    for r in tracks.values():
+        f = GENRE_FAM.get(r.get("genre") or "")
+        if r.get("src") != "descoberta" or not f or r.get("genre") in AMBIGUOUS_GENRES:
+            continue
+        for a in _artists(r)[:1]:                        # o artista principal
+            votes.setdefault(a, {}).setdefault(f, 0)
+            votes[a][f] += 1
+    out = {}
+    for a, v in votes.items():
+        f, n = max(v.items(), key=lambda x: x[1])
+        if n >= sum(v.values()) * 0.6:
+            out[a] = f
+    return out
+
+
+def _name_fam(r: dict) -> str | None:
+    m = NAME_FAM.search(f"{r.get('name') or ''}")
+    if not m:
+        return None
+    w = m.group(0).lower()
+    return "hardcore" if w in ("hardstyle", "rawstyle", "uptempo", "frenchcore", "gabber", "hardcore") \
+        else "techno" if w in ("techno", "schranz") else "bass"
 
 
 def _fam_from(row: dict, genres: list[str]) -> str | None:
-    """Família pelos gêneros do álbum: vale a mais específica. "Techno/House" do Deezer junta as duas coisas: com
-    140 bpm ou mais é eletrônica pesada (hard techno), abaixo é house/dance."""
+    """Família pelos gêneros do álbum no Deezer, com o BPM desempatando os genéricos: eletrônica a 145+ bpm (ou a
+    metade disso: meio tempo) é hard dance; "Techno/House" a 140+ é techno, abaixo é house."""
+    bpm = row.get("bpm_src") or row.get("bpm") or 0
     found = set()
     for g in genres:
         gl = (g or "").lower()
         if "techno" in gl and "house" in gl:
-            found.add("pesada" if (row.get("bpm") or 0) >= 140 else "eletronica")
+            found.add("techno" if bpm >= 140 else "eletronica")
+            continue
+        if gl.strip() == "hardcore":            # sozinho é hardcore eletrônico; com rock/metal/punk/alternativo junto, é punk
+            rockish = any(family_of(x) == "rock" for x in genres if (x or "").strip().lower() != "hardcore")
+            found.add("rock" if rockish else "hardcore")
             continue
         f = family_of(g)
         if f:
             found.add(f)
-    return next((f for f in FAM_PRIORITY if f in found), None)
+    fam = next((f for f in FAM_ORDER if f in found), None)
+    if fam == "eletronica" and (bpm >= 145 or 70 <= bpm < 80):
+        return "hardcore"
+    return fam
+
+
+HALF_TIME = {"hardcore": 100, "bass": 100, "techno": 100}   # eletrônica rápida que o detector leu pela metade
+
+
+def _true_bpm(r: dict) -> float | None:
+    """BPM real. O detector lê hard dance, dubstep e DnB pela metade (75 em vez de 150); uptempo/frenchcore são de 180+."""
+    b = r.get("bpm_src") or r.get("bpm")
+    if not b:
+        return None
+    m = re.search(r"(\d{3})\s*bpm", r.get("name") or "", re.I)
+    if m and 120 <= int(m.group(1)) <= 300:
+        return float(m.group(1))
+    fam = r.get("fam")
+    fast = re.search(r"uptempo|frenchcore|terror", f"{r.get('name') or ''} {r.get('genre') or ''}", re.I)
+    if fast and b < 180:
+        return b * 2
+    if fam in HALF_TIME and b < HALF_TIME[fam]:
+        return b * 2
+    return b
 
 
 def classify(budget_s: float = 6.0) -> int:
-    """Põe cada música numa família de estilo. Descobertas já vêm com o estilo; as suas, pelo gênero do álbum no Deezer.
-    Devolve quantas ainda faltam."""
+    """Põe cada música numa família de estilo, nesta ordem de confiança:
+    1) o estilo que o app buscou (descobertas; menos "hardcore", que traz punk junto);
+    2) o nome da música (hardstyle, uptempo, dubstep...);
+    3) o artista, pelo estilo em que ele apareceu nas buscas;
+    4) o gênero do álbum no Deezer, com o BPM desempatando.
+    Depois corrige o BPM de meio tempo pela família. Devolve quantas ainda faltam."""
     lib = _lib()
     tracks = lib.get("tracks") or {}
     if lib.get("style_v") != STYLE_V:
         for r in tracks.values():
             r.pop("fam", None)
             r.pop("fam_tried", None)
+            if r.get("bpm_src"):
+                r["bpm"] = r["bpm_src"]
         lib["style_v"] = STYLE_V
     albums = lib.setdefault("albums", {})
+    by_artist = _artist_fams(tracks)
+
+    def settle(r: dict, f: str | None) -> None:
+        if f:
+            r["fam"] = f
+        b = _true_bpm(r)
+        if b and b != (r.get("bpm_src") or r.get("bpm")):
+            r["bpm_src"] = r.get("bpm_src") or r["bpm"]
+            r["bpm"] = round(b, 1)
+
     todo = []
     for r in tracks.values():
         if r.get("fam") or r.get("fam_tried") or not r.get("bpm"):
             continue
         g = r.get("genre") or ""
-        f = GENRE_FAM.get(g) or (family_of(g[7:]) if g.startswith("custom:") else None)
+        f = (GENRE_FAM.get(g) if g not in AMBIGUOUS_GENRES else None) or (family_of(g[7:]) if g.startswith("custom:") else None) \
+            or _name_fam(r) or next((by_artist[a] for a in _artists(r) if a in by_artist), None)
         if f:
-            r["fam"] = f
+            settle(r, f)
+        elif "dz" in r:                                  # gêneros do Deezer já buscados antes: não busca de novo
+            r["fam_tried"] = True
+            settle(r, _fam_from(r, r["dz"]))
         else:
             todo.append(r)
     t0 = time.monotonic()
@@ -559,9 +653,11 @@ def classify(budget_s: float = 6.0) -> int:
             res = list(ex.map(lambda r: _safe(_deezer_genres, r, albums) or [], chunk))
         for r, gs in zip(chunk, res):
             r["fam_tried"] = True
+            r["dz"] = gs
             f = _fam_from(r, gs)
-            if f:
-                r["fam"] = f
+            if (r.get("genre") == "hardcore_el") and f not in ("rock",):
+                f = "hardcore"                           # veio da busca de hardcore eletrônico e o Deezer não diz que é punk/rock
+            settle(r, f)
     if len(albums) > 3000:                   # cache de álbuns não cresce para sempre
         lib["albums"] = dict(list(albums.items())[-2000:])
     _save_lib(lib)
@@ -589,38 +685,38 @@ def _safe(fn, *a):
 
 # ------------------------------------------------------------------ escolher ----
 
-def _cands(bpm: float, mode: str, cad: int) -> list[float]:
+def _cands(bpm: float, mode: str, cad: int, sure: bool = False) -> list[float]:
     """BPMs que a música "vale": corrida aceita metade/dobro (um passo por batida ou a cada duas); nas outras,
     só corrige o detector que às vezes dobra o BPM de música lenta (acima de 185)."""
     if "cad" in MODES[mode] or "cad_lo" in MODES[mode]:
         return [bpm, bpm * 2, bpm / 2]
-    return [bpm] + ([bpm / 2] if bpm > 185 else [])
+    return [bpm] + ([bpm / 2] if bpm > 185 and mode != "gas" and not sure else [])   # sure: BPM já corrigido (uptempo de verdade)
 
 
-def _fit(bpm: float, mode: str, cad: int) -> float | None:
+def _fit(bpm: float, mode: str, cad: int, sure: bool = False) -> float | None:
     """0 = no alvo; None = não serve."""
     m = MODES[mode]
     if "cad_lo" in m:
         lo, hi = cad + m["cad_lo"], cad + m["cad_hi"]
-        ok = [abs(b - (lo + hi) / 2) / hi * 0.5 for b in _cands(bpm, mode, cad) if lo <= b <= hi]
+        ok = [abs(b - (lo + hi) / 2) / hi * 0.5 for b in _cands(bpm, mode, cad, sure) if lo <= b <= hi]
         return min(ok) if ok else None
     if "cad" in m:
         target = cad + m["cad"]
-        best = min(abs(b - target) / target for b in _cands(bpm, mode, cad))
+        best = min(abs(b - target) / target for b in _cands(bpm, mode, cad, sure))
         return best if best <= TOL else None
     mid = (m["lo"] + m["hi"]) / 2
-    ok = [abs(b - mid) / mid * 0.5 for b in _cands(bpm, mode, cad) if m["lo"] <= b <= m["hi"]]
+    ok = [abs(b - mid) / mid * 0.5 for b in _cands(bpm, mode, cad, sure) if m["lo"] <= b <= m["hi"]]
     return min(ok) if ok else None
 
 
-def _eff_bpm(bpm: float, mode: str, cad: int) -> float:
+def _eff_bpm(bpm: float, mode: str, cad: int, sure: bool = False) -> float:
     m = MODES[mode]
     target = (cad + m["cad"] if "cad" in m else cad + (m["cad_lo"] + m["cad_hi"]) / 2 if "cad_lo" in m
               else (m["lo"] + m["hi"]) / 2)
-    return min(_cands(bpm, mode, cad), key=lambda b: abs(b - target))
+    return min(_cands(bpm, mode, cad, sure), key=lambda b: abs(b - target))
 
 
-RULES_V = 4   # muda quando as faixas mudam: a tela refaz as playlists sozinha (4: playlists por estilo)
+RULES_V = 5   # muda quando as faixas mudam: a tela refaz as playlists sozinha (5: estilos mais finos e BPM de meio tempo)
 
 
 def _range_txt(m: dict, cad: int) -> str:
@@ -645,7 +741,8 @@ def pick(mode: str, cad: int, lib: dict | None = None, n: int = MAX_PER_LIST, fa
             if mix == "so_minhas" or r.get("genre") not in genres:   # estilo desmarcado: sai
                 continue
             r = {**r, "aff": DISC_AFF.get(mix, 0.25)}
-        f = _fit(r["bpm"], mode, cad)
+        sure = bool(r.get("bpm_src"))
+        f = _fit(r["bpm"], mode, cad, sure)
         if f is None:
             continue
         if tid in blocked:
@@ -660,7 +757,7 @@ def pick(mode: str, cad: int, lib: dict | None = None, n: int = MAX_PER_LIST, fa
         score = r.get("aff", 1) * 1.0 - f * 6 + ((energy or 0.6) - 0.6) * (2 if mode in ("gas", "tiros", "musculacao") else -2 if mode == "calma" else 0)
         if tid in lift:                       # música com que você rende mais: sobe (até +1,5)
             score += min(1.5, lift[tid]["gain"] * 25)
-        rows.append({"id": tid, **r, "eff": round(_eff_bpm(r["bpm"], mode, cad)), "score": round(score, 3)})
+        rows.append({"id": tid, **r, "eff": round(_eff_bpm(r["bpm"], mode, cad, sure)), "score": round(score, 3)})
     order = MODES[mode]["order"]
     rows.sort(key=lambda x: -x["score"])
     rows = rows[:n]
@@ -735,17 +832,25 @@ def build_playlists(cad: int, budget_s: float = 14.0) -> dict:
     for mode, m in MODES.items():
         for st in styles_for(mode, cad, lib):
             key = f"{mode}|{st['fam']}"
-            old = sty.get(key) or ({"id": (s.get("style_ids") or {}).get(key)} if (s.get("style_ids") or {}).get(key) else {})
+            ids = s.get("style_ids") or {}
+            legacy = next((f"{mode}|{o}" for o, n in LEGACY_FAM.items() if n == st["fam"] and ids.get(f"{mode}|{o}")), None)
+            old = sty.get(key) or ({"id": ids.get(key)} if ids.get(key) else {"id": ids.get(legacy), "rename": True} if legacy else {})
             if time.monotonic() - t0 > budget_s:
                 done = False
                 if old.get("id"):
                     styles_out[key] = old
                 continue
             rows = pick(mode, cad, lib, fam=st["fam"])
-            pid = _fill(old.get("id"), f"HAX · {m['label']} · {st['label']}",
-                        f"Feita pelo app HAX: {m['desc']}, só {st['label'].lower()} · {_range_txt(m, cad)}.", rows)
+            name = f"HAX · {m['label']} · {st['label']}"
+            desc = f"Feita pelo app HAX: {m['desc']}, só {st['label'].lower()} · {_range_txt(m, cad)}."
+            if old.get("id") and (old.get("rename") or (old.get("name") and old["name"] != name)):
+                try:
+                    call("PUT", f"/playlists/{old['id']}", {"name": name, "description": desc})
+                except MusicError:
+                    pass
+            pid = _fill(old.get("id"), name, desc, rows)
             if pid:
-                styles_out[key] = {"id": pid, "n": len(rows), "fam": st["fam"], "mode": mode,
+                styles_out[key] = {"id": pid, "n": len(rows), "fam": st["fam"], "mode": mode, "name": name,
                                    "url": f"https://open.spotify.com/playlist/{pid}"}
     # estilo que perdeu músicas continua guardado (a playlist não é apagada no Spotify), só sai da lista do app
     s["playlists"] = {k: v for k, v in out.items() if v.get("id")}
