@@ -44,7 +44,8 @@ def test_regenerate_then_resend_cleans_old_workouts(tmp_path, monkeypatch):
         second = c.post("/api/schedule/push-week", json={"only_outdated": True}).json()
         ents = c.get("/api/schedule").json()["entries"] + c.get("/api/schedule", params={"date": (t0 + timedelta(days=7)).isoformat()}).json()["entries"]
         pend = [e for e in ents if e["status"] == "planejado" and e["date"] in win]
-        assert pend and len(second) == len(pend)
+        # treino que ficou igual na planilha nova continua o mesmo no relógio (não é reenviado); os outros vão de novo
+        assert pend and 0 < len(second) <= len(pend)
         # sem duplicados e sem treino da planilha antiga (nem na semana seguinte): só o novo no relógio
         assert sorted(on_watch) == sorted(e["garmin_workout_id"] for e in pend)
     auth.reset_cache()

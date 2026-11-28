@@ -162,7 +162,13 @@ def derive(p: dict) -> dict:
                                     "antes; acima de 250 com cetona (ou 300 com sintomas), não treine forte. Leve 15 g de "
                                     "carboidrato rápido; a hipoglicemia pode vir até 12–24 h depois.")
     # ---- obesidade e GLP-1
-    if b and b >= 30:
+    # IMC 30–33 com 3+ anos de musculação costuma ser músculo, não gordura: as regras de sobrepeso (corre-caminha,
+    # sem saltos) não se aplicam. Acima disso, ou com pouco tempo de treino, valem.
+    muscular = bool(b and 30 <= b < 33 and float((p or {}).get("training_months") or 0) >= 36)
+    if muscular:
+        out["notes"].append(f"IMC {b:g} com {int(float(p.get('training_months')) // 12)} anos de musculação: o app considera "
+                            "que é massa muscular (as regras de sobrepeso, como corre-caminha e sem saltos, ficam de fora).")
+    if b and b >= 30 and not muscular:
         out["no_jumps"] = True
         out["avoid"] |= {"Burpee_Broad_Jump", "Burpee", "Mountain_Climbers"}
         out["machines_first"] = True

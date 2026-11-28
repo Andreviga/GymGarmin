@@ -251,8 +251,13 @@ def _scale_repeats(steps: list[dict], frac: float) -> None:
             st["n"] = n
 
 
-def adjust_entry(entry: dict, action: str, anchors: dict | None = None, force: bool = False) -> dict | None:
-    """Ajusta um treino da agenda conforme a prontidão. Retorna o treino alterado (ou None se nada muda)."""
+def adjust_entry(entry: dict, action: str, anchors: dict | None = None, force: bool = False,
+                 protect: set[str] | None = None) -> dict | None:
+    """Ajusta um treino da agenda conforme a prontidão. Retorna o treino alterado (ou None se nada muda).
+
+    protect: músculos que já perderam um treino nesta semana (falta). Neles as séries ficam; só o esforço baixa
+    (RPE até 7), para a falta e o dia ruim não se somarem e o músculo ficar com metade da semana."""
+    from . import catalog
     from . import endurance as en
 
     if action == "seguir" or entry.get("status") not in ("planejado", None):
@@ -272,6 +277,7 @@ def adjust_entry(entry: dict, action: str, anchors: dict | None = None, force: b
     notes = []
     changed = False
     new_items = []
+    kept: list[str] = []
     for it in e["items"]:
         end = it.get("endurance")
         if end:
@@ -300,7 +306,12 @@ def adjust_entry(entry: dict, action: str, anchors: dict | None = None, force: b
         elif it.get("sets") and (it.get("phase") or "principal") == "principal" and action in ("moderar", "trocar", "descanso"):
             sets = int(it["sets"])
             cut = 1 if action == "moderar" else max(1, round(sets * 0.4))
-            if it.get("role") in ("main", "sec") or action != "moderar":
+            prim = set((catalog.get(it.get("exercise_id")) or {}).get("primaryMuscles") or it.get("pm") or [])
+            if protect and prim & protect:
+                it["rpe_target"] = min(7, it.get("rpe_target") or 7)   # séries mantidas: já faltou um treino desse músculo
+                kept.append(it.get("exercise_id"))
+                changed = True
+            elif it.get("role") in ("main", "sec") or action != "moderar":
                 it["sets"] = max(1, sets - cut)
                 if action != "moderar":
                     it["rpe_target"] = min(7, it.get("rpe_target") or 7)
@@ -308,6 +319,9 @@ def adjust_entry(entry: dict, action: str, anchors: dict | None = None, force: b
         new_items.append(it)
     if any(i.get("sets") and (i.get("phase") or "principal") == "principal" for i in e["items"] if not i.get("endurance")):
         notes.append("musculação: " + ("−1 série nos principais" if action == "moderar" else "−40% das séries, RPE até 7"))
+        if kept:
+            notes.append(f"{len(kept)} {'exercício manteve' if len(kept) == 1 else 'exercícios mantiveram'} as séries (só RPE até 7): "
+                         "esses músculos já perderam um treino nesta semana")
     if not changed:
         return None
     e["items"] = new_items

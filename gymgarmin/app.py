@@ -3139,11 +3139,25 @@ def _refresh_readiness(day: date, auto_apply: bool = False) -> dict | None:
     return view
 
 
+def _missed_muscles(day: date) -> set[str]:
+    """Músculos principais dos treinos de força pulados/perdidos nesta semana antes do dia (a prontidão não corta em
+    cima da falta)."""
+    ws = schedule.week_start(day)
+    out: set[str] = set()
+    for e in db.list_schedule(ws.isoformat(), (day - timedelta(days=1)).isoformat()):
+        if e.get("status") in ("pulado", "perdido") and e.get("kind") == "forca":
+            for it in e.get("items") or []:
+                if (it.get("phase") or "principal") == "principal" and not it.get("endurance"):
+                    out |= set((catalog.get(it.get("exercise_id")) or {}).get("primaryMuscles") or [])
+    return out
+
+
 def _apply_readiness(day: date, action: str, force: bool = False) -> list[dict]:
     anchors = sports.anchors_of(_profile())
     out = []
+    protect = _missed_muscles(day)
     for e in db.list_schedule(day.isoformat(), day.isoformat()):
-        new = readiness.adjust_entry(e, action, anchors, force=force)
+        new = readiness.adjust_entry(e, action, anchors, force=force, protect=protect)
         if new:
             out.append(db.save_entry(new))
     return out

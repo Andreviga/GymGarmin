@@ -1996,7 +1996,12 @@ async function viewTreinar(planId, idx) {
       ${agenda.length ? `<h2 class="sec-title">Da sua agenda</h2><div class="picks">${agenda.slice(0, 7).map((e) => row(`#treinar/agenda/${e.id}`, `${dayLabel(e.date, sch)} · ${dayTitle(shortName(e))}`,
         `${e.time ? `~${Math.round(e.time.total)} min · ` : ""}${dayKind(e)}`, e.date === sch.today)).join("")}</div>` : ""}
       ${(() => {
-        const list = plans.map((p) => `<h2 class="sec-title">${esc(p.name)}</h2><div class="picks">${p.days.map((d, i) => row(`#treinar/${p.id}/${i}`, dayTitle(d.name), (() => { const n = (d.items || []).filter((x) => (x.phase || "principal") === "principal").length; return n ? `${n} exercícios + aquecimento e alongamento` : "da planilha"; })())).join("")}</div>`).join("");
+        // corrida/bike da planilha é só o lugar na semana: a sessão de verdade sai da agenda (muda toda semana)
+        const slotName = (d) => { const sl = d.endurance_slot; if (!sl) return dayTitle(d.name);
+          const wd = String(d.name).split(/\s+[–—-]\s+/)[0]; return `${wd} · ${SPORT_WORD[sl.sport] ? SPORT_WORD[sl.sport][0].toUpperCase() + SPORT_WORD[sl.sport].slice(1) : "Cardio"}${sl.role === "longo" ? " longa" : sl.role === "qualidade" ? " forte" : " leve"}`; };
+        const list = plans.map((p) => `<h2 class="sec-title">${esc(p.name)}</h2><div class="picks">${p.days.map((d, i) => d.endurance_slot
+          ? row("#hoje", slotName(d), "o tipo muda a cada semana: veja na agenda")
+          : row(`#treinar/${p.id}/${i}`, dayTitle(d.name), (() => { const n = (d.items || []).filter((x) => (x.phase || "principal") === "principal").length; return n ? `${n} exercícios + aquecimento e alongamento` : "da planilha"; })())).join("")}</div>`).join("");
         if (!list) return agenda.length ? "" : `<p class="muted">Sem planilhas ativas.</p>`;
         return agenda.length ? `<details class="plan-all"><summary class="text-link">Ver plano completo</summary>${list}</details>` : list;
       })()}
